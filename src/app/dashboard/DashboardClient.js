@@ -88,11 +88,11 @@ function buildChartData(articles) {
   return { mentionTrend, sentimentTrend, sourceBreakdown };
 }
 
-export default function DashboardClient({ articles, districts }) {
+export default function DashboardClient({ articles, districts, userDistrictId }) {
   const [search, setSearch] = useState('');
   const [sourceFilter, setSourceFilter] = useState('All');
   const [tagFilter, setTagFilter] = useState('All');
-  const [districtFilter, setDistrictFilter] = useState('All');
+  const [districtFilter, setDistrictFilter] = useState(userDistrictId ?? 'All');
   const [noteModal, setNoteModal] = useState(null);
   const [sidebarOpen, setSidebarOpen] = useState(false);
 
@@ -183,20 +183,22 @@ export default function DashboardClient({ articles, districts }) {
               <span className="sidebar-link-badge">{notesCount}</span>
             </a>
           </div>
-          <div className="sidebar-section">
-            <div className="sidebar-section-label">Districts</div>
-            {districts.map((d) => (
-              <button
-                key={d.id}
-                onClick={() => setDistrictFilter(d.id === districtFilter ? 'All' : d.id)}
-                className={`sidebar-link ${districtFilter === d.id ? 'active' : ''}`}
-                style={{ width: '100%', background: 'none', border: 'none', textAlign: 'left', cursor: 'pointer' }}
-              >
-                <span className="sidebar-link-icon">🏫</span>
-                {d.name}
-              </button>
-            ))}
-          </div>
+          {!userDistrictId && (
+            <div className="sidebar-section">
+              <div className="sidebar-section-label">Districts</div>
+              {districts.map((d) => (
+                <button
+                  key={d.id}
+                  onClick={() => setDistrictFilter(d.id === districtFilter ? 'All' : d.id)}
+                  className={`sidebar-link ${districtFilter === d.id ? 'active' : ''}`}
+                  style={{ width: '100%', background: 'none', border: 'none', textAlign: 'left', cursor: 'pointer' }}
+                >
+                  <span className="sidebar-link-icon">🏫</span>
+                  {d.name}
+                </button>
+              ))}
+            </div>
+          )}
           <div className="sidebar-section">
             <div className="sidebar-section-label">Account</div>
             <a href="#" className="sidebar-link">
