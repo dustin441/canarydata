@@ -64,7 +64,7 @@ function InfoTooltip({ text }) {
       }}>i</span>
       <span style={{
         visibility: 'hidden', opacity: 0, position: 'absolute',
-        bottom: 'calc(100% + 10px)', right: '-10px',
+        top: 'calc(100% + 10px)', right: '-10px',
         background: '#1A2332', border: '1px solid var(--border-secondary)',
         borderRadius: '8px', padding: '12px 16px',
         fontSize: '0.78rem', color: 'var(--text-secondary)', lineHeight: 1.5,
