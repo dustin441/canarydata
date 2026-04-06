@@ -3,6 +3,7 @@
 import { useState } from 'react';
 import { createClient } from '@/lib/supabase/client';
 import { useRouter } from 'next/navigation';
+import Link from 'next/link';
 
 export default function Login() {
   const router = useRouter();
@@ -100,12 +101,19 @@ export default function Login() {
           style={{
             textAlign: 'center',
             marginTop: '24px',
-            fontSize: '0.78rem',
-            color: 'var(--text-tertiary)',
+            fontSize: '0.85rem',
+            color: 'var(--text-secondary)',
           }}
         >
-          Need access?{' '}
-          <a href="mailto:dustin@eic.agency">Contact your administrator</a>
+          Don't have an account?{' '}
+          <Link href="/signup" style={{ color: 'var(--brand-primary)', textDecoration: 'none', fontWeight: '500' }}>
+            Sign up
+          </Link>
+          <br />
+          <br />
+          <span style={{ fontSize: '0.78rem', color: 'var(--text-tertiary)' }}>
+            Need enterprise access? <a href="mailto:dustin@eic.agency" style={{ color: 'inherit' }}>Contact your administrator</a>
+          </span>
         </p>
       </div>
     </div>

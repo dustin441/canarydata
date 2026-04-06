@@ -95,6 +95,43 @@ function formatDistrictName(id) {
     .join(' ');
 }
 
+function ScoreGauge({ score }) {
+  const nScore = score === '—' ? 0 : parseFloat(score);
+  
+  // Decide color based on score
+  let color = '#EF4444'; // Red (0-3)
+  if (nScore >= 3) color = '#F5C518'; // Yellow (3-7)
+  if (nScore >= 7) color = '#22C55E'; // Green (7-10)
+
+  // Math for SVG arc (strokeDasharray for a semicircle of r=80 is pi * 80 ~= 251.2)
+  const dashArray = 251.2;
+  const dashOffset = dashArray - (dashArray * (nScore / 10));
+
+  return (
+    <div style={{ position: 'relative', width: '100%', height: '100%', display: 'flex', flexDirection: 'column', alignItems: 'center', justifyContent: 'center', paddingTop: '20px' }}>
+      <svg width="200" height="105" viewBox="0 0 200 105" style={{ overflow: 'visible' }}>
+        {/* Background track */}
+        <path d="M 20 100 A 80 80 0 0 1 180 100" fill="none" stroke="#1E2D40" strokeWidth="20" strokeLinecap="round" />
+        {/* Progress track */}
+        <path 
+           d="M 20 100 A 80 80 0 0 1 180 100" 
+           fill="none" 
+           stroke={color} 
+           strokeWidth="20" 
+           strokeLinecap="round"
+           strokeDasharray={dashArray} 
+           strokeDashoffset={dashOffset} 
+           style={{ transition: 'stroke-dashoffset 1s ease-out, stroke 1s ease' }}
+        />
+      </svg>
+      <div style={{ position: 'absolute', bottom: '-10px', textAlign: 'center' }}>
+        <div style={{ fontSize: '2.5rem', fontWeight: '800', color: 'var(--text-primary)', lineHeight: 1 }}>{score}</div>
+        <div style={{ fontSize: '0.8rem', color: 'var(--text-tertiary)', textTransform: 'uppercase', letterSpacing: '0.05em', marginTop: '6px' }}>Health Score</div>
+      </div>
+    </div>
+  );
+}
+
 function buildChartData(articles) {
   // Group by week for trend charts
   const byWeek = {};
@@ -376,6 +413,116 @@ function QueriesView({ initialQueries, districts, userDistrictId }) {
   );
 }
 
+function NotesView({ articles, getNoteText, openNoteModal }) {
+  const noted = articles.filter((a) => getNoteText(a));
+
+  if (noted.length === 0) {
+    return (
+      <div className="data-section">
+        <div className="data-header"><h3>📝 Analyst Notes</h3></div>
+        <div className="empty-state">
+          <div className="empty-state-icon">📝</div>
+          <h3>No notes yet</h3>
+          <p>Add notes to articles from the Dashboard view.</p>
+        </div>
+      </div>
+    );
+  }
+
+  return (
+    <div className="data-section">
+      <div className="data-header">
+        <h3>📝 Analyst Notes <span style={{ color: 'var(--text-tertiary)', fontSize: '0.85rem', fontWeight: 400 }}>({noted.length})</span></h3>
+      </div>
+      <div className="data-table-wrapper">
+        <table className="data-table">
+          <thead>
+            <tr>
+              <th>Date</th>
+              <th>Headline</th>
+              <th>Note</th>
+              <th>Action</th>
+            </tr>
+          </thead>
+          <tbody>
+            {noted.map((a) => (
+              <tr key={a.id}>
+                <td style={{ whiteSpace: 'nowrap', color: 'var(--text-secondary)', fontSize: '0.82rem' }}>{formatDate(a.date)}</td>
+                <td style={{ fontWeight: 500, color: 'var(--text-primary)' }}>
+                  {a.link
+                    ? <a href={a.link} target="_blank" rel="noopener noreferrer" style={{ color: 'inherit', textDecoration: 'none' }}>{a.headline}</a>
+                    : a.headline}
+                </td>
+                <td style={{ color: 'var(--text-secondary)', fontSize: '0.85rem', maxWidth: '400px' }}>{getNoteText(a)}</td>
+                <td>
+                  <button className="btn btn-secondary btn-sm" onClick={() => openNoteModal(a)}>Edit</button>
+                </td>
+              </tr>
+            ))}
+          </tbody>
+        </table>
+      </div>
+    </div>
+  );
+}
+
+function SettingsView() {
+  const handleLogout = async () => {
+    try {
+      const { createClient } = await import('@/lib/supabase/client');
+      const supabase = createClient();
+      await supabase.auth.signOut();
+      window.location.href = '/login';
+    } catch {}
+  };
+
+  return (
+    <div className="data-section">
+      <div className="data-header">
+        <h3>⚙️ Settings</h3>
+      </div>
+      <div style={{ background: 'var(--bg-elevated)', border: '1px solid var(--border-secondary)', borderRadius: 'var(--radius-lg)', padding: '32px', maxWidth: '800px', marginBottom: '24px' }}>
+        <h4 style={{ color: 'var(--text-primary)', marginBottom: '16px', fontSize: '1.2rem' }}>Profile Information</h4>
+        <div style={{ display: 'grid', gap: '20px', marginBottom: '32px', maxWidth: '400px' }}>
+          <div className="form-group" style={{ marginBottom: 0 }}>
+            <label className="form-label" style={{ color: 'var(--text-secondary)', fontSize: '0.85rem', marginBottom: '8px', display: 'block' }}>Full Name</label>
+            <input type="text" className="form-input" disabled defaultValue="Canary Admin" />
+          </div>
+          <div className="form-group" style={{ marginBottom: 0 }}>
+            <label className="form-label" style={{ color: 'var(--text-secondary)', fontSize: '0.85rem', marginBottom: '8px', display: 'block' }}>Email Address</label>
+            <input type="text" className="form-input" disabled defaultValue="admin@canary.data" />
+          </div>
+        </div>
+
+        <h4 style={{ color: 'var(--text-primary)', marginBottom: '16px', marginTop: '32px', fontSize: '1.2rem', paddingTop: '32px', borderTop: '1px solid var(--border-secondary)' }}>Notification Preferences</h4>
+        <div style={{ display: 'grid', gap: '16px' }}>
+          <label style={{ display: 'flex', alignItems: 'center', gap: '12px', color: 'var(--text-primary)', fontSize: '0.95rem', cursor: 'pointer' }}>
+            <input type="checkbox" defaultChecked style={{ width: '18px', height: '18px', accentColor: 'var(--brand-primary)' }} />
+            Daily digest emails
+          </label>
+          <label style={{ display: 'flex', alignItems: 'center', gap: '12px', color: 'var(--text-primary)', fontSize: '0.95rem', cursor: 'pointer' }}>
+            <input type="checkbox" defaultChecked style={{ width: '18px', height: '18px', accentColor: 'var(--brand-primary)' }} />
+            Alerts for negative sentiment drops
+          </label>
+          <label style={{ display: 'flex', alignItems: 'center', gap: '12px', color: 'var(--text-primary)', fontSize: '0.95rem', cursor: 'pointer' }}>
+            <input type="checkbox" style={{ width: '18px', height: '18px', accentColor: 'var(--brand-primary)' }} />
+            Weekly reporting summaries
+          </label>
+        </div>
+
+        <div style={{ marginTop: '48px', paddingTop: '24px', borderTop: '1px solid var(--border-secondary)', display: 'flex', justifyContent: 'space-between', alignItems: 'center' }}>
+          <div style={{ color: 'var(--text-secondary)', fontSize: '0.85rem' }}>
+            Need help? Contact support.
+          </div>
+          <button onClick={handleLogout} className="btn btn-danger">
+            Sign Out
+          </button>
+        </div>
+      </div>
+    </div>
+  );
+}
+
 export default function DashboardClient({ articles, districts, queries: initialQueries, userDistrictId }) {
   const [currentView, setCurrentView] = useState('dashboard');
   const [search, setSearch] = useState('');
@@ -562,8 +709,8 @@ export default function DashboardClient({ articles, districts, queries: initialQ
               <span className="sidebar-link-badge">{initialQueries.length}</span>
             </button>
             <button
-              className="sidebar-link"
-              onClick={() => setCurrentView('dashboard')}
+              className={`sidebar-link ${currentView === 'notes' ? 'active' : ''}`}
+              onClick={() => setCurrentView('notes')}
               style={{ width: '100%', background: 'none', border: 'none', textAlign: 'left', cursor: 'pointer' }}
             >
               <span className="sidebar-link-icon">📝</span>
@@ -589,10 +736,14 @@ export default function DashboardClient({ articles, districts, queries: initialQ
           )}
           <div className="sidebar-section">
             <div className="sidebar-section-label">Account</div>
-            <a href="#" className="sidebar-link">
+            <button
+              className={`sidebar-link ${currentView === 'settings' ? 'active' : ''}`}
+              onClick={() => setCurrentView('settings')}
+              style={{ width: '100%', background: 'none', border: 'none', textAlign: 'left', cursor: 'pointer' }}
+            >
               <span className="sidebar-link-icon">⚙️</span>
               Settings
-            </a>
+            </button>
           </div>
         </nav>
 
@@ -621,12 +772,19 @@ export default function DashboardClient({ articles, districts, queries: initialQ
               <div className="topbar-title">
                 {currentView === 'queries'
                   ? 'Search Queries'
-                  : districtFilter === 'All'
-                    ? 'All Districts'
-                    : formatDistrictName(districtFilter)}
+                  : currentView === 'settings'
+                    ? 'Settings'
+                    : currentView === 'notes'
+                      ? 'Analyst Notes'
+                      : districtFilter === 'All'
+                        ? 'All Districts'
+                        : formatDistrictName(districtFilter)}
               </div>
               <div className="topbar-breadcrumb">
-                {currentView === 'queries' ? 'Manage monitored search terms' : 'Media Intelligence Dashboard'}
+                {currentView === 'queries' ? 'Manage monitored search terms'
+                  : currentView === 'settings' ? 'Manage your account and preferences'
+                  : currentView === 'notes' ? 'Articles with analyst annotations'
+                  : 'Media Intelligence Dashboard'}
               </div>
             </div>
           </div>
@@ -636,11 +794,19 @@ export default function DashboardClient({ articles, districts, queries: initialQ
         </header>
 
         <main className="page-content">
+          {currentView === 'settings' && <SettingsView />}
           {currentView === 'queries' && (
             <QueriesView
               initialQueries={initialQueries}
               districts={districts}
               userDistrictId={userDistrictId}
+            />
+          )}
+          {currentView === 'notes' && (
+            <NotesView
+              articles={articles}
+              getNoteText={getNoteText}
+              openNoteModal={openNoteModal}
             />
           )}
           {currentView === 'dashboard' && (<>
@@ -746,6 +912,13 @@ export default function DashboardClient({ articles, districts, queries: initialQ
                   <Line type="monotone" dataKey="score" stroke="#22C55E" strokeWidth={2} dot={{ fill: '#22C55E', r: 3, strokeWidth: 0 }} />
                 </LineChart>
               </ResponsiveContainer>
+            </div>
+
+            <div className="chart-card">
+              <h4>Overall Health <span>Current score</span></h4>
+              <div style={{ width: '100%', height: '200px', display: 'flex' }}>
+                <ScoreGauge score={avgScore} />
+              </div>
             </div>
           </div>
 
