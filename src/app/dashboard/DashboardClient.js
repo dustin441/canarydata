@@ -1,7 +1,7 @@
 'use client';
 
 import { useState, useMemo, useEffect, useRef, useTransition } from 'react';
-import { setEarnedMedia } from '@/app/actions';
+import { setEarnedMedia, saveNote } from '@/app/actions';
 
 const ALL_COLUMNS = [
   { id: 'date',               label: 'Date',               required: true  },
@@ -148,6 +148,32 @@ export default function DashboardClient({ articles, districts, userDistrictId })
   }
 
   const col = (id) => visibleColumns.has(id);
+
+  // Note editing
+  const [noteText, setNoteText] = useState('');
+  const [noteSaving, setNoteSaving] = useState(false);
+  const [noteOverrides, setNoteOverrides] = useState({});
+
+  function openNoteModal(article) {
+    setNoteText(noteOverrides[article.id] ?? article.notes ?? '');
+    setNoteModal(article);
+  }
+
+  async function handleSaveNote() {
+    if (!noteModal) return;
+    setNoteSaving(true);
+    try {
+      await saveNote(noteModal.id, noteText);
+      setNoteOverrides((prev) => ({ ...prev, [noteModal.id]: noteText || null }));
+      setNoteModal(null);
+    } finally {
+      setNoteSaving(false);
+    }
+  }
+
+  function getNoteText(article) {
+    return article.id in noteOverrides ? noteOverrides[article.id] : article.notes;
+  }
 
   // Optimistic earned media state — tracks checkbox changes before DB confirms
   const [earnedOverrides, setEarnedOverrides] = useState({});
@@ -632,10 +658,10 @@ export default function DashboardClient({ articles, districts, userDistrictId })
                       {col('notes') && (
                         <td>
                           <button
-                            className={`note-indicator ${article.notes ? 'has-note' : ''}`}
-                            onClick={() => setNoteModal(article)}
+                            className={`note-indicator ${getNoteText(article) ? 'has-note' : ''}`}
+                            onClick={() => openNoteModal(article)}
                           >
-                            📝 {article.notes ? 'View' : 'Add'}
+                            📝 {getNoteText(article) ? 'Edit' : 'Add'}
                           </button>
                         </td>
                       )}
@@ -657,21 +683,49 @@ export default function DashboardClient({ articles, districts, userDistrictId })
       {/* Note Modal */}
       {noteModal && (
         <div className="modal-overlay" onClick={() => setNoteModal(null)}>
-          <div className="modal" onClick={(e) => e.stopPropagation()}>
-            <h3>📝 Note</h3>
-            <p style={{ color: 'var(--canary-yellow)', fontWeight: 600, fontSize: '0.85rem', marginBottom: '8px' }}>
+          <div className="modal" onClick={(e) => e.stopPropagation()} style={{ maxWidth: '520px' }}>
+            <h3>📝 {getNoteText(noteModal) ? 'Edit Note' : 'Add Note'}</h3>
+            <p style={{
+              color: 'var(--canary-yellow)', fontWeight: 600,
+              fontSize: '0.85rem', marginBottom: '16px', lineHeight: 1.4,
+            }}>
               {noteModal.headline}
             </p>
-            {noteModal.notes ? (
-              <p>{noteModal.notes}</p>
-            ) : (
-              <p style={{ color: 'var(--text-tertiary)', fontStyle: 'italic' }}>
-                No note added for this article yet.
-              </p>
-            )}
-            <div className="modal-actions">
-              <button className="btn btn-secondary btn-sm" onClick={() => setNoteModal(null)}>
-                Close
+
+            <textarea
+              className="form-textarea"
+              placeholder="Add your note here — context, follow-up actions, key observations..."
+              value={noteText}
+              onChange={(e) => setNoteText(e.target.value)}
+              rows={5}
+              autoFocus
+            />
+
+            <div className="modal-actions" style={{ marginTop: '16px' }}>
+              {getNoteText(noteModal) && (
+                <button
+                  className="btn btn-danger btn-sm"
+                  onClick={() => setNoteText('')}
+                  disabled={noteSaving}
+                  style={{ marginRight: 'auto' }}
+                >
+                  Clear
+                </button>
+              )}
+              <button
+                className="btn btn-secondary btn-sm"
+                onClick={() => setNoteModal(null)}
+                disabled={noteSaving}
+              >
+                Cancel
+              </button>
+              <button
+                className="btn btn-primary btn-sm"
+                onClick={handleSaveNote}
+                disabled={noteSaving}
+                style={{ width: 'auto', minWidth: '80px' }}
+              >
+                {noteSaving ? <span className="spinner" style={{ margin: '0 auto' }} /> : 'Save'}
               </button>
             </div>
           </div>

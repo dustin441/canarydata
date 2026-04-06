@@ -10,3 +10,12 @@ export async function setEarnedMedia(id, value) {
     .eq('id', id);
   if (error) throw error;
 }
+
+export async function saveNote(id, notes) {
+  const supabase = createAdminClient();
+  const { error } = await supabase
+    .from('news_stories')
+    .update({ notes: notes || null })
+    .eq('id', id);
+  if (error) throw error;
+}
