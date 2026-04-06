@@ -45,10 +45,42 @@ const SOURCE_COLORS = {
 
 function getScoreClass(score) {
   const n = parseFloat(score);
-  if (n >= 9.0) return 'high';
-  if (n >= 8.0) return 'medium';
+  if (n >= 7.0) return 'high';
+  if (n >= 3.0) return 'medium';
   return 'low';
 }
+
+function InfoTooltip({ text }) {
+  return (
+    <span style={{ position: 'relative', display: 'inline-flex', alignItems: 'center', marginLeft: '5px', verticalAlign: 'middle' }}
+      className="info-tooltip-wrap"
+    >
+      <span style={{
+        display: 'inline-flex', alignItems: 'center', justifyContent: 'center',
+        width: '15px', height: '15px', borderRadius: '50%',
+        background: 'var(--bg-elevated)', border: '1px solid var(--border-secondary)',
+        color: 'var(--text-tertiary)', fontSize: '10px', fontWeight: 700,
+        cursor: 'default', lineHeight: 1, userSelect: 'none',
+      }}>i</span>
+      <span style={{
+        visibility: 'hidden', opacity: 0, position: 'absolute',
+        bottom: 'calc(100% + 8px)', left: '50%', transform: 'translateX(-50%)',
+        background: '#1A2332', border: '1px solid var(--border-secondary)',
+        borderRadius: '8px', padding: '10px 14px',
+        fontSize: '0.78rem', color: 'var(--text-secondary)', lineHeight: 1.5,
+        width: '260px', whiteSpace: 'normal', zIndex: 300,
+        boxShadow: 'var(--shadow-lg)',
+        transition: 'opacity 0.15s',
+        pointerEvents: 'none',
+      }} className="info-tooltip-box">
+        {text}
+      </span>
+      <style>{`.info-tooltip-wrap:hover .info-tooltip-box { visibility: visible !important; opacity: 1 !important; }`}</style>
+    </span>
+  );
+}
+
+const SCORE_TOOLTIP = 'Canary Score (1–10) measures how positive an article is about your district. 7–10 = positive coverage, 3–7 = neutral, 1–3 = negative or critical news.';
 
 function formatDate(dateStr) {
   return new Date(dateStr + 'T00:00:00').toLocaleDateString('en-US', {
@@ -625,7 +657,10 @@ export default function DashboardClient({ articles, districts, queries: initialQ
 
             <div className="kpi-card">
               <div className="kpi-header">
-                <div className="kpi-label">Avg Canary Score</div>
+                <div className="kpi-label">
+                  Avg Canary Score
+                  <InfoTooltip text={SCORE_TOOLTIP} />
+                </div>
                 <div className="kpi-icon green">📈</div>
               </div>
               <div className="kpi-value">{avgScore}</div>
@@ -787,7 +822,7 @@ export default function DashboardClient({ articles, districts, queries: initialQ
                     {col('link')              && <th>Link</th>}
                     {col('source')            && <th>Source</th>}
                     {col('tags')              && <th>Tags</th>}
-                    {col('score')             && <th>Score</th>}
+                    {col('score')             && <th>Score<InfoTooltip text={SCORE_TOOLTIP} /></th>}
                     {col('innovation_reason') && <th>Innovation</th>}
                     {col('recommendation')    && <th>Recommendation</th>}
                     {col('earned_media')      && <th>Earned Media</th>}
