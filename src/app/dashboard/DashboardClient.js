@@ -1,6 +1,7 @@
 'use client';
 
-import { useState, useMemo, useEffect, useRef } from 'react';
+import { useState, useMemo, useEffect, useRef, useTransition } from 'react';
+import { setEarnedMedia } from '@/app/actions';
 
 const ALL_COLUMNS = [
   { id: 'date',               label: 'Date',               required: true  },
@@ -12,6 +13,7 @@ const ALL_COLUMNS = [
   { id: 'score',              label: 'Score',              defaultOn: true },
   { id: 'innovation_reason',  label: 'Innovation Reason',  defaultOn: false },
   { id: 'recommendation',     label: 'Recommendation',     defaultOn: false },
+  { id: 'earned_media',       label: 'Earned Media',       defaultOn: true },
   { id: 'notes',              label: 'Notes',              defaultOn: true },
 ];
 
@@ -146,6 +148,28 @@ export default function DashboardClient({ articles, districts, userDistrictId })
   }
 
   const col = (id) => visibleColumns.has(id);
+
+  // Optimistic earned media state — tracks checkbox changes before DB confirms
+  const [earnedOverrides, setEarnedOverrides] = useState({});
+  const [, startTransition] = useTransition();
+
+  function handleEarnedMedia(article, checked) {
+    setEarnedOverrides((prev) => ({ ...prev, [article.id]: checked }));
+    startTransition(async () => {
+      try {
+        await setEarnedMedia(article.id, checked);
+      } catch {
+        // Revert on failure
+        setEarnedOverrides((prev) => ({ ...prev, [article.id]: !checked }));
+      }
+    });
+  }
+
+  function isEarned(article) {
+    return article.id in earnedOverrides
+      ? earnedOverrides[article.id]
+      : article.is_earned_media;
+  }
 
   const notesCount = articles.filter((a) => a.notes).length;
 
@@ -473,6 +497,7 @@ export default function DashboardClient({ articles, districts, userDistrictId })
                     {col('score')             && <th>Score</th>}
                     {col('innovation_reason') && <th>Innovation</th>}
                     {col('recommendation')    && <th>Recommendation</th>}
+                    {col('earned_media')      && <th>Earned Media</th>}
                     {col('notes')             && <th>Notes</th>}
                   </tr>
                 </thead>
@@ -581,6 +606,25 @@ export default function DashboardClient({ articles, districts, userDistrictId })
                               : <span style={{ color: 'var(--text-tertiary)', fontStyle: 'italic' }}>—</span>
                             }
                           </div>
+                        </td>
+                      )}
+
+                      {/* Earned Media */}
+                      {col('earned_media') && (
+                        <td style={{ textAlign: 'center' }}>
+                          <label style={{ display: 'inline-flex', alignItems: 'center', gap: '6px', cursor: 'pointer' }}>
+                            <input
+                              type="checkbox"
+                              checked={isEarned(article)}
+                              onChange={(e) => handleEarnedMedia(article, e.target.checked)}
+                              style={{ accentColor: 'var(--canary-yellow)', width: '16px', height: '16px', cursor: 'pointer' }}
+                            />
+                            {isEarned(article) && (
+                              <span style={{ fontSize: '0.7rem', fontWeight: 700, color: 'var(--canary-yellow)' }}>
+                                Earned
+                              </span>
+                            )}
+                          </label>
                         </td>
                       )}
 
