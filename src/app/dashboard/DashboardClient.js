@@ -1,6 +1,23 @@
 'use client';
 
-import { useState, useMemo } from 'react';
+import { useState, useMemo, useEffect, useRef } from 'react';
+
+const ALL_COLUMNS = [
+  { id: 'date',               label: 'Date',               required: true  },
+  { id: 'headline',           label: 'Headline',           required: true  },
+  { id: 'summary',            label: 'Summary',            defaultOn: true },
+  { id: 'link',               label: 'Link',               defaultOn: true },
+  { id: 'source',             label: 'Source',             defaultOn: true },
+  { id: 'tags',               label: 'Tags',               defaultOn: true },
+  { id: 'score',              label: 'Score',              defaultOn: true },
+  { id: 'innovation_reason',  label: 'Innovation Reason',  defaultOn: false },
+  { id: 'recommendation',     label: 'Recommendation',     defaultOn: false },
+  { id: 'notes',              label: 'Notes',              defaultOn: true },
+];
+
+const DEFAULT_VISIBLE = new Set(
+  ALL_COLUMNS.filter((c) => c.required || c.defaultOn).map((c) => c.id)
+);
 import {
   AreaChart, Area, LineChart, Line, PieChart, Pie, Cell,
   XAxis, YAxis, CartesianGrid, Tooltip, ResponsiveContainer, Legend,
@@ -95,6 +112,40 @@ export default function DashboardClient({ articles, districts, userDistrictId })
   const [districtFilter, setDistrictFilter] = useState(userDistrictId ?? 'All');
   const [noteModal, setNoteModal] = useState(null);
   const [sidebarOpen, setSidebarOpen] = useState(false);
+  const [visibleColumns, setVisibleColumns] = useState(DEFAULT_VISIBLE);
+  const [colMenuOpen, setColMenuOpen] = useState(false);
+  const colMenuRef = useRef(null);
+
+  // Load saved column prefs from localStorage
+  useEffect(() => {
+    try {
+      const saved = localStorage.getItem('canary_columns');
+      if (saved) setVisibleColumns(new Set(JSON.parse(saved)));
+    } catch {}
+  }, []);
+
+  // Close column menu on outside click
+  useEffect(() => {
+    function handleClick(e) {
+      if (colMenuRef.current && !colMenuRef.current.contains(e.target)) {
+        setColMenuOpen(false);
+      }
+    }
+    document.addEventListener('mousedown', handleClick);
+    return () => document.removeEventListener('mousedown', handleClick);
+  }, []);
+
+  function toggleColumn(id) {
+    setVisibleColumns((prev) => {
+      const next = new Set(prev);
+      if (next.has(id)) next.delete(id);
+      else next.add(id);
+      try { localStorage.setItem('canary_columns', JSON.stringify([...next])); } catch {}
+      return next;
+    });
+  }
+
+  const col = (id) => visibleColumns.has(id);
 
   const notesCount = articles.filter((a) => a.notes).length;
 
@@ -364,13 +415,48 @@ export default function DashboardClient({ articles, districts, userDistrictId })
                   {allTags.map((t) => <option key={t}>{t}</option>)}
                 </select>
                 {districtFilter !== 'All' && (
-                  <button
-                    className="btn btn-secondary btn-sm"
-                    onClick={() => setDistrictFilter('All')}
-                  >
+                  <button className="btn btn-secondary btn-sm" onClick={() => setDistrictFilter('All')}>
                     {formatDistrictName(districtFilter)} ✕
                   </button>
                 )}
+
+                {/* Column Manager */}
+                <div ref={colMenuRef} style={{ position: 'relative' }}>
+                  <button
+                    className="btn btn-secondary btn-sm"
+                    onClick={() => setColMenuOpen((o) => !o)}
+                  >
+                    ⊞ Columns
+                  </button>
+                  {colMenuOpen && (
+                    <div style={{
+                      position: 'absolute', right: 0, top: 'calc(100% + 6px)',
+                      background: 'var(--bg-card)', border: '1px solid var(--border-secondary)',
+                      borderRadius: 'var(--radius-lg)', padding: '12px 16px',
+                      zIndex: 200, minWidth: '190px', boxShadow: 'var(--shadow-lg)',
+                    }}>
+                      <div style={{ fontSize: '0.7rem', fontWeight: 700, textTransform: 'uppercase', letterSpacing: '0.08em', color: 'var(--text-tertiary)', marginBottom: '10px' }}>
+                        Visible Columns
+                      </div>
+                      {ALL_COLUMNS.map((c) => (
+                        <label key={c.id} style={{
+                          display: 'flex', alignItems: 'center', gap: '10px',
+                          padding: '6px 0', cursor: c.required ? 'default' : 'pointer',
+                          fontSize: '0.85rem', color: c.required ? 'var(--text-tertiary)' : 'var(--text-primary)',
+                        }}>
+                          <input
+                            type="checkbox"
+                            checked={visibleColumns.has(c.id)}
+                            disabled={c.required}
+                            onChange={() => toggleColumn(c.id)}
+                            style={{ accentColor: 'var(--canary-yellow)', width: '15px', height: '15px' }}
+                          />
+                          {c.label}
+                        </label>
+                      ))}
+                    </div>
+                  )}
+                </div>
               </div>
             </div>
 
@@ -380,11 +466,14 @@ export default function DashboardClient({ articles, districts, userDistrictId })
                   <tr>
                     <th>Date</th>
                     <th>Headline</th>
-                    <th>Summary</th>
-                    <th>Source</th>
-                    <th>Tags</th>
-                    <th>Score</th>
-                    <th>Notes</th>
+                    {col('summary')           && <th>Summary</th>}
+                    {col('link')              && <th>Link</th>}
+                    {col('source')            && <th>Source</th>}
+                    {col('tags')              && <th>Tags</th>}
+                    {col('score')             && <th>Score</th>}
+                    {col('innovation_reason') && <th>Innovation</th>}
+                    {col('recommendation')    && <th>Recommendation</th>}
+                    {col('notes')             && <th>Notes</th>}
                   </tr>
                 </thead>
                 <tbody>
@@ -400,64 +489,112 @@ export default function DashboardClient({ articles, districts, userDistrictId })
                     </tr>
                   ) : filtered.map((article) => (
                     <tr key={article.id}>
+                      {/* Date */}
                       <td style={{ whiteSpace: 'nowrap', color: 'var(--text-tertiary)', fontSize: '0.78rem' }}>
                         {formatDate(article.date)}
                       </td>
 
+                      {/* Headline */}
                       <td className="headline-cell">
-                        <a href={article.link} target="_blank" rel="noopener noreferrer" className="headline-text">
+                        <div className="headline-text" style={{ color: 'var(--text-primary)', fontWeight: 600 }}>
                           {article.headline}
-                        </a>
-                      </td>
-
-                      <td className="summary-cell">
-                        <div className="summary-text">{article.summary}</div>
-                      </td>
-
-                      <td>
-                        <span style={{
-                          padding: '3px 10px',
-                          borderRadius: 'var(--radius-full)',
-                          fontSize: '0.72rem',
-                          fontWeight: 600,
-                          background: SOURCE_COLORS[article.source_type] ? `${SOURCE_COLORS[article.source_type]}20` : 'var(--bg-elevated)',
-                          color: SOURCE_COLORS[article.source_type] ?? 'var(--text-secondary)',
-                        }}>
-                          {article.source_type ?? 'other'}
-                        </span>
-                      </td>
-
-                      <td>
-                        <div style={{ display: 'flex', gap: '4px', flexWrap: 'wrap', maxWidth: '160px' }}>
-                          {Array.isArray(article.tags) && article.tags.map((tag) => (
-                            <span key={tag} style={{
-                              padding: '2px 8px',
-                              borderRadius: 'var(--radius-full)',
-                              fontSize: '0.68rem',
-                              fontWeight: 600,
-                              background: 'var(--bg-elevated)',
-                              color: 'var(--text-secondary)',
-                            }}>
-                              {tag}
-                            </span>
-                          ))}
                         </div>
                       </td>
 
-                      <td>
-                        <span className={`score-badge ${getScoreClass(article.canary_score)}`}>
-                          {parseFloat(article.canary_score).toFixed(1)}
-                        </span>
-                      </td>
+                      {/* Summary */}
+                      {col('summary') && (
+                        <td className="summary-cell">
+                          <div className="summary-text">{article.summary}</div>
+                        </td>
+                      )}
 
-                      <td>
-                        <button
-                          className={`note-indicator ${article.notes ? 'has-note' : ''}`}
-                          onClick={() => setNoteModal(article)}
-                        >
-                          📝 {article.notes ? 'View' : 'Add'}
-                        </button>
-                      </td>
+                      {/* Link */}
+                      {col('link') && (
+                        <td style={{ whiteSpace: 'nowrap' }}>
+                          {article.link && (
+                            <a href={article.link} target="_blank" rel="noopener noreferrer"
+                              style={{ display: 'inline-flex', alignItems: 'center', gap: '4px', fontSize: '0.78rem', color: 'var(--blue-400)' }}>
+                              ↗ View Story
+                            </a>
+                          )}
+                        </td>
+                      )}
+
+                      {/* Source */}
+                      {col('source') && (
+                        <td>
+                          <span style={{
+                            padding: '3px 10px', borderRadius: 'var(--radius-full)',
+                            fontSize: '0.72rem', fontWeight: 600,
+                            background: SOURCE_COLORS[article.source_type] ? `${SOURCE_COLORS[article.source_type]}20` : 'var(--bg-elevated)',
+                            color: SOURCE_COLORS[article.source_type] ?? 'var(--text-secondary)',
+                          }}>
+                            {article.source_type ?? 'other'}
+                          </span>
+                        </td>
+                      )}
+
+                      {/* Tags */}
+                      {col('tags') && (
+                        <td>
+                          <div style={{ display: 'flex', gap: '4px', flexWrap: 'wrap', maxWidth: '160px' }}>
+                            {Array.isArray(article.tags) && article.tags.map((tag) => (
+                              <span key={tag} style={{
+                                padding: '2px 8px', borderRadius: 'var(--radius-full)',
+                                fontSize: '0.68rem', fontWeight: 600,
+                                background: 'var(--bg-elevated)', color: 'var(--text-secondary)',
+                              }}>
+                                {tag}
+                              </span>
+                            ))}
+                          </div>
+                        </td>
+                      )}
+
+                      {/* Score */}
+                      {col('score') && (
+                        <td>
+                          <span className={`score-badge ${getScoreClass(article.canary_score)}`}>
+                            {parseFloat(article.canary_score).toFixed(1)}
+                          </span>
+                        </td>
+                      )}
+
+                      {/* Innovation Reason */}
+                      {col('innovation_reason') && (
+                        <td className="summary-cell">
+                          <div className="summary-text">
+                            {article.innovation_reason && article.innovation_reason !== 'N/A'
+                              ? article.innovation_reason
+                              : <span style={{ color: 'var(--text-tertiary)', fontStyle: 'italic' }}>—</span>
+                            }
+                          </div>
+                        </td>
+                      )}
+
+                      {/* Recommendation */}
+                      {col('recommendation') && (
+                        <td className="summary-cell">
+                          <div className="summary-text">
+                            {article.recommendation
+                              ? article.recommendation
+                              : <span style={{ color: 'var(--text-tertiary)', fontStyle: 'italic' }}>—</span>
+                            }
+                          </div>
+                        </td>
+                      )}
+
+                      {/* Notes */}
+                      {col('notes') && (
+                        <td>
+                          <button
+                            className={`note-indicator ${article.notes ? 'has-note' : ''}`}
+                            onClick={() => setNoteModal(article)}
+                          >
+                            📝 {article.notes ? 'View' : 'Add'}
+                          </button>
+                        </td>
+                      )}
                     </tr>
                   ))}
                 </tbody>

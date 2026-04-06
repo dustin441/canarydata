@@ -6,7 +6,7 @@ export async function getArticles(districtId = null) {
   let query = supabase
     .from('news_stories')
     .select(
-      'id, date, headline, summary, source, source_type, canary_score, tags, notes, is_earned_media, is_perched, link, district_id'
+      'id, date, headline, summary, source, source_type, canary_score, tags, notes, is_earned_media, is_perched, link, district_id, innovation_reason, recommendation'
     )
     .order('date', { ascending: false });
 
