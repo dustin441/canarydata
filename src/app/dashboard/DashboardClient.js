@@ -68,7 +68,7 @@ function InfoTooltip({ text }) {
         background: '#1A2332', border: '1px solid var(--border-secondary)',
         borderRadius: '8px', padding: '12px 16px',
         fontSize: '0.78rem', color: 'var(--text-secondary)', lineHeight: 1.5,
-        width: '280px', whiteSpace: 'normal', zIndex: 300,
+        width: '280px', whiteSpace: 'normal', zIndex: 1000,
         boxShadow: 'var(--shadow-lg)',
         transition: 'opacity 0.15s, visibility 0.15s',
         pointerEvents: 'none',

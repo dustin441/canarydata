@@ -624,7 +624,7 @@ a:hover {
   padding: 22px;
   transition: all var(--transition-base);
   position: relative;
-  overflow: hidden;
+  overflow: visible;
 }
 
 .kpi-card:hover {
