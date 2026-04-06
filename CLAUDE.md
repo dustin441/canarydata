@@ -21,7 +21,8 @@ Canary is a SaaS media monitoring tool targeting public sector organizations (sc
 ```
 src/
   app/
-    page.js                  # Redirects / → /dashboard
+    page.js                  # Marketing homepage (hero, differentiator, features, pricing)
+    page.module.css          # Homepage-only scoped styles (dark-mode, glassmorphism, animations)
     layout.js                # Root layout, loads fonts
     globals.css              # Full design system — use these classes, don't add inline styles unless necessary
     actions.js               # Server actions: setEarnedMedia, saveNote, addQuery, deleteQuery
@@ -41,7 +42,7 @@ src/
       client.js              # Browser client
       server.js              # Server client (anon key + cookies)
       middleware.js          # Session refresh
-  middleware.js              # Auth guard — redirects unauthenticated users to /login
+  middleware.js              # Auth guard — redirects unauthenticated users to /login (/ is public)
 ```
 
 ## Database schema (Supabase)
