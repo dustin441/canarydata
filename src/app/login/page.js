@@ -105,7 +105,7 @@ export default function Login() {
             color: 'var(--text-secondary)',
           }}
         >
-          Don't have an account?{' '}
+          Don&apos;t have an account?{' '}
           <Link href="/signup" style={{ color: 'var(--brand-primary)', textDecoration: 'none', fontWeight: '500' }}>
             Sign up
           </Link>
