@@ -64,13 +64,13 @@ function InfoTooltip({ text }) {
       }}>i</span>
       <span style={{
         visibility: 'hidden', opacity: 0, position: 'absolute',
-        bottom: 'calc(100% + 8px)', left: '50%', transform: 'translateX(-50%)',
+        bottom: 'calc(100% + 10px)', right: '-10px',
         background: '#1A2332', border: '1px solid var(--border-secondary)',
-        borderRadius: '8px', padding: '10px 14px',
+        borderRadius: '8px', padding: '12px 16px',
         fontSize: '0.78rem', color: 'var(--text-secondary)', lineHeight: 1.5,
-        width: '260px', whiteSpace: 'normal', zIndex: 300,
+        width: '280px', whiteSpace: 'normal', zIndex: 300,
         boxShadow: 'var(--shadow-lg)',
-        transition: 'opacity 0.15s',
+        transition: 'opacity 0.15s, visibility 0.15s',
         pointerEvents: 'none',
       }} className="info-tooltip-box">
         {text}

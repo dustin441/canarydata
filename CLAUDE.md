@@ -67,7 +67,7 @@ src/
 | Email | District | Role |
 |-------|----------|------|
 | dustin@eic.agency | (all) | Admin — sees all districts |
-| lesley@schoolspiritpr.com | bessemer-city-schools | Client |
+| lesley@schoolspiritpr.com | (all) | Admin — sees all districts |
 | jdericco@scusd.net | santa-clara-usd | Client |
 
 District restriction works by reading `user_metadata.district_id` via the admin client on dashboard load. Users with a `district_id` only see their district's data; the district switcher is hidden from them.
