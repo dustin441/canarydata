@@ -1,0 +1,499 @@
+'use client';
+
+import { useState, useMemo } from 'react';
+import {
+  AreaChart, Area, LineChart, Line, PieChart, Pie, Cell,
+  XAxis, YAxis, CartesianGrid, Tooltip, ResponsiveContainer, Legend,
+} from 'recharts';
+
+const TOOLTIP_STYLE = {
+  background: '#1A2332',
+  border: '1px solid #1E2D40',
+  borderRadius: '8px',
+  color: '#F1F5F9',
+  fontSize: '12px',
+};
+
+const SOURCE_COLORS = {
+  news: '#F5C518',
+  facebook: '#3B82F6',
+  instagram: '#E1306C',
+  tiktok: '#69C9D0',
+  twitter: '#1DA1F2',
+  youtube: '#FF0000',
+  other: '#94A3B8',
+};
+
+function getScoreClass(score) {
+  const n = parseFloat(score);
+  if (n >= 9.0) return 'high';
+  if (n >= 8.0) return 'medium';
+  return 'low';
+}
+
+function formatDate(dateStr) {
+  return new Date(dateStr + 'T00:00:00').toLocaleDateString('en-US', {
+    month: 'short', day: 'numeric', year: 'numeric',
+  });
+}
+
+function formatDistrictName(id) {
+  return id
+    .split('-')
+    .map((w) => w.charAt(0).toUpperCase() + w.slice(1))
+    .join(' ');
+}
+
+function buildChartData(articles) {
+  // Group by week for trend charts
+  const byWeek = {};
+  articles.forEach((a) => {
+    const d = new Date(a.date + 'T00:00:00');
+    // Get Sunday of that week
+    const day = d.getDay();
+    const sunday = new Date(d);
+    sunday.setDate(d.getDate() - day);
+    const key = sunday.toLocaleDateString('en-US', { month: 'short', day: 'numeric' });
+    if (!byWeek[key]) byWeek[key] = { date: key, mentions: 0, scoreSum: 0 };
+    byWeek[key].mentions++;
+    byWeek[key].scoreSum += parseFloat(a.canary_score ?? 0);
+  });
+
+  const mentionTrend = Object.values(byWeek)
+    .map((w) => ({ date: w.date, mentions: w.mentions }))
+    .slice(-10);
+
+  const sentimentTrend = Object.values(byWeek)
+    .map((w) => ({
+      date: w.date,
+      score: parseFloat((w.scoreSum / w.mentions).toFixed(2)),
+    }))
+    .slice(-10);
+
+  // Source breakdown
+  const sourceCounts = {};
+  articles.forEach((a) => {
+    const t = (a.source_type ?? 'other').toLowerCase();
+    sourceCounts[t] = (sourceCounts[t] ?? 0) + 1;
+  });
+  const total = articles.length || 1;
+  const sourceBreakdown = Object.entries(sourceCounts)
+    .map(([name, count]) => ({
+      name: name.charAt(0).toUpperCase() + name.slice(1),
+      value: Math.round((count / total) * 100),
+      color: SOURCE_COLORS[name] ?? SOURCE_COLORS.other,
+    }))
+    .sort((a, b) => b.value - a.value);
+
+  return { mentionTrend, sentimentTrend, sourceBreakdown };
+}
+
+export default function DashboardClient({ articles, districts }) {
+  const [search, setSearch] = useState('');
+  const [sourceFilter, setSourceFilter] = useState('All');
+  const [tagFilter, setTagFilter] = useState('All');
+  const [districtFilter, setDistrictFilter] = useState('All');
+  const [noteModal, setNoteModal] = useState(null);
+  const [sidebarOpen, setSidebarOpen] = useState(false);
+
+  const notesCount = articles.filter((a) => a.notes).length;
+
+  const allTags = useMemo(() => {
+    const tagSet = new Set();
+    articles.forEach((a) => {
+      if (Array.isArray(a.tags)) a.tags.forEach((t) => tagSet.add(t));
+    });
+    return ['All', ...Array.from(tagSet).sort()];
+  }, [articles]);
+
+  const allSources = useMemo(() => {
+    const s = new Set(articles.map((a) => a.source_type ?? 'other'));
+    return ['All', ...Array.from(s).sort()];
+  }, [articles]);
+
+  const filtered = useMemo(() => {
+    const q = search.toLowerCase();
+    return articles.filter((a) => {
+      const matchSearch =
+        !search ||
+        a.headline?.toLowerCase().includes(q) ||
+        a.summary?.toLowerCase().includes(q);
+      const matchSource =
+        sourceFilter === 'All' || (a.source_type ?? 'other') === sourceFilter;
+      const matchTag =
+        tagFilter === 'All' ||
+        (Array.isArray(a.tags) && a.tags.includes(tagFilter));
+      const matchDistrict =
+        districtFilter === 'All' || a.district_id === districtFilter;
+      return matchSearch && matchSource && matchTag && matchDistrict;
+    });
+  }, [articles, search, sourceFilter, tagFilter, districtFilter]);
+
+  const chartArticles = districtFilter === 'All'
+    ? articles
+    : articles.filter((a) => a.district_id === districtFilter);
+
+  const { mentionTrend, sentimentTrend, sourceBreakdown } = useMemo(
+    () => buildChartData(chartArticles),
+    [chartArticles]
+  );
+
+  const avgScore = chartArticles.length
+    ? (
+        chartArticles.reduce((sum, a) => sum + parseFloat(a.canary_score ?? 0), 0) /
+        chartArticles.length
+      ).toFixed(2)
+    : '—';
+
+  const topSource = sourceBreakdown[0];
+
+  return (
+    <div className="dashboard-layout">
+      {/* Sidebar */}
+      <aside className={`sidebar ${sidebarOpen ? 'open' : ''}`}>
+        <div className="sidebar-header">
+          <div className="sidebar-brand">
+            <div className="sidebar-brand-icon">🐦</div>
+            <div className="sidebar-brand-text">
+              <h2>Canary</h2>
+              <span>Media Intelligence</span>
+            </div>
+          </div>
+        </div>
+
+        <nav className="sidebar-nav">
+          <div className="sidebar-section">
+            <div className="sidebar-section-label">Menu</div>
+            <a href="/dashboard" className="sidebar-link active">
+              <span className="sidebar-link-icon">📊</span>
+              Dashboard
+            </a>
+            <a href="#" className="sidebar-link">
+              <span className="sidebar-link-icon">📰</span>
+              Articles
+              <span className="sidebar-link-badge">{articles.length}</span>
+            </a>
+            <a href="#" className="sidebar-link">
+              <span className="sidebar-link-icon">🔍</span>
+              Queries
+            </a>
+            <a href="#" className="sidebar-link">
+              <span className="sidebar-link-icon">📝</span>
+              Notes
+              <span className="sidebar-link-badge">{notesCount}</span>
+            </a>
+          </div>
+          <div className="sidebar-section">
+            <div className="sidebar-section-label">Districts</div>
+            {districts.map((d) => (
+              <button
+                key={d.id}
+                onClick={() => setDistrictFilter(d.id === districtFilter ? 'All' : d.id)}
+                className={`sidebar-link ${districtFilter === d.id ? 'active' : ''}`}
+                style={{ width: '100%', background: 'none', border: 'none', textAlign: 'left', cursor: 'pointer' }}
+              >
+                <span className="sidebar-link-icon">🏫</span>
+                {d.name}
+              </button>
+            ))}
+          </div>
+          <div className="sidebar-section">
+            <div className="sidebar-section-label">Account</div>
+            <a href="#" className="sidebar-link">
+              <span className="sidebar-link-icon">⚙️</span>
+              Settings
+            </a>
+          </div>
+        </nav>
+
+        <div className="sidebar-footer">
+          <div className="sidebar-user">
+            <div className="sidebar-avatar">C</div>
+            <div className="sidebar-user-info">
+              <div className="sidebar-user-name">Canary Admin</div>
+              <div className="sidebar-user-email">{districts.length} districts</div>
+            </div>
+          </div>
+        </div>
+      </aside>
+
+      {/* Main */}
+      <div className="main-content">
+        <header className="topbar">
+          <div className="topbar-left">
+            <button
+              className="mobile-menu-btn"
+              onClick={() => setSidebarOpen((o) => !o)}
+            >
+              ☰
+            </button>
+            <div>
+              <div className="topbar-title">
+                {districtFilter === 'All'
+                  ? 'All Districts'
+                  : formatDistrictName(districtFilter)}
+              </div>
+              <div className="topbar-breadcrumb">Media Intelligence Dashboard</div>
+            </div>
+          </div>
+          <div className="topbar-right">
+            <button className="topbar-btn" title="Notifications">🔔</button>
+          </div>
+        </header>
+
+        <main className="page-content">
+          {/* KPI Cards */}
+          <div className="kpi-grid">
+            <div className="kpi-card">
+              <div className="kpi-header">
+                <div className="kpi-label">Total Mentions</div>
+                <div className="kpi-icon yellow">📰</div>
+              </div>
+              <div className="kpi-value">{chartArticles.length}</div>
+              <span className="kpi-change positive">↑ Active monitoring</span>
+            </div>
+
+            <div className="kpi-card">
+              <div className="kpi-header">
+                <div className="kpi-label">Avg Canary Score</div>
+                <div className="kpi-icon green">📈</div>
+              </div>
+              <div className="kpi-value">{avgScore}</div>
+              <span className="kpi-change positive">↑ Positive sentiment</span>
+            </div>
+
+            <div className="kpi-card">
+              <div className="kpi-header">
+                <div className="kpi-label">Top Source</div>
+                <div className="kpi-icon blue">🌐</div>
+              </div>
+              <div className="kpi-value" style={{ fontSize: '1.4rem' }}>
+                {topSource?.name ?? '—'}
+              </div>
+              {topSource && (
+                <span className="kpi-change positive">
+                  {topSource.value}% of coverage
+                </span>
+              )}
+            </div>
+
+            <div className="kpi-card">
+              <div className="kpi-header">
+                <div className="kpi-label">Notes Added</div>
+                <div className="kpi-icon yellow">📝</div>
+              </div>
+              <div className="kpi-value">{notesCount}</div>
+              <span className="kpi-change positive">
+                Across {articles.length} articles
+              </span>
+            </div>
+          </div>
+
+          {/* Charts */}
+          <div className="charts-grid">
+            <div className="chart-card">
+              <h4>Mention Trend <span>By week</span></h4>
+              <ResponsiveContainer width="100%" height={200}>
+                <AreaChart data={mentionTrend}>
+                  <defs>
+                    <linearGradient id="mentionGrad" x1="0" y1="0" x2="0" y2="1">
+                      <stop offset="5%" stopColor="#F5C518" stopOpacity={0.2} />
+                      <stop offset="95%" stopColor="#F5C518" stopOpacity={0} />
+                    </linearGradient>
+                  </defs>
+                  <CartesianGrid strokeDasharray="3 3" stroke="#1E2D40" />
+                  <XAxis dataKey="date" tick={{ fill: '#64748B', fontSize: 10 }} axisLine={false} tickLine={false} />
+                  <YAxis tick={{ fill: '#64748B', fontSize: 10 }} axisLine={false} tickLine={false} width={24} />
+                  <Tooltip contentStyle={TOOLTIP_STYLE} />
+                  <Area type="monotone" dataKey="mentions" stroke="#F5C518" strokeWidth={2} fill="url(#mentionGrad)" dot={false} />
+                </AreaChart>
+              </ResponsiveContainer>
+            </div>
+
+            <div className="chart-card">
+              <h4>Source Breakdown <span>By type</span></h4>
+              <ResponsiveContainer width="100%" height={200}>
+                <PieChart>
+                  <Pie
+                    data={sourceBreakdown}
+                    cx="50%" cy="50%"
+                    innerRadius={52} outerRadius={80}
+                    dataKey="value" paddingAngle={3}
+                  >
+                    {sourceBreakdown.map((entry, i) => (
+                      <Cell key={i} fill={entry.color} />
+                    ))}
+                  </Pie>
+                  <Tooltip contentStyle={TOOLTIP_STYLE} formatter={(val) => `${val}%`} />
+                  <Legend formatter={(val) => <span style={{ color: '#94A3B8', fontSize: '11px' }}>{val}</span>} />
+                </PieChart>
+              </ResponsiveContainer>
+            </div>
+
+            <div className="chart-card">
+              <h4>Sentiment Trend <span>Canary score over time</span></h4>
+              <ResponsiveContainer width="100%" height={200}>
+                <LineChart data={sentimentTrend}>
+                  <CartesianGrid strokeDasharray="3 3" stroke="#1E2D40" />
+                  <XAxis dataKey="date" tick={{ fill: '#64748B', fontSize: 10 }} axisLine={false} tickLine={false} />
+                  <YAxis domain={[6, 10]} tick={{ fill: '#64748B', fontSize: 10 }} axisLine={false} tickLine={false} width={24} />
+                  <Tooltip contentStyle={TOOLTIP_STYLE} />
+                  <Line type="monotone" dataKey="score" stroke="#22C55E" strokeWidth={2} dot={{ fill: '#22C55E', r: 3, strokeWidth: 0 }} />
+                </LineChart>
+              </ResponsiveContainer>
+            </div>
+          </div>
+
+          {/* Articles Table */}
+          <div className="data-section">
+            <div className="data-header">
+              <h3>📰 Media Articles</h3>
+              <div className="data-filters">
+                <input
+                  className="filter-input"
+                  placeholder="Search headlines..."
+                  value={search}
+                  onChange={(e) => setSearch(e.target.value)}
+                />
+                <select className="filter-select" value={sourceFilter} onChange={(e) => setSourceFilter(e.target.value)}>
+                  {allSources.map((s) => <option key={s}>{s}</option>)}
+                </select>
+                <select className="filter-select" value={tagFilter} onChange={(e) => setTagFilter(e.target.value)}>
+                  {allTags.map((t) => <option key={t}>{t}</option>)}
+                </select>
+                {districtFilter !== 'All' && (
+                  <button
+                    className="btn btn-secondary btn-sm"
+                    onClick={() => setDistrictFilter('All')}
+                  >
+                    {formatDistrictName(districtFilter)} ✕
+                  </button>
+                )}
+              </div>
+            </div>
+
+            <div className="data-table-wrapper">
+              <table className="data-table">
+                <thead>
+                  <tr>
+                    <th>Date</th>
+                    <th>Headline</th>
+                    <th>Summary</th>
+                    <th>Source</th>
+                    <th>Tags</th>
+                    <th>Score</th>
+                    <th>Notes</th>
+                  </tr>
+                </thead>
+                <tbody>
+                  {filtered.length === 0 ? (
+                    <tr>
+                      <td colSpan={7}>
+                        <div className="empty-state">
+                          <div className="empty-state-icon">🔍</div>
+                          <h3>No results found</h3>
+                          <p>Try adjusting your search or filters.</p>
+                        </div>
+                      </td>
+                    </tr>
+                  ) : filtered.map((article) => (
+                    <tr key={article.id}>
+                      <td style={{ whiteSpace: 'nowrap', color: 'var(--text-tertiary)', fontSize: '0.78rem' }}>
+                        {formatDate(article.date)}
+                      </td>
+
+                      <td className="headline-cell">
+                        <a href={article.link} target="_blank" rel="noopener noreferrer" className="headline-text">
+                          {article.headline}
+                        </a>
+                      </td>
+
+                      <td className="summary-cell">
+                        <div className="summary-text">{article.summary}</div>
+                      </td>
+
+                      <td>
+                        <span style={{
+                          padding: '3px 10px',
+                          borderRadius: 'var(--radius-full)',
+                          fontSize: '0.72rem',
+                          fontWeight: 600,
+                          background: SOURCE_COLORS[article.source_type] ? `${SOURCE_COLORS[article.source_type]}20` : 'var(--bg-elevated)',
+                          color: SOURCE_COLORS[article.source_type] ?? 'var(--text-secondary)',
+                        }}>
+                          {article.source_type ?? 'other'}
+                        </span>
+                      </td>
+
+                      <td>
+                        <div style={{ display: 'flex', gap: '4px', flexWrap: 'wrap', maxWidth: '160px' }}>
+                          {Array.isArray(article.tags) && article.tags.map((tag) => (
+                            <span key={tag} style={{
+                              padding: '2px 8px',
+                              borderRadius: 'var(--radius-full)',
+                              fontSize: '0.68rem',
+                              fontWeight: 600,
+                              background: 'var(--bg-elevated)',
+                              color: 'var(--text-secondary)',
+                            }}>
+                              {tag}
+                            </span>
+                          ))}
+                        </div>
+                      </td>
+
+                      <td>
+                        <span className={`score-badge ${getScoreClass(article.canary_score)}`}>
+                          {parseFloat(article.canary_score).toFixed(1)}
+                        </span>
+                      </td>
+
+                      <td>
+                        <button
+                          className={`note-indicator ${article.notes ? 'has-note' : ''}`}
+                          onClick={() => setNoteModal(article)}
+                        >
+                          📝 {article.notes ? 'View' : 'Add'}
+                        </button>
+                      </td>
+                    </tr>
+                  ))}
+                </tbody>
+              </table>
+            </div>
+
+            <div className="data-footer">
+              <div className="data-footer-info">
+                Showing {filtered.length} of {articles.length} articles
+              </div>
+            </div>
+          </div>
+        </main>
+      </div>
+
+      {/* Note Modal */}
+      {noteModal && (
+        <div className="modal-overlay" onClick={() => setNoteModal(null)}>
+          <div className="modal" onClick={(e) => e.stopPropagation()}>
+            <h3>📝 Note</h3>
+            <p style={{ color: 'var(--canary-yellow)', fontWeight: 600, fontSize: '0.85rem', marginBottom: '8px' }}>
+              {noteModal.headline}
+            </p>
+            {noteModal.notes ? (
+              <p>{noteModal.notes}</p>
+            ) : (
+              <p style={{ color: 'var(--text-tertiary)', fontStyle: 'italic' }}>
+                No note added for this article yet.
+              </p>
+            )}
+            <div className="modal-actions">
+              <button className="btn btn-secondary btn-sm" onClick={() => setNoteModal(null)}>
+                Close
+              </button>
+            </div>
+          </div>
+        </div>
+      )}
+    </div>
+  );
+}
