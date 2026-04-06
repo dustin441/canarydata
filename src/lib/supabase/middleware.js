@@ -36,6 +36,7 @@ export async function updateSession(request) {
   // If no user and not on login/signup/auth pages, redirect to login
   if (
     !user &&
+    request.nextUrl.pathname !== '/' &&
     !request.nextUrl.pathname.startsWith('/login') &&
     !request.nextUrl.pathname.startsWith('/signup') &&
     !request.nextUrl.pathname.startsWith('/auth')
