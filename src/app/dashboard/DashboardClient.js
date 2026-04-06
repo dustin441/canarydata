@@ -1,7 +1,7 @@
 'use client';
 
 import { useState, useMemo, useEffect, useRef, useTransition } from 'react';
-import { setEarnedMedia, saveNote } from '@/app/actions';
+import { setEarnedMedia, saveNote, addQuery, deleteQuery } from '@/app/actions';
 
 const ALL_COLUMNS = [
   { id: 'date',               label: 'Date',               required: true  },
@@ -107,7 +107,245 @@ function buildChartData(articles) {
   return { mentionTrend, sentimentTrend, sourceBreakdown };
 }
 
-export default function DashboardClient({ articles, districts, userDistrictId }) {
+const CHANNEL_COLORS = {
+  news:   { bg: '#F5C51820', color: '#F5C518' },
+  social: { bg: '#3B82F620', color: '#3B82F6' },
+  all:    { bg: '#22C55E20', color: '#22C55E' },
+};
+
+function QueriesView({ initialQueries, districts, userDistrictId }) {
+  const [queries, setQueries] = useState(initialQueries);
+  const [districtFilter, setDistrictFilter] = useState(userDistrictId ?? 'All');
+  const [showAddForm, setShowAddForm] = useState(false);
+  const [form, setForm] = useState({
+    query_text: '',
+    channels: 'news',
+    district_id: userDistrictId ?? '',
+    geo_city: '',
+    geo_state: '',
+    geo_zip: '',
+  });
+  const [saving, setSaving] = useState(false);
+  const [deletingId, setDeletingId] = useState(null);
+  const [addError, setAddError] = useState('');
+
+  const filtered = districtFilter === 'All'
+    ? queries
+    : queries.filter((q) => q.district_id === districtFilter);
+
+  // group by has-geo vs no-geo
+  const geoQueries = filtered.filter((q) => q.geo_city || q.geo_state || q.geo_zip);
+  const keywordQueries = filtered.filter((q) => !q.geo_city && !q.geo_state && !q.geo_zip);
+
+  async function handleDelete(id) {
+    setDeletingId(id);
+    try {
+      await deleteQuery(id);
+      setQueries((prev) => prev.filter((q) => q.id !== id));
+    } finally {
+      setDeletingId(null);
+    }
+  }
+
+  async function handleAdd(e) {
+    e.preventDefault();
+    if (!form.query_text.trim()) { setAddError('Query text is required.'); return; }
+    setAddError('');
+    setSaving(true);
+    try {
+      const districtName = districts.find((d) => d.id === form.district_id)?.name ?? null;
+      const newQuery = await addQuery({ ...form, district_name: districtName });
+      setQueries((prev) => [...prev, newQuery]);
+      setForm({ query_text: '', channels: 'news', district_id: userDistrictId ?? '', geo_city: '', geo_state: '', geo_zip: '' });
+      setShowAddForm(false);
+    } catch (err) {
+      setAddError(err.message ?? 'Failed to add query.');
+    } finally {
+      setSaving(false);
+    }
+  }
+
+  function QueryRow({ q }) {
+    const ch = CHANNEL_COLORS[q.channels] ?? CHANNEL_COLORS.news;
+    const geo = [q.geo_city, q.geo_state, q.geo_zip].filter(Boolean).join(', ');
+    return (
+      <tr key={q.id}>
+        <td style={{ fontWeight: 500, color: 'var(--text-primary)' }}>{q.query_text}</td>
+        <td>
+          <span style={{
+            padding: '3px 10px', borderRadius: 'var(--radius-full)',
+            fontSize: '0.72rem', fontWeight: 600,
+            background: ch.bg, color: ch.color,
+          }}>
+            {q.channels ?? 'news'}
+          </span>
+        </td>
+        <td style={{ color: 'var(--text-secondary)', fontSize: '0.82rem' }}>
+          {geo || <span style={{ color: 'var(--text-tertiary)', fontStyle: 'italic' }}>—</span>}
+        </td>
+        {!userDistrictId && (
+          <td style={{ color: 'var(--text-secondary)', fontSize: '0.82rem' }}>
+            {q.district_name ?? <span style={{ color: 'var(--text-tertiary)', fontStyle: 'italic' }}>—</span>}
+          </td>
+        )}
+        <td style={{ textAlign: 'right' }}>
+          <button
+            className="btn btn-danger btn-sm"
+            onClick={() => handleDelete(q.id)}
+            disabled={deletingId === q.id}
+            style={{ padding: '4px 10px', fontSize: '0.75rem' }}
+          >
+            {deletingId === q.id ? '…' : 'Delete'}
+          </button>
+        </td>
+      </tr>
+    );
+  }
+
+  function QueryTable({ rows, emptyMsg }) {
+    if (rows.length === 0) {
+      return <p style={{ color: 'var(--text-tertiary)', fontStyle: 'italic', padding: '12px 0', fontSize: '0.85rem' }}>{emptyMsg}</p>;
+    }
+    return (
+      <div className="data-table-wrapper">
+        <table className="data-table">
+          <thead>
+            <tr>
+              <th>Query</th>
+              <th>Channel</th>
+              <th>Location</th>
+              {!userDistrictId && <th>District</th>}
+              <th style={{ textAlign: 'right' }}>Action</th>
+            </tr>
+          </thead>
+          <tbody>
+            {rows.map((q) => <QueryRow key={q.id} q={q} />)}
+          </tbody>
+        </table>
+      </div>
+    );
+  }
+
+  return (
+    <>
+      {/* Queries header */}
+      <div className="data-section">
+        <div className="data-header">
+          <h3>🔍 Search Queries <span style={{ color: 'var(--text-tertiary)', fontSize: '0.85rem', fontWeight: 400 }}>({filtered.length})</span></h3>
+          <div className="data-filters">
+            {!userDistrictId && (
+              <select
+                className="filter-select"
+                value={districtFilter}
+                onChange={(e) => setDistrictFilter(e.target.value)}
+              >
+                <option value="All">All Districts</option>
+                {districts.map((d) => <option key={d.id} value={d.id}>{d.name}</option>)}
+              </select>
+            )}
+            <button
+              className="btn btn-primary btn-sm"
+              onClick={() => setShowAddForm((o) => !o)}
+            >
+              {showAddForm ? '✕ Cancel' : '+ Add Query'}
+            </button>
+          </div>
+        </div>
+
+        {/* Add Query Form */}
+        {showAddForm && (
+          <form onSubmit={handleAdd} style={{
+            background: 'var(--bg-elevated)', border: '1px solid var(--border-secondary)',
+            borderRadius: 'var(--radius-lg)', padding: '20px', marginBottom: '24px',
+          }}>
+            <div style={{ fontSize: '0.75rem', fontWeight: 700, textTransform: 'uppercase', letterSpacing: '0.08em', color: 'var(--text-tertiary)', marginBottom: '14px' }}>
+              New Query
+            </div>
+            <div style={{ display: 'grid', gridTemplateColumns: '1fr auto', gap: '12px', marginBottom: '12px' }}>
+              <input
+                className="form-input"
+                placeholder="Query text (e.g. Bessemer City Schools budget)"
+                value={form.query_text}
+                onChange={(e) => setForm((f) => ({ ...f, query_text: e.target.value }))}
+                required
+              />
+              <select
+                className="filter-select"
+                value={form.channels}
+                onChange={(e) => setForm((f) => ({ ...f, channels: e.target.value }))}
+                style={{ minWidth: '100px' }}
+              >
+                <option value="news">News</option>
+                <option value="social">Social</option>
+                <option value="all">All</option>
+              </select>
+            </div>
+            <div style={{ display: 'grid', gridTemplateColumns: '1fr 1fr 120px', gap: '12px', marginBottom: '12px' }}>
+              <input
+                className="form-input"
+                placeholder="City (optional)"
+                value={form.geo_city}
+                onChange={(e) => setForm((f) => ({ ...f, geo_city: e.target.value }))}
+              />
+              <input
+                className="form-input"
+                placeholder="State (optional)"
+                value={form.geo_state}
+                onChange={(e) => setForm((f) => ({ ...f, geo_state: e.target.value }))}
+              />
+              <input
+                className="form-input"
+                placeholder="ZIP"
+                value={form.geo_zip}
+                onChange={(e) => setForm((f) => ({ ...f, geo_zip: e.target.value }))}
+              />
+            </div>
+            {!userDistrictId && (
+              <div style={{ marginBottom: '12px' }}>
+                <select
+                  className="filter-select"
+                  value={form.district_id}
+                  onChange={(e) => setForm((f) => ({ ...f, district_id: e.target.value }))}
+                  style={{ width: '100%' }}
+                >
+                  <option value="">No district</option>
+                  {districts.map((d) => <option key={d.id} value={d.id}>{d.name}</option>)}
+                </select>
+              </div>
+            )}
+            {addError && (
+              <div style={{ color: '#EF4444', fontSize: '0.82rem', marginBottom: '10px' }}>{addError}</div>
+            )}
+            <div style={{ display: 'flex', justifyContent: 'flex-end' }}>
+              <button type="submit" className="btn btn-primary btn-sm" disabled={saving}>
+                {saving ? <span className="spinner" style={{ margin: '0 auto' }} /> : 'Add Query'}
+              </button>
+            </div>
+          </form>
+        )}
+
+        {/* Keyword Queries */}
+        <div style={{ marginBottom: '32px' }}>
+          <div style={{ fontSize: '0.72rem', fontWeight: 700, textTransform: 'uppercase', letterSpacing: '0.08em', color: 'var(--text-tertiary)', marginBottom: '12px' }}>
+            Keyword Queries ({keywordQueries.length})
+          </div>
+          <QueryTable rows={keywordQueries} emptyMsg="No keyword queries." />
+        </div>
+
+        {/* Geographic Queries */}
+        <div>
+          <div style={{ fontSize: '0.72rem', fontWeight: 700, textTransform: 'uppercase', letterSpacing: '0.08em', color: 'var(--text-tertiary)', marginBottom: '12px' }}>
+            Geographic Queries ({geoQueries.length})
+          </div>
+          <QueryTable rows={geoQueries} emptyMsg="No geographic queries." />
+        </div>
+      </div>
+    </>
+  );
+}
+
+export default function DashboardClient({ articles, districts, queries: initialQueries, userDistrictId }) {
+  const [currentView, setCurrentView] = useState('dashboard');
   const [search, setSearch] = useState('');
   const [sourceFilter, setSourceFilter] = useState('All');
   const [tagFilter, setTagFilter] = useState('All');
@@ -265,24 +503,41 @@ export default function DashboardClient({ articles, districts, userDistrictId })
         <nav className="sidebar-nav">
           <div className="sidebar-section">
             <div className="sidebar-section-label">Menu</div>
-            <a href="/dashboard" className="sidebar-link active">
+            <button
+              className={`sidebar-link ${currentView === 'dashboard' ? 'active' : ''}`}
+              onClick={() => setCurrentView('dashboard')}
+              style={{ width: '100%', background: 'none', border: 'none', textAlign: 'left', cursor: 'pointer' }}
+            >
               <span className="sidebar-link-icon">📊</span>
               Dashboard
-            </a>
-            <a href="#" className="sidebar-link">
+            </button>
+            <button
+              className={`sidebar-link ${currentView === 'articles' ? 'active' : ''}`}
+              onClick={() => setCurrentView('dashboard')}
+              style={{ width: '100%', background: 'none', border: 'none', textAlign: 'left', cursor: 'pointer' }}
+            >
               <span className="sidebar-link-icon">📰</span>
               Articles
               <span className="sidebar-link-badge">{articles.length}</span>
-            </a>
-            <a href="#" className="sidebar-link">
+            </button>
+            <button
+              className={`sidebar-link ${currentView === 'queries' ? 'active' : ''}`}
+              onClick={() => setCurrentView('queries')}
+              style={{ width: '100%', background: 'none', border: 'none', textAlign: 'left', cursor: 'pointer' }}
+            >
               <span className="sidebar-link-icon">🔍</span>
               Queries
-            </a>
-            <a href="#" className="sidebar-link">
+              <span className="sidebar-link-badge">{initialQueries.length}</span>
+            </button>
+            <button
+              className="sidebar-link"
+              onClick={() => setCurrentView('dashboard')}
+              style={{ width: '100%', background: 'none', border: 'none', textAlign: 'left', cursor: 'pointer' }}
+            >
               <span className="sidebar-link-icon">📝</span>
               Notes
               <span className="sidebar-link-badge">{notesCount}</span>
-            </a>
+            </button>
           </div>
           {!userDistrictId && (
             <div className="sidebar-section">
@@ -332,11 +587,15 @@ export default function DashboardClient({ articles, districts, userDistrictId })
             </button>
             <div>
               <div className="topbar-title">
-                {districtFilter === 'All'
-                  ? 'All Districts'
-                  : formatDistrictName(districtFilter)}
+                {currentView === 'queries'
+                  ? 'Search Queries'
+                  : districtFilter === 'All'
+                    ? 'All Districts'
+                    : formatDistrictName(districtFilter)}
               </div>
-              <div className="topbar-breadcrumb">Media Intelligence Dashboard</div>
+              <div className="topbar-breadcrumb">
+                {currentView === 'queries' ? 'Manage monitored search terms' : 'Media Intelligence Dashboard'}
+              </div>
             </div>
           </div>
           <div className="topbar-right">
@@ -345,6 +604,14 @@ export default function DashboardClient({ articles, districts, userDistrictId })
         </header>
 
         <main className="page-content">
+          {currentView === 'queries' && (
+            <QueriesView
+              initialQueries={initialQueries}
+              districts={districts}
+              userDistrictId={userDistrictId}
+            />
+          )}
+          {currentView === 'dashboard' && (<>
           {/* KPI Cards */}
           <div className="kpi-grid">
             <div className="kpi-card">
@@ -677,6 +944,7 @@ export default function DashboardClient({ articles, districts, userDistrictId })
               </div>
             </div>
           </div>
+          </>)}
         </main>
       </div>
 

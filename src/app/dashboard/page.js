@@ -1,4 +1,4 @@
-import { getArticles, getDistricts } from '@/lib/data';
+import { getArticles, getDistricts, getQueries } from '@/lib/data';
 import { createClient } from '@/lib/supabase/server';
 import { createAdminClient } from '@/lib/supabase/admin';
 import DashboardClient from './DashboardClient';
@@ -16,15 +16,17 @@ export default async function DashboardPage() {
     userDistrictId = user?.user_metadata?.district_id ?? null;
   }
 
-  const [articles, districts] = await Promise.all([
+  const [articles, districts, queries] = await Promise.all([
     getArticles(userDistrictId),
     getDistricts(),
+    getQueries(userDistrictId),
   ]);
 
   return (
     <DashboardClient
       articles={articles}
       districts={districts}
+      queries={queries}
       userDistrictId={userDistrictId}
     />
   );
