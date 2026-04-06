@@ -81,6 +81,16 @@ export default function Login() {
                 required
                 autoComplete="current-password"
               />
+              <div style={{ textAlign: 'right', marginTop: '8px' }}>
+                <Link 
+                  href="/forgot-password" 
+                  style={{ fontSize: '0.8rem', color: 'var(--text-tertiary)', textDecoration: 'none' }}
+                  onMouseOver={(e) => e.target.style.color = 'var(--canary-yellow)'}
+                  onMouseOut={(e) => e.target.style.color = 'var(--text-tertiary)'}
+                >
+                  Forgot password?
+                </Link>
+              </div>
             </div>
 
             <button
