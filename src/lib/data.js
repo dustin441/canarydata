@@ -47,6 +47,16 @@ export async function toggleEarnedMedia(id, value) {
   if (error) throw error;
 }
 
+export async function getClients() {
+  const supabase = createAdminClient();
+  const { data, error } = await supabase
+    .from('client_credentials')
+    .select('district_id, first_name, last_name, email, temp_password, created_at')
+    .order('created_at');
+  if (error) throw error;
+  return data ?? [];
+}
+
 export async function getQueries(districtId = null) {
   const supabase = createAdminClient();
   let query = supabase

@@ -523,7 +523,110 @@ function SettingsView() {
   );
 }
 
-export default function DashboardClient({ articles, districts, queries: initialQueries, userDistrictId }) {
+function ClientsView({ clients }) {
+  const [revealed, setRevealed] = useState({});
+  const [copied, setCopied] = useState({});
+
+  function toggleReveal(id) {
+    setRevealed((prev) => ({ ...prev, [id]: !prev[id] }));
+  }
+
+  function copyText(key, text) {
+    navigator.clipboard.writeText(text).then(() => {
+      setCopied((prev) => ({ ...prev, [key]: true }));
+      setTimeout(() => setCopied((prev) => ({ ...prev, [key]: false })), 1500);
+    });
+  }
+
+  const loginUrl = 'https://canarydata.vercel.app/login';
+
+  return (
+    <div className="data-section">
+      <div className="data-header">
+        <h3>👥 Beta Testers</h3>
+        <span style={{ fontSize: '0.85rem', color: 'var(--text-secondary)' }}>{clients.length} clients</span>
+      </div>
+      <div style={{ overflowX: 'auto' }}>
+        <table className="data-table" style={{ minWidth: '900px' }}>
+          <thead>
+            <tr>
+              <th>Organization</th>
+              <th>Contact</th>
+              <th>Email</th>
+              <th>Temp Password</th>
+              <th>Login URL</th>
+            </tr>
+          </thead>
+          <tbody>
+            {clients.map((c) => {
+              const emailKey = `email-${c.district_id}`;
+              const pwKey = `pw-${c.district_id}`;
+              const urlKey = `url-${c.district_id}`;
+              return (
+                <tr key={c.district_id}>
+                  <td style={{ fontWeight: 500, color: 'var(--text-primary)' }}>
+                    {c.district_id.split('-').map(w => w.charAt(0).toUpperCase() + w.slice(1)).join(' ')}
+                  </td>
+                  <td style={{ color: 'var(--text-secondary)' }}>{c.first_name} {c.last_name}</td>
+                  <td>
+                    <div style={{ display: 'flex', alignItems: 'center', gap: '8px' }}>
+                      <span style={{ fontFamily: 'monospace', fontSize: '0.85rem' }}>{c.email}</span>
+                      <button
+                        onClick={() => copyText(emailKey, c.email)}
+                        className="btn btn-sm btn-secondary"
+                        style={{ padding: '2px 8px', fontSize: '0.75rem', minWidth: '52px' }}
+                      >
+                        {copied[emailKey] ? '✓' : 'Copy'}
+                      </button>
+                    </div>
+                  </td>
+                  <td>
+                    <div style={{ display: 'flex', alignItems: 'center', gap: '8px' }}>
+                      <span style={{ fontFamily: 'monospace', fontSize: '0.85rem', color: 'var(--text-secondary)' }}>
+                        {revealed[c.district_id] ? c.temp_password : '••••••••••••••'}
+                      </span>
+                      <button
+                        onClick={() => toggleReveal(c.district_id)}
+                        className="btn btn-sm btn-secondary"
+                        style={{ padding: '2px 8px', fontSize: '0.75rem', minWidth: '52px' }}
+                      >
+                        {revealed[c.district_id] ? 'Hide' : 'Show'}
+                      </button>
+                      <button
+                        onClick={() => copyText(pwKey, c.temp_password)}
+                        className="btn btn-sm btn-secondary"
+                        style={{ padding: '2px 8px', fontSize: '0.75rem', minWidth: '52px' }}
+                      >
+                        {copied[pwKey] ? '✓' : 'Copy'}
+                      </button>
+                    </div>
+                  </td>
+                  <td>
+                    <div style={{ display: 'flex', alignItems: 'center', gap: '8px' }}>
+                      <a href={loginUrl} target="_blank" rel="noreferrer"
+                        style={{ fontSize: '0.85rem', color: 'var(--brand-primary)', textDecoration: 'none' }}>
+                        canarydata.vercel.app/login
+                      </a>
+                      <button
+                        onClick={() => copyText(urlKey, loginUrl)}
+                        className="btn btn-sm btn-secondary"
+                        style={{ padding: '2px 8px', fontSize: '0.75rem', minWidth: '52px' }}
+                      >
+                        {copied[urlKey] ? '✓' : 'Copy'}
+                      </button>
+                    </div>
+                  </td>
+                </tr>
+              );
+            })}
+          </tbody>
+        </table>
+      </div>
+    </div>
+  );
+}
+
+export default function DashboardClient({ articles, districts, queries: initialQueries, clients = [], userDistrictId }) {
   const [currentView, setCurrentView] = useState('dashboard');
   const [search, setSearch] = useState('');
   const [sourceFilter, setSourceFilter] = useState('All');
@@ -720,6 +823,20 @@ export default function DashboardClient({ articles, districts, queries: initialQ
           </div>
           {!userDistrictId && (
             <div className="sidebar-section">
+              <div className="sidebar-section-label">Admin</div>
+              <button
+                className={`sidebar-link ${currentView === 'clients' ? 'active' : ''}`}
+                onClick={() => setCurrentView('clients')}
+                style={{ width: '100%', background: 'none', border: 'none', textAlign: 'left', cursor: 'pointer' }}
+              >
+                <span className="sidebar-link-icon">👥</span>
+                Beta Testers
+                <span className="sidebar-link-badge">{clients.length}</span>
+              </button>
+            </div>
+          )}
+          {!userDistrictId && (
+            <div className="sidebar-section">
               <div className="sidebar-section-label">Districts</div>
               {districts.map((d) => (
                 <button
@@ -776,14 +893,17 @@ export default function DashboardClient({ articles, districts, queries: initialQ
                     ? 'Settings'
                     : currentView === 'notes'
                       ? 'Analyst Notes'
-                      : districtFilter === 'All'
-                        ? 'All Districts'
-                        : formatDistrictName(districtFilter)}
+                      : currentView === 'clients'
+                        ? 'Beta Testers'
+                        : districtFilter === 'All'
+                          ? 'All Districts'
+                          : formatDistrictName(districtFilter)}
               </div>
               <div className="topbar-breadcrumb">
                 {currentView === 'queries' ? 'Manage monitored search terms'
                   : currentView === 'settings' ? 'Manage your account and preferences'
                   : currentView === 'notes' ? 'Articles with analyst annotations'
+                  : currentView === 'clients' ? 'Login credentials for beta testers'
                   : 'Media Intelligence Dashboard'}
               </div>
             </div>
@@ -794,6 +914,7 @@ export default function DashboardClient({ articles, districts, queries: initialQ
         </header>
 
         <main className="page-content">
+          {currentView === 'clients' && <ClientsView clients={clients} />}
           {currentView === 'settings' && <SettingsView />}
           {currentView === 'queries' && (
             <QueriesView
