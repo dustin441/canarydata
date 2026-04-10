@@ -133,48 +133,28 @@ export default function Home() {
             <li>Intuitive, Zero-Learning-Curve Dashboard</li>
           </ul>
           <Link href="/login" className={styles.primaryBtn} style={{ display: 'block' }}>Get Started Today</Link>
+          <div style={{
+            marginTop: '1.5rem',
+            padding: '1rem 1.25rem',
+            background: 'rgba(16,185,129,0.06)',
+            border: '1px solid rgba(16,185,129,0.2)',
+            borderRadius: '10px',
+            display: 'flex',
+            alignItems: 'flex-start',
+            gap: '0.65rem',
+            textAlign: 'left',
+          }}>
+            <span style={{ fontSize: '1rem', flexShrink: 0, marginTop: '1px' }}>🔒</span>
+            <p style={{ margin: 0, fontSize: '0.88rem', color: '#94a3b8', lineHeight: '1.6' }}>
+              We will never sell or share your data.{' '}
+              <Link href="/privacy" style={{ color: '#34d399', textDecoration: 'none', fontWeight: 600 }}>
+                Read our Privacy Policy →
+              </Link>
+            </p>
+          </div>
           <p style={{ marginTop: '1.5rem', fontSize: '0.9rem', color: '#94a3b8', lineHeight: '1.6' }}>
             Start your 30-day free trial today. During this trial period, you&apos;ll need to submit your payment to continue service. We&apos;ll send you an invoice that you can pay by check, ACH, or credit card. Please ensure your payment is received within the 30-day trial window. We&apos;re happy to work with you on any questions or assistance you need during this process. Let&apos;s get you set up!
           </p>
-        </div>
-      </section>
-
-      {/* Data Privacy Trust Section */}
-      <section className={styles.section} style={{ paddingTop: '2rem', paddingBottom: '6rem' }}>
-        <div style={{
-          background: 'rgba(16,185,129,0.06)',
-          border: '1px solid rgba(16,185,129,0.25)',
-          borderRadius: '24px',
-          padding: '4rem',
-          textAlign: 'center',
-          position: 'relative',
-          overflow: 'hidden',
-        }}>
-          <div style={{ fontSize: '3rem', marginBottom: '1rem' }}>🔒</div>
-          <span className={styles.badge} style={{ background: 'rgba(16,185,129,0.1)', color: '#34d399', borderColor: 'rgba(16,185,129,0.2)' }}>
-            Your Data. Full Stop.
-          </span>
-          <h2 className={styles.sectionTitle} style={{ marginTop: '1rem' }}>
-            We Will Never Sell or Share Your Data
-          </h2>
-          <p className={styles.sectionDesc} style={{ marginBottom: '2.5rem' }}>
-            School districts handle sensitive community relationships. We take that seriously. Your data exists to power your dashboard — nothing else. No data brokers. No advertisers. No exceptions.
-          </p>
-          <Link href="/privacy" style={{
-            display: 'inline-flex',
-            alignItems: 'center',
-            gap: '0.5rem',
-            color: '#34d399',
-            textDecoration: 'none',
-            fontWeight: 600,
-            fontSize: '1.05rem',
-            border: '1px solid rgba(16,185,129,0.3)',
-            padding: '0.85rem 2rem',
-            borderRadius: '10px',
-            transition: 'background 0.2s, border-color 0.2s',
-          }}>
-            Read Our Privacy Policy →
-          </Link>
         </div>
       </section>
 

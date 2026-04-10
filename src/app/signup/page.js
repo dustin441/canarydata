@@ -135,6 +135,25 @@ export default function Signup() {
                   'Sign Up'
                 )}
               </button>
+
+              <div style={{
+                marginTop: '1rem',
+                padding: '0.85rem 1rem',
+                background: 'rgba(16,185,129,0.06)',
+                border: '1px solid rgba(16,185,129,0.2)',
+                borderRadius: '8px',
+                display: 'flex',
+                alignItems: 'flex-start',
+                gap: '0.5rem',
+              }}>
+                <span style={{ fontSize: '0.9rem', flexShrink: 0 }}>🔒</span>
+                <p style={{ margin: 0, fontSize: '0.8rem', color: 'var(--text-secondary)', lineHeight: '1.5' }}>
+                  We will never sell or share your data.{' '}
+                  <Link href="/privacy" style={{ color: '#34d399', textDecoration: 'none', fontWeight: 600 }}>
+                    Privacy Policy
+                  </Link>
+                </p>
+              </div>
             </form>
           )}
         </div>
