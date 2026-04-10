@@ -52,7 +52,7 @@ export default function Home() {
           <span className={styles.badge}>Our Differentiator</span>
           <h2 className={styles.sectionTitle}>Stop Drowning in Irrelevant National News</h2>
           <p className={styles.sectionDesc}>
-            While legacy platforms like Clearwater and Edgewater give you a noisy feed of every school in the country, we fold rigorous GEO context into your search.
+            While legacy media monitoring platforms give you a noisy feed of every school in the country, we fold rigorous GEO context into your search, surfacing information from your community.
           </p>
         </div>
 
@@ -91,7 +91,7 @@ export default function Home() {
             <div className={styles.cardIcon}>🧠</div>
             <h3 className={styles.cardTitle}>Smart Summaries</h3>
             <p className={styles.cardText}>
-              Don&apos;t have time to read 40 articles? Our AI analyzes the entire text and produces concise, objective summaries of what&apos;s being said about you online.
+              Don&apos;t have time to read 40 articles? Our AI analyzes the entire text and produces concise, objective summaries of what&apos;s being said about your district online.
             </p>
           </div>
           <div className={styles.card}>
@@ -123,8 +123,9 @@ export default function Home() {
 
         <div className={styles.priceCard}>
           <div className={styles.priceSub}>Comprehensive Annual Access</div>
-          <div className={styles.priceAmount}>$600<span style={{ fontSize: '2rem', color: '#64748b' }}>/yr</span></div>
+          <div className={styles.priceAmount}>$1,499<span style={{ fontSize: '2rem', color: '#64748b' }}>/yr</span></div>
           <ul className={styles.priceList}>
+            <li>Unlimited Users</li>
             <li>AI-Summarized Daily Mentions</li>
             <li>Hyper-Local GEO Context Filtering</li>
             <li>News, Facebook, Instagram, & TikTok</li>
@@ -132,8 +133,8 @@ export default function Home() {
             <li>Intuitive, Zero-Learning-Curve Dashboard</li>
           </ul>
           <Link href="/login" className={styles.primaryBtn} style={{ display: 'block' }}>Get Started Today</Link>
-          <p style={{ marginTop: '1.5rem', fontSize: '0.85rem', color: '#64748b' }}>
-            * Tiered options up to $800/yr based on tracking volume.
+          <p style={{ marginTop: '1.5rem', fontSize: '0.9rem', color: '#94a3b8', lineHeight: '1.6' }}>
+            Start your 30-day free trial today. During this trial period, you&apos;ll need to submit your payment to continue service. We&apos;ll send you an invoice that you can pay by check, ACH, or credit card. Please ensure your payment is received within the 30-day trial window. We&apos;re happy to work with you on any questions or assistance you need during this process. Let&apos;s get you set up!
           </p>
         </div>
       </section>
