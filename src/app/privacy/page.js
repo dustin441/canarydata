@@ -1,4 +1,5 @@
 import Link from 'next/link';
+import Image from 'next/image';
 
 export const metadata = {
   title: 'Privacy Policy | Canary Data',
@@ -25,19 +26,8 @@ export default function PrivacyPolicy() {
         top: 0,
         zIndex: 100,
       }}>
-        <Link href="/" style={{ display: 'flex', alignItems: 'center', gap: '0.5rem', textDecoration: 'none' }}>
-          <svg width="32" height="27" viewBox="0 0 36 30" fill="none">
-            <ellipse cx="14" cy="20" rx="11" ry="8" fill="#facc15"/>
-            <circle cx="24" cy="13" r="6" fill="#facc15"/>
-            <circle cx="26" cy="11.5" r="1.4" fill="#0B1120"/>
-            <path d="M30 13 L36 11 L30 16Z" fill="#facc15"/>
-            <path d="M3 20 L0 27 L7 23Z" fill="#facc15"/>
-            <rect x="11" y="8" width="3" height="11" rx="1" fill="rgba(255,255,255,0.85)"/>
-            <rect x="15.5" y="5" width="3" height="14" rx="1" fill="rgba(255,255,255,0.85)"/>
-            <rect x="20" y="2" width="3" height="17" rx="1" fill="rgba(255,255,255,0.85)"/>
-          </svg>
-          <span style={{ color: '#facc15', fontWeight: 700, fontSize: '1.3rem' }}>Canary</span>
-          <span style={{ color: '#fff', fontWeight: 400, fontSize: '1.3rem' }}>Data</span>
+        <Link href="/" style={{ display: 'flex', alignItems: 'center', textDecoration: 'none' }}>
+          <Image src="/canary-logo.svg" alt="Canary Data" width={160} height={43} style={{ height: '32px', width: 'auto' }} />
         </Link>
         <Link href="/" style={{ color: '#94a3b8', textDecoration: 'none', fontSize: '0.95rem' }}>
           ← Back to Home

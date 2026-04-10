@@ -1,4 +1,5 @@
 import Link from 'next/link';
+import Image from 'next/image';
 import styles from './page.module.css';
 
 export const metadata = {
@@ -12,17 +13,7 @@ export default function Home() {
       {/* Header */}
       <header className={styles.header}>
         <div className={styles.logo}>
-          <svg width="36" height="30" viewBox="0 0 36 30" fill="none">
-            <ellipse cx="14" cy="20" rx="11" ry="8" fill="#facc15"/>
-            <circle cx="24" cy="13" r="6" fill="#facc15"/>
-            <circle cx="26" cy="11.5" r="1.4" fill="#0B1120"/>
-            <path d="M30 13 L36 11 L30 16Z" fill="#facc15"/>
-            <path d="M3 20 L0 27 L7 23Z" fill="#facc15"/>
-            <rect x="11" y="8" width="3" height="11" rx="1" fill="rgba(255,255,255,0.85)"/>
-            <rect x="15.5" y="5" width="3" height="14" rx="1" fill="rgba(255,255,255,0.85)"/>
-            <rect x="20" y="2" width="3" height="17" rx="1" fill="rgba(255,255,255,0.85)"/>
-          </svg>
-          <span>Canary</span><span style={{color:'#fff', fontWeight:400}}> Data</span>
+          <Image src="/canary-logo.svg" alt="Canary Data" width={180} height={48} priority style={{ height: '36px', width: 'auto' }} />
         </div>
         <nav className={styles.nav}>
           <Link href="#features">Features</Link>

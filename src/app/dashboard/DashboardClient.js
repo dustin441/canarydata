@@ -1,6 +1,7 @@
 'use client';
 
 import { useState, useMemo, useEffect, useRef, useTransition } from 'react';
+import Image from 'next/image';
 import { setEarnedMedia, saveNote, addQuery, deleteQuery } from '@/app/actions';
 
 const ALL_COLUMNS = [
@@ -774,11 +775,7 @@ export default function DashboardClient({ articles, districts, queries: initialQ
       <aside className={`sidebar ${sidebarOpen ? 'open' : ''}`}>
         <div className="sidebar-header">
           <div className="sidebar-brand">
-            <div className="sidebar-brand-icon">🐦</div>
-            <div className="sidebar-brand-text">
-              <h2>Canary</h2>
-              <span>Media Intelligence</span>
-            </div>
+            <Image src="/canary-logo.svg" alt="Canary Data" width={160} height={43} style={{ height: '32px', width: 'auto' }} />
           </div>
         </div>
 

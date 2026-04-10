@@ -4,6 +4,7 @@ import { useState } from 'react';
 import { createClient } from '@/lib/supabase/client';
 import { useRouter } from 'next/navigation';
 import Link from 'next/link';
+import Image from 'next/image';
 
 export default function Login() {
   const router = useRouter();
@@ -37,8 +38,7 @@ export default function Login() {
     <div className="auth-page">
       <div className="auth-container">
         <div className="auth-logo">
-          <div className="auth-logo-icon">🐦</div>
-          <h1>Canary</h1>
+          <Image src="/canary-logo.svg" alt="Canary Data" width={200} height={54} style={{ height: '44px', width: 'auto', marginBottom: '0.5rem' }} />
           <p>Media Intelligence Platform</p>
         </div>
 
