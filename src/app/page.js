@@ -13,7 +13,7 @@ export default function Home() {
       {/* Header */}
       <header className={styles.header}>
         <div className={styles.logo}>
-          <Image src="/canary-logo.svg" alt="Canary Data" width={180} height={48} priority style={{ height: '36px', width: 'auto' }} />
+          <Image src="/canary-logo.svg" alt="Canary Data" width={220} height={60} priority style={{ height: '48px', width: 'auto' }} />
         </div>
         <nav className={styles.nav}>
           <Link href="#features">Features</Link>
