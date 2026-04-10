@@ -139,8 +139,47 @@ export default function Home() {
         </div>
       </section>
 
+      {/* Data Privacy Trust Section */}
+      <section className={styles.section} style={{ paddingTop: '2rem', paddingBottom: '6rem' }}>
+        <div style={{
+          background: 'rgba(16,185,129,0.06)',
+          border: '1px solid rgba(16,185,129,0.25)',
+          borderRadius: '24px',
+          padding: '4rem',
+          textAlign: 'center',
+          position: 'relative',
+          overflow: 'hidden',
+        }}>
+          <div style={{ fontSize: '3rem', marginBottom: '1rem' }}>🔒</div>
+          <span className={styles.badge} style={{ background: 'rgba(16,185,129,0.1)', color: '#34d399', borderColor: 'rgba(16,185,129,0.2)' }}>
+            Your Data. Full Stop.
+          </span>
+          <h2 className={styles.sectionTitle} style={{ marginTop: '1rem' }}>
+            We Will Never Sell or Share Your Data
+          </h2>
+          <p className={styles.sectionDesc} style={{ marginBottom: '2.5rem' }}>
+            School districts handle sensitive community relationships. We take that seriously. Your data exists to power your dashboard — nothing else. No data brokers. No advertisers. No exceptions.
+          </p>
+          <Link href="/privacy" style={{
+            display: 'inline-flex',
+            alignItems: 'center',
+            gap: '0.5rem',
+            color: '#34d399',
+            textDecoration: 'none',
+            fontWeight: 600,
+            fontSize: '1.05rem',
+            border: '1px solid rgba(16,185,129,0.3)',
+            padding: '0.85rem 2rem',
+            borderRadius: '10px',
+            transition: 'background 0.2s, border-color 0.2s',
+          }}>
+            Read Our Privacy Policy →
+          </Link>
+        </div>
+      </section>
+
       <footer className={styles.footer}>
-        <p>© {new Date().getFullYear()} Canary Data. AI-Driven Brand Intelligence.</p>
+        <p>© {new Date().getFullYear()} Canary Data. AI-Driven Brand Intelligence. &nbsp;·&nbsp; <Link href="/privacy" style={{ color: '#64748b', textDecoration: 'none' }}>Privacy Policy</Link></p>
       </footer>
     </div>
   );
