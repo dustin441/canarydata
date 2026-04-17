@@ -999,6 +999,67 @@ a:hover {
   overflow: hidden;
 }
 
+.expand-btn {
+  display: inline-block;
+  margin-top: 4px;
+  background: none;
+  border: none;
+  padding: 0;
+  font-size: 0.75rem;
+  color: var(--accent-primary);
+  cursor: pointer;
+  font-weight: 600;
+  line-height: 1;
+}
+.expand-btn:hover {
+  text-decoration: underline;
+}
+
+.expand-overlay {
+  position: fixed;
+  inset: 0;
+  background: rgba(0, 0, 0, 0.45);
+  display: flex;
+  align-items: center;
+  justify-content: center;
+  z-index: 300;
+  padding: 16px;
+}
+.expand-popover {
+  background: var(--bg-secondary);
+  border: 1px solid var(--border-primary);
+  border-radius: var(--radius-lg);
+  padding: 24px;
+  max-width: 520px;
+  width: 100%;
+  display: flex;
+  flex-direction: column;
+  gap: 16px;
+}
+.expand-body {
+  font-size: 0.9rem;
+  color: var(--text-primary);
+  line-height: 1.7;
+  margin: 0;
+  white-space: pre-wrap;
+}
+.expand-close-btn {
+  align-self: flex-end;
+  height: 32px;
+  padding: 0 16px;
+  border-radius: var(--radius-md);
+  background: transparent;
+  border: 1px solid var(--border-primary);
+  color: var(--text-secondary);
+  font-size: 0.82rem;
+  cursor: pointer;
+  transition: all var(--transition-fast);
+}
+.expand-close-btn:hover {
+  background: var(--bg-elevated);
+  color: var(--text-primary);
+}
+
 .link-cell a {
   color: var(--blue-400);
   font-size: 0.8rem;

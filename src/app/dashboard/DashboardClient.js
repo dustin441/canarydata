@@ -633,6 +633,25 @@ function ClientsView({ clients }) {
   );
 }
 
+function ExpandableText({ text, empty = false }) {
+  const [open, setOpen] = useState(false);
+  if (empty || !text) return <span style={{ color: 'var(--text-tertiary)', fontStyle: 'italic' }}>—</span>;
+  return (
+    <>
+      <div className="summary-text">{text}</div>
+      <button className="expand-btn" onClick={() => setOpen(true)}>Show more</button>
+      {open && (
+        <div className="expand-overlay" onClick={() => setOpen(false)}>
+          <div className="expand-popover" onClick={(e) => e.stopPropagation()}>
+            <p className="expand-body">{text}</p>
+            <button className="expand-close-btn" onClick={() => setOpen(false)}>Hide</button>
+          </div>
+        </div>
+      )}
+    </>
+  );
+}
+
 function FeedbackModal({ districtId, districtName, onClose }) {
   const [message, setMessage] = useState('');
   const [photo, setPhoto] = useState(null);
@@ -1240,7 +1259,7 @@ export default function DashboardClient({ articles, districts, queries: initialQ
                       {/* Summary */}
                       {col('summary') && (
                         <td className="summary-cell">
-                          <div className="summary-text">{article.summary}</div>
+                          <ExpandableText text={article.summary} />
                         </td>
                       )}
 
@@ -1299,24 +1318,16 @@ export default function DashboardClient({ articles, districts, queries: initialQ
                       {/* Innovation Reason */}
                       {col('innovation_reason') && (
                         <td className="summary-cell">
-                          <div className="summary-text">
-                            {article.innovation_reason && article.innovation_reason !== 'N/A'
-                              ? article.innovation_reason
-                              : <span style={{ color: 'var(--text-tertiary)', fontStyle: 'italic' }}>—</span>
-                            }
-                          </div>
+                          <ExpandableText
+                            text={article.innovation_reason !== 'N/A' ? article.innovation_reason : null}
+                          />
                         </td>
                       )}
 
                       {/* Recommendation */}
                       {col('recommendation') && (
                         <td className="summary-cell">
-                          <div className="summary-text">
-                            {article.recommendation
-                              ? article.recommendation
-                              : <span style={{ color: 'var(--text-tertiary)', fontStyle: 'italic' }}>—</span>
-                            }
-                          </div>
+                          <ExpandableText text={article.recommendation} />
                         </td>
                       )}
 
