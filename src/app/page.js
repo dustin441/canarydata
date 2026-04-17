@@ -33,7 +33,7 @@ export default function Home() {
           <span className={styles.badge}>Our Differentiator</span>
           <h2 className={styles.sectionTitle}>Stop Drowning in Irrelevant National News</h2>
           <p className={styles.sectionDesc}>
-            While legacy media monitoring platforms give you a noisy feed of every school in the country, we fold rigorous GEO context into your search, surfacing information from your community.
+            While legacy media monitoring platforms give you a noisy feed of every school in the country, we fold rigorous geographical context into your search, surfacing information from your community.
           </p>
         </div>
 
@@ -108,7 +108,7 @@ export default function Home() {
           <ul className={styles.priceList}>
             <li>Unlimited Users</li>
             <li>AI-Summarized Daily Mentions</li>
-            <li>Hyper-Local GEO Context Filtering</li>
+            <li>Hyper-Local Geographic Context Filtering</li>
             <li>News, Facebook, Instagram, & TikTok</li>
             <li>Mission-Aligned AI Suggestions</li>
             <li>Intuitive, Zero-Learning-Curve Dashboard</li>
