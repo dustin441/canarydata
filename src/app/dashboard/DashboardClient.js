@@ -1352,13 +1352,25 @@ export default function DashboardClient({ articles, districts, queries: initialQ
 
                       {/* Notes */}
                       {col('notes') && (
-                        <td>
-                          <button
-                            className={`note-indicator ${getNoteText(article) ? 'has-note' : ''}`}
-                            onClick={() => openNoteModal(article)}
-                          >
-                            📝 {getNoteText(article) ? 'Edit' : 'Add'}
-                          </button>
+                        <td className="summary-cell">
+                          {getNoteText(article)
+                            ? <>
+                                <ExpandableText text={getNoteText(article)} />
+                                <button
+                                  className="expand-btn"
+                                  style={{ marginTop: '6px', opacity: 0.6 }}
+                                  onClick={() => openNoteModal(article)}
+                                >
+                                  Edit note
+                                </button>
+                              </>
+                            : <button
+                                className={`note-indicator`}
+                                onClick={() => openNoteModal(article)}
+                              >
+                                📝 Add note
+                              </button>
+                          }
                         </td>
                       )}
                     </tr>
