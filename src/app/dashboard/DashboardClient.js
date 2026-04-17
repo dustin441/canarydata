@@ -134,30 +134,36 @@ function ScoreGauge({ score }) {
 }
 
 function buildChartData(articles) {
-  // Group by week for trend charts
+  // Group by week for trend charts — key is ISO date of Sunday (sortable, year-aware)
   const byWeek = {};
   articles.forEach((a) => {
     const d = new Date(a.date + 'T00:00:00');
-    // Get Sunday of that week
-    const day = d.getDay();
     const sunday = new Date(d);
-    sunday.setDate(d.getDate() - day);
-    const key = sunday.toLocaleDateString('en-US', { month: 'short', day: 'numeric' });
-    if (!byWeek[key]) byWeek[key] = { date: key, mentions: 0, scoreSum: 0 };
+    sunday.setDate(d.getDate() - d.getDay());
+    // ISO key ensures no cross-year collisions and enables correct sort
+    const key = sunday.toISOString().slice(0, 10);
+    if (!byWeek[key]) byWeek[key] = { isoDate: key, mentions: 0, scoreSum: 0 };
     byWeek[key].mentions++;
     byWeek[key].scoreSum += parseFloat(a.canary_score ?? 0);
   });
 
-  const mentionTrend = Object.values(byWeek)
-    .map((w) => ({ date: w.date, mentions: w.mentions }))
-    .slice(-10);
+  // Sort chronologically, then take the most recent 10 weeks
+  const sorted = Object.values(byWeek).sort((a, b) => a.isoDate.localeCompare(b.isoDate));
+  const recent = sorted.slice(-10);
 
-  const sentimentTrend = Object.values(byWeek)
-    .map((w) => ({
-      date: w.date,
-      score: parseFloat((w.scoreSum / w.mentions).toFixed(2)),
-    }))
-    .slice(-10);
+  // Format display label: "May 12, 2025"
+  function weekLabel(isoDate) {
+    const [year, month, day] = isoDate.split('-');
+    return new Date(Number(year), Number(month) - 1, Number(day))
+      .toLocaleDateString('en-US', { month: 'short', day: 'numeric', year: 'numeric' });
+  }
+
+  const mentionTrend = recent.map((w) => ({ date: weekLabel(w.isoDate), mentions: w.mentions }));
+
+  const sentimentTrend = recent.map((w) => ({
+    date: weekLabel(w.isoDate),
+    score: parseFloat((w.scoreSum / w.mentions).toFixed(2)),
+  }));
 
   // Source breakdown
   const sourceCounts = {};
