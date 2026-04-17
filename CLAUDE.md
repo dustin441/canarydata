@@ -54,12 +54,14 @@ src/
 - `innovation_reason` text, `recommendation` text
 - `district_id` text (foreign key to districts.id)
 
-**`districts`** (2 rows) — `id` text, `name`, `city`, `state`, `zip`
-- `bessemer-city-schools` — Bessemer City Schools, AL
-- `santa-clara-usd` — Santa Clara Unified School District, CA
+**`districts`** (14 rows) — `id` text, `name`, `city`, `state`, `zip`
+- 12 beta tester districts + `bessemer-city-schools` + `santa-clara-usd`
 
-**`search_queries`** (25 rows) — monitored search terms per district  
+**`search_queries`** (300+ rows) — monitored search terms per district. Columns: `district_id`, `district_name`, `query_text`, `channels` (news/social), `geo_zip`, `active`
+
 **`social_sources`** (6 rows) — social accounts being tracked
+
+**`client_credentials`** (12 rows) — admin reference table: `district_id`, `first_name`, `last_name`, `email`, `temp_password`
 
 **RLS:** Enabled on all tables but NO policies defined. Always use the admin client (`createAdminClient()`) for data access — the anon client returns zero rows.
 
@@ -93,6 +95,8 @@ All component classes are in `globals.css`. Key ones:
   - Available columns: Date*, Headline*, Summary, Link, Source, Tags, Score, Innovation Reason, Recommendation, Earned Media, Notes (* = required)
 - **Earned Media checkbox** — saves to DB instantly via server action with optimistic UI
 - **Notes** — add/edit/clear via modal form, saves to DB via server action
+
+**Beta Testers** (admin only) — table of all 12 beta tester clients with email, temp password (show/hide + copy), and login URL. Backed by `client_credentials` table.
 
 **Queries** — list all monitored search terms grouped by keyword vs geographic; add new queries; delete queries; filtered by district (admin only)
 

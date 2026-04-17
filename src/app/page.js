@@ -1,5 +1,5 @@
 import Link from 'next/link';
-import Image from 'next/image';
+import Header from './Header';
 import styles from './page.module.css';
 
 export const metadata = {
@@ -11,16 +11,7 @@ export default function Home() {
   return (
     <div className={styles.container}>
       {/* Header */}
-      <header className={styles.header}>
-        <div className={styles.logo}>
-          <Image src="/canary-logo.svg" alt="Canary Data" width={280} height={60} priority style={{ height: '44px', width: 'auto' }} />
-        </div>
-        <nav className={styles.nav}>
-          <Link href="#features">Features</Link>
-          <Link href="#pricing">Pricing</Link>
-          <Link href="/login">Login</Link>
-        </nav>
-      </header>
+      <Header />
 
       {/* Hero */}
       <section className={styles.hero}>
@@ -32,7 +23,6 @@ export default function Home() {
           </p>
           <div className={styles.heroButtons}>
             <Link href="/login" className={styles.primaryBtn}>Start Tracking Today</Link>
-            <Link href="/login" className={styles.secondaryBtn}>See the Dashboard</Link>
           </div>
         </div>
       </section>
@@ -51,7 +41,7 @@ export default function Home() {
           <div className={styles.vsText}>
             <h3 className={styles.cardTitle}>Hyper-Local Precision</h3>
             <p className={styles.cardText} style={{ marginBottom: '1.5rem' }}>
-              Central High School has hundreds of locations across the United States. We filter mentions by specific counties, ZIP codes, and cities, ensuring that 100% of the articles you see are actually about <em>your</em> district. 
+              Central High School has nearly 200 locations across the United States. We filter mentions by specific counties, ZIP codes, and cities, ensuring that 100% of the articles you see are actually about <em>your</em> district. 
             </p>
             <p className={styles.cardText}>
               More context means refined searches, fewer false positives, and highly relevant intelligence immediately at your fingertips.
