@@ -2,7 +2,7 @@
 
 import { useState, useMemo, useEffect, useRef, useTransition } from 'react';
 import Image from 'next/image';
-import { setEarnedMedia, saveNote, addQuery, deleteQuery } from '@/app/actions';
+import { setEarnedMedia, saveNote, addQuery, deleteQuery, submitFeedback } from '@/app/actions';
 
 const ALL_COLUMNS = [
   { id: 'date',               label: 'Date',               required: true  },
@@ -633,6 +633,89 @@ function ClientsView({ clients }) {
   );
 }
 
+function FeedbackModal({ districtId, districtName, onClose }) {
+  const [message, setMessage] = useState('');
+  const [photo, setPhoto] = useState(null);
+  const [preview, setPreview] = useState(null);
+  const [isPending, startTransition] = useTransition();
+  const [submitted, setSubmitted] = useState(false);
+  const [error, setError] = useState(null);
+
+  function handlePhoto(e) {
+    const file = e.target.files?.[0];
+    if (!file) return;
+    setPhoto(file);
+    setPreview(URL.createObjectURL(file));
+  }
+
+  function handleSubmit(e) {
+    e.preventDefault();
+    setError(null);
+    const fd = new FormData();
+    fd.append('message', message);
+    fd.append('district_id', districtId || '');
+    fd.append('district_name', districtName || '');
+    if (photo) fd.append('photo', photo);
+    startTransition(async () => {
+      try {
+        await submitFeedback(fd);
+        setSubmitted(true);
+      } catch (err) {
+        setError(err.message || 'Something went wrong. Please try again.');
+      }
+    });
+  }
+
+  return (
+    <div className="modal-overlay" onClick={(e) => e.target === e.currentTarget && onClose()}>
+      <div className="modal-box">
+        {submitted ? (
+          <>
+            <h3>Thanks for the feedback! 🙌</h3>
+            <p className="modal-success">We received your message and will review it shortly.</p>
+            <div className="modal-actions">
+              <button className="modal-submit-btn" onClick={onClose}>Close</button>
+            </div>
+          </>
+        ) : (
+          <>
+            <div>
+              <h3>Share Feedback</h3>
+              <p>Found a bug, have a suggestion, or want to share something? Let us know.</p>
+            </div>
+            <form onSubmit={handleSubmit} style={{ display: 'contents' }}>
+              <textarea
+                className="modal-textarea"
+                placeholder="Describe your feedback..."
+                value={message}
+                onChange={(e) => setMessage(e.target.value)}
+                required
+              />
+              <label className="modal-file-label">
+                Attach a screenshot (optional)
+                <input
+                  className="modal-file-input"
+                  type="file"
+                  accept="image/*"
+                  onChange={handlePhoto}
+                />
+              </label>
+              {preview && <img className="modal-preview-img" src={preview} alt="Preview" />}
+              {error && <p style={{ color: 'var(--status-negative)', fontSize: '0.82rem', margin: 0 }}>{error}</p>}
+              <div className="modal-actions">
+                <button type="button" className="modal-cancel-btn" onClick={onClose}>Cancel</button>
+                <button type="submit" className="modal-submit-btn" disabled={isPending || !message.trim()}>
+                  {isPending ? 'Sending…' : 'Send Feedback'}
+                </button>
+              </div>
+            </form>
+          </>
+        )}
+      </div>
+    </div>
+  );
+}
+
 export default function DashboardClient({ articles, districts, queries: initialQueries, clients = [], userDistrictId }) {
   const [currentView, setCurrentView] = useState('dashboard');
   const [search, setSearch] = useState('');
@@ -640,6 +723,7 @@ export default function DashboardClient({ articles, districts, queries: initialQ
   const [tagFilter, setTagFilter] = useState('All');
   const [districtFilter, setDistrictFilter] = useState(userDistrictId ?? 'All');
   const [noteModal, setNoteModal] = useState(null);
+  const [feedbackOpen, setFeedbackOpen] = useState(false);
   const [sidebarOpen, setSidebarOpen] = useState(false);
   const [visibleColumns, setVisibleColumns] = useState(DEFAULT_VISIBLE);
   const [colMenuOpen, setColMenuOpen] = useState(false);
@@ -912,7 +996,9 @@ export default function DashboardClient({ articles, districts, queries: initialQ
             </div>
           </div>
           <div className="topbar-right">
-            <button className="topbar-btn" title="Notifications">🔔</button>
+            <button className="feedback-btn" onClick={() => setFeedbackOpen(true)}>
+              💬 Feedback
+            </button>
           </div>
         </header>
 
@@ -1330,6 +1416,14 @@ export default function DashboardClient({ articles, districts, queries: initialQ
             </div>
           </div>
         </div>
+      )}
+
+      {feedbackOpen && (
+        <FeedbackModal
+          districtId={userDistrictId}
+          districtName={userDistrictId ? districts.find((d) => d.id === userDistrictId)?.name : null}
+          onClose={() => setFeedbackOpen(false)}
+        />
       )}
     </div>
   );
