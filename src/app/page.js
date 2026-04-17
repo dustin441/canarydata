@@ -134,8 +134,7 @@ export default function Home() {
             </p>
           </div>
           <p style={{ marginTop: '1.5rem', fontSize: '0.9rem', color: '#94a3b8', lineHeight: '1.6' }}>
-            <strong style={{ color: '#e2e8f0' }}>Built for Schools. Works Everywhere.</strong>
-            {' '}We built Canary Data for schools. We quickly learned the problem was bigger. Government agencies, nonprofits, and colleges—you all need to track your media and earned coverage without breaking the bank. View our demo, share your industry details, and we&apos;ll customize your categories before your trial starts. Interested?
+            We believe in our product. Start your 30-day free trial today—no payment upfront, no barriers to entry. We know school district payment cycles take time, so we&apos;re giving you full access now. Just submit payment within 30 days to keep monitoring without interruption. We&apos;ll send you an invoice that you can pay by check, ACH, or credit card. Let&apos;s get started!
           </p>
         </div>
       </section>
