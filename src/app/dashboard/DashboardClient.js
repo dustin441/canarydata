@@ -16,6 +16,7 @@ const ALL_COLUMNS = [
   { id: 'recommendation',     label: 'Recommendation',     defaultOn: false },
   { id: 'earned_media',       label: 'Earned Media',       defaultOn: true },
   { id: 'notes',              label: 'Notes',              defaultOn: true },
+  { id: 'query',              label: 'Source Query',       defaultOn: false },
 ];
 
 const DEFAULT_VISIBLE = new Set(
@@ -1460,6 +1461,7 @@ export default function DashboardClient({ articles, districts, queries: initialQ
                     {col('recommendation')    && <th>Recommendation</th>}
                     {col('earned_media')      && <th>Earned Media</th>}
                     {col('notes')             && <th>Notes</th>}
+                    {col('query')             && <th>Source Query</th>}
                   </tr>
                 </thead>
                 <tbody>
@@ -1601,6 +1603,30 @@ export default function DashboardClient({ articles, districts, queries: initialQ
                               >
                                 📝 Add note
                               </button>
+                          }
+                        </td>
+                      )}
+
+                      {/* Source Query */}
+                      {col('query') && (
+                        <td style={{ fontSize: '0.78rem', color: 'var(--text-secondary)', maxWidth: '180px' }}>
+                          {article.source_query
+                            ? <span style={{
+                                display: 'inline-block',
+                                padding: '2px 8px',
+                                borderRadius: 'var(--radius-full)',
+                                background: 'var(--bg-elevated)',
+                                color: 'var(--text-secondary)',
+                                fontSize: '0.72rem',
+                                fontWeight: 500,
+                                whiteSpace: 'nowrap',
+                                overflow: 'hidden',
+                                textOverflow: 'ellipsis',
+                                maxWidth: '170px',
+                              }}>
+                                {article.source_query}
+                              </span>
+                            : <span style={{ color: 'var(--text-tertiary)', fontStyle: 'italic' }}>—</span>
                           }
                         </td>
                       )}
