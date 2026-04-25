@@ -98,37 +98,76 @@ function formatDistrictName(id) {
 
 function ScoreGauge({ score }) {
   const nScore = score === '—' ? 0 : parseFloat(score);
-  
-  // Decide color based on score
-  let color = '#EF4444'; // Red (0-3)
-  if (nScore >= 3) color = '#F5C518'; // Yellow (3-7)
-  if (nScore >= 7) color = '#22C55E'; // Green (7-10)
+  // Arc circumference: π × r = π × 80 ≈ 251.33
+  const C = Math.PI * 80;
+  const d = 'M 20 100 A 80 80 0 0 1 180 100';
 
-  // Math for SVG arc (strokeDasharray for a semicircle of r=80 is pi * 80 ~= 251.2)
-  const dashArray = 251.2;
-  const dashOffset = dashArray - (dashArray * (nScore / 10));
+  // Compute strokeDasharray/strokeDashoffset for a zone segment s1→s2
+  function zoneStroke(s1, s2) {
+    const segLen = C * (s2 - s1) / 10;
+    return { strokeDasharray: `${segLen} ${C}`, strokeDashoffset: -(C * s1 / 10) };
+  }
+
+  const progressLen = C * nScore / 10;
+
+  let fillColor = '#EF4444';           // 0–3  red
+  if (nScore >= 3) fillColor = '#F5C518'; // 3–7  yellow
+  if (nScore >= 7) fillColor = '#22C55E'; // 7–10 green
 
   return (
-    <div style={{ position: 'relative', width: '100%', height: '100%', display: 'flex', flexDirection: 'column', alignItems: 'center', justifyContent: 'center', paddingTop: '20px' }}>
-      <svg width="200" height="105" viewBox="0 0 200 105" style={{ overflow: 'visible' }}>
-        {/* Background track */}
-        <path d="M 20 100 A 80 80 0 0 1 180 100" fill="none" stroke="#1E2D40" strokeWidth="20" strokeLinecap="round" />
-        {/* Progress track */}
-        <path 
-           d="M 20 100 A 80 80 0 0 1 180 100" 
-           fill="none" 
-           stroke={color} 
-           strokeWidth="20" 
-           strokeLinecap="round"
-           strokeDasharray={dashArray} 
-           strokeDashoffset={dashOffset} 
-           style={{ transition: 'stroke-dashoffset 1s ease-out, stroke 1s ease' }}
-        />
+    <div style={{ width: '100%', display: 'flex', flexDirection: 'column', alignItems: 'center', paddingTop: '4px' }}>
+      {/*
+        viewBox 0 0 200 120:
+          Arc center at y=100, r=80 → top of arc at y=20, outer edge at y=11.
+          "Low"/"High" labels sit below the arc ends at y=116.
+          Score text baseline at y=96, "AVG SCORE" at y=110.
+      */}
+      <svg viewBox="0 0 200 120" style={{ width: '100%', maxWidth: '180px', overflow: 'visible' }}>
+        {/* Gray base track */}
+        <path d={d} fill="none" stroke="#1E2D40" strokeWidth="18" strokeLinecap="round" />
+
+        {/* Dim zone tints — show threshold bands even when score = 0 */}
+        <path d={d} fill="none" stroke="#EF4444" strokeWidth="16" strokeLinecap="butt" opacity="0.22" {...zoneStroke(0, 3)} />
+        <path d={d} fill="none" stroke="#F5C518" strokeWidth="16" strokeLinecap="butt" opacity="0.22" {...zoneStroke(3, 7)} />
+        <path d={d} fill="none" stroke="#22C55E" strokeWidth="16" strokeLinecap="butt" opacity="0.22" {...zoneStroke(7, 10)} />
+
+        {/* Progress fill up to current score */}
+        {nScore > 0 && (
+          <path
+            d={d}
+            fill="none"
+            stroke={fillColor}
+            strokeWidth="16"
+            strokeLinecap="round"
+            strokeDasharray={`${progressLen} ${C}`}
+            strokeDashoffset={0}
+            style={{ transition: 'stroke-dasharray 1s ease-out, stroke 1s ease' }}
+          />
+        )}
+
+        {/*
+          Threshold separator ticks at score=3 and score=7.
+          score=3: θ=126°  inner(r=72)→(57.7,41.8)  outer(r=89)→(47.7,28.0)
+          score=7: θ=54°   inner(r=72)→(142.3,41.8)  outer(r=89)→(152.3,28.0)
+        */}
+        <line x1="57.7"  y1="41.8" x2="47.7"  y2="28.0" stroke="#94A3B8" strokeWidth="1.5" opacity="0.55" />
+        <line x1="142.3" y1="41.8" x2="152.3" y2="28.0" stroke="#94A3B8" strokeWidth="1.5" opacity="0.55" />
+
+        {/* Zone labels */}
+        <text x="14"  y="116" textAnchor="middle" fill="#EF4444" fontSize="8" fontWeight="700" opacity="0.75">Low</text>
+        <text x="100" y="9"   textAnchor="middle" fill="#F5C518" fontSize="8" fontWeight="700" opacity="0.75">Avg</text>
+        <text x="186" y="116" textAnchor="middle" fill="#22C55E" fontSize="8" fontWeight="700" opacity="0.75">High</text>
+
+        {/* Score value */}
+        <text
+          x="100" y="96"
+          textAnchor="middle" dominantBaseline="auto"
+          fill={fillColor} fontSize="30" fontWeight="800"
+          style={{ transition: 'fill 1s ease' }}
+        >
+          {score}
+        </text>
       </svg>
-      <div style={{ position: 'absolute', bottom: '-10px', textAlign: 'center' }}>
-        <div style={{ fontSize: '2.5rem', fontWeight: '800', color: 'var(--text-primary)', lineHeight: 1 }}>{score}</div>
-        <div style={{ fontSize: '0.8rem', color: 'var(--text-tertiary)', textTransform: 'uppercase', letterSpacing: '0.05em', marginTop: '6px' }}>Health Score</div>
-      </div>
     </div>
   );
 }
@@ -1176,8 +1215,7 @@ export default function DashboardClient({ articles, districts, queries: initialQ
                 </div>
                 <div className="kpi-icon green">📈</div>
               </div>
-              <div className="kpi-value">{avgScore}</div>
-              <span className="kpi-change positive">↑ Positive sentiment</span>
+              <ScoreGauge score={avgScore} />
             </div>
 
             <div className="kpi-card">
@@ -1261,12 +1299,6 @@ export default function DashboardClient({ articles, districts, queries: initialQ
               </ResponsiveContainer>
             </div>
 
-            <div className="chart-card">
-              <h4>Overall Health <span>Current score</span></h4>
-              <div style={{ width: '100%', height: '200px', display: 'flex' }}>
-                <ScoreGauge score={avgScore} />
-              </div>
-            </div>
           </div>
 
           {/* Articles Table */}
