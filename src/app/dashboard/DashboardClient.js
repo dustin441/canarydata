@@ -735,12 +735,107 @@ function FeedbackModal({ districtId, districtName, onClose }) {
   );
 }
 
+function ScoreRangeFilter({ min, max, onChange }) {
+  const SCORE_MIN = 1;
+  const SCORE_MAX = 10;
+  const pct = (v) => ((v - SCORE_MIN) / (SCORE_MAX - SCORE_MIN)) * 100;
+
+  return (
+    <div style={{ display: 'flex', alignItems: 'center', gap: '8px' }}>
+      <span className="filter-group-label">Score</span>
+      <div style={{ display: 'flex', flexDirection: 'column', gap: '3px' }}>
+        <div className="score-range-slider">
+          <div className="score-range-track">
+            <div className="score-range-fill" style={{ left: `${pct(min)}%`, right: `${100 - pct(max)}%` }} />
+          </div>
+          <input
+            type="range" min={SCORE_MIN} max={SCORE_MAX} step="0.5" value={min}
+            onChange={(e) => onChange(Math.min(parseFloat(e.target.value), max - 0.5), max)}
+          />
+          <input
+            type="range" min={SCORE_MIN} max={SCORE_MAX} step="0.5" value={max}
+            onChange={(e) => onChange(min, Math.max(parseFloat(e.target.value), min + 0.5))}
+          />
+        </div>
+        <div style={{ display: 'flex', justifyContent: 'space-between', fontSize: '0.65rem', color: 'var(--canary-yellow)', fontWeight: 700 }}>
+          <span>{min.toFixed(1)}</span>
+          <span>{max.toFixed(1)}</span>
+        </div>
+      </div>
+    </div>
+  );
+}
+
+function QueryMultiSelect({ allQueries, selectedQueries, onChange }) {
+  const [open, setOpen] = useState(false);
+  const ref = useRef(null);
+
+  useEffect(() => {
+    function handleClick(e) {
+      if (ref.current && !ref.current.contains(e.target)) setOpen(false);
+    }
+    document.addEventListener('mousedown', handleClick);
+    return () => document.removeEventListener('mousedown', handleClick);
+  }, []);
+
+  const count = selectedQueries.size;
+
+  return (
+    <div ref={ref} style={{ position: 'relative' }}>
+      <button className="btn btn-secondary btn-sm" onClick={() => setOpen((o) => !o)}>
+        🔍 {count === 0 ? 'All Queries' : `${count} Quer${count === 1 ? 'y' : 'ies'}`}
+      </button>
+      {open && (
+        <div className="query-multiselect-dropdown">
+          <div style={{ display: 'flex', justifyContent: 'space-between', alignItems: 'center', marginBottom: '8px' }}>
+            <span className="filter-group-label">Filter by Query</span>
+            {count > 0 && (
+              <button
+                className="btn btn-ghost"
+                style={{ padding: '2px 6px', fontSize: '0.7rem' }}
+                onClick={() => onChange(new Set())}
+              >
+                Clear
+              </button>
+            )}
+          </div>
+          {allQueries.length === 0 ? (
+            <p style={{ color: 'var(--text-tertiary)', fontSize: '0.8rem', fontStyle: 'italic' }}>No queries found</p>
+          ) : (
+            allQueries.map((q) => (
+              <label key={q} className="query-multiselect-item">
+                <input
+                  type="checkbox"
+                  checked={selectedQueries.has(q)}
+                  onChange={(e) => {
+                    const next = new Set(selectedQueries);
+                    if (e.target.checked) next.add(q);
+                    else next.delete(q);
+                    onChange(next);
+                  }}
+                  style={{ accentColor: 'var(--canary-yellow)', width: '14px', height: '14px', flexShrink: 0 }}
+                />
+                <span style={{ overflow: 'hidden', textOverflow: 'ellipsis' }}>{q}</span>
+              </label>
+            ))
+          )}
+        </div>
+      )}
+    </div>
+  );
+}
+
 export default function DashboardClient({ articles, districts, queries: initialQueries, clients = [], userDistrictId }) {
   const [currentView, setCurrentView] = useState('dashboard');
   const [search, setSearch] = useState('');
   const [sourceFilter, setSourceFilter] = useState('All');
   const [tagFilter, setTagFilter] = useState('All');
   const [districtFilter, setDistrictFilter] = useState(userDistrictId ?? 'All');
+  const [dateStart, setDateStart] = useState('');
+  const [dateEnd, setDateEnd] = useState('');
+  const [scoreMin, setScoreMin] = useState(1);
+  const [scoreMax, setScoreMax] = useState(10);
+  const [selectedQueries, setSelectedQueries] = useState(new Set());
   const [noteModal, setNoteModal] = useState(null);
   const [feedbackOpen, setFeedbackOpen] = useState(false);
   const [sidebarOpen, setSidebarOpen] = useState(false);
@@ -842,6 +937,22 @@ export default function DashboardClient({ articles, districts, queries: initialQ
     return ['All', ...Array.from(s).sort()];
   }, [articles]);
 
+  const allSourceQueries = useMemo(() => {
+    const qs = new Set();
+    articles.forEach((a) => { if (a.source_query) qs.add(a.source_query); });
+    return Array.from(qs).sort();
+  }, [articles]);
+
+  const hasSecondaryFilters = dateStart || dateEnd || scoreMin !== 1 || scoreMax !== 10 || selectedQueries.size > 0;
+
+  function clearSecondaryFilters() {
+    setDateStart('');
+    setDateEnd('');
+    setScoreMin(1);
+    setScoreMax(10);
+    setSelectedQueries(new Set());
+  }
+
   const filtered = useMemo(() => {
     const q = search.toLowerCase();
     return articles.filter((a) => {
@@ -856,9 +967,16 @@ export default function DashboardClient({ articles, districts, queries: initialQ
         (Array.isArray(a.tags) && a.tags.includes(tagFilter));
       const matchDistrict =
         districtFilter === 'All' || a.district_id === districtFilter;
-      return matchSearch && matchSource && matchTag && matchDistrict;
+      const matchDateStart = !dateStart || a.date >= dateStart;
+      const matchDateEnd = !dateEnd || a.date <= dateEnd;
+      const score = parseFloat(a.canary_score ?? 0);
+      const matchScore = score >= scoreMin && score <= scoreMax;
+      const matchQuery =
+        selectedQueries.size === 0 ||
+        (a.source_query && selectedQueries.has(a.source_query));
+      return matchSearch && matchSource && matchTag && matchDistrict && matchDateStart && matchDateEnd && matchScore && matchQuery;
     });
-  }, [articles, search, sourceFilter, tagFilter, districtFilter]);
+  }, [articles, search, sourceFilter, tagFilter, districtFilter, dateStart, dateEnd, scoreMin, scoreMax, selectedQueries]);
 
   const chartArticles = districtFilter === 'All'
     ? articles
@@ -1212,6 +1330,48 @@ export default function DashboardClient({ articles, districts, queries: initialQ
                   )}
                 </div>
               </div>
+            </div>
+
+            {/* Secondary filter bar — date, score, query */}
+            <div className="filter-secondary-bar">
+              {/* Date range */}
+              <div style={{ display: 'flex', alignItems: 'center', gap: '6px' }}>
+                <span className="filter-group-label">Date</span>
+                <input
+                  type="date"
+                  className="filter-date"
+                  value={dateStart}
+                  onChange={(e) => setDateStart(e.target.value)}
+                />
+                <span style={{ color: 'var(--text-tertiary)', fontSize: '0.8rem' }}>–</span>
+                <input
+                  type="date"
+                  className="filter-date"
+                  value={dateEnd}
+                  onChange={(e) => setDateEnd(e.target.value)}
+                />
+              </div>
+
+              {/* Canary score slider */}
+              <ScoreRangeFilter
+                min={scoreMin}
+                max={scoreMax}
+                onChange={(min, max) => { setScoreMin(min); setScoreMax(max); }}
+              />
+
+              {/* Query multi-select */}
+              <QueryMultiSelect
+                allQueries={allSourceQueries}
+                selectedQueries={selectedQueries}
+                onChange={setSelectedQueries}
+              />
+
+              {/* Clear all secondary filters */}
+              {hasSecondaryFilters && (
+                <button className="btn btn-ghost btn-sm" onClick={clearSecondaryFilters}>
+                  ✕ Clear filters
+                </button>
+              )}
             </div>
 
             <div className="data-table-wrapper">

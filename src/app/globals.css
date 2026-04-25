@@ -1597,3 +1597,141 @@ a:hover {
     grid-template-columns: 1fr;
   }
 }
+
+/* ===== FILTER BAR — SECONDARY ROW ===== */
+.filter-secondary-bar {
+  display: flex;
+  align-items: center;
+  gap: 20px;
+  padding: 11px 22px;
+  border-bottom: 1px solid var(--border-primary);
+  flex-wrap: wrap;
+  background: var(--bg-secondary);
+}
+
+.filter-group-label {
+  font-size: 0.68rem;
+  font-weight: 700;
+  text-transform: uppercase;
+  letter-spacing: 0.07em;
+  color: var(--text-tertiary);
+  white-space: nowrap;
+}
+
+/* Date inputs inside filter bar */
+.filter-date {
+  padding: 6px 10px;
+  background: var(--bg-input);
+  border: 1px solid var(--border-primary);
+  border-radius: var(--radius-md);
+  color: var(--text-primary);
+  font-family: inherit;
+  font-size: 0.78rem;
+  outline: none;
+  width: 124px;
+  transition: border-color var(--transition-fast);
+  color-scheme: dark;
+}
+
+.filter-date:focus {
+  border-color: var(--canary-yellow);
+}
+
+/* Score dual-range slider */
+.score-range-slider {
+  position: relative;
+  width: 120px;
+  height: 20px;
+}
+
+.score-range-track {
+  position: absolute;
+  top: 50%;
+  transform: translateY(-50%);
+  left: 0;
+  right: 0;
+  height: 4px;
+  background: var(--border-secondary);
+  border-radius: var(--radius-full);
+  pointer-events: none;
+}
+
+.score-range-fill {
+  position: absolute;
+  top: 0;
+  height: 100%;
+  background: var(--canary-yellow);
+  border-radius: var(--radius-full);
+}
+
+.score-range-slider input[type="range"] {
+  position: absolute;
+  left: 0;
+  top: 0;
+  width: 100%;
+  height: 100%;
+  margin: 0;
+  appearance: none;
+  -webkit-appearance: none;
+  background: transparent;
+  pointer-events: none;
+  outline: none;
+}
+
+.score-range-slider input[type="range"]::-webkit-slider-thumb {
+  -webkit-appearance: none;
+  width: 16px;
+  height: 16px;
+  border-radius: 50%;
+  background: var(--canary-yellow);
+  border: 2px solid var(--bg-card);
+  cursor: pointer;
+  pointer-events: all;
+  box-shadow: 0 0 6px rgba(245, 197, 24, 0.35);
+  transition: transform var(--transition-fast);
+}
+
+.score-range-slider input[type="range"]::-webkit-slider-thumb:hover {
+  transform: scale(1.15);
+}
+
+.score-range-slider input[type="range"]::-moz-range-thumb {
+  width: 16px;
+  height: 16px;
+  border-radius: 50%;
+  background: var(--canary-yellow);
+  border: 2px solid var(--bg-card);
+  cursor: pointer;
+  pointer-events: all;
+  box-shadow: 0 0 6px rgba(245, 197, 24, 0.35);
+}
+
+/* Query multi-select dropdown */
+.query-multiselect-dropdown {
+  position: absolute;
+  right: 0;
+  top: calc(100% + 6px);
+  background: var(--bg-card);
+  border: 1px solid var(--border-secondary);
+  border-radius: var(--radius-lg);
+  padding: 10px 12px;
+  z-index: 200;
+  min-width: 240px;
+  max-width: 340px;
+  max-height: 260px;
+  overflow-y: auto;
+  box-shadow: var(--shadow-lg);
+}
+
+.query-multiselect-item {
+  display: flex;
+  align-items: center;
+  gap: 8px;
+  padding: 5px 0;
+  font-size: 0.8rem;
+  color: var(--text-primary);
+  cursor: pointer;
+  white-space: nowrap;
+  overflow: hidden;
+  text-overflow: ellipsis;
+}
