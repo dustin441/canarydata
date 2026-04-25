@@ -540,7 +540,12 @@ function HowItWorksView() {
   );
 }
 
-function SettingsView() {
+function SettingsView({ userDistrictId, districts }) {
+  const [issue, setIssue] = useState('');
+  const [isPending, startSupportTransition] = useTransition();
+  const [submitted, setSubmitted] = useState(false);
+  const [supportError, setSupportError] = useState(null);
+
   const handleLogout = async () => {
     try {
       const { createClient } = await import('@/lib/supabase/client');
@@ -550,11 +555,31 @@ function SettingsView() {
     } catch {}
   };
 
+  function handleSupportSubmit(e) {
+    e.preventDefault();
+    setSupportError(null);
+    const fd = new FormData();
+    fd.append('message', issue);
+    fd.append('district_id', userDistrictId || '');
+    fd.append('district_name', districts?.find((d) => d.id === userDistrictId)?.name ?? '');
+    startSupportTransition(async () => {
+      try {
+        await submitFeedback(fd);
+        setSubmitted(true);
+        setIssue('');
+      } catch (err) {
+        setSupportError(err.message || 'Something went wrong. Please try again.');
+      }
+    });
+  }
+
   return (
     <div className="data-section">
       <div className="data-header">
         <h3>⚙️ Settings</h3>
       </div>
+
+      {/* Profile */}
       <div style={{ background: 'var(--bg-elevated)', border: '1px solid var(--border-secondary)', borderRadius: 'var(--radius-lg)', padding: '32px', maxWidth: '800px', marginBottom: '24px' }}>
         <h4 style={{ color: 'var(--text-primary)', marginBottom: '16px', fontSize: '1.2rem' }}>Profile Information</h4>
         <div style={{ display: 'grid', gap: '20px', marginBottom: '32px', maxWidth: '400px' }}>
@@ -568,30 +593,65 @@ function SettingsView() {
           </div>
         </div>
 
-        <h4 style={{ color: 'var(--text-primary)', marginBottom: '16px', marginTop: '32px', fontSize: '1.2rem', paddingTop: '32px', borderTop: '1px solid var(--border-secondary)' }}>Notification Preferences</h4>
-        <div style={{ display: 'grid', gap: '16px' }}>
-          <label style={{ display: 'flex', alignItems: 'center', gap: '12px', color: 'var(--text-primary)', fontSize: '0.95rem', cursor: 'pointer' }}>
-            <input type="checkbox" defaultChecked style={{ width: '18px', height: '18px', accentColor: 'var(--brand-primary)' }} />
-            Daily digest emails
-          </label>
-          <label style={{ display: 'flex', alignItems: 'center', gap: '12px', color: 'var(--text-primary)', fontSize: '0.95rem', cursor: 'pointer' }}>
-            <input type="checkbox" defaultChecked style={{ width: '18px', height: '18px', accentColor: 'var(--brand-primary)' }} />
-            Alerts for negative sentiment drops
-          </label>
-          <label style={{ display: 'flex', alignItems: 'center', gap: '12px', color: 'var(--text-primary)', fontSize: '0.95rem', cursor: 'pointer' }}>
-            <input type="checkbox" style={{ width: '18px', height: '18px', accentColor: 'var(--brand-primary)' }} />
-            Weekly reporting summaries
-          </label>
-        </div>
-
-        <div style={{ marginTop: '48px', paddingTop: '24px', borderTop: '1px solid var(--border-secondary)', display: 'flex', justifyContent: 'space-between', alignItems: 'center' }}>
-          <div style={{ color: 'var(--text-secondary)', fontSize: '0.85rem' }}>
-            Need help? Contact support.
-          </div>
+        <div style={{ marginTop: '32px', paddingTop: '24px', borderTop: '1px solid var(--border-secondary)', display: 'flex', justifyContent: 'flex-end' }}>
           <button onClick={handleLogout} className="btn btn-danger">
             Sign Out
           </button>
         </div>
+      </div>
+
+      {/* Contact Support */}
+      <div style={{ background: 'var(--bg-elevated)', border: '1px solid var(--border-secondary)', borderRadius: 'var(--radius-lg)', padding: '32px', maxWidth: '800px' }}>
+        <h4 style={{ color: 'var(--text-primary)', marginBottom: '8px', fontSize: '1.2rem' }}>Need Help?</h4>
+        <p style={{ color: 'var(--text-secondary)', fontSize: '0.9rem', marginBottom: '24px', lineHeight: 1.6 }}>
+          Contact support by describing your issue below. Our team will follow up within 24–48 business hours.
+        </p>
+
+        {submitted ? (
+          <div style={{
+            background: '#22C55E15',
+            border: '1px solid #22C55E40',
+            borderRadius: 'var(--radius-md)',
+            padding: '16px 20px',
+            color: '#22C55E',
+            fontSize: '0.9rem',
+            display: 'flex',
+            alignItems: 'center',
+            gap: '10px',
+          }}>
+            <span style={{ fontSize: '1.1rem', flexShrink: 0 }}>✓</span>
+            Your issue has been received. Someone will reach back within 24–48 business hours.
+          </div>
+        ) : (
+          <form onSubmit={handleSupportSubmit}>
+            <div style={{ marginBottom: '16px' }}>
+              <label style={{ display: 'block', color: 'var(--text-secondary)', fontSize: '0.85rem', marginBottom: '8px' }}>
+                Describe your issue
+              </label>
+              <textarea
+                className="form-textarea"
+                placeholder="What do you need help with?"
+                value={issue}
+                onChange={(e) => setIssue(e.target.value)}
+                rows={5}
+                required
+                style={{ width: '100%' }}
+              />
+            </div>
+            {supportError && (
+              <p style={{ color: 'var(--status-negative)', fontSize: '0.82rem', marginBottom: '12px' }}>{supportError}</p>
+            )}
+            <div style={{ display: 'flex', justifyContent: 'flex-end' }}>
+              <button
+                type="submit"
+                className="btn btn-primary"
+                disabled={isPending || !issue.trim()}
+              >
+                {isPending ? <span className="spinner" style={{ margin: '0 auto' }} /> : 'Submit Request'}
+              </button>
+            </div>
+          </form>
+        )}
       </div>
     </div>
   );
@@ -1219,7 +1279,7 @@ export default function DashboardClient({ articles, districts, queries: initialQ
 
         <main className="page-content">
           {currentView === 'clients' && <ClientsView clients={clients} />}
-          {currentView === 'settings' && <SettingsView />}
+          {currentView === 'settings' && <SettingsView userDistrictId={userDistrictId} districts={districts} />}
           {currentView === 'howto' && <HowItWorksView />}
           {currentView === 'queries' && (
             <QueriesView
