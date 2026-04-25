@@ -512,6 +512,33 @@ function NotesView({ articles, getNoteText, openNoteModal }) {
   );
 }
 
+function HowItWorksView() {
+  return (
+    <div className="data-section" style={{ maxWidth: '860px' }}>
+      <div className="data-header">
+        <h3>▶ How This Works</h3>
+        <span style={{ fontSize: '0.82rem', color: 'var(--text-secondary)' }}>Platform walkthrough</span>
+      </div>
+      <div style={{ padding: '28px' }}>
+        <p style={{ color: 'var(--text-secondary)', fontSize: '0.9rem', marginBottom: '24px', lineHeight: 1.6 }}>
+          Watch this short walkthrough to understand how Canary monitors media, interprets Canary Scores, and surfaces the insights most relevant to your district.
+        </p>
+        {/* Responsive 16:9 Loom embed */}
+        <div style={{ position: 'relative', paddingBottom: '56.25%', height: 0, borderRadius: 'var(--radius-lg)', overflow: 'hidden', background: '#0B1120' }}>
+          <iframe
+            src="https://www.loom.com/embed/e3a252bc1c0b4b258e5412720aa301b7"
+            frameBorder="0"
+            webkitallowfullscreen="true"
+            mozallowfullscreen="true"
+            allowFullScreen
+            style={{ position: 'absolute', top: 0, left: 0, width: '100%', height: '100%' }}
+          />
+        </div>
+      </div>
+    </div>
+  );
+}
+
 function SettingsView() {
   const handleLogout = async () => {
     try {
@@ -1057,6 +1084,14 @@ export default function DashboardClient({ articles, districts, queries: initialQ
               Dashboard
             </button>
             <button
+              className={`sidebar-link ${currentView === 'howto' ? 'active' : ''}`}
+              onClick={() => setCurrentView('howto')}
+              style={{ width: '100%', background: 'none', border: 'none', textAlign: 'left', cursor: 'pointer' }}
+            >
+              <span className="sidebar-link-icon">▶️</span>
+              How This Works
+            </button>
+            <button
               className={`sidebar-link ${currentView === 'articles' ? 'active' : ''}`}
               onClick={() => setCurrentView('dashboard')}
               style={{ width: '100%', background: 'none', border: 'none', textAlign: 'left', cursor: 'pointer' }}
@@ -1158,15 +1193,18 @@ export default function DashboardClient({ articles, districts, queries: initialQ
                       ? 'Analyst Notes'
                       : currentView === 'clients'
                         ? 'Beta Testers'
-                        : districtFilter === 'All'
-                          ? 'All Districts'
-                          : formatDistrictName(districtFilter)}
+                        : currentView === 'howto'
+                          ? 'How This Works'
+                          : districtFilter === 'All'
+                            ? 'All Districts'
+                            : formatDistrictName(districtFilter)}
               </div>
               <div className="topbar-breadcrumb">
                 {currentView === 'queries' ? 'Manage monitored search terms'
                   : currentView === 'settings' ? 'Manage your account and preferences'
                   : currentView === 'notes' ? 'Articles with analyst annotations'
                   : currentView === 'clients' ? 'Login credentials for beta testers'
+                  : currentView === 'howto' ? 'Platform walkthrough video'
                   : 'Media Intelligence Dashboard'}
               </div>
             </div>
@@ -1181,6 +1219,7 @@ export default function DashboardClient({ articles, districts, queries: initialQ
         <main className="page-content">
           {currentView === 'clients' && <ClientsView clients={clients} />}
           {currentView === 'settings' && <SettingsView />}
+          {currentView === 'howto' && <HowItWorksView />}
           {currentView === 'queries' && (
             <QueriesView
               initialQueries={initialQueries}
