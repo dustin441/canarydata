@@ -1,6 +1,7 @@
 'use server';
 
 import { createAdminClient } from '@/lib/supabase/admin';
+import { createClickUpFeedbackTask, isClickUpConfigured } from '@/lib/clickup';
 import { revalidatePath } from 'next/cache';
 
 export async function setEarnedMedia(id, value) {
@@ -73,11 +74,41 @@ export async function submitFeedback(formData) {
     photoUrl = urlData.publicUrl;
   }
 
-  const { error } = await supabase.from('feedback').insert({
+  const { data: feedback, error } = await supabase.from('feedback').insert({
     message: message.trim(),
     photo_url: photoUrl,
     district_id: districtId,
     district_name: districtName,
-  });
+  }).select('*').single();
   if (error) throw error;
+
+  if (!isClickUpConfigured()) return;
+
+  try {
+    const task = await createClickUpFeedbackTask(feedback);
+    const { error: updateError } = await supabase
+      .from('feedback')
+      .update({
+        status: 'clickup_synced',
+        clickup_task_id: task?.id || null,
+        clickup_task_url: task?.url || null,
+        clickup_synced_at: new Date().toISOString(),
+        clickup_sync_error: null,
+      })
+      .eq('id', feedback.id);
+    if (updateError) {
+      await supabase.from('feedback').update({ status: 'clickup_synced' }).eq('id', feedback.id);
+    }
+  } catch (clickupError) {
+    const { error: updateError } = await supabase
+      .from('feedback')
+      .update({
+        status: 'clickup_failed',
+        clickup_sync_error: clickupError.message || 'Unknown ClickUp error',
+      })
+      .eq('id', feedback.id);
+    if (updateError) {
+      await supabase.from('feedback').update({ status: 'clickup_failed' }).eq('id', feedback.id);
+    }
+  }
 }
