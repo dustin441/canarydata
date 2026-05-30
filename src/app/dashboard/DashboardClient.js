@@ -779,6 +779,84 @@ function ExpandableText({ text, empty = false }) {
   );
 }
 
+function renderRecMarkdown(text) {
+  const lines = text.split('\n');
+  const elements = [];
+  let listBuffer = [];
+
+  function flushList() {
+    if (listBuffer.length > 0) {
+      elements.push(
+        <ul key={`ul-${elements.length}`} style={{ margin: '4px 0 8px 16px', padding: 0, listStyle: 'disc' }}>
+          {listBuffer.map((item, i) => <li key={i} style={{ fontSize: '0.85rem', lineHeight: 1.6, color: 'var(--text-primary)' }}>{item}</li>)}
+        </ul>
+      );
+      listBuffer = [];
+    }
+  }
+
+  function renderInline(str) {
+    const parts = str.split(/(\*\*[^*]+\*\*)/g);
+    return parts.map((part, i) =>
+      part.startsWith('**') && part.endsWith('**')
+        ? <strong key={i}>{part.slice(2, -2)}</strong>
+        : part
+    );
+  }
+
+  lines.forEach((line, i) => {
+    if (line.startsWith('## ')) {
+      flushList();
+      elements.push(
+        <div key={i} style={{ marginTop: elements.length > 0 ? '14px' : 0, marginBottom: '4px', fontSize: '0.7rem', fontWeight: 700, textTransform: 'uppercase', letterSpacing: '0.07em', color: 'var(--canary-yellow)', borderBottom: '1px solid var(--border-primary)', paddingBottom: '3px' }}>
+          {line.slice(3)}
+        </div>
+      );
+    } else if (line.startsWith('- ')) {
+      listBuffer.push(renderInline(line.slice(2)));
+    } else if (line.trim() === '') {
+      flushList();
+    } else {
+      flushList();
+      elements.push(
+        <p key={i} style={{ margin: '2px 0', fontSize: '0.85rem', lineHeight: 1.6, color: 'var(--text-primary)' }}>
+          {renderInline(line)}
+        </p>
+      );
+    }
+  });
+  flushList();
+  return elements;
+}
+
+function RecommendationText({ text }) {
+  const [open, setOpen] = useState(false);
+  if (!text) return <span style={{ color: 'var(--text-tertiary)', fontStyle: 'italic' }}>—</span>;
+
+  const hasMarkdown = text.includes('## ');
+  const preview = hasMarkdown
+    ? text.replace(/##\s+[^\n]+/g, '').replace(/\n+/g, ' ').trim().slice(0, 110)
+    : text.slice(0, 110);
+
+  return (
+    <>
+      <div className="summary-text">{preview}{preview.length >= 110 ? '…' : ''}</div>
+      <button className="expand-btn" onClick={() => setOpen(true)}>Show more</button>
+      {open && (
+        <div className="expand-overlay" onClick={() => setOpen(false)}>
+          <div className="expand-popover" style={{ maxHeight: '80vh', overflowY: 'auto' }} onClick={(e) => e.stopPropagation()}>
+            {hasMarkdown
+              ? <div>{renderRecMarkdown(text)}</div>
+              : <p className="expand-body">{text}</p>
+            }
+            <button className="expand-close-btn" onClick={() => setOpen(false)}>Hide</button>
+          </div>
+        </div>
+      )}
+    </>
+  );
+}
+
 function FeedbackModal({ districtId, districtName, onClose }) {
   const [message, setMessage] = useState('');
   const [photo, setPhoto] = useState(null);
@@ -1620,7 +1698,7 @@ export default function DashboardClient({ articles, districts, queries: initialQ
                       {/* Recommendation */}
                       {col('recommendation') && (
                         <td className="summary-cell">
-                          <ExpandableText text={article.recommendation} />
+                          <RecommendationText text={article.recommendation} />
                         </td>
                       )}
 
