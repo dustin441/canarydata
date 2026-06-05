@@ -1158,6 +1158,15 @@ export default function DashboardClient({ articles, districts, queries: initialQ
     setSelectedQueries(new Set());
   }
 
+  function handleExportPdf() {
+    setCurrentView('dashboard');
+    setColMenuOpen(false);
+    setFeedbackOpen(false);
+
+    // Let React finish switching back to the dashboard before opening print.
+    window.setTimeout(() => window.print(), 120);
+  }
+
   const filtered = useMemo(() => {
     const q = search.toLowerCase();
     return articles.filter((a) => {
@@ -1349,6 +1358,11 @@ export default function DashboardClient({ articles, districts, queries: initialQ
             </div>
           </div>
           <div className="topbar-right">
+            {currentView === 'dashboard' && (
+              <button className="btn btn-secondary btn-sm export-pdf-btn" onClick={handleExportPdf}>
+                ⬇ Export PDF
+              </button>
+            )}
             <button className="feedback-btn" onClick={() => setFeedbackOpen(true)}>
               💬 Feedback
             </button>
@@ -1374,6 +1388,19 @@ export default function DashboardClient({ articles, districts, queries: initialQ
             />
           )}
           {currentView === 'dashboard' && (<>
+          <div className="print-report-header">
+            <div>
+              <h1>{districtFilter === 'All' ? 'All Districts' : formatDistrictName(districtFilter)} Media Intelligence Dashboard</h1>
+              <p>
+                Exported {new Date().toLocaleDateString('en-US', { month: 'long', day: 'numeric', year: 'numeric' })}
+                {' · '}{filtered.length} visible articles
+                {dateStart || dateEnd ? ` · Date: ${dateStart || 'Any'}–${dateEnd || 'Any'}` : ''}
+                {sourceFilter !== 'All' ? ` · Source: ${sourceFilter}` : ''}
+                {tagFilter !== 'All' ? ` · Tag: ${tagFilter}` : ''}
+              </p>
+            </div>
+            <Image src="/canary-logo.svg" alt="Canary Data" width={160} height={43} style={{ height: '36px', width: 'auto' }} />
+          </div>
           {/* KPI Cards */}
           <div className="kpi-grid">
             <div className="kpi-card">

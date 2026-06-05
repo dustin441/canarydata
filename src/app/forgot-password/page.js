@@ -58,7 +58,7 @@ export default function ForgotPassword() {
               <div style={{ fontSize: '2.5rem', marginBottom: '16px' }}>✉️</div>
               <h3 style={{ color: 'var(--text-primary)', marginBottom: '10px' }}>Check your email</h3>
               <p style={{ color: 'var(--text-secondary)', fontSize: '0.9rem', lineHeight: '1.5' }}>
-                We've sent a password reset link to <strong>{email}</strong>.
+                We&apos;ve sent a password reset link to <strong>{email}</strong>.
               </p>
               <button 
                 onClick={() => router.push('/login')} 
