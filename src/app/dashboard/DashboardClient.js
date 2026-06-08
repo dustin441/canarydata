@@ -1192,9 +1192,10 @@ export default function DashboardClient({ articles, districts, queries: initialQ
     });
   }, [articles, search, sourceFilter, tagFilter, districtFilter, dateStart, dateEnd, scoreMin, scoreMax, selectedQueries]);
 
-  const chartArticles = districtFilter === 'All'
-    ? articles
-    : articles.filter((a) => a.district_id === districtFilter);
+  // Keep KPI/charts aligned with the visible article table. This prevents cases
+  // where a filtered table shows only TikTok rows but the source wheel still
+  // reflects the broader district/all-article set.
+  const chartArticles = filtered;
 
   const { mentionTrend, sentimentTrend, sourceBreakdown } = useMemo(
     () => buildChartData(chartArticles),
