@@ -17,6 +17,7 @@ export default function Header() {
       {/* Desktop nav */}
       <nav className={`${styles.nav} ${styles.desktopNav}`}>
         <Link href="#features">Features</Link>
+        <Link href="#demo">Demo</Link>
         <Link href="#pricing">Pricing</Link>
         <Link href="/login">Login</Link>
       </nav>
@@ -37,6 +38,7 @@ export default function Header() {
       {open && (
         <div className={styles.mobileMenu} onClick={() => setOpen(false)}>
           <Link href="#features" className={styles.mobileLink}>Features</Link>
+          <Link href="#demo" className={styles.mobileLink}>Demo</Link>
           <Link href="#pricing" className={styles.mobileLink}>Pricing</Link>
           <Link href="/login" className={styles.mobileLink}>Login</Link>
         </div>
