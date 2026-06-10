@@ -89,8 +89,8 @@ export default function PrivacyPolicy() {
         }}>
           <p style={{ color: '#64748b', fontSize: '0.9rem', lineHeight: '1.7', margin: 0 }}>
             <strong style={{ color: '#94a3b8' }}>Questions about this policy?</strong> Contact us at{' '}
-            <a href="mailto:privacy@canarydata.io" style={linkStyle}>
-              privacy@canarydata.io
+            <a href="mailto:privacy@canarydata.media" style={linkStyle}>
+              privacy@canarydata.media
             </a>. We&apos;re a small team and will respond personally.
           </p>
         </div>
@@ -115,7 +115,7 @@ const sections = [
     content: (
       <p>
         Canary Data is a media intelligence platform that helps public school districts and other public sector organizations monitor publicly accessible news coverage, online conversations, and social media mentions related to their organization, schools, programs, and publicly identifiable leadership. The platform is designed to help communications teams understand public discussion, identify emerging issues, track sentiment, evaluate communications impact, and make informed messaging decisions. Contact us at{' '}
-        <a href="mailto:privacy@canarydata.io" style={linkStyle}>privacy@canarydata.io</a>.
+        <a href="mailto:privacy@canarydata.media" style={linkStyle}>privacy@canarydata.media</a>.
       </p>
     ),
   },
@@ -223,7 +223,7 @@ const sections = [
           <li style={itemStyle}>Request deletion or export of customer data, subject to applicable law and contractual requirements.</li>
           <li style={itemStyle}>Opt out of non-essential communications.</li>
         </ul>
-        <p>To exercise these rights, email <a href="mailto:privacy@canarydata.io" style={linkStyle}>privacy@canarydata.io</a>. We will respond within a reasonable timeframe.</p>
+        <p>To exercise these rights, email <a href="mailto:privacy@canarydata.media" style={linkStyle}>privacy@canarydata.media</a>. We will respond within a reasonable timeframe.</p>
       </>
     ),
   },

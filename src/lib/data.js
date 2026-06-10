@@ -1,22 +1,33 @@
 import { createAdminClient } from '@/lib/supabase/admin';
 
+const ARTICLE_COLUMNS = 'id, date, headline, summary, source, source_type, canary_score, tags, notes, is_earned_media, is_perched, link, district_id, innovation_reason, recommendation, source_query';
+const ARTICLE_PAGE_SIZE = 1000;
+
 export async function getArticles(districtId = null) {
   const supabase = createAdminClient();
+  const allArticles = [];
 
-  let query = supabase
-    .from('news_stories')
-    .select(
-      'id, date, headline, summary, source, source_type, canary_score, tags, notes, is_earned_media, is_perched, link, district_id, innovation_reason, recommendation, source_query'
-    )
-    .order('date', { ascending: false });
+  for (let from = 0; ; from += ARTICLE_PAGE_SIZE) {
+    let query = supabase
+      .from('news_stories')
+      .select(ARTICLE_COLUMNS)
+      .order('date', { ascending: false })
+      .range(from, from + ARTICLE_PAGE_SIZE - 1);
 
-  if (districtId) {
-    query = query.eq('district_id', districtId);
+    if (districtId) {
+      query = query.eq('district_id', districtId);
+    }
+
+    const { data, error } = await query;
+    if (error) throw error;
+
+    const page = data ?? [];
+    allArticles.push(...page);
+
+    if (page.length < ARTICLE_PAGE_SIZE) break;
   }
 
-  const { data, error } = await query;
-  if (error) throw error;
-  return data ?? [];
+  return allArticles;
 }
 
 export async function getDistricts() {

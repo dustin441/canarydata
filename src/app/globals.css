@@ -1736,13 +1736,33 @@ a:hover {
   text-overflow: ellipsis;
 }
 
+.export-pdf-btn {
+  display: inline-flex;
+  align-items: center;
+  gap: 8px;
+}
+
+.export-pdf-hint {
+  padding-left: 8px;
+  border-left: 1px solid var(--border-secondary);
+  color: var(--text-tertiary);
+  font-size: 0.68rem;
+  font-weight: 600;
+}
+
+@media (max-width: 900px) {
+  .export-pdf-hint {
+    display: none;
+  }
+}
+
 .print-report-header {
   display: none;
 }
 
 @media print {
   @page {
-    size: landscape;
+    size: 17in 11in;
     margin: 0.35in;
   }
 
@@ -1800,21 +1820,23 @@ a:hover {
     justify-content: space-between;
     gap: 24px;
     margin-bottom: 18px;
-    padding-bottom: 14px;
-    border-bottom: 2px solid #e2e8f0;
+    padding: 14px 18px;
+    border: 1px solid #0f2a44;
+    border-radius: 12px;
+    background: #0f2a44 !important;
     break-after: avoid;
   }
 
   .print-report-header h1 {
     margin: 0 0 6px;
     font-size: 22px;
-    color: #0f172a;
+    color: #ffffff !important;
   }
 
   .print-report-header p {
     margin: 0;
     font-size: 11px;
-    color: #475569;
+    color: #dbeafe !important;
   }
 
   .kpi-grid,
