@@ -1839,6 +1839,16 @@ a:hover {
     color: #dbeafe !important;
   }
 
+  .print-report-logo {
+    background: #ffffff !important;
+    border-radius: 10px;
+    padding: 8px 12px;
+    display: inline-flex !important;
+    align-items: center;
+    justify-content: center;
+    flex: 0 0 auto;
+  }
+
   .kpi-grid,
   .charts-grid {
     break-inside: avoid;

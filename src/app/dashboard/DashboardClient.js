@@ -1405,7 +1405,9 @@ export default function DashboardClient({ articles, districts, queries: initialQ
                 {tagFilter !== 'All' ? ` · Tag: ${tagFilter}` : ''}
               </p>
             </div>
-            <Image src="/canary-logo.svg" alt="Canary Data" width={160} height={43} style={{ height: '36px', width: 'auto' }} />
+            <div className="print-report-logo">
+              <Image src="/canary-logo-duotone-blue.png" alt="Canary Data" width={178} height={40} style={{ height: '40px', width: 'auto' }} />
+            </div>
           </div>
           {/* KPI Cards */}
           <div className="kpi-grid">
