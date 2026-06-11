@@ -1821,32 +1821,40 @@ a:hover {
     gap: 24px;
     margin-bottom: 18px;
     padding: 14px 18px;
-    border: 1px solid #0f2a44;
+    border: 1px solid #cbd5e1;
+    border-left: 8px solid #0f2a44;
     border-radius: 12px;
-    background: #0f2a44 !important;
+    background: #ffffff !important;
     break-after: avoid;
+    box-shadow: none !important;
   }
 
   .print-report-header h1 {
     margin: 0 0 6px;
     font-size: 22px;
-    color: #ffffff !important;
+    color: #0f2a44 !important;
   }
 
   .print-report-header p {
     margin: 0;
     font-size: 11px;
-    color: #dbeafe !important;
+    color: #475569 !important;
   }
 
   .print-report-logo {
     background: #ffffff !important;
     border-radius: 10px;
-    padding: 8px 12px;
+    padding: 4px 0 4px 12px;
     display: inline-flex !important;
     align-items: center;
     justify-content: center;
     flex: 0 0 auto;
+  }
+
+  .print-report-logo img {
+    filter: none !important;
+    print-color-adjust: exact;
+    -webkit-print-color-adjust: exact;
   }
 
   .kpi-grid,
