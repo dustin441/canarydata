@@ -23,7 +23,7 @@ export default function Home() {
           </p>
           <div className={styles.heroButtons}>
             <Link href="/login" className={styles.primaryBtn}>Start Tracking Today</Link>
-            <Link href="#demo" className={styles.secondaryBtn}>View Demo Dashboard</Link>
+            <Link href="/demo" className={styles.secondaryBtn}>Try Live Demo Dashboard</Link>
           </div>
         </div>
       </section>
@@ -108,7 +108,7 @@ export default function Home() {
                 <p className={styles.demoEyebrow}>Central County Schools</p>
                 <h3>Communications Intelligence Dashboard</h3>
               </div>
-              <button className={styles.demoExport}>Export PDF</button>
+              <Link href="/demo" className={styles.demoExport}>Open Live Demo</Link>
             </div>
 
             <div className={styles.metricGrid}>

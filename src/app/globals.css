@@ -1736,6 +1736,22 @@ a:hover {
   text-overflow: ellipsis;
 }
 
+
+.demo-mode-banner {
+  margin-bottom: 18px;
+  padding: 12px 16px;
+  border: 1px solid rgba(245, 197, 24, 0.35);
+  border-radius: var(--radius-lg);
+  background: rgba(245, 197, 24, 0.08);
+  color: var(--text-secondary);
+  font-size: 0.88rem;
+  line-height: 1.5;
+}
+
+.demo-mode-banner strong {
+  color: var(--canary-yellow);
+}
+
 .export-pdf-btn {
   display: inline-flex;
   align-items: center;
