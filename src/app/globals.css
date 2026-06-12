@@ -783,6 +783,7 @@ a:hover {
   align-items: center;
   justify-content: space-between;
   margin-bottom: 14px;
+  gap: 12px;
 }
 
 .kpi-label {
@@ -791,6 +792,13 @@ a:hover {
   color: var(--text-secondary);
   text-transform: uppercase;
   letter-spacing: 0.05em;
+  display: inline-flex;
+  align-items: center;
+  gap: 6px;
+  min-width: 0;
+  line-height: 1.25;
+  white-space: normal;
+  overflow: visible;
 }
 
 .kpi-icon {
@@ -926,6 +934,7 @@ a:hover {
 
 .data-table {
   width: 100%;
+  min-width: 980px;
   border-collapse: collapse;
 }
 
@@ -943,6 +952,7 @@ a:hover {
   cursor: pointer;
   user-select: none;
   transition: color var(--transition-fast);
+  overflow: visible;
 }
 
 .data-table th:hover {
@@ -959,6 +969,14 @@ a:hover {
   color: var(--text-primary);
   border-bottom: 1px solid var(--border-primary);
   vertical-align: top;
+  overflow: visible;
+}
+
+.data-table th.score-column,
+.data-table td.score-column {
+  min-width: 92px;
+  width: 92px;
+  text-align: center;
 }
 
 .data-table tr {
@@ -1077,11 +1095,13 @@ a:hover {
   display: inline-flex;
   align-items: center;
   justify-content: center;
-  min-width: 44px;
-  padding: 4px 10px;
+  min-width: 54px;
+  padding: 5px 12px;
   border-radius: var(--radius-full);
   font-size: 0.8rem;
   font-weight: 700;
+  line-height: 1.2;
+  white-space: nowrap;
 }
 
 .score-badge.high {
@@ -1195,6 +1215,8 @@ a:hover {
   display: flex;
   align-items: center;
   gap: 8px;
+  flex-wrap: wrap;
+  line-height: 1.35;
 }
 
 .chart-card h4 span {

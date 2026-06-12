@@ -1742,7 +1742,7 @@ export default function DashboardClient({ articles, districts, queries: initialQ
                     {col('link')              && <th>Link</th>}
                     {col('source')            && <th>Source</th>}
                     {col('tags')              && <th>Tags</th>}
-                    {col('score')             && <th>Score<InfoTooltip text={SCORE_TOOLTIP} /></th>}
+                    {col('score')             && <th className="score-column">Score<InfoTooltip text={SCORE_TOOLTIP} /></th>}
                     {col('innovation_reason') && <th>Innovation</th>}
                     {col('recommendation')    && <th>Recommendation</th>}
                     {col('earned_media')      && <th>Earned Media</th>}
@@ -1827,7 +1827,7 @@ export default function DashboardClient({ articles, districts, queries: initialQ
 
                       {/* Score */}
                       {col('score') && (
-                        <td>
+                        <td className="score-column">
                           <span className={`score-badge ${getScoreClass(article.canary_score)}`}>
                             {parseFloat(article.canary_score).toFixed(1)}
                           </span>

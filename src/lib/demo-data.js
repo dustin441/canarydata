@@ -8,6 +8,7 @@ export const demoQueries = [
   { id: 'demo-q-3', query_text: 'Central High Bobcats Phoenix athletics', district_id: 'phoenix-central-high', district_name: 'Central High School', geo_city: 'Phoenix', geo_state: 'AZ', geo_zip: '85012', channels: 'social', active: true, created_at: '2026-05-03' },
   { id: 'demo-q-4', query_text: 'Central High School Phoenix FAFSA graduation', district_id: 'phoenix-central-high', district_name: 'Central High School', geo_city: 'Phoenix', geo_state: 'AZ', geo_zip: '85012', channels: 'all', active: true, created_at: '2026-05-05' },
   { id: 'demo-q-5', query_text: 'Central High School wrong district examples', district_id: 'phoenix-central-high', district_name: 'Central High School', geo_city: '', geo_state: '', geo_zip: '', channels: 'news', active: true, created_at: '2026-05-06' },
+  { id: 'demo-q-6', query_text: 'Central High School Phoenix lockdown safety communication', district_id: 'phoenix-central-high', district_name: 'Central High School', geo_city: 'Phoenix', geo_state: 'AZ', geo_zip: '85012', channels: 'news', active: true, created_at: '2026-06-11' },
 ];
 
 export const demoArticles = [
@@ -20,6 +21,16 @@ export const demoArticles = [
     innovation_reason: 'Shows proactive family engagement and multilingual access, both aligned with community-trust messaging.',
     recommendation: 'Share as a short social post and add a principal quote about belonging before the first event. Include the registration link and translation availability.',
     source_query: '"Central High School" Phoenix',
+  },
+  {
+    id: 'demo-016', date: '2026-06-10', district_id: 'phoenix-central-high', source_type: 'news', source: 'Phoenix Safety Bulletin Demo',
+    headline: 'Central High enters brief lockdown after police activity reported near campus',
+    summary: 'Central High School was placed in a brief precautionary lockdown after police activity was reported several blocks from campus. No students or staff were injured, and the school resumed normal operations after law enforcement cleared the area.',
+    link: 'https://example.com/demo/brief-lockdown-safety-update', canary_score: 2.7,
+    tags: ['Safety', 'Crisis Response', 'Family Communication'], notes: 'Full-recommendation demo scenario adapted from Lesley\'s lockdown example direction.', is_earned_media: false, is_perched: false,
+    innovation_reason: 'High-sensitivity safety item where speed, clarity, and empathy matter more than amplification.',
+    recommendation: 'Immediate response: Publish a concise safety update across parent email, SMS, website alerts, and social channels confirming the lockdown timeline, that students and staff are safe, and that normal operations have resumed. Audience focus: Lead with families and staff first, then prepare a short media holding statement so public coverage does not outpace district communication. Message guidance: Avoid speculation about the off-campus incident; explain what the school did, when law enforcement cleared the scene, and where families can get follow-up information. Follow-up: Send a second message by end of day with counseling/support resources, principal contact information, and any procedural reminders for reunification or emergency notifications.',
+    source_query: 'Central High School Phoenix lockdown safety communication',
   },
   {
     id: 'demo-002', date: '2026-06-09', district_id: 'phoenix-central-high', source_type: 'facebook', source: 'Central High School Facebook',
