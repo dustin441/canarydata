@@ -128,7 +128,7 @@ const sections = [
           <li style={itemStyle}><strong style={strongStyle}>Account information:</strong> name, email address, organization, role, and other information provided during signup or account support.</li>
           <li style={itemStyle}><strong style={strongStyle}>District configuration:</strong> district names, schools, geographic parameters, search terms, monitored public sources, and public social accounts or hashtags designated for monitoring.</li>
           <li style={itemStyle}><strong style={strongStyle}>Publicly accessible content:</strong> news articles, public websites, public posts, metadata, and links retrieved from publicly available sources on a customer&apos;s behalf.</li>
-          <li style={itemStyle}><strong style={strongStyle}>Platform outputs:</strong> summaries, sentiment scores, risk levels, recommendations, tags, Visibility Value Equivalent (VVE) estimates, reports, exports, and other derivative analysis generated for the customer.</li>
+          <li style={itemStyle}><strong style={strongStyle}>Platform outputs:</strong> summaries, sentiment scores, risk levels, recommendations, tags, reports, exports, and other derivative analysis generated for the customer.</li>
           <li style={itemStyle}><strong style={strongStyle}>Usage and security data:</strong> access logs, IP address, browser type, pages visited, authentication events, and similar technical data used for security, auditing, troubleshooting, and performance.</li>
         </ul>
         <p>We do not intentionally collect student educational records, internal student information system data, private messages, or sensitive personal information. Canary Data is not designed to monitor private or closed Facebook groups, private social accounts, password-protected communities, or content that is not publicly accessible.</p>
@@ -144,7 +144,7 @@ const sections = [
           <li style={itemStyle}>Operate, maintain, and deliver the Canary Data dashboard, reports, alerts, and support services.</li>
           <li style={itemStyle}>Authenticate users, secure accounts, enforce district-level access controls, and protect customer workspaces.</li>
           <li style={itemStyle}>Retrieve, filter, summarize, classify, and present publicly accessible media and social content selected by or relevant to the customer&apos;s configuration.</li>
-          <li style={itemStyle}>Generate communications-focused analysis, including sentiment, reputation risk, Value Signal, VVE estimates, recommendations, and report exports.</li>
+          <li style={itemStyle}>Generate communications-focused analysis, including sentiment, reputation risk, recommendations, and report exports.</li>
           <li style={itemStyle}>Communicate about account setup, service operations, invoices, security, support, and product updates.</li>
           <li style={itemStyle}>Improve platform reliability, accuracy, and safety without selling customer data or using one customer&apos;s confidential configuration or outputs to market to another customer.</li>
         </ul>

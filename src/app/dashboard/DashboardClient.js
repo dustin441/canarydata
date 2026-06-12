@@ -118,6 +118,63 @@ function InfoTooltip({ text }) {
 
 const SCORE_TOOLTIP = 'Canary Score (1–10) measures how positive an article is about your district. 7–10 = positive coverage, 3–7 = neutral, 1–3 = negative or critical news.';
 
+const HIDDEN_ROADMAP_METRIC_PATTERNS = [
+  /\bVVE\b/i,
+  /Visibility Value Equivalent/i,
+  /Visibility Intelligence/i,
+  /Calculated VVE/i,
+  /Visibility Type/i,
+  /VVE Role/i,
+  /Earned Share/i,
+  /Total VVE/i,
+  /Earned[-\s]?only VVE/i,
+];
+
+function isHiddenRoadmapMetricLine(line) {
+  return HIDDEN_ROADMAP_METRIC_PATTERNS.some((pattern) => pattern.test(line));
+}
+
+function isRecommendationHeading(line) {
+  return /^\s*(#{1,3}\s+|\*\*[^*]+\*\*\s*$)/.test(line);
+}
+
+function isHiddenRoadmapMetricHeading(line) {
+  const normalized = line
+    .replace(/^\s*#{1,3}\s+/, '')
+    .replace(/^\s*\*\*/, '')
+    .replace(/\*\*\s*$/, '')
+    .trim();
+  return isHiddenRoadmapMetricLine(normalized);
+}
+
+function sanitizeRecommendationText(text) {
+  if (!text) return text;
+
+  const lines = text.split('\n');
+  const kept = [];
+  let skippingRoadmapSection = false;
+
+  lines.forEach((line) => {
+    if (isHiddenRoadmapMetricHeading(line)) {
+      skippingRoadmapSection = true;
+      return;
+    }
+
+    if (skippingRoadmapSection) {
+      if (isRecommendationHeading(line)) {
+        skippingRoadmapSection = false;
+      } else {
+        return;
+      }
+    }
+
+    if (isHiddenRoadmapMetricLine(line)) return;
+    kept.push(line);
+  });
+
+  return kept.join('\n').replace(/\n{3,}/g, '\n\n').trim();
+}
+
 function formatDate(dateStr) {
   return new Date(dateStr + 'T00:00:00').toLocaleDateString('en-US', {
     month: 'short', day: 'numeric', year: 'numeric',
@@ -873,12 +930,13 @@ function renderRecMarkdown(text) {
 
 function RecommendationText({ text }) {
   const [open, setOpen] = useState(false);
-  if (!text) return <span style={{ color: 'var(--text-tertiary)', fontStyle: 'italic' }}>—</span>;
+  const visibleText = sanitizeRecommendationText(text);
+  if (!visibleText) return <span style={{ color: 'var(--text-tertiary)', fontStyle: 'italic' }}>—</span>;
 
-  const hasMarkdown = text.includes('## ');
+  const hasMarkdown = visibleText.includes('## ');
   const preview = hasMarkdown
-    ? text.replace(/##\s+[^\n]+/g, '').replace(/\n+/g, ' ').trim().slice(0, 110)
-    : text.slice(0, 110);
+    ? visibleText.replace(/##\s+[^\n]+/g, '').replace(/\n+/g, ' ').trim().slice(0, 110)
+    : visibleText.slice(0, 110);
 
   return (
     <>
@@ -888,8 +946,8 @@ function RecommendationText({ text }) {
         <div className="expand-overlay" onClick={() => setOpen(false)}>
           <div className="expand-popover" style={{ maxHeight: '80vh', overflowY: 'auto' }} onClick={(e) => e.stopPropagation()}>
             {hasMarkdown
-              ? <div>{renderRecMarkdown(text)}</div>
-              : <p className="expand-body">{text}</p>
+              ? <div>{renderRecMarkdown(visibleText)}</div>
+              : <p className="expand-body">{visibleText}</p>
             }
             <button className="expand-close-btn" onClick={() => setOpen(false)}>Hide</button>
           </div>

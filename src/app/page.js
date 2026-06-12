@@ -115,7 +115,7 @@ export default function Home() {
               <div className={styles.metricCard}><span>Mentions</span><strong>42</strong><small>Last 30 days</small></div>
               <div className={styles.metricCard}><span>Avg. Sentiment</span><strong>7.8</strong><small>Positive trend</small></div>
               <div className={styles.metricCard}><span>High Risk</span><strong>3</strong><small>Needs review</small></div>
-              <div className={styles.metricCard}><span>Total VVE</span><strong>$18.4k</strong><small>Modeled visibility value</small></div>
+              <div className={styles.metricCard}><span>Earned Stories</span><strong>18</strong><small>Coverage wins to report</small></div>
             </div>
 
             <div className={styles.demoColumns}>
@@ -149,7 +149,7 @@ export default function Home() {
                 <ul className={styles.demoList}>
                   <li>Geo-validation keeps lookalike districts out of the feed.</li>
                   <li>Strategic recommendations stay inside the communications function.</li>
-                  <li>Value Signal and VVE help explain impact without calling it revenue.</li>
+                  <li>Earned-story counts help teams show coverage wins without overcomplicating launch metrics.</li>
                   <li>PDF export gives leaders a clean report for cabinets and board updates.</li>
                 </ul>
               </div>
