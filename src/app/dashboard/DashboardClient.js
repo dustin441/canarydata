@@ -1364,7 +1364,7 @@ export default function DashboardClient({ articles, districts, queries: initialQ
             </button>
             <button
               className={`sidebar-link ${currentView === 'articles' ? 'active' : ''}`}
-              onClick={() => setCurrentView('dashboard')}
+              onClick={() => setCurrentView('articles')}
               style={{ width: '100%', background: 'none', border: 'none', textAlign: 'left', cursor: 'pointer' }}
             >
               <span className="sidebar-link-icon">📰</span>
@@ -1468,8 +1468,10 @@ export default function DashboardClient({ articles, districts, queries: initialQ
                         ? 'Beta Testers'
                         : currentView === 'howto'
                           ? 'How This Works'
-                          : districtFilter === 'All'
-                            ? 'All Districts'
+                          : currentView === 'articles'
+                            ? 'Media Articles'
+                            : districtFilter === 'All'
+                              ? 'All Districts'
                             : formatDistrictName(districtFilter)}
               </div>
               <div className="topbar-breadcrumb">
@@ -1478,6 +1480,7 @@ export default function DashboardClient({ articles, districts, queries: initialQ
                   : currentView === 'notes' ? 'Articles with analyst annotations'
                   : currentView === 'clients' ? 'Login credentials for beta testers'
                   : currentView === 'howto' ? 'Platform walkthrough video'
+                  : currentView === 'articles' ? 'Browse, filter, annotate, and export article-level coverage'
                   : 'Media Intelligence Dashboard'}
               </div>
             </div>
@@ -1523,7 +1526,7 @@ export default function DashboardClient({ articles, districts, queries: initialQ
               openNoteModal={openNoteModal}
             />
           )}
-          {currentView === 'dashboard' && (<>
+          {(currentView === 'dashboard' || currentView === 'articles') && (<>
           <div className="print-report-header">
             <div>
               <h1>{districtFilter === 'All' ? 'All Districts' : formatDistrictName(districtFilter)} Media Intelligence Dashboard</h1>
@@ -1540,6 +1543,7 @@ export default function DashboardClient({ articles, districts, queries: initialQ
               <img src={PRINT_LOGO_SRC} alt="Canary Data" width={178} height={40} style={{ height: '40px', width: 'auto' }} />
             </div>
           </div>
+          {currentView === 'dashboard' && (<>
           {/* KPI Cards */}
           <div className="kpi-grid">
             <div className="kpi-card">
@@ -1644,6 +1648,7 @@ export default function DashboardClient({ articles, districts, queries: initialQ
             </div>
 
           </div>
+          </>)}
 
           {/* Articles Table */}
           <div className="data-section">
