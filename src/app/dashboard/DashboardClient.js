@@ -1502,6 +1502,11 @@ export default function DashboardClient({ articles, districts, queries: initialQ
                 <span className="export-pdf-hint">Tabloid landscape works best</span>
               </button>
             )}
+            {demoMode && (
+              <a className="privacy-topbar-link" href="/privacy" target="_blank" rel="noreferrer">
+                🔒 Privacy Policy
+              </a>
+            )}
             <button className="feedback-btn" onClick={() => setFeedbackOpen(true)}>
               💬 Feedback
             </button>

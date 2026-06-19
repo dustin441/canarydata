@@ -611,6 +611,29 @@ a:hover {
   opacity: 0.88;
 }
 
+.privacy-topbar-link {
+  display: inline-flex;
+  align-items: center;
+  justify-content: center;
+  height: 38px;
+  padding: 0 13px;
+  border-radius: var(--radius-md);
+  background: var(--bg-elevated);
+  border: 1px solid var(--border-primary);
+  color: var(--text-secondary);
+  font-size: 0.82rem;
+  font-weight: 600;
+  text-decoration: none;
+  white-space: nowrap;
+  transition: all var(--transition-fast);
+}
+
+.privacy-topbar-link:hover {
+  color: var(--text-primary);
+  border-color: var(--border-secondary);
+  background: var(--bg-card-hover);
+}
+
 .modal-overlay {
   position: fixed;
   inset: 0;
@@ -1856,6 +1879,7 @@ a:hover {
   .sidebar,
   .topbar,
   .feedback-btn,
+  .privacy-topbar-link,
   .export-pdf-btn,
   .filter-input,
   .filter-select,
