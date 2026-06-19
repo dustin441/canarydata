@@ -1673,7 +1673,7 @@ export default function DashboardClient({ articles, districts, queries: initialQ
                 <select className="filter-select" value={tagFilter} onChange={(e) => setTagFilter(e.target.value)}>
                   {allTags.map((t) => <option key={t}>{t}</option>)}
                 </select>
-                {districtFilter !== 'All' && (
+                {!demoMode && districtFilter !== 'All' && (
                   <button className="btn btn-secondary btn-sm" onClick={() => setDistrictFilter('All')}>
                     {formatDistrictName(districtFilter)} ✕
                   </button>

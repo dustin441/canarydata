@@ -137,7 +137,7 @@ Bundle the posts into a web recap and add a callout for upcoming FAFSA or counse
     source_query: 'Beacon Ridge High School Canary Falls FAFSA graduation',
   },
   {
-    id: 'demo-005', date: '2026-06-06', district_id: 'canary-falls-usd', source_type: 'twitter', source: 'Canary Falls Transit Updates',
+    id: 'demo-005', date: '2026-06-06', district_id: 'canary-falls-usd', source_type: 'tiktok', source: 'Canary Falls Transit Updates TikTok',
     headline: 'Morning bus detour near Beacon Avenue expected to affect Beacon Ridge High arrival traffic',
     summary: 'A public transit account announced a morning detour near campus. The post did not mention the school directly but could affect student arrival and family drop-off.',
     link: 'https://example.com/demo/bus-detour', canary_score: 5.8,
@@ -347,7 +347,7 @@ Thank the partner, capture participation numbers, and develop a short case study
     source_query: '"Beacon Ridge High" "Canary Falls Unified"',
   },
   {
-    id: 'demo-014', date: '2026-05-18', district_id: 'canary-falls-usd', source_type: 'twitter', source: 'Local Reporter Demo Account',
+    id: 'demo-014', date: '2026-05-18', district_id: 'canary-falls-usd', source_type: 'tiktok', source: 'Local Reporter Demo TikTok',
     headline: 'Reporter asks for family perspectives on Beacon Ridge High grading-policy pilot',
     summary: 'A local reporter posted a request for families willing to discuss the school grading-policy pilot, signaling possible coverage before the district has framed the issue.',
     link: 'https://example.com/demo/grading-policy-reporter', canary_score: 4.8,
