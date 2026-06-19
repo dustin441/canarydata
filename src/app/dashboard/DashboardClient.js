@@ -1274,6 +1274,7 @@ export default function DashboardClient({ articles, districts, queries: initialQ
   const [noteModal, setNoteModal] = useState(null);
   const [feedbackOpen, setFeedbackOpen] = useState(false);
   const [releaseSignupOpen, setReleaseSignupOpen] = useState(false);
+  const [releaseAutoPromptShown, setReleaseAutoPromptShown] = useState(false);
   const [sidebarOpen, setSidebarOpen] = useState(false);
   const [visibleColumns, setVisibleColumns] = useState(DEFAULT_VISIBLE);
   const [colMenuOpen, setColMenuOpen] = useState(false);
@@ -1297,6 +1298,22 @@ export default function DashboardClient({ articles, districts, queries: initialQ
     document.addEventListener('mousedown', handleClick);
     return () => document.removeEventListener('mousedown', handleClick);
   }, []);
+
+  // Prompt demo visitors to join the release notification list after 30 seconds.
+  useEffect(() => {
+    if (!demoMode || releaseAutoPromptShown) return undefined;
+    try {
+      if (sessionStorage.getItem('canary_release_signup_auto_shown') === '1') return undefined;
+    } catch {}
+
+    const timer = setTimeout(() => {
+      try { sessionStorage.setItem('canary_release_signup_auto_shown', '1'); } catch {}
+      setReleaseAutoPromptShown(true);
+      setReleaseSignupOpen(true);
+    }, 30000);
+
+    return () => clearTimeout(timer);
+  }, [demoMode, releaseAutoPromptShown]);
 
   function toggleColumn(id) {
     setVisibleColumns((prev) => {
