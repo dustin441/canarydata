@@ -1624,11 +1624,6 @@ export default function DashboardClient({ articles, districts, queries: initialQ
             </div>
           </div>
           <div className="topbar-right">
-            {demoMode && (
-              <button className="release-cta release-cta-right" onClick={() => setReleaseSignupOpen(true)}>
-                Get Release Updates
-              </button>
-            )}
             {currentView === 'dashboard' && (
               <button
                 className="btn btn-secondary btn-sm export-pdf-btn"

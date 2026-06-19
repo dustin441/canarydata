@@ -661,10 +661,6 @@ a:hover {
   margin-right: 4px;
 }
 
-.release-cta-right {
-  box-shadow: 0 0 0 1px rgba(250, 186, 24, 0.06);
-}
-
 .release-signup-modal {
   max-width: 500px;
 }
@@ -1667,12 +1663,6 @@ a:hover {
 /* ===== RESPONSIVE ===== */
 @media (max-width: 1280px) {
   .release-cta-left {
-    display: none;
-  }
-}
-
-@media (max-width: 1100px) {
-  .release-cta-right {
     display: none;
   }
 }
