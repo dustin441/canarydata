@@ -919,11 +919,12 @@ function renderRecMarkdown(text) {
   }
 
   lines.forEach((line, i) => {
-    if (line.startsWith('## ')) {
+    const boldHeading = line.match(/^\s*\*\*([^*]+)\*\*\s*$/);
+    if (line.startsWith('## ') || boldHeading) {
       flushList();
       elements.push(
         <div key={i} style={{ marginTop: elements.length > 0 ? '14px' : 0, marginBottom: '4px', fontSize: '0.7rem', fontWeight: 700, textTransform: 'uppercase', letterSpacing: '0.07em', color: 'var(--canary-yellow)', borderBottom: '1px solid var(--border-primary)', paddingBottom: '3px' }}>
-          {line.slice(3)}
+          {boldHeading ? boldHeading[1] : line.slice(3)}
         </div>
       );
     } else if (line.startsWith('- ')) {
@@ -948,9 +949,14 @@ function RecommendationText({ text }) {
   const visibleText = sanitizeRecommendationText(text);
   if (!visibleText) return <span style={{ color: 'var(--text-tertiary)', fontStyle: 'italic' }}>—</span>;
 
-  const hasMarkdown = visibleText.includes('## ');
+  const hasMarkdown = /^\s*(##\s+|\*\*[^*]+\*\*\s*$)/m.test(visibleText);
   const preview = hasMarkdown
-    ? visibleText.replace(/##\s+[^\n]+/g, '').replace(/\n+/g, ' ').trim().slice(0, 110)
+    ? visibleText
+        .replace(/##\s+[^\n]+/g, '')
+        .replace(/^\s*\*\*[^*]+\*\*\s*$/gm, '')
+        .replace(/\n+/g, ' ')
+        .trim()
+        .slice(0, 110)
     : visibleText.slice(0, 110);
 
   return (
