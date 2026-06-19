@@ -51,11 +51,11 @@ export default function Home() {
           <div className={styles.vsVisual}>
             <div className={styles.competitorBox}>
               <h4>The Other Guys</h4>
-              <p>📍 Loose Match: &quot;Sample High wins state&quot; (wrong state, wrong district)</p>
+              <p>📍 Loose Match: &quot;Beacon Ridge High wins state&quot; (wrong state, wrong district)</p>
             </div>
             <div className={styles.canaryBox}>
               <h4>Canary Data</h4>
-              <p>📍 Verified Match: &quot;Sample City USD launches new STEM program in Sample County.&quot;</p>
+              <p>📍 Verified Match: &quot;Canary Falls USD launches new STEM program in Canary County.&quot;</p>
             </div>
           </div>
         </div>
@@ -105,7 +105,7 @@ export default function Home() {
           <div className={styles.demoShell}>
             <div className={styles.demoTopBar}>
               <div>
-                <p className={styles.demoEyebrow}>Sample City School District</p>
+                <p className={styles.demoEyebrow}>Canary Falls Unified School District</p>
                 <h3>Communications Intelligence Dashboard</h3>
               </div>
               <Link href="/demo" className={styles.demoExport}>Open Live Demo</Link>

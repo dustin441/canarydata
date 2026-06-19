@@ -1440,7 +1440,7 @@ export default function DashboardClient({ articles, districts, queries: initialQ
             <div className="sidebar-avatar">C</div>
             <div className="sidebar-user-info">
               <div className="sidebar-user-name">{demoMode ? 'Demo Account' : 'Canary Admin'}</div>
-              <div className="sidebar-user-email">{demoMode ? 'Phoenix sample data' : `${districts.length} districts`}</div>
+              <div className="sidebar-user-email">{demoMode ? 'Fictional demo data' : `${districts.length} districts`}</div>
             </div>
           </div>
         </div>
@@ -1502,7 +1502,7 @@ export default function DashboardClient({ articles, districts, queries: initialQ
         <main className="page-content">
           {demoMode && (
             <div className="demo-mode-banner">
-              <strong>Interactive demo:</strong> sample public-media intelligence for Sample City School District. Filters, Social aggregation, columns, notes, feedback, and PDF export are enabled; changes stay in this browser session.
+              <strong>Interactive demo:</strong> sample public-media intelligence for Canary Falls Unified School District. Filters, Social aggregation, columns, notes, feedback, and PDF export are enabled; changes stay in this browser session.
             </div>
           )}
           {currentView === 'clients' && <ClientsView clients={clients} />}
@@ -2005,7 +2005,7 @@ export default function DashboardClient({ articles, districts, queries: initialQ
       {feedbackOpen && (
         <FeedbackModal
           districtId={userDistrictId || (demoMode ? districtFilter : '')}
-          districtName={userDistrictId ? districts.find((d) => d.id === userDistrictId)?.name : (demoMode ? 'Sample City School District' : null)}
+          districtName={userDistrictId ? districts.find((d) => d.id === userDistrictId)?.name : (demoMode ? 'Canary Falls Unified School District' : null)}
           onClose={() => setFeedbackOpen(false)}
         />
       )}
