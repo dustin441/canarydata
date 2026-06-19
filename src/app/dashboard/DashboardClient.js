@@ -1061,6 +1061,115 @@ function FeedbackModal({ districtId, districtName, onClose }) {
   );
 }
 
+function ReleaseSignupModal({ onClose }) {
+  const [name, setName] = useState('');
+  const [email, setEmail] = useState('');
+  const [schoolDistrict, setSchoolDistrict] = useState('');
+  const [isPending, startTransition] = useTransition();
+  const [submitted, setSubmitted] = useState(false);
+  const [error, setError] = useState(null);
+
+  function handleSubmit(e) {
+    e.preventDefault();
+    setError(null);
+    const trimmedName = name.trim();
+    const trimmedEmail = email.trim();
+    const trimmedSchoolDistrict = schoolDistrict.trim();
+    if (!trimmedName || !trimmedEmail || !trimmedSchoolDistrict) {
+      setError('Please add your name, email, and school or district.');
+      return;
+    }
+    const fd = new FormData();
+    fd.append('district_id', 'demo-release-notification');
+    fd.append('district_name', trimmedSchoolDistrict);
+    fd.append('message', [
+      'Release notification signup from Canary Data demo.',
+      `Name: ${trimmedName}`,
+      `Email: ${trimmedEmail}`,
+      `School/District: ${trimmedSchoolDistrict}`,
+    ].join('\n'));
+    startTransition(async () => {
+      try {
+        await submitFeedback(fd);
+        setSubmitted(true);
+      } catch (err) {
+        setError(err.message || 'Something went wrong. Please try again.');
+      }
+    });
+  }
+
+  return (
+    <div className="modal-overlay" onClick={(e) => e.target === e.currentTarget && onClose()}>
+      <div className="modal-box release-signup-modal">
+        {submitted ? (
+          <>
+            <h3>You’re on the list! 🐤</h3>
+            <p className="modal-success">We’ll notify you when Canary Data is ready for broader release.</p>
+            <div className="modal-actions">
+              <button className="modal-submit-btn" onClick={onClose}>Close</button>
+            </div>
+          </>
+        ) : (
+          <>
+            <div>
+              <h3>Notify Me When Canary Data Launches</h3>
+              <p>Leave your contact information and we’ll follow up when Canary Data is ready for more schools and districts.</p>
+            </div>
+            <form onSubmit={handleSubmit} style={{ display: 'contents' }}>
+              <label className="modal-field-label">
+                Name
+                <input
+                  className="modal-input"
+                  name="release_name"
+                  type="text"
+                  value={name}
+                  onChange={(e) => setName(e.target.value)}
+                  placeholder="Your name"
+                  autoComplete="name"
+                  required
+                />
+              </label>
+              <label className="modal-field-label">
+                Email
+                <input
+                  className="modal-input"
+                  name="release_email"
+                  type="email"
+                  value={email}
+                  onChange={(e) => setEmail(e.target.value)}
+                  placeholder="you@district.org"
+                  autoComplete="email"
+                  required
+                />
+              </label>
+              <label className="modal-field-label">
+                School or district
+                <input
+                  className="modal-input"
+                  name="release_school_district"
+                  type="text"
+                  value={schoolDistrict}
+                  onChange={(e) => setSchoolDistrict(e.target.value)}
+                  placeholder="School or district name"
+                  autoComplete="organization"
+                  required
+                />
+              </label>
+              {error && <p style={{ color: 'var(--status-negative)', fontSize: '0.82rem', margin: 0 }}>{error}</p>}
+              <div className="modal-actions">
+                <button type="button" className="modal-cancel-btn" onClick={onClose}>Cancel</button>
+                <button type="submit" className="modal-submit-btn" disabled={isPending || !name.trim() || !email.trim() || !schoolDistrict.trim()}>
+                  {isPending ? 'Saving…' : 'Notify Me'}
+                </button>
+              </div>
+            </form>
+          </>
+        )}
+      </div>
+    </div>
+  );
+}
+
 function ScoreRangeFilter({ min, max, onChange }) {
   const SCORE_MIN = 1;
   const SCORE_MAX = 10;
@@ -1164,6 +1273,7 @@ export default function DashboardClient({ articles, districts, queries: initialQ
   const [selectedQueries, setSelectedQueries] = useState(new Set());
   const [noteModal, setNoteModal] = useState(null);
   const [feedbackOpen, setFeedbackOpen] = useState(false);
+  const [releaseSignupOpen, setReleaseSignupOpen] = useState(false);
   const [sidebarOpen, setSidebarOpen] = useState(false);
   const [visibleColumns, setVisibleColumns] = useState(DEFAULT_VISIBLE);
   const [colMenuOpen, setColMenuOpen] = useState(false);
@@ -1462,6 +1572,11 @@ export default function DashboardClient({ articles, districts, queries: initialQ
             >
               ☰
             </button>
+            {demoMode && (
+              <button className="release-cta release-cta-left" onClick={() => setReleaseSignupOpen(true)}>
+                Notify Me When Canary Data Launches
+              </button>
+            )}
             <div>
               <div className="topbar-title">
                 {currentView === 'queries'
@@ -1492,6 +1607,11 @@ export default function DashboardClient({ articles, districts, queries: initialQ
             </div>
           </div>
           <div className="topbar-right">
+            {demoMode && (
+              <button className="release-cta release-cta-right" onClick={() => setReleaseSignupOpen(true)}>
+                Get Release Updates
+              </button>
+            )}
             {currentView === 'dashboard' && (
               <button
                 className="btn btn-secondary btn-sm export-pdf-btn"
@@ -2024,6 +2144,10 @@ export default function DashboardClient({ articles, districts, queries: initialQ
           districtName={userDistrictId ? districts.find((d) => d.id === userDistrictId)?.name : (demoMode ? 'Canary Falls Unified School District' : null)}
           onClose={() => setFeedbackOpen(false)}
         />
+      )}
+
+      {releaseSignupOpen && (
+        <ReleaseSignupModal onClose={() => setReleaseSignupOpen(false)} />
       )}
     </div>
   );
