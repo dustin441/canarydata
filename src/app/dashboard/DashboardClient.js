@@ -12,7 +12,7 @@ const ALL_COLUMNS = [
   { id: 'source',             label: 'Source',             defaultOn: true },
   { id: 'tags',               label: 'Tags',               defaultOn: true },
   { id: 'score',              label: 'Score',              defaultOn: true },
-  { id: 'innovation_reason',  label: 'Innovation Reason',  defaultOn: false },
+  { id: 'innovation_reason',  label: 'Strategic Alignment', defaultOn: false },
   { id: 'recommendation',     label: 'Recommendation',     defaultOn: false },
   { id: 'earned_media',       label: 'Earned Media',       defaultOn: true },
   { id: 'notes',              label: 'Notes',              defaultOn: true },
@@ -1772,7 +1772,7 @@ export default function DashboardClient({ articles, districts, queries: initialQ
                     {col('source')            && <th>Source</th>}
                     {col('tags')              && <th>Tags</th>}
                     {col('score')             && <th className="score-column">Score<InfoTooltip text={SCORE_TOOLTIP} /></th>}
-                    {col('innovation_reason') && <th>Innovation</th>}
+                    {col('innovation_reason') && <th>Strategic Alignment</th>}
                     {col('recommendation')    && <th>Recommendation</th>}
                     {col('earned_media')      && <th>Earned Media</th>}
                     {col('notes')             && <th>Notes</th>}
@@ -1863,7 +1863,7 @@ export default function DashboardClient({ articles, districts, queries: initialQ
                         </td>
                       )}
 
-                      {/* Innovation Reason */}
+                      {/* Strategic Alignment */}
                       {col('innovation_reason') && (
                         <td className="summary-cell">
                           <ExpandableText
