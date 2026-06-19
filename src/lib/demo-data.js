@@ -47,7 +47,7 @@ export const demoArticles = [
     headline: 'Neighbors ask for more notice around Beacon Ridge High summer parking lot construction',
     summary: 'A neighborhood story noted confusion around temporary parking restrictions tied to construction on the Beacon Ridge High campus. Residents said signs appeared after work had already started.',
     link: 'https://example.com/demo/parking-construction-notice', canary_score: 3.4,
-    tags: ['Facilities', 'Community Concern', 'Operations'], notes: 'Sample high-risk item: needs fast operational follow-up.', is_earned_media: false, is_perched: false,
+    tags: ['Facilities', 'Community Concern', 'Operations'], notes: 'Demo high-risk item: needs fast operational follow-up.', is_earned_media: false, is_perched: false,
     innovation_reason: 'Not an innovation story; this is a preventable trust-friction issue around communication timing.',
     recommendation: 'Post a same-day construction update with timeline, map, and contact email. Ask the principal or operations lead to acknowledge the notice gap and explain what changes next week.',
     source_query: '"Beacon Ridge High" "Canary Falls Unified"',
