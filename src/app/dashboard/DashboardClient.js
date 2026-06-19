@@ -1067,9 +1067,9 @@ function ScoreRangeFilter({ min, max, onChange }) {
   const pct = (v) => ((v - SCORE_MIN) / (SCORE_MAX - SCORE_MIN)) * 100;
 
   return (
-    <div style={{ display: 'flex', alignItems: 'center', gap: '8px' }}>
+    <div className="filter-control-group score-filter-group">
       <span className="filter-group-label">Score</span>
-      <div style={{ display: 'flex', flexDirection: 'column', gap: '3px' }}>
+      <div className="score-filter-stack">
         <div className="score-range-slider">
           <div className="score-range-track">
             <div className="score-range-fill" style={{ left: `${pct(min)}%`, right: `${100 - pct(max)}%` }} />
@@ -1722,7 +1722,7 @@ export default function DashboardClient({ articles, districts, queries: initialQ
             {/* Secondary filter bar — date, score, query */}
             <div className="filter-secondary-bar">
               {/* Date range */}
-              <div style={{ display: 'flex', alignItems: 'center', gap: '6px' }}>
+              <div className="filter-control-group date-filter-group">
                 <span className="filter-group-label">Date</span>
                 <input
                   type="date"

@@ -878,8 +878,12 @@ a:hover {
 }
 
 .data-header h3 {
+  display: flex;
+  align-items: center;
+  margin: 0;
   font-size: 1rem;
   font-weight: 700;
+  line-height: 1.2;
 }
 
 .data-filters {
@@ -948,11 +952,14 @@ a:hover {
   color: var(--text-tertiary);
   background: var(--bg-secondary);
   border-bottom: 1px solid var(--border-primary);
-  white-space: nowrap;
   cursor: pointer;
   user-select: none;
   transition: color var(--transition-fast);
+  position: relative;
   overflow: visible;
+  vertical-align: middle;
+  line-height: 1.2;
+  white-space: nowrap;
 }
 
 .data-table th:hover {
@@ -1623,12 +1630,37 @@ a:hover {
 /* ===== FILTER BAR — SECONDARY ROW ===== */
 .filter-secondary-bar {
   display: flex;
-  align-items: center;
-  gap: 20px;
-  padding: 11px 22px;
+  align-items: flex-start;
+  gap: 16px;
+  padding: 12px 16px;
   border-bottom: 1px solid var(--border-primary);
   flex-wrap: wrap;
   background: var(--bg-secondary);
+}
+
+.filter-control-group {
+  display: flex;
+  align-items: center;
+  gap: 8px;
+  min-height: 34px;
+}
+
+.date-filter-group {
+  gap: 6px;
+}
+
+.score-filter-group {
+  align-items: flex-start;
+}
+
+.score-filter-group .filter-group-label {
+  padding-top: 7px;
+}
+
+.score-filter-stack {
+  display: flex;
+  flex-direction: column;
+  gap: 3px;
 }
 
 .filter-group-label {
