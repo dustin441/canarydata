@@ -59,7 +59,7 @@ export default function PrivacyPolicy() {
           Privacy Policy
         </h1>
         <p style={{ color: '#64748b', fontSize: '0.95rem', marginBottom: '3.5rem' }}>
-          Effective Date: June 5, 2026 &nbsp;·&nbsp; Last Updated: June 9, 2026
+          Effective Date: June 5, 2026 &nbsp;·&nbsp; Last Updated: June 19, 2026
         </p>
 
         {sections.map((section) => (
@@ -158,6 +158,7 @@ const sections = [
         <p style={{ marginBottom: '1rem' }}>Canary Data is a public media and digital monitoring tool. Our intent is to surface information a district communications team could reasonably find in publicly accessible media or public social channels, not to surveil private communities.</p>
         <ul style={listStyle}>
           <li style={itemStyle}>We do not intentionally access closed groups, private social media accounts, private parent or employee communities, or password-protected spaces.</li>
+          <li style={itemStyle}>We monitor public social signals only when they are publicly accessible and relevant to a customer&apos;s configured district, schools, leaders, sources, or search terms.</li>
           <li style={itemStyle}>We do not provide tools for employee discipline, student discipline, law enforcement, or private individual surveillance.</li>
           <li style={itemStyle}>Recommendations are limited to communications functions such as messaging, engagement, channel strategy, reputation monitoring, and stakeholder awareness.</li>
           <li style={itemStyle}>Customers are responsible for choosing monitored terms and sources that are appropriate, lawful, and aligned with their organization&apos;s policies.</li>
@@ -189,6 +190,7 @@ const sections = [
           <li style={itemStyle}>Data is encrypted in transit using HTTPS/TLS and encrypted at rest by our infrastructure providers.</li>
           <li style={itemStyle}>Customer workspaces are separated by district or organization, with access limited to authorized users.</li>
           <li style={itemStyle}>Production access is limited to authorized Canary Data personnel and service providers who need access to operate, secure, or support the platform.</li>
+          <li style={itemStyle}>Demo environments use fake/sample data and should not contain live customer records, student records, or private district work product.</li>
           <li style={itemStyle}>We use role-based access, logging, and operational controls designed to reduce unauthorized access and support investigation if an issue occurs.</li>
           <li style={itemStyle}>We review platform logic and data workflows to reduce inaccurate or off-geo results that could create misleading analysis for customers.</li>
         </ul>

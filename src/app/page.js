@@ -42,7 +42,7 @@ export default function Home() {
           <div className={styles.vsText}>
             <h3 className={styles.cardTitle}>Hyper-Local Precision</h3>
             <p className={styles.cardText} style={{ marginBottom: '1.5rem' }}>
-              Central High School has nearly 200 locations across the United States. We filter mentions by specific counties, ZIP codes, and cities, ensuring that 100% of the articles you see are actually about <em>your</em> district. 
+              Many districts share similar school names, mascots, acronyms, and city names. Canary Data uses district-specific geography, school anchors, source context, and exclusion rules to keep lookalike communities out of <em>your</em> feed.
             </p>
             <p className={styles.cardText}>
               More context means refined searches, fewer false positives, and highly relevant intelligence immediately at your fingertips.
@@ -51,11 +51,11 @@ export default function Home() {
           <div className={styles.vsVisual}>
             <div className={styles.competitorBox}>
               <h4>The Other Guys</h4>
-              <p>📍 National Match: &quot;Central High wins state&quot; (Wrong state, wrong school)</p>
+              <p>📍 Loose Match: &quot;Sample High wins state&quot; (wrong state, wrong district)</p>
             </div>
             <div className={styles.canaryBox}>
               <h4>Canary Data</h4>
-              <p>📍 Local Match: &quot;Central High (Marion County, 32162) launches new STEM program.&quot;</p>
+              <p>📍 Verified Match: &quot;Sample City USD launches new STEM program in Sample County.&quot;</p>
             </div>
           </div>
         </div>
@@ -105,7 +105,7 @@ export default function Home() {
           <div className={styles.demoShell}>
             <div className={styles.demoTopBar}>
               <div>
-                <p className={styles.demoEyebrow}>Central County Schools</p>
+                <p className={styles.demoEyebrow}>Sample City School District</p>
                 <h3>Communications Intelligence Dashboard</h3>
               </div>
               <Link href="/demo" className={styles.demoExport}>Open Live Demo</Link>
@@ -145,12 +145,13 @@ export default function Home() {
               </div>
 
               <div className={styles.demoPanel}>
-                <h4>Why teams use it</h4>
+                <h4>Current launch features</h4>
                 <ul className={styles.demoList}>
                   <li>Geo-validation keeps lookalike districts out of the feed.</li>
-                  <li>Strategic recommendations stay inside the communications function.</li>
+                  <li>News and public social sources can be filtered separately or viewed as an aggregate Social feed.</li>
+                  <li>Strategic recommendations stay focused on communications action, not student discipline or private surveillance.</li>
                   <li>Earned-story counts help teams show coverage wins without overcomplicating launch metrics.</li>
-                  <li>PDF export gives leaders a clean report for cabinets and board updates.</li>
+                  <li>PDF export, notes, feedback, and stakeholder-ready reports support cabinet and board updates.</li>
                 </ul>
               </div>
             </div>
