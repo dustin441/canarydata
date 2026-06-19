@@ -320,7 +320,7 @@ function buildChartData(articles) {
   const total = articles.length || 1;
   const sourceBreakdown = Object.entries(sourceCounts)
     .map(([name, count]) => ({
-      name: name.charAt(0).toUpperCase() + name.slice(1),
+      name: formatSourceLabel(name),
       value: Math.round((count / total) * 100),
       color: SOURCE_COLORS[name] ?? SOURCE_COLORS.other,
     }))
