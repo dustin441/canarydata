@@ -75,9 +75,24 @@ const SOURCE_COLORS = {
   instagram: '#E1306C',
   tiktok: '#69C9D0',
   twitter: '#1DA1F2',
-  youtube: '#FF0000',
   other: '#94A3B8',
 };
+
+const SOCIAL_SOURCE_TYPES = new Set(['facebook', 'instagram', 'tiktok', 'twitter']);
+
+function formatSourceLabel(source) {
+  if (source === 'All') return 'All';
+  if (source === 'Social') return 'Social';
+  const labels = {
+    news: 'News',
+    facebook: 'Facebook',
+    instagram: 'Instagram',
+    tiktok: 'TikTok',
+    twitter: 'Twitter',
+    other: 'Other',
+  };
+  return labels[source] ?? String(source || 'Other').replace(/\b\w/g, (c) => c.toUpperCase());
+}
 
 function getScoreClass(score) {
   const n = parseFloat(score);
@@ -1240,7 +1255,9 @@ export default function DashboardClient({ articles, districts, queries: initialQ
 
   const allSources = useMemo(() => {
     const s = new Set(articles.map((a) => a.source_type ?? 'other'));
-    return ['All', ...Array.from(s).sort()];
+    const sources = Array.from(s).sort();
+    const hasSocial = sources.some((source) => SOCIAL_SOURCE_TYPES.has(source));
+    return ['All', ...(hasSocial ? ['Social'] : []), ...sources];
   }, [articles]);
 
   const allSourceQueries = useMemo(() => {
@@ -1276,8 +1293,11 @@ export default function DashboardClient({ articles, districts, queries: initialQ
         !search ||
         a.headline?.toLowerCase().includes(q) ||
         a.summary?.toLowerCase().includes(q);
+      const articleSource = a.source_type ?? 'other';
       const matchSource =
-        sourceFilter === 'All' || (a.source_type ?? 'other') === sourceFilter;
+        sourceFilter === 'All' ||
+        articleSource === sourceFilter ||
+        (sourceFilter === 'Social' && SOCIAL_SOURCE_TYPES.has(articleSource));
       const matchTag =
         tagFilter === 'All' ||
         (Array.isArray(a.tags) && a.tags.includes(tagFilter));
@@ -1473,18 +1493,16 @@ export default function DashboardClient({ articles, districts, queries: initialQ
                 <span className="export-pdf-hint">Tabloid landscape works best</span>
               </button>
             )}
-            {!demoMode && (
-              <button className="feedback-btn" onClick={() => setFeedbackOpen(true)}>
-                💬 Feedback
-              </button>
-            )}
+            <button className="feedback-btn" onClick={() => setFeedbackOpen(true)}>
+              💬 Feedback
+            </button>
           </div>
         </header>
 
         <main className="page-content">
           {demoMode && (
             <div className="demo-mode-banner">
-              <strong>Interactive demo:</strong> sample public-media intelligence for Central High School in Phoenix, Arizona. Filters, columns, notes, and PDF export are enabled; changes stay in this browser session.
+              <strong>Interactive demo:</strong> sample public-media intelligence for Sample City School District. Filters, Social aggregation, columns, notes, feedback, and PDF export are enabled; changes stay in this browser session.
             </div>
           )}
           {currentView === 'clients' && <ClientsView clients={clients} />}
@@ -1639,7 +1657,7 @@ export default function DashboardClient({ articles, districts, queries: initialQ
                   onChange={(e) => setSearch(e.target.value)}
                 />
                 <select className="filter-select" value={sourceFilter} onChange={(e) => setSourceFilter(e.target.value)}>
-                  {allSources.map((s) => <option key={s}>{s}</option>)}
+                  {allSources.map((s) => <option key={s} value={s}>{formatSourceLabel(s)}</option>)}
                 </select>
                 <select className="filter-select" value={tagFilter} onChange={(e) => setTagFilter(e.target.value)}>
                   {allTags.map((t) => <option key={t}>{t}</option>)}
@@ -1803,7 +1821,7 @@ export default function DashboardClient({ articles, districts, queries: initialQ
                             background: SOURCE_COLORS[article.source_type] ? `${SOURCE_COLORS[article.source_type]}20` : 'var(--bg-elevated)',
                             color: SOURCE_COLORS[article.source_type] ?? 'var(--text-secondary)',
                           }}>
-                            {article.source_type ?? 'other'}
+                            {formatSourceLabel(article.source_type ?? 'other')}
                           </span>
                         </td>
                       )}
@@ -1984,10 +2002,10 @@ export default function DashboardClient({ articles, districts, queries: initialQ
         </div>
       )}
 
-      {!demoMode && feedbackOpen && (
+      {feedbackOpen && (
         <FeedbackModal
-          districtId={userDistrictId}
-          districtName={userDistrictId ? districts.find((d) => d.id === userDistrictId)?.name : null}
+          districtId={userDistrictId || (demoMode ? districtFilter : '')}
+          districtName={userDistrictId ? districts.find((d) => d.id === userDistrictId)?.name : (demoMode ? 'Sample City School District' : null)}
           onClose={() => setFeedbackOpen(false)}
         />
       )}
