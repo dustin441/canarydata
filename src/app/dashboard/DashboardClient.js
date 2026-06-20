@@ -962,11 +962,14 @@ function RecommendationText({ text }) {
   const visibleText = sanitizeRecommendationText(text);
   if (!visibleText) return <span style={{ color: 'var(--text-tertiary)', fontStyle: 'italic' }}>—</span>;
 
-  const hasMarkdown = /^\s*(##\s+|\*\*[^*]+\*\*\s*$)/m.test(visibleText);
+  const hasSectionMarkdown = /^\s*(##\s+|\*\*[^*]+\*\*\s*$)/m.test(visibleText);
+  const hasInlineMarkdown = /\*\*[^*]+\*\*/.test(visibleText);
+  const hasMarkdown = hasSectionMarkdown || hasInlineMarkdown;
   const preview = hasMarkdown
     ? visibleText
         .replace(/##\s+[^\n]+/g, '')
         .replace(/^\s*\*\*[^*]+\*\*\s*$/gm, '')
+        .replace(/\*\*([^*]+)\*\*/g, '$1')
         .replace(/\n+/g, ' ')
         .trim()
         .slice(0, 110)
@@ -2027,7 +2030,7 @@ export default function DashboardClient({ articles, districts, queries: initialQ
                       {/* Strategic Alignment */}
                       {col('innovation_reason') && (
                         <td className="summary-cell">
-                          <ExpandableText
+                          <RecommendationText
                             text={article.innovation_reason !== 'N/A' ? article.innovation_reason : null}
                           />
                         </td>
