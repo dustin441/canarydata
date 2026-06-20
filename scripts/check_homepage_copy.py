@@ -13,6 +13,8 @@ required = {
     'old hero headline removed': 'See everything said about your district. Once a day.' not in page,
     'risk badges replaced with sentiment score badges': 'High Risk' not in page and '>High<' not in page and '>Low<' not in page and 'riskHigh' not in page and 'riskLow' not in page,
     'score badge styles exist': all(s in css for s in ['scoreConcerning', 'scoreNeutral', 'scorePositive']),
+    'demo section uses buyer-facing badge': 'See It in Action' in page and 'Sales Demo Ready' not in page,
+    'homepage preview metrics match visible dashboard KPIs': all(s in page for s in ['Total Mentions', 'Avg. Sentiment Score', 'Top Source', 'Notes Added']) and all(s not in page for s in ['High Risk', 'Concerning Items', 'Earned Stories']),
 }
 
 failed = [name for name, ok in required.items() if not ok]

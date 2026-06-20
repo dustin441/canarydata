@@ -114,8 +114,8 @@ export default function Home() {
       {/* Demo Dashboard */}
       <section id="demo" className={styles.demoSection}>
         <div className={styles.demoContent}>
-          <span className={styles.badge}>Sales Demo Ready</span>
-          <h2 className={styles.sectionTitle}>A boardroom-ready view of reputation risk and opportunity</h2>
+          <span className={styles.badge}>See It in Action</span>
+          <h2 className={styles.sectionTitle}>What You’ll See Inside Canary Data</h2>
           <p className={styles.sectionDesc}>
             Show prospects how Canary Data turns messy coverage into a practical daily briefing: what happened, why it matters, whether action is needed, and how to communicate next.
           </p>
@@ -130,10 +130,10 @@ export default function Home() {
             </div>
 
             <div className={styles.metricGrid}>
-              <div className={styles.metricCard}><span>Mentions</span><strong>42</strong><small>Last 30 days</small></div>
-              <div className={styles.metricCard}><span>Avg. Sentiment Score</span><strong>8.8</strong><small>Positive</small></div>
-              <div className={styles.metricCard}><span>Concerning Items</span><strong>3</strong><small>Score below 4.0</small></div>
-              <div className={styles.metricCard}><span>Earned Stories</span><strong>18</strong><small>Coverage wins to report</small></div>
+              <div className={styles.metricCard}><span>Total Mentions</span><strong>16</strong><small>Visible in the demo dashboard</small></div>
+              <div className={styles.metricCard}><span>Avg. Sentiment Score</span><strong>6.6</strong><small>Concern / Neutral / Positive</small></div>
+              <div className={styles.metricCard}><span>Top Source</span><strong>News</strong><small>Source breakdown by type</small></div>
+              <div className={styles.metricCard}><span>Notes Added</span><strong>10</strong><small>Analyst notes in the feed</small></div>
             </div>
 
             <div className={styles.demoColumns}>
