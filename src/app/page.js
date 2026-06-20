@@ -17,9 +17,9 @@ export default function Home() {
       <section className={styles.hero}>
         <div className={styles.heroBackground}></div>
         <div className={styles.heroContent}>
-          <h1 className={styles.title}>See everything said about your district. Once a day.</h1>
+          <h1 className={styles.title}>Know What Matters. Before Everyone Else Asks About It.</h1>
           <p className={styles.subtitle}>
-            School communicators don’t have time to search, sort, and interpret everything being said about their district. Canary Data runs a once-a-day review of news and publicly available social content, then organizes what matters using hyper-local context, AI summaries, sentiment, and strategic communication recommendations.
+            Canary Data gives school communicators a daily review of the news and public social conversation that matters most — with sentiment scores, summaries, local context, and strategic recommendations before small issues become bigger questions.
           </p>
           <div className={styles.heroButtons}>
             <Link href="/login" className={styles.primaryBtn}>Start Tracking Today</Link>
@@ -131,8 +131,8 @@ export default function Home() {
 
             <div className={styles.metricGrid}>
               <div className={styles.metricCard}><span>Mentions</span><strong>42</strong><small>Last 30 days</small></div>
-              <div className={styles.metricCard}><span>Avg. Sentiment</span><strong>7.8</strong><small>Positive trend</small></div>
-              <div className={styles.metricCard}><span>High Risk</span><strong>3</strong><small>Needs review</small></div>
+              <div className={styles.metricCard}><span>Avg. Sentiment Score</span><strong>8.8</strong><small>Positive</small></div>
+              <div className={styles.metricCard}><span>Concerning Items</span><strong>3</strong><small>Score below 4.0</small></div>
               <div className={styles.metricCard}><span>Earned Stories</span><strong>18</strong><small>Coverage wins to report</small></div>
             </div>
 
@@ -140,21 +140,21 @@ export default function Home() {
               <div className={styles.demoPanel}>
                 <h4>Stories to Review</h4>
                 <div className={styles.storyItem}>
-                  <span className={styles.riskHigh}>High</span>
+                  <span className={styles.scoreConcerning}>Score: 3.9<br/>Concerning</span>
                   <div>
                     <strong>Bus-route change sparks parent concerns</strong>
                     <p>Recommendation: acknowledge concerns, explain the decision timeline, and publish a FAQ before the next board meeting.</p>
                   </div>
                 </div>
                 <div className={styles.storyItem}>
-                  <span className={styles.riskLow}>Low</span>
+                  <span className={styles.scorePositive}>Score: 8.8<br/>Positive</span>
                   <div>
                     <strong>Voters approve school facility investment</strong>
                     <p>Recommendation: amplify as a community-trust milestone and connect the investment to student impact.</p>
                   </div>
                 </div>
                 <div className={styles.storyItem}>
-                  <span className={styles.riskNone}>No Action</span>
+                  <span className={styles.scoreNeutral}>Score: 5.6<br/>Neutral</span>
                   <div>
                     <strong>Routine classroom celebration post</strong>
                     <p>No immediate communications action recommended. Continue routine monitoring.</p>

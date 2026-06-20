@@ -531,21 +531,24 @@
   font-size: 0.94rem;
 }
 
-.riskHigh,
-.riskLow,
-.riskNone {
+.scoreConcerning,
+.scoreNeutral,
+.scorePositive {
   display: inline-flex;
   justify-content: center;
+  align-items: center;
+  text-align: center;
   border-radius: 999px;
-  padding: 0.35rem 0.6rem;
-  font-size: 0.72rem;
+  padding: 0.42rem 0.65rem;
+  font-size: 0.68rem;
   font-weight: 800;
   text-transform: uppercase;
+  line-height: 1.25;
 }
 
-.riskHigh { color: #fecaca; background: rgba(239,68,68,0.12); border: 1px solid rgba(239,68,68,0.28); }
-.riskLow { color: #bbf7d0; background: rgba(34,197,94,0.10); border: 1px solid rgba(34,197,94,0.24); }
-.riskNone { color: #bae6fd; background: rgba(14,165,233,0.10); border: 1px solid rgba(14,165,233,0.24); }
+.scoreConcerning { color: #fecaca; background: rgba(239,68,68,0.12); border: 1px solid rgba(239,68,68,0.28); }
+.scoreNeutral { color: #fde68a; background: rgba(250,204,21,0.10); border: 1px solid rgba(250,204,21,0.24); }
+.scorePositive { color: #bbf7d0; background: rgba(34,197,94,0.10); border: 1px solid rgba(34,197,94,0.24); }
 
 .demoList {
   padding-left: 1.2rem;
