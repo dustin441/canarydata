@@ -20,22 +20,28 @@ export const demoArticles = [
     tags: ['Engagement', 'Academic Success'], notes: 'Analyst note: Good owned-channel story to amplify before freshman orientation; include translation access in every post.', is_earned_media: true, is_perched: false,
     innovation_reason: 'Proactive multilingual family engagement that supports belonging before the ninth-grade transition.',
     recommendation: `**Strategic Intent**
-Turn a positive service update into a trust-building enrollment message.
+Position Beacon Ridge High as a welcoming, family-centered school committed to student success before the first day of classes. Reinforce accessibility, inclusion, and proactive student support.
 
 **Audience Focus**
-Incoming freshmen families, multilingual households, counselors, campus staff.
+Primary: Incoming freshmen families, multilingual households, students transitioning from middle school. Secondary: Community partners, district leadership, prospective families considering enrollment.
 
 **Message Angle**
-Beacon Ridge is reducing transition friction and making family support easy to access.
+Highlight the school's commitment to reducing anxiety, building belonging, and ensuring every family has access to information and support regardless of language or background.
 
 **Channel Strategy**
-District social, family email, school website, and counselor/principal talking points.
+School and district websites, social media, feeder middle school communications, parent newsletters, community partner channels.
 
 **Execution Plan**
-Publish a short event post with registration details, translation availability, and a principal quote about belonging; add the dates to the orientation page.
+Create a campaign around "Starting Strong at Beacon Ridge." Share testimonials from counselors, current freshmen, and families. Produce short videos showcasing campus tours and support services. Promote attendance through feeder schools and community organizations.
 
 **Guardrails**
-Avoid implying this is only for families already struggling; frame it as a universal support.`,
+Avoid implying the transition is difficult for all students. Ensure translation services are accurately represented and available as advertised.
+
+**Expected Outcome**
+Increased event participation, stronger family engagement, improved perceptions of school accessibility, and smoother freshman onboarding.
+
+**Next Phase**
+Capture attendance data and feedback. Develop a freshman transition success story after the first semester using participant testimonials and outcome metrics.`,
     source_query: '"Beacon Ridge High School" Canary Falls',
   },
   {
@@ -46,22 +52,43 @@ Avoid implying this is only for families already struggling; frame it as a unive
     tags: ['Safety & Wellness', 'Engagement'], notes: 'Analyst note: High-sensitivity safety scenario; use as the demo example for fast, clear family-first communication.', is_earned_media: false, is_perched: false,
     innovation_reason: 'N/A',
     recommendation: `**Strategic Intent**
-Protect trust during a safety incident by communicating quickly, calmly, and factually.
+A false shooter report triggered a school lockdown, creating immediate safety concerns and potential community anxiety. The district must quickly confirm facts, reassure families, and clarify lockdown protocols to prevent misinformation and maintain public confidence in emergency response procedures.
 
 **Audience Focus**
-Families and staff first; then local media and community observers.
+Primary: Parents and families of students at the affected school; local media outlets covering the incident
+
+Secondary: District staff, board members, broader Canary Falls USD community, law enforcement partners
 
 **Message Angle**
-Students and staff are safe, the lockdown was precautionary, law enforcement cleared the scene, and the district will share confirmed updates only.
+Acknowledge the incident promptly and factually. Emphasize that district emergency protocols worked as designed, that students and staff are safe, and provide clarity on what triggered the lockdown. Tone should be calm, professional, and reassuring—avoiding defensiveness while demonstrating competent crisis response.
 
 **Channel Strategy**
-Parent email, SMS, website alert, social post, and a short media holding statement.
+District website homepage with incident summary and all-clear statement
+Direct email/text alert to affected school families with facts and reassurance
+Social media (Facebook, X) with brief factual post and link to full statement
+Prepare spokesperson for local media and other outlets already covering
+Internal communication to all staff with talking points
 
 **Execution Plan**
-Send an immediate notice with timeline and safety status; send an end-of-day follow-up with support resources and where families can ask questions.
+Issue a holding statement within 2 hours confirming the lockdown occurred, that it was in response to 911 reports, that no threat was found, and that all students/staff are safe
+Coordinate with Canary Falls law enforcement to confirm their preliminary findings and clarify the nature of the false reports
+Assess whether misinformation or incorrect details are circulating on local social media; if so, flag inaccurate posts to Meta/Facebook for review
+Request an editorial or call-in opportunity with ABC affiliate to provide full context on how the district's lockdown protocols operated and why they were effective
+Prepare FAQ addressing common parent concerns: How was the threat assessed? When were students released? What happens next?
+Monitor social media and news comments for rumor spread; have comms team ready to respond to factually incorrect claims with corrections
 
 **Guardrails**
-Do not speculate about the off-campus police activity or overstate details beyond what law enforcement confirmed.`,
+Do NOT speculate on the identity or motive of those who made false reports
+Do NOT blame 911 callers; frame as community members reporting concerns in good faith
+Do NOT discuss specific lockdown procedures in public statements (security operational detail)
+Avoid defensive language; focus on competence and student safety
+Coordinate all external statements through superintendent or designated spokesperson
+
+**Expected Outcome**
+Families understand the incident was false, trust district emergency response, and feel confident in school safety protocols. Media coverage shifts from alarm to reassurance, and misinformation is contained before it spreads further.
+
+**Next Phase**
+Monitor local news for follow-up stories over the next 24–48 hours. If media requests school safety statistics, lockdown drill frequency, or protocol details, have superintendent ready for interview. If parent concerns escalate, consider a brief follow-up message reaffirming safety measures. Document incident response for internal after-action review with building administration and law enforcement partners.`,
     source_query: 'Beacon Ridge High School Canary Falls lockdown safety communication',
   },
   {
@@ -71,20 +98,7 @@ Do not speculate about the off-campus police activity or overstate details beyon
     link: 'https://example.com/demo/robotics-showcase', canary_score: 9.2,
     tags: ['Innovation', 'Academic Success', 'Engagement'], notes: null, is_earned_media: true, is_perched: false,
     innovation_reason: 'Student innovation story with visual proof and partner/community validation.',
-    recommendation: `**Strategic Intent**
-Use the robotics showcase to reinforce student innovation and career-connected learning.
-
-**Audience Focus**
-Prospective families, STEM partners, local business leaders, and current students.
-
-**Message Angle**
-Students are solving real-world problems and learning in public with community support.
-
-**Channel Strategy**
-LinkedIn, Instagram/Facebook carousel, district newsletter, and a local education reporter pitch.
-
-**Execution Plan**
-Choose one strong photo, add a student quote, tag the partner if appropriate, and invite local media to cover the next showcase.`,
+    recommendation: `No immediate communications action recommended. Continue routine monitoring.`,
     source_query: 'Beacon Ridge High Bobcats Canary Falls athletics',
   },
   {
@@ -95,22 +109,28 @@ Choose one strong photo, add a student quote, tag the partner if appropriate, an
     tags: ['Operations & Finance', 'Engagement'], notes: 'Analyst note: Preventable trust-friction item; operations and comms should coordinate same-day.', is_earned_media: false, is_perched: false,
     innovation_reason: 'N/A',
     recommendation: `**Strategic Intent**
-Close the notice gap before a facilities issue becomes a broader trust issue.
+Protect community trust by acknowledging concerns, improving communication, and demonstrating responsiveness to neighborhood impacts.
 
 **Audience Focus**
-Nearby residents, families driving to campus, front-office staff, and operations.
+Primary: Nearby residents, families, staff. Secondary: Local government, community organizations, media.
 
 **Message Angle**
-The district heard the confusion, is clarifying the timeline, and will improve advance notice on future work.
+Emphasize that the district values being a good neighbor and is committed to improving communication around construction activities.
 
 **Channel Strategy**
-Website construction update, neighborhood email if available, school social channels, and office talking points.
+Website updates, neighborhood email lists, construction FAQ page, social media updates, community meetings.
 
 **Execution Plan**
-Publish a same-day map/timeline/contact update and ask operations to confirm the next signage or notice milestone.
+Coordinate with facilities staff to clarify timelines, parking changes, and anticipated disruptions. Create visual maps and regular construction updates. Designate a contact for resident concerns.
 
 **Guardrails**
-Acknowledge the timing issue without blaming contractors or residents.`,
+Avoid dismissing resident concerns or assigning blame. Ensure information is accurate and updated as conditions change.
+
+**Expected Outcome**
+Reduced frustration, improved community relations, and increased confidence in district transparency.
+
+**Next Phase**
+Use lessons learned to create a standardized community notification process for future projects.`,
     source_query: '"Beacon Ridge High" "Canary Falls Unified"',
   },
   {
@@ -120,20 +140,7 @@ Acknowledge the timing issue without blaming contractors or residents.`,
     link: 'https://example.com/demo/senior-spotlight', canary_score: 9.0,
     tags: ['Academic Success', 'Engagement'], notes: null, is_earned_media: true, is_perched: false,
     innovation_reason: 'Human-centered college-readiness proof point with student voice and family support.',
-    recommendation: `**Strategic Intent**
-Extend the senior spotlight series into a college-readiness narrative.
-
-**Audience Focus**
-Families, rising seniors, counselors, alumni, and community partners.
-
-**Message Angle**
-Student success is connected to counseling, family support, and clear postsecondary planning.
-
-**Channel Strategy**
-Instagram/Facebook series, website recap, alumni comments, and FAFSA support reminders.
-
-**Execution Plan**
-Bundle the posts into a web recap and add a callout for upcoming FAFSA or counseling supports.`,
+    recommendation: `No immediate communications action recommended. Continue routine monitoring.`,
     source_query: 'Beacon Ridge High School Canary Falls FAFSA graduation',
   },
   {
@@ -143,20 +150,7 @@ Bundle the posts into a web recap and add a callout for upcoming FAFSA or counse
     link: 'https://example.com/demo/bus-detour', canary_score: 5.8,
     tags: ['Operations & Finance', 'Safety & Wellness'], notes: 'Analyst note: Operational heads-up, not a reputation story; useful because it affects family logistics.', is_earned_media: false, is_perched: false,
     innovation_reason: 'N/A',
-    recommendation: `**Strategic Intent**
-Use an external transit signal to prevent arrival confusion.
-
-**Audience Focus**
-Families, students who ride or get dropped off, attendance office, and campus security.
-
-**Message Angle**
-A temporary detour may affect arrival; here are alternate routes and where to check updates.
-
-**Channel Strategy**
-ParentSquare/email, school website alert, and front-office script.
-
-**Execution Plan**
-Post a short morning advisory with route details and remove it once the detour clears.`,
+    recommendation: `Monitor closely: Monitor traffic and transportation-related conversations for reports of delays, congestion, or confusion affecting student arrival and dismissal. If concerns begin to surface, be prepared to share alternative routes, arrival guidance, or transportation updates to help families plan accordingly.`,
     source_query: '"Beacon Ridge High School" Canary Falls',
   },
   {
@@ -167,19 +161,28 @@ Post a short morning advisory with route details and remove it once the detour c
     tags: ['Academic Success', 'Engagement'], notes: null, is_earned_media: true, is_perched: false,
     innovation_reason: 'Positive student-achievement story with an academic eligibility angle beyond athletics.',
     recommendation: `**Strategic Intent**
-Celebrate athletics while reinforcing academic expectations and team culture.
+Celebrate athletic excellence while reinforcing the connection between academics, discipline, and student development.
 
 **Audience Focus**
-Students, families, alumni, athletics supporters, and local sports media.
+Primary: Families, students, alumni. Secondary: Community supporters, local media, board members.
 
 **Message Angle**
-The relay achievement reflects preparation, eligibility, teamwork, and school pride.
+Highlight the team's commitment to both classroom and athletic success, emphasizing teamwork and perseverance.
 
 **Channel Strategy**
-Athletics social channels, district repost, newsletter highlight, and local sports contact.
+Social media, athletics website, district communications, local sports media outreach.
 
 **Execution Plan**
-Publish congratulations before the state meet and gather one coach/student quote for follow-up coverage.`,
+Create athlete profiles, share competition highlights, recognize coaches and support staff, and feature academic accomplishments alongside athletic success.
+
+**Guardrails**
+Avoid focusing exclusively on winning. Ensure recognition extends beyond star performers.
+
+**Expected Outcome**
+Increased school pride, community engagement, and support for student activities.
+
+**Next Phase**
+Follow the team's state competition journey and create post-event recognition opportunities regardless of outcome.`,
     source_query: 'Beacon Ridge High Bobcats Canary Falls athletics',
   },
   {
@@ -190,22 +193,28 @@ Publish congratulations before the state meet and gather one coach/student quote
     tags: ['Safety & Wellness', 'Operations & Finance', 'Engagement'], notes: 'Analyst note: Board-agenda item likely needs FAQ language before public comment grows.', is_earned_media: false, is_perched: false,
     innovation_reason: 'N/A',
     recommendation: `**Strategic Intent**
-Prepare a plain-language explanation before the security-camera agenda item draws concern.
+Build understanding and trust around a potentially sensitive decision while demonstrating thoughtful consideration of stakeholder concerns.
 
 **Audience Focus**
-Parents, staff, privacy-sensitive community members, and board watchers.
+Primary: Parents, students, staff. Secondary: Community members, board members, local media.
 
 **Message Angle**
-The proposal is about safety infrastructure with clear limits on access, retention, and oversight.
+Focus on balancing safety, privacy, transparency, and responsible stewardship of public resources.
 
 **Channel Strategy**
-Board preview, FAQ page, parent email, and meeting talking points.
+Board communication materials, FAQs, website resources, stakeholder meetings, social media information posts.
 
 **Execution Plan**
-Publish a short FAQ covering what changes, who accesses footage, retention policy, and how questions can be submitted.
+Develop clear talking points explaining the purpose, scope, and safeguards of the proposed upgrades. Anticipate common questions and provide fact-based responses.
 
 **Guardrails**
-Do not dismiss privacy concerns; explain safeguards directly.`,
+Avoid minimizing privacy concerns or framing stakeholders as opponents. Present balanced information.
+
+**Expected Outcome**
+More informed community dialogue and reduced misinformation ahead of the vote.
+
+**Next Phase**
+Monitor public feedback and adjust communications to address recurring questions.`,
     source_query: '"Beacon Ridge High" "Canary Falls Unified"',
   },
   {
@@ -215,20 +224,7 @@ Do not dismiss privacy concerns; explain safeguards directly.`,
     link: 'https://example.com/demo/culinary-resource-fair', canary_score: 8.8,
     tags: ['Academic Success', 'Engagement'], notes: null, is_earned_media: true, is_perched: false,
     innovation_reason: 'Career-connected learning that also shows student service to the community.',
-    recommendation: `**Strategic Intent**
-Turn a visual CTE moment into a program-awareness asset.
-
-**Audience Focus**
-Current families, prospective CTE students, community partners, and local employers.
-
-**Message Angle**
-Students are building practical skills while serving families and community needs.
-
-**Channel Strategy**
-Short video clip on social, CTE program page, partner newsletter, and course-selection reminders.
-
-**Execution Plan**
-Clip a 20-second student quote, connect it to CTE enrollment, and thank the resource-fair partners.`,
+    recommendation: `No immediate communications action recommended. Continue routine monitoring.`,
     source_query: '"Beacon Ridge High School" Canary Falls',
   },
   {
@@ -239,19 +235,28 @@ Clip a 20-second student quote, connect it to CTE enrollment, and thank the reso
     tags: ['Academic Success', 'Engagement'], notes: 'Analyst note: Family questions indicate the original summer-school post needs clearer logistics.', is_earned_media: false, is_perched: false,
     innovation_reason: 'N/A',
     recommendation: `**Strategic Intent**
-Reduce public confusion by answering logistics in one official place.
+Identify and address information gaps before confusion affects participation and student success.
 
 **Audience Focus**
-Families considering credit recovery, counselors, transportation, and campus office staff.
+Primary: Students needing credit recovery and their families. Secondary: Counselors, school staff.
 
 **Message Angle**
-The district has a clear summer schedule and support plan; families should not have to piece it together from comments.
+Position the district as responsive and committed to ensuring families have the information needed to support student success.
 
 **Channel Strategy**
-Summer school webpage, family email, and a pinned social reply linking to the FAQ.
+FAQ pages, direct communications, social media, counseling outreach.
 
 **Execution Plan**
-Add FAQ items for transportation, meals, course times, registration confirmation, and contact information.`,
+Create a centralized information hub covering schedules, transportation, meals, contacts, and enrollment procedures. Use common parent questions to guide content.
+
+**Guardrails**
+Verify all operational details before publishing. Avoid assumptions about transportation availability.
+
+**Expected Outcome**
+Improved program participation and reduced family frustration.
+
+**Next Phase**
+Monitor questions throughout the summer and continuously update resources.`,
     source_query: '"Beacon Ridge High School" Canary Falls',
   },
   {
@@ -261,20 +266,7 @@ Add FAQ items for transportation, meals, course times, registration confirmation
     link: 'https://example.com/demo/mariachi-festival', canary_score: 9.4,
     tags: ['Engagement', 'Academic Success'], notes: 'Analyst note: Strong earned-media pitch opportunity because it is visual, cultural, and student-led.', is_earned_media: true, is_perched: false,
     innovation_reason: 'Strong culture/belonging story with student voice and community visibility.',
-    recommendation: `**Strategic Intent**
-Use the mariachi invitation as a student-voice and culture story.
-
-**Audience Focus**
-Families, arts supporters, local media, alumni, and community partners.
-
-**Message Angle**
-Students are representing Beacon Ridge through cultural pride, performance, and disciplined practice.
-
-**Channel Strategy**
-Media pitch, photo carousel, district newsletter, and event-day reposts.
-
-**Execution Plan**
-Pitch a photo-friendly feature, collect student quotes before the event, and invite families to attend.`,
+    recommendation: `No immediate communications action recommended. Continue routine monitoring.`,
     source_query: '"Beacon Ridge High School" Canary Falls',
   },
   {
@@ -285,19 +277,7 @@ Pitch a photo-friendly feature, collect student quotes before the event, and inv
     tags: ['Operations & Finance'], notes: 'Analyst note: Demo-only row; keep it as a visible example of wrong-district validation logic.', is_earned_media: false, is_perched: false,
     innovation_reason: 'Shows the product differentiator: school-name matching is not enough without local context.',
     recommendation: `**Strategic Intent**
-Use this as a product demo example, not a communications action item.
-
-**Audience Focus**
-Prospects evaluating data quality and district communications leaders.
-
-**Message Angle**
-Canary separates lookalike mentions from relevant local coverage before teams waste time on them.
-
-**Channel Strategy**
-Demo walkthrough and sales conversation only.
-
-**Execution Plan**
-Explain why this row is flagged/suppressed and show how geo/context validation protects dashboard trust.`,
+This result demonstrates a common monitoring problem: stories about a different school with the same or similar name. In the live Canary Data platform, geo-filtering automatically removes these false matches, helping ensure your results are accurate and actionable.`,
     source_query: 'Beacon Ridge High School wrong district examples',
   },
   {
@@ -308,19 +288,28 @@ Explain why this row is flagged/suppressed and show how geo/context validation p
     tags: ['Safety & Wellness', 'Engagement'], notes: 'Analyst note: Practical operations item; coordinate with athletics and health/safety before families ask.', is_earned_media: false, is_perched: false,
     innovation_reason: 'N/A',
     recommendation: `**Strategic Intent**
-Answer heat-safety questions before they turn into parent concern.
+Monitor closely: As temperatures rise, monitor parent questions and community comments about outdoor activities, athletics, and student safety. Be prepared to share existing heat-safety protocols, hydration practices, and any schedule adjustments if concerns or misinformation begin to increase.
 
 **Audience Focus**
-Families, athletes, coaches, nurses, and operations staff.
+Primary: Families, student athletes, activity participants. Secondary: Staff, community supporters.
 
 **Message Angle**
-The school has a plan for water access, outdoor practice adjustments, and heat-advisory monitoring.
+Highlight proactive efforts to keep students safe, hydrated, and supported during seasonal weather challenges.
 
 **Channel Strategy**
-Parent email, athletics channels, school website, and coach talking points.
+Social media, family communications, athletics updates, PTO channels.
 
 **Execution Plan**
-Coordinate one heat-safety message and include who families should contact with medical or practice questions.`,
+Coordinate messaging around hydration stations, practice modifications, heat protocols, and donation opportunities. Thank community supporters.
+
+**Guardrails**
+Avoid creating unnecessary concern about safety conditions. Ensure all guidance aligns with district policies.
+
+**Expected Outcome**
+Increased awareness of safety measures and successful community support efforts.
+
+**Next Phase**
+Evaluate whether weather-related communications should become part of seasonal preparedness planning.`,
     source_query: '"Beacon Ridge High School" Canary Falls',
   },
   {
@@ -331,19 +320,28 @@ Coordinate one heat-safety message and include who families should contact with 
     tags: ['Innovation', 'Academic Success', 'Engagement'], notes: null, is_earned_media: true, is_perched: false,
     innovation_reason: 'High-value partnership story connecting workforce readiness with student access.',
     recommendation: `**Strategic Intent**
-Position the coding lab as a workforce-readiness and partnership win.
+Showcase partnership-driven innovation and expanded opportunities for student learning and career exploration.
 
 **Audience Focus**
-Prospective families, donors, employer partners, students, and board members.
+Primary: Students, families, prospective students. Secondary: Employers, community partners, donors.
 
 **Message Angle**
-The partnership expands student access to technology, mentoring, and career-connected experiences.
+Emphasize collaboration between education and industry to prepare students for future careers.
 
 **Channel Strategy**
-Press release, LinkedIn, website case study, board update, and partner cross-post.
+Press release, social media, website feature, partner communications, workforce development channels.
 
 **Execution Plan**
-Thank the partner, capture participation numbers, and develop a short case study with student quotes.`,
+Recognize nonprofit and employer partners. Highlight student benefits, career pathways, and mentorship opportunities. Create student success stories as the program develops.
+
+**Guardrails**
+Avoid overstating workforce outcomes before results are available.
+
+**Expected Outcome**
+Enhanced reputation for innovation, stronger partnerships, and increased student participation.
+
+**Next Phase**
+Track participation, mentor engagement, and student outcomes to support future funding and expansion efforts.`,
     source_query: '"Beacon Ridge High" "Canary Falls Unified"',
   },
   {
@@ -354,22 +352,28 @@ Thank the partner, capture participation numbers, and develop a short case study
     tags: ['Operations & Finance', 'Engagement'], notes: 'Analyst note: Early-warning media signal; prepare context before the article is written.', is_earned_media: false, is_perched: false,
     innovation_reason: 'N/A',
     recommendation: `**Strategic Intent**
-Shape context before a grading-policy story publishes.
+Prepare proactively for media attention and ensure stakeholders receive accurate context before public narratives solidify.
 
 **Audience Focus**
-Families, teachers, administrators, board members, and the reporter.
+Primary: Families, staff, students. Secondary: Media, board members, community stakeholders.
 
 **Message Angle**
-The pilot has a defined purpose, feedback loop, and criteria for success.
+Position the district as transparent, thoughtful, and data-driven in evaluating educational practices.
 
 **Channel Strategy**
-Background statement, administrator interview offer, FAQ link, and board talking points.
+Internal communications, talking points, FAQs, website resources, media relations outreach.
 
 **Execution Plan**
-Prepare three background points and offer an interview with the administrator closest to the pilot.
+Develop key messages, anticipated questions, stakeholder FAQs, and spokesperson preparation. Consider publishing explanatory content before media coverage appears.
 
 **Guardrails**
-Do not over-defend the policy; acknowledge parent questions and explain how feedback is being reviewed.`,
+Avoid appearing defensive or attempting to influence family participation in reporting. Maintain transparency and respect differing viewpoints.
+
+**Expected Outcome**
+Improved message consistency and greater likelihood that coverage reflects district context.
+
+**Next Phase**
+Monitor media coverage and community response. Update communications based on emerging questions and concerns.`,
     source_query: '"Beacon Ridge High School" Canary Falls',
   },
   {
@@ -380,19 +384,28 @@ Do not over-defend the policy; acknowledge parent questions and explain how feed
     tags: ['Engagement', 'Academic Success'], notes: null, is_earned_media: true, is_perched: false,
     innovation_reason: 'Student-voice and community-trust narrative with strong visual assets.',
     recommendation: `**Strategic Intent**
-Amplify the mural as a student-voice and community-history story.
+Celebrate community-connected learning while reinforcing student voice, cultural preservation, and civic pride.
 
 **Audience Focus**
-Families, neighborhood partners, arts supporters, alumni, and local media.
+Primary: Families, students, neighborhood residents. Secondary: Community organizations, local leaders, arts advocates.
 
 **Message Angle**
-Students are connecting campus identity to neighborhood history through creative work.
+Highlight how student creativity can preserve local stories, strengthen community ties, and create a lasting legacy on campus.
 
 **Channel Strategy**
-Photo carousel, website feature, partner tags, and local arts calendar/community media.
+Website feature story, social media campaign, local arts coverage, community events, board recognition.
 
 **Execution Plan**
-Publish a carousel with student artist quotes and invite community partners to share the story.`,
+Document the mural's creation process through photos and video. Capture reflections from students, artists, and elders. Host a community celebration and guided mural tour.
+
+**Guardrails**
+Ensure historical and cultural narratives are represented accurately and respectfully.
+
+**Expected Outcome**
+Increased community pride, positive visibility, and stronger connections between school and neighborhood.
+
+**Next Phase**
+Develop curriculum connections, anniversary features, and additional community-based arts initiatives.`,
     source_query: '"Beacon Ridge High School" Canary Falls',
   },
 ];

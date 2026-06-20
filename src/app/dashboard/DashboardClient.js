@@ -162,10 +162,23 @@ function isHiddenRoadmapMetricHeading(line) {
   return isHiddenRoadmapMetricLine(normalized);
 }
 
+function normalizeEscapedRecommendationText(text) {
+  if (!text) return text;
+  return String(text)
+    .replace(/\\r\\n/g, '\n')
+    .replace(/\\N/gi, '\n')
+    .replace(/\\n/g, '\n')
+    .replace(/\\r/g, '\n')
+    .replace(/\\t/g, ' ')
+    .replace(/\n{3,}/g, '\n\n')
+    .trim();
+}
+
 function sanitizeRecommendationText(text) {
   if (!text) return text;
 
-  const lines = text.split('\n');
+  const normalizedText = normalizeEscapedRecommendationText(text);
+  const lines = normalizedText.split('\n');
   const kept = [];
   let skippingRoadmapSection = false;
 
@@ -1555,6 +1568,17 @@ export default function DashboardClient({ articles, districts, queries: initialQ
           )}
           <div className="sidebar-section">
             <div className="sidebar-section-label">Account</div>
+            {demoMode && (
+              <a
+                className="sidebar-link"
+                href="/privacy"
+                target="_blank"
+                rel="noreferrer"
+              >
+                <span className="sidebar-link-icon">🔒</span>
+                Privacy Policy
+              </a>
+            )}
             {!demoMode && (
               <button
                 className={`sidebar-link ${currentView === 'settings' ? 'active' : ''}`}
