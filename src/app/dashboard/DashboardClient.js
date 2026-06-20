@@ -652,17 +652,15 @@ function HowItWorksView() {
         <p style={{ color: 'var(--text-secondary)', fontSize: '0.9rem', marginBottom: '18px', lineHeight: 1.6 }}>
           Watch this short walkthrough to see how Canary Data reviews news and publicly available social content, organizes what matters with hyper-local context, and turns daily mentions into summaries, sentiment, and strategic communication recommendations.
         </p>
-        <div style={{
-          marginBottom: '24px',
-          padding: '14px 16px',
-          borderRadius: 'var(--radius-md)',
-          border: '1px solid rgba(250, 204, 21, 0.28)',
-          background: 'rgba(250, 204, 21, 0.08)',
-          color: 'var(--text-primary)',
-          fontSize: '0.9rem',
-          lineHeight: 1.55,
-        }}>
-          <strong>Launch pricing:</strong> $1,499 per year for comprehensive annual access, including unlimited users, daily monitoring, strategic recommendations, and PDF exports.
+        <div className="pricing-journey-card">
+          <div className="pricing-journey-eyebrow">Early adopter launch offer</div>
+          <div className="pricing-journey-main">
+            <span className="pricing-journey-price">$1,499</span>
+            <span className="pricing-journey-term">per year</span>
+          </div>
+          <p>
+            Built to feel approachable before signup: comprehensive annual access with unlimited users, daily monitoring, strategic recommendations, and PDF exports.
+          </p>
         </div>
         {/* Responsive 16:9 Google Drive video embed */}
         <div style={{ position: 'relative', paddingBottom: '56.25%', height: 0, borderRadius: 'var(--radius-lg)', overflow: 'hidden', background: '#0B1120' }}>
@@ -1142,7 +1140,16 @@ function ReleaseSignupModal({ onClose }) {
           <>
             <div>
               <h3>Notify Me When Canary Data Launches</h3>
-              <p>Launch pricing is $1,499 per year for comprehensive annual access, including unlimited users, daily AI-summarized mentions, hyper-local filtering, news and public social monitoring, strategic recommendations, and PDF exports.</p>
+              <div className="release-pricing-card">
+                <span className="release-pricing-eyebrow">Early adopter launch offer</span>
+                <div className="release-pricing-price">$1,499 <small>/ year</small></div>
+                <p>Built for school communicators who need clarity without enterprise software sticker shock.</p>
+                <ul>
+                  <li>Unlimited users for the district team</li>
+                  <li>Daily AI-summarized news and public social monitoring</li>
+                  <li>Hyper-local filtering, strategic recommendations, and PDF exports</li>
+                </ul>
+              </div>
               <p>Leave your contact information and we’ll follow up when Canary Data is ready for more schools and districts.</p>
             </div>
             <form onSubmit={handleSubmit} style={{ display: 'contents' }}>
@@ -1443,10 +1450,21 @@ export default function DashboardClient({ articles, districts, queries: initialQ
     setCurrentView('dashboard');
     setColMenuOpen(false);
     setFeedbackOpen(false);
+    setSidebarOpen(false);
 
     // Let React finish switching back to the dashboard and give print-only
     // assets a moment to paint before opening the browser print dialog.
     window.setTimeout(() => window.print(), 250);
+  }
+
+  function handleNavSelect(view) {
+    setCurrentView(view);
+    setSidebarOpen(false);
+  }
+
+  function handleDistrictSelect(districtId) {
+    setDistrictFilter(districtId === districtFilter ? 'All' : districtId);
+    setSidebarOpen(false);
   }
 
   const filtered = useMemo(() => {
@@ -1498,12 +1516,16 @@ export default function DashboardClient({ articles, districts, queries: initialQ
 
   return (
     <div className="dashboard-layout">
+      {sidebarOpen && <button className="sidebar-scrim" type="button" aria-label="Close navigation menu" onClick={() => setSidebarOpen(false)} />}
       {/* Sidebar */}
       <aside className={`sidebar ${sidebarOpen ? 'open' : ''}`}>
         <div className="sidebar-header">
           <Link href="/" className="sidebar-brand" aria-label="Return to Canary Data homepage">
             <Image src="/canary-logo.svg" alt="Canary Data" width={160} height={43} style={{ height: '32px', width: 'auto' }} />
           </Link>
+          <button className="sidebar-close-btn" type="button" aria-label="Close navigation menu" onClick={() => setSidebarOpen(false)}>
+            ×
+          </button>
         </div>
 
         <nav className="sidebar-nav">
@@ -1511,7 +1533,7 @@ export default function DashboardClient({ articles, districts, queries: initialQ
             <div className="sidebar-section-label">Menu</div>
             <button
               className={`sidebar-link ${currentView === 'dashboard' ? 'active' : ''}`}
-              onClick={() => setCurrentView('dashboard')}
+              onClick={() => handleNavSelect('dashboard')}
               style={{ width: '100%', background: 'none', border: 'none', textAlign: 'left', cursor: 'pointer' }}
             >
               <span className="sidebar-link-icon">📊</span>
@@ -1519,7 +1541,7 @@ export default function DashboardClient({ articles, districts, queries: initialQ
             </button>
             <button
               className={`sidebar-link ${currentView === 'howto' ? 'active' : ''}`}
-              onClick={() => setCurrentView('howto')}
+              onClick={() => handleNavSelect('howto')}
               style={{ width: '100%', background: 'none', border: 'none', textAlign: 'left', cursor: 'pointer' }}
             >
               <span className="sidebar-link-icon">▶️</span>
@@ -1527,7 +1549,7 @@ export default function DashboardClient({ articles, districts, queries: initialQ
             </button>
             <button
               className={`sidebar-link ${currentView === 'articles' ? 'active' : ''}`}
-              onClick={() => setCurrentView('articles')}
+              onClick={() => handleNavSelect('articles')}
               style={{ width: '100%', background: 'none', border: 'none', textAlign: 'left', cursor: 'pointer' }}
             >
               <span className="sidebar-link-icon">📰</span>
@@ -1536,7 +1558,7 @@ export default function DashboardClient({ articles, districts, queries: initialQ
             </button>
             <button
               className={`sidebar-link ${currentView === 'queries' ? 'active' : ''}`}
-              onClick={() => setCurrentView('queries')}
+              onClick={() => handleNavSelect('queries')}
               style={{ width: '100%', background: 'none', border: 'none', textAlign: 'left', cursor: 'pointer' }}
             >
               <span className="sidebar-link-icon">🔍</span>
@@ -1545,7 +1567,7 @@ export default function DashboardClient({ articles, districts, queries: initialQ
             </button>
             <button
               className={`sidebar-link ${currentView === 'notes' ? 'active' : ''}`}
-              onClick={() => setCurrentView('notes')}
+              onClick={() => handleNavSelect('notes')}
               style={{ width: '100%', background: 'none', border: 'none', textAlign: 'left', cursor: 'pointer' }}
             >
               <span className="sidebar-link-icon">📝</span>
@@ -1558,7 +1580,7 @@ export default function DashboardClient({ articles, districts, queries: initialQ
               <div className="sidebar-section-label">Admin</div>
               <button
                 className={`sidebar-link ${currentView === 'clients' ? 'active' : ''}`}
-                onClick={() => setCurrentView('clients')}
+                onClick={() => handleNavSelect('clients')}
                 style={{ width: '100%', background: 'none', border: 'none', textAlign: 'left', cursor: 'pointer' }}
               >
                 <span className="sidebar-link-icon">👥</span>
@@ -1573,7 +1595,7 @@ export default function DashboardClient({ articles, districts, queries: initialQ
               {districts.map((d) => (
                 <button
                   key={d.id}
-                  onClick={() => setDistrictFilter(d.id === districtFilter ? 'All' : d.id)}
+                  onClick={() => handleDistrictSelect(d.id)}
                   className={`sidebar-link ${districtFilter === d.id ? 'active' : ''}`}
                   style={{ width: '100%', background: 'none', border: 'none', textAlign: 'left', cursor: 'pointer' }}
                 >
@@ -1591,6 +1613,7 @@ export default function DashboardClient({ articles, districts, queries: initialQ
                 href="/privacy"
                 target="_blank"
                 rel="noreferrer"
+                onClick={() => setSidebarOpen(false)}
               >
                 <span className="sidebar-link-icon">🔒</span>
                 Privacy Policy
@@ -1599,7 +1622,7 @@ export default function DashboardClient({ articles, districts, queries: initialQ
             {!demoMode && (
               <button
                 className={`sidebar-link ${currentView === 'settings' ? 'active' : ''}`}
-                onClick={() => setCurrentView('settings')}
+                onClick={() => handleNavSelect('settings')}
                 style={{ width: '100%', background: 'none', border: 'none', textAlign: 'left', cursor: 'pointer' }}
               >
                 <span className="sidebar-link-icon">⚙️</span>
@@ -1633,6 +1656,11 @@ export default function DashboardClient({ articles, districts, queries: initialQ
             {demoMode && (
               <button className="release-cta release-cta-left" onClick={() => setReleaseSignupOpen(true)}>
                 Notify Me When Canary Data Launches
+              </button>
+            )}
+            {demoMode && (
+              <button className="release-cta release-cta-mobile" onClick={() => setReleaseSignupOpen(true)}>
+                Notify Me
               </button>
             )}
             <div>
