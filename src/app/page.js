@@ -17,13 +17,13 @@ export default function Home() {
       <section className={styles.hero}>
         <div className={styles.heroBackground}></div>
         <div className={styles.heroContent}>
-          <h1 className={styles.title}>See everything said about your district. Instantly.</h1>
+          <h1 className={styles.title}>See everything said about your district. Once a day.</h1>
           <p className={styles.subtitle}>
-            Track public news and social conversations with district-specific geographic filtering. Canary Data summarizes mentions, flags reputation risk, and turns coverage into actionable communications guidance.
+            School communicators don’t have time to search, sort, and interpret everything being said about their district. Canary Data runs a once-a-day review of news and publicly available social content, then organizes what matters using hyper-local context, AI summaries, sentiment, and strategic communication recommendations.
           </p>
           <div className={styles.heroButtons}>
             <Link href="/login" className={styles.primaryBtn}>Start Tracking Today</Link>
-            <Link href="/demo" className={styles.secondaryBtn}>Try Live Demo Dashboard</Link>
+            <Link href="/demo" className={styles.secondaryBtn}>Try the Demo Dashboard</Link>
           </div>
         </div>
       </section>
@@ -34,7 +34,7 @@ export default function Home() {
           <span className={styles.badge}>Our Differentiator</span>
           <h2 className={styles.sectionTitle}>Stop Drowning in Irrelevant National News</h2>
           <p className={styles.sectionDesc}>
-            While legacy media monitoring platforms give you a noisy feed of every school in the country, we fold rigorous geographical context into your search, surfacing information from your community.
+            Most monitoring tools are built to capture everything, everywhere. That often means more noise than insight. Canary Data focuses on your district — using geographic context to keep results relevant and local.
           </p>
         </div>
 
@@ -42,10 +42,10 @@ export default function Home() {
           <div className={styles.vsText}>
             <h3 className={styles.cardTitle}>Hyper-Local Precision</h3>
             <p className={styles.cardText} style={{ marginBottom: '1.5rem' }}>
-              Many districts share similar school names, mascots, acronyms, and city names. Canary Data uses district-specific geography, school anchors, source context, and exclusion rules to keep lookalike communities out of <em>your</em> feed.
+              Many districts share similar school names, mascots, acronyms, and community names. Canary Data uses district geography, school anchors, source context, and exclusion rules to reduce irrelevant results and keep lookalike districts out of your daily review.
             </p>
             <p className={styles.cardText}>
-              More context means refined searches, fewer false positives, and highly relevant intelligence immediately at your fingertips.
+              The goal is simple: what you see is actually about you.
             </p>
           </div>
           <div className={styles.vsVisual}>
@@ -73,23 +73,41 @@ export default function Home() {
             <div className={styles.cardIcon}>🧠</div>
             <h3 className={styles.cardTitle}>Smart Summaries</h3>
             <p className={styles.cardText}>
-              Don&apos;t have time to read 40 articles? Our AI analyzes the entire text and produces concise, objective summaries of what&apos;s being said about your district online.
+              Canary Data summarizes daily mentions so you can understand what’s being said in seconds.
             </p>
           </div>
           <div className={styles.card}>
             <div className={styles.cardIcon}>🎯</div>
-            <h3 className={styles.cardTitle}>Mission-Aligned Suggestions</h3>
+            <h3 className={styles.cardTitle}>Strategic Communication Recommendations</h3>
             <p className={styles.cardText}>
-              We analyze the sentiment and context of online mentions, giving you specific suggestions on how to respond and align the narrative with your district&apos;s strategic direction.
+              When something matters, you don’t start from scratch. Canary Data provides strategic communication recommendations grounded in context and sentiment to guide next steps.
+            </p>
+          </div>
+          <div className={styles.card}>
+            <div className={styles.cardIcon}>📈</div>
+            <h3 className={styles.cardTitle}>Sentiment</h3>
+            <p className={styles.cardText}>
+              Each item includes sentiment, which reflects how stories are being received — positive, neutral, or concerning — so you can quickly understand what deserves attention.
             </p>
           </div>
           <div className={styles.card}>
             <div className={styles.cardIcon}>📱</div>
             <h3 className={styles.cardTitle}>Public Social Awareness</h3>
             <p className={styles.cardText}>
-              Monitor publicly accessible conversations alongside traditional media so your team can separate routine chatter from issues that need attention.
+              Each daily review includes publicly available social conversations alongside news coverage so you can understand what your community is seeing and discussing.
             </p>
           </div>
+        </div>
+      </section>
+
+      {/* Built for school communications */}
+      <section className={styles.section}>
+        <div className={styles.sectionHeader}>
+          <span className={styles.badge}>Built for the reality of school communications</span>
+          <h2 className={styles.sectionTitle}>Start your day with clarity, not noise.</h2>
+          <p className={styles.sectionDesc}>
+            Most weeks bring multiple priorities at once. A transportation concern, a personnel rumor, a board discussion, and a student achievement story can all surface over the course of a week. Canary Data helps you quickly understand what’s been said, how it’s being received, whether communication action may be needed, and when something is simply informational.
+          </p>
         </div>
       </section>
 

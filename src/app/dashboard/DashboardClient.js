@@ -2,6 +2,7 @@
 
 import { useState, useMemo, useEffect, useRef, useTransition } from 'react';
 import Image from 'next/image';
+import Link from 'next/link';
 import { setEarnedMedia, saveNote, addQuery, deleteQuery, submitFeedback } from '@/app/actions';
 
 const ALL_COLUMNS = [
@@ -648,13 +649,25 @@ function HowItWorksView() {
         <span style={{ fontSize: '0.82rem', color: 'var(--text-secondary)' }}>Platform walkthrough</span>
       </div>
       <div style={{ padding: '28px' }}>
-        <p style={{ color: 'var(--text-secondary)', fontSize: '0.9rem', marginBottom: '24px', lineHeight: 1.6 }}>
-          Watch this short walkthrough to understand how Canary monitors media, interprets Canary Scores, and surfaces the insights most relevant to your district.
+        <p style={{ color: 'var(--text-secondary)', fontSize: '0.9rem', marginBottom: '18px', lineHeight: 1.6 }}>
+          Watch this short walkthrough to see how Canary Data reviews news and publicly available social content, organizes what matters with hyper-local context, and turns daily mentions into summaries, sentiment, and strategic communication recommendations.
         </p>
-        {/* Responsive 16:9 Loom embed */}
+        <div style={{
+          marginBottom: '24px',
+          padding: '14px 16px',
+          borderRadius: 'var(--radius-md)',
+          border: '1px solid rgba(250, 204, 21, 0.28)',
+          background: 'rgba(250, 204, 21, 0.08)',
+          color: 'var(--text-primary)',
+          fontSize: '0.9rem',
+          lineHeight: 1.55,
+        }}>
+          <strong>Launch pricing:</strong> $1,499 per year for comprehensive annual access, including unlimited users, daily monitoring, strategic recommendations, and PDF exports.
+        </div>
+        {/* Responsive 16:9 Google Drive video embed */}
         <div style={{ position: 'relative', paddingBottom: '56.25%', height: 0, borderRadius: 'var(--radius-lg)', overflow: 'hidden', background: '#0B1120' }}>
           <iframe
-            src="https://www.loom.com/embed/e3a252bc1c0b4b258e5412720aa301b7"
+            src="https://drive.google.com/file/d/1zqrSxZdsa8wXRg8wSZ6G4R-qYyf0oFfX/preview"
             frameBorder="0"
             webkitallowfullscreen="true"
             mozallowfullscreen="true"
@@ -1129,6 +1142,7 @@ function ReleaseSignupModal({ onClose }) {
           <>
             <div>
               <h3>Notify Me When Canary Data Launches</h3>
+              <p>Launch pricing is $1,499 per year for comprehensive annual access, including unlimited users, daily AI-summarized mentions, hyper-local filtering, news and public social monitoring, strategic recommendations, and PDF exports.</p>
               <p>Leave your contact information and we’ll follow up when Canary Data is ready for more schools and districts.</p>
             </div>
             <form onSubmit={handleSubmit} style={{ display: 'contents' }}>
@@ -1487,9 +1501,9 @@ export default function DashboardClient({ articles, districts, queries: initialQ
       {/* Sidebar */}
       <aside className={`sidebar ${sidebarOpen ? 'open' : ''}`}>
         <div className="sidebar-header">
-          <div className="sidebar-brand">
+          <Link href="/" className="sidebar-brand" aria-label="Return to Canary Data homepage">
             <Image src="/canary-logo.svg" alt="Canary Data" width={160} height={43} style={{ height: '32px', width: 'auto' }} />
-          </div>
+          </Link>
         </div>
 
         <nav className="sidebar-nav">
