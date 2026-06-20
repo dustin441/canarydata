@@ -240,7 +240,7 @@ function ScoreGauge({ score }) {
       {/*
         viewBox 0 0 200 120:
           Arc center at y=100, r=80 → top of arc at y=20, outer edge at y=11.
-          "Low"/"High" labels sit below the arc ends at y=116.
+          Sentiment labels sit below the arc ends and above the neutral midpoint.
           Score text baseline at y=96, "AVG SCORE" at y=110.
       */}
       <svg viewBox="0 0 200 120" style={{ width: '100%', maxWidth: '180px', overflow: 'visible' }}>
@@ -275,9 +275,9 @@ function ScoreGauge({ score }) {
         <line x1="142.3" y1="41.8" x2="152.3" y2="28.0" stroke="#94A3B8" strokeWidth="1.5" opacity="0.55" />
 
         {/* Zone labels */}
-        <text x="14"  y="116" textAnchor="middle" fill="#EF4444" fontSize="8" fontWeight="700" opacity="0.75">Low</text>
-        <text x="100" y="9"   textAnchor="middle" fill="#F5C518" fontSize="8" fontWeight="700" opacity="0.75">Avg</text>
-        <text x="186" y="116" textAnchor="middle" fill="#22C55E" fontSize="8" fontWeight="700" opacity="0.75">High</text>
+        <text x="14"  y="116" textAnchor="middle" fill="#EF4444" fontSize="7.5" fontWeight="700" opacity="0.75">Concern</text>
+        <text x="100" y="9"   textAnchor="middle" fill="#F5C518" fontSize="7.5" fontWeight="700" opacity="0.75">Neutral</text>
+        <text x="186" y="116" textAnchor="middle" fill="#22C55E" fontSize="7.5" fontWeight="700" opacity="0.75">Positive</text>
 
         {/* Score value */}
         <text

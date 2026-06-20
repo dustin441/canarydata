@@ -13,6 +13,7 @@ checks = {
     'pricing is treated as a journey/value card': 'pricing-journey-card' in client and 'Early adopter launch offer' in client,
     'pricing modal uses structured value bullets': 'release-pricing-card' in client and 'Built for school communicators' in client,
     'small-screen modal/CTA CSS exists': '@media (max-width: 768px)' in css and '.release-cta-mobile' in css and '.release-pricing-card' in css,
+    'score gauge uses sentiment language instead of low/avg/high': all(label in client for label in ['Concern', 'Neutral', 'Positive']) and not any(f'>{label}<' in client for label in ['Low', 'Avg', 'High']),
 }
 
 failed = [name for name, ok in checks.items() if not ok]
