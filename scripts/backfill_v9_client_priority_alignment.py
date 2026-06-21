@@ -25,10 +25,10 @@ def load_env():
 
 
 def supabase_creds():
-    url = os.environ.get('SUPABASE_URL') or os.environ.get('CANARY_SUPABASE_URL') or 'https://fehdonfrlsrrkzaemkxp.supabase.co'
-    key = os.environ.get('SUPABASE_SERVICE_ROLE_KEY') or os.environ.get('SUPABASE_SECRET_KEY') or os.environ.get('CANARY_SUPABASE_SERVICE_ROLE_KEY')
+    url = os.environ.get('CANARY_SUPABASE_URL') or 'https://fehdonfrlsrrkzaemkxp.supabase.co'
+    key = os.environ.get('CANARY_SUPABASE_SERVICE_ROLE_KEY') or os.environ.get('CANARY_SUPABASE_SECRET_KEY')
     if not key:
-        raise RuntimeError('Set SUPABASE_SERVICE_ROLE_KEY in the runtime environment; do not scrape or hardcode Supabase keys.')
+        raise RuntimeError('Set CANARY_SUPABASE_SERVICE_ROLE_KEY in the runtime environment; do not scrape or hardcode Supabase keys.')
     return url, key
 
 

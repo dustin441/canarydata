@@ -9,9 +9,9 @@ TARGETS = {
     'dVIf6KnZklHYzQvi': {'name': 'Canary Data - Live Ingestion with Geo Validation', 'from': 'Format for AI', 'ai': 'AI Analysis1'},
 }
 SUPABASE_URL = 'https://fehdonfrlsrrkzaemkxp.supabase.co'
-SUPABASE_KEY = os.environ.get('SUPABASE_SERVICE_ROLE_KEY') or os.environ.get('SUPABASE_SECRET_KEY') or os.environ.get('CANARY_SUPABASE_SERVICE_ROLE_KEY')
+SUPABASE_KEY = os.environ.get('CANARY_SUPABASE_SERVICE_ROLE_KEY') or os.environ.get('CANARY_SUPABASE_SECRET_KEY')
 if not SUPABASE_KEY:
-    raise RuntimeError('Set SUPABASE_SERVICE_ROLE_KEY in the runtime environment; do not hardcode it in scripts.')
+    raise RuntimeError('Set CANARY_SUPABASE_SERVICE_ROLE_KEY in the runtime environment; do not hardcode it in scripts.')
 NODE_NAME = 'Attach DB Strategic Priorities'
 
 
