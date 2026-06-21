@@ -11,11 +11,10 @@ SEED_PATH = Path('data/strategic-priorities.seed.json')
 
 
 def supabase_creds():
-    candidate = ''
-    for path in Path('/tmp/canary_v8_update').glob('*/*_after.json'):
-        candidate += path.read_text(errors='ignore') + '\n'
-    url = re.search(r'https://fehdonfrlsrrkzaemkxp\.supabase\.co', candidate).group(0)
-    key = re.search(r'sb_secret_[A-Za-z0-9_\-]+', candidate).group(0)
+    url = os.environ.get('SUPABASE_URL') or os.environ.get('CANARY_SUPABASE_URL') or 'https://fehdonfrlsrrkzaemkxp.supabase.co'
+    key = os.environ.get('SUPABASE_SERVICE_ROLE_KEY') or os.environ.get('SUPABASE_SECRET_KEY') or os.environ.get('CANARY_SUPABASE_SERVICE_ROLE_KEY')
+    if not key:
+        raise RuntimeError('Set SUPABASE_SERVICE_ROLE_KEY in the runtime environment; do not scrape or hardcode Supabase keys.')
     return url, key
 
 

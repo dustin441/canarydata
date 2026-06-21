@@ -76,30 +76,11 @@ def load_env():
 
 
 def supabase_creds():
-    # Prefer credentials embedded in the Canary n8n workflow backups. The shell env may
-    # point at a different Supabase project for unrelated Hermes/Fathom work.
-    candidate = ''
-    for root in [Path('/tmp/canary_v8_update'), Path('/tmp')]:
-        for path in root.glob('**/*.json'):
-            if path.stat().st_size < 2_000_000:
-                try:
-                    txt = path.read_text(errors='ignore')
-                except Exception:
-                    continue
-                if 'fehdonfrlsrrkzaemkxp.supabase.co' in txt or 'sb_secret_' in txt:
-                    candidate += txt + '\n'
-    urls = re.findall(r'https://[a-z0-9]+\.supabase\.co', candidate)
-    keys = re.findall(r'sb_secret_[A-Za-z0-9_\-]+', candidate)
-    if urls and keys:
-        # Canary Data project from memory / workflow backups.
-        canary_urls = [u for u in urls if 'fehdonfrlsrrkzaemkxp' in u]
-        return (canary_urls[0] if canary_urls else urls[0]), keys[0]
-
-    url = os.environ.get('SUPABASE_URL')
-    key = os.environ.get('SUPABASE_SERVICE_ROLE_KEY') or os.environ.get('SUPABASE_SECRET_KEY') or os.environ.get('SUPABASE_SERVICE_KEY')
-    if url and key:
-        return url.rstrip('/'), key
-    raise RuntimeError('Could not resolve Supabase URL/service key')
+    url = os.environ.get('SUPABASE_URL') or os.environ.get('CANARY_SUPABASE_URL') or 'https://fehdonfrlsrrkzaemkxp.supabase.co'
+    key = os.environ.get('SUPABASE_SERVICE_ROLE_KEY') or os.environ.get('SUPABASE_SECRET_KEY') or os.environ.get('CANARY_SUPABASE_SERVICE_ROLE_KEY')
+    if not key:
+        raise RuntimeError('Set SUPABASE_SERVICE_ROLE_KEY in the runtime environment; do not scrape or hardcode Supabase keys.')
+    return url.rstrip('/'), key
 
 
 def http_json(method, url, key, params=None, body=None, prefer=None):
