@@ -1,0 +1,175 @@
+{
+  "version": "2026-06-20-initial-public-research",
+  "note": "Initial public-source strategic priority seed. Use exact labels when confidence is high; mark low-confidence profiles for onboarding/client confirmation.",
+  "profiles": {
+    "chiefs-for-change": {
+      "source_confidence": "medium",
+      "source_urls": ["https://www.chiefsforchange.org/our-work/policy-and-advocacy"],
+      "mission": "A national network of education leaders transforming public schools and advancing equity.",
+      "priorities": [
+        {"label": "Sustaining Federal K-12 Funding", "aliases": ["federal funding", "k-12 funding", "title funding", "education funding"], "confidence": "high"},
+        {"label": "Postsecondary Pathways", "aliases": ["postsecondary", "post-secondary", "career pathways", "college readiness", "career readiness", "CTE", "workforce", "technical education"], "confidence": "medium"},
+        {"label": "Early Literacy", "aliases": ["early literacy", "reading", "foundational reading", "literacy"], "confidence": "medium"},
+        {"label": "Chronic Absenteeism", "aliases": ["chronic absenteeism", "attendance", "student attendance", "absenteeism"], "confidence": "medium"},
+        {"label": "Teacher Retention and Recruitment", "aliases": ["teacher retention", "teacher recruitment", "educator workforce", "teacher pipeline", "staffing"], "confidence": "medium"}
+      ]
+    },
+    "alief-independent-school-district": {
+      "source_confidence": "high",
+      "source_urls": ["https://www.aliefisd.net/documents/our-district/strategic-priorities-%26-accountability/554676", "https://core-docs.s3.us-east-1.amazonaws.com/documents/asset/uploaded_file/4448/AISD/3976560/ND_AliefISD_SP_2023_Updated1024.pdf"],
+      "mission": "Provide an exemplary education that values diversity and equity in collaboration with family and community.",
+      "priorities": [
+        {"label": "Strategic Priorities & Accountability", "aliases": ["strategic priorities", "accountability", "district priorities"], "confidence": "medium"},
+        {"label": "Equity", "aliases": ["equitable", "diversity", "equity", "access"], "confidence": "medium"},
+        {"label": "Family and Community Collaboration", "aliases": ["family", "community", "engagement", "collaboration"], "confidence": "medium"}
+      ]
+    },
+    "autauga-county-schools": {
+      "source_confidence": "high",
+      "source_urls": ["https://www.acboe.net/advancingautaugacounty", "https://content.myconnectsuite.com/api/documents/294f057659f9429a829e9433e3931ce2.pdf"],
+      "mission": "Fostering the whole student in an academically rigorous environment where everyone is known and valued.",
+      "priorities": [
+        {"label": "Academic Advancement", "aliases": ["academic advancement", "academic excellence", "student growth", "achievement"], "confidence": "high"},
+        {"label": "Safe and Healthy Learning Environment", "aliases": ["safe", "healthy", "safety", "wellness", "supportive environment"], "confidence": "high"},
+        {"label": "Pathways Designed for Success", "aliases": ["pathways", "college", "career", "success", "future ready"], "confidence": "medium"}
+      ]
+    },
+    "bessemer-city-schools": {
+      "source_confidence": "high",
+      "source_urls": ["https://www.bessk12.org/about", "https://resources.finalsite.net/images/v1760534944/bessk12org/v99olqwg3mgpzwbg7vsi/BessemerCitySchools11.pdf", "https://content.myconnectsuite.com/api/documents/6dd84d4f19834a1893b695baed3a3be1.pdf"],
+      "mission": "Provide a safe and nurturing learning environment that meets the needs of the whole child through quality instruction, programs, and resources.",
+      "priorities": [
+        {"label": "Whole Child", "aliases": ["whole child", "nurturing", "social emotional", "student needs"], "confidence": "high"},
+        {"label": "Quality Instruction", "aliases": ["quality instruction", "teaching", "learning", "instruction"], "confidence": "high"},
+        {"label": "Resource Capacity", "aliases": ["resource capacity", "teacher recruitment", "retention", "facilities", "technology", "professional development"], "confidence": "high"}
+      ]
+    },
+    "deerfield-public-schools-district-109": {
+      "source_confidence": "high",
+      "source_urls": ["https://www.dps109.org/about-dps-109/define109", "https://resources.finalsite.net/images/v1712071429/dps109org/rt0pmsvgjc5o4rjsw807/DPS109StrategicPlan.pdf"],
+      "mission": "Develop each student to be emotionally resilient, socially skilled, and academically prepared.",
+      "priorities": [
+        {"label": "Dynamic & Responsive Instructional Practices", "aliases": ["instructional practices", "curriculum", "assessment", "learning"], "confidence": "high"},
+        {"label": "Positive Culture and Personal Development", "aliases": ["positive culture", "personal development", "emotionally resilient", "socially skilled"], "confidence": "high"},
+        {"label": "Equitable Outcomes", "aliases": ["equitable outcomes", "equity", "inclusive practices"], "confidence": "high"},
+        {"label": "Reciprocal & Respectful Communication", "aliases": ["communication", "community interaction", "listen", "learn", "dialogue"], "confidence": "high"}
+      ]
+    },
+    "fort-worth-isd": {
+      "source_confidence": "high",
+      "source_urls": ["https://resources.finalsite.net/images/v1737655595/fwisdorg/kbqogulbwmoogoz5ijpn/January_Board_Presentation_DRAFT.pdf"],
+      "mission": "Preparing all students for success in college, career, and community leadership.",
+      "priorities": [
+        {"label": "Student Academic Excellence", "aliases": ["academic excellence", "early literacy", "numeracy", "math", "reading", "post-secondary readiness"], "confidence": "high"},
+        {"label": "Student and Family Engagement", "aliases": ["family engagement", "student engagement", "community engagement"], "confidence": "high"},
+        {"label": "Employee Effectiveness and Retention", "aliases": ["employee effectiveness", "retention", "teacher retention", "staff"], "confidence": "high"},
+        {"label": "Operational Alignment and Efficiency", "aliases": ["operations", "efficiency", "alignment", "facilities", "resources"], "confidence": "high"}
+      ]
+    },
+    "huntsville-city-schools": {
+      "source_confidence": "high",
+      "source_urls": ["https://www.huntsvillecityschools.org/page/strategic-plan", "https://core-docs.s3.us-east-1.amazonaws.com/documents/asset/uploaded_file/4113/hcs/3699516/DRAFT_HCS_Strategic_Plan.pdf"],
+      "priorities": [
+        {"label": "Leadership for Learning", "aliases": ["governance", "leadership", "policies", "procedures"], "confidence": "high"},
+        {"label": "Teaching and Learning", "aliases": ["teaching", "learning", "academic pathways", "instruction"], "confidence": "high"},
+        {"label": "Resources for Learning", "aliases": ["resources", "learning resources", "technology", "facilities"], "confidence": "high"},
+        {"label": "Culture for Learning", "aliases": ["school culture", "positive culture", "climate"], "confidence": "high"},
+        {"label": "Stakeholder Engagement to Support Learning", "aliases": ["stakeholder engagement", "family", "community", "collaboration"], "confidence": "high"}
+      ]
+    },
+    "klein-isd": {
+      "source_confidence": "high",
+      "source_urls": ["https://www.chron.com/neighborhood/champions-klein/schools/article/Klein-ISD-s-strategic-plan-aims-for-continued-11173809.php", "https://patch.com/texas/woodlands/klein-isd-board-trustees-approves-district-strategic-plan"],
+      "mission": "Every student enters with a promise and exits with a purpose.",
+      "priorities": [
+        {"label": "Reimagine Learning", "aliases": ["reimagine learning", "student learning", "innovation", "early readiness"], "confidence": "high"},
+        {"label": "Build Community", "aliases": ["build community", "community", "family engagement", "partnerships"], "confidence": "high"},
+        {"label": "Cultivate Talent", "aliases": ["cultivate talent", "teacher", "staff", "recruitment", "retention", "talent"], "confidence": "high"}
+      ]
+    },
+    "longview-isd": {
+      "source_confidence": "medium",
+      "source_urls": ["https://www.longviewisd.com/page/elevate2030", "https://www.longviewisd.com/o/ecc/article/2320001"],
+      "mission": "Believe in Excellence for All.",
+      "priorities": [
+        {"label": "Student Achievement", "aliases": ["student achievement", "academic", "learning"], "confidence": "medium"},
+        {"label": "Teacher Development", "aliases": ["teacher development", "professional development", "educator"], "confidence": "medium"},
+        {"label": "Community Engagement", "aliases": ["community engagement", "family", "stakeholder"], "confidence": "medium"},
+        {"label": "Joyful Learning", "aliases": ["joyful", "culture", "school experience"], "confidence": "medium"}
+      ]
+    },
+    "orange-county-schools": {
+      "source_confidence": "high",
+      "source_urls": ["https://www.orangecountyfirst.com/our-district-main/ocs-strategic-plan/strategic-planning-home"],
+      "mission": "Educate students in a safe, inclusive environment where we engage, challenge, and inspire them to reach their maximum potential.",
+      "priorities": [
+        {"label": "Safe, Inclusive Environment", "aliases": ["safe", "inclusive", "belonging", "school climate"], "confidence": "medium"},
+        {"label": "Engage, Challenge, and Inspire", "aliases": ["engage", "challenge", "inspire", "student outcomes", "achievement"], "confidence": "medium"},
+        {"label": "Continuous Improvement", "aliases": ["continuous improvement", "strategic plan", "positive outcomes"], "confidence": "medium"}
+      ]
+    },
+    "santa-clara-usd": {
+      "source_confidence": "high",
+      "source_urls": ["https://www.santaclarausd.org/about-us/district-plans/strategic-plan", "https://resources.finalsite.net/images/v1692995373/santaclarausdorg/rskeqtm4rts1rdlxhtpd/SCUSDStrategicPlan_English.pdf"],
+      "priorities": [
+        {"label": "Learning Experiences and Supports for Students", "aliases": ["learning experiences", "student supports", "instructional framework", "self-directed learning"], "confidence": "high"},
+        {"label": "Supports for Adults", "aliases": ["adult supports", "workforce", "professional learning", "staff"], "confidence": "high"},
+        {"label": "System Transformation", "aliases": ["system transformation", "integrated technology", "data management", "community engagement", "equity framework"], "confidence": "high"}
+      ]
+    },
+    "shelby-county-school-district": {
+      "source_confidence": "high",
+      "source_urls": ["https://www.shelbyed.k12.al.us/o/newdirection/article/1270787", "https://www.wbrc.com/2023/10/02/shelby-county-schools-launches-new-strategic-plan"],
+      "mission": "Empower and inspire students to achieve academic excellence and make a positive contribution to the world.",
+      "priorities": [
+        {"label": "Innovation", "aliases": ["innovation", "innovative", "technology", "virtual reality"], "confidence": "high"},
+        {"label": "Leadership Development", "aliases": ["leadership", "leadership development"], "confidence": "high"},
+        {"label": "Recruitment and Retention", "aliases": ["recruitment", "retention", "teacher", "staff"], "confidence": "high"},
+        {"label": "Academic Excellence", "aliases": ["academic excellence", "student success", "achievement"], "confidence": "medium"}
+      ]
+    },
+    "vallejo-city-unified-school-district": {
+      "source_confidence": "high",
+      "source_urls": ["https://www.vcusd.org/about-us/strategic-plan", "https://resources.finalsite.net/images/v1710350990/vcusdorg/hqaz5oltvkyjrrfnsem4/strategicplan_accessibleEnglish.pdf"],
+      "mission": "Meet students and families where they are and provide a high-quality, enriching educational experience.",
+      "priorities": [
+        {"label": "Equitable Opportunities, Equitable Outcomes", "aliases": ["equitable opportunities", "equitable outcomes", "interventions", "parent engagement"], "confidence": "high"},
+        {"label": "Safe and Supportive Learning Environments", "aliases": ["safe", "supportive", "physical safety", "emotional safety", "relationships"], "confidence": "high"},
+        {"label": "Vibrant Culture of Teaching and Learning", "aliases": ["teaching and learning", "responsive instruction", "student voice", "choice"], "confidence": "high"},
+        {"label": "Community-Centered Education", "aliases": ["community-centered", "community", "family education", "cultural competency"], "confidence": "high"}
+      ]
+    },
+    "alabaster-city-schools": {
+      "source_confidence": "medium",
+      "source_urls": ["https://core-docs.s3.us-east-1.amazonaws.com/documents/asset/uploaded_file/4309/ACSD/3602954/Alabaster_Strategic_Plan_Summary.pdf", "https://www.shelbycountyreporter.com/news/alabaster-schools-approve-goals-mission-statement-401800"],
+      "mission": "Partner with families and the community to inspire and prepare graduates to be responsible and productive champions of their future.",
+      "priorities": [
+        {"label": "Facilities", "aliases": ["facilities", "buildings", "infrastructure"], "confidence": "medium"},
+        {"label": "Communication", "aliases": ["communication", "family", "community", "engagement"], "confidence": "medium"},
+        {"label": "Classroom Offerings", "aliases": ["classroom offerings", "programs", "college and career", "academic"], "confidence": "medium"},
+        {"label": "Leadership", "aliases": ["leadership", "staff", "leaders"], "confidence": "medium"}
+      ]
+    },
+    "hoover-city-schools": {
+      "source_confidence": "medium",
+      "source_urls": ["https://www.hoovercityschools.net/85271_2"],
+      "mission": "In a safe, caring atmosphere of teaching and learning, provide each student opportunities to develop exemplary character and achieve personal excellence through rigorous and relevant curriculum.",
+      "priorities": [
+        {"label": "Safe, Caring Atmosphere", "aliases": ["safe", "caring", "safety", "supportive"], "confidence": "medium"},
+        {"label": "Exemplary Character", "aliases": ["character", "leadership", "service"], "confidence": "medium"},
+        {"label": "Personal Excellence", "aliases": ["personal excellence", "achievement", "student success"], "confidence": "medium"},
+        {"label": "Rigorous and Relevant Curriculum", "aliases": ["rigorous", "relevant curriculum", "instruction", "learning"], "confidence": "medium"}
+      ]
+    },
+    "jefferson-county-schools": {
+      "source_confidence": "medium",
+      "source_urls": ["https://content.myconnectsuite.com/api/documents/73e17c8f460c4aeeb49ba99d77cae339.pdf", "https://www.jefcoed.com/article/2365992"],
+      "mission": "Through the T.I.G.E.R. framework, ensure every student, every day, is equipped to reach the next level with no limits.",
+      "priorities": [
+        {"label": "Transformational Growth", "aliases": ["transformational growth", "growth", "achievement"], "confidence": "medium"},
+        {"label": "Deeper Community Connections", "aliases": ["community connections", "family", "community", "partnerships"], "confidence": "medium"},
+        {"label": "Stronger Futures", "aliases": ["stronger futures", "college", "career", "future ready"], "confidence": "medium"}
+      ]
+    }
+  }
+}
