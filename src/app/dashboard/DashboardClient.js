@@ -171,6 +171,17 @@ function normalizeEscapedRecommendationText(text) {
     .replace(/\\n/g, '\n')
     .replace(/\\r/g, '\n')
     .replace(/\\t/g, ' ')
+    // Multi-alignment output like "**A | B | C** – explanation" was hard to scan;
+    // split the focus areas onto their own bold lines while keeping the explanation.
+    .replace(/^\s*\*\*([^*\n]+\s\|\s[^*\n]+)\*\*\s*[–-]\s*/gm, (_, labels) => {
+      const labelLines = labels
+        .split('|')
+        .map((label) => label.trim())
+        .filter(Boolean)
+        .map((label) => `**${label}**`)
+        .join('\n');
+      return `${labelLines}\n`;
+    })
     .replace(/\n{3,}/g, '\n\n')
     .trim();
 }
@@ -1492,6 +1503,10 @@ export default function DashboardClient({ articles, districts, queries: initialQ
         selectedQueries.size === 0 ||
         (a.source_query && selectedQueries.has(a.source_query));
       return matchSearch && matchSource && matchTag && matchDistrict && matchDateStart && matchDateEnd && matchScore && matchQuery;
+    }).sort((a, b) => {
+      const dateCompare = String(b.date || '').localeCompare(String(a.date || ''));
+      if (dateCompare !== 0) return dateCompare;
+      return String(b.created_at || '').localeCompare(String(a.created_at || ''));
     });
   }, [articles, search, sourceFilter, tagFilter, districtFilter, dateStart, dateEnd, scoreMin, scoreMax, selectedQueries]);
 
