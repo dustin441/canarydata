@@ -694,6 +694,9 @@ function SettingsView({ userDistrictId, districts }) {
   const [isPending, startSupportTransition] = useTransition();
   const [submitted, setSubmitted] = useState(false);
   const [supportError, setSupportError] = useState(null);
+  const assignedDistrict = userDistrictId ? districts?.find((d) => d.id === userDistrictId) : null;
+  const profileName = assignedDistrict?.name ?? 'Canary Admin';
+  const profileDetail = userDistrictId ? 'Client view · 1 district' : 'Admin view · all districts';
 
   const handleLogout = async () => {
     try {
@@ -733,12 +736,12 @@ function SettingsView({ userDistrictId, districts }) {
         <h4 style={{ color: 'var(--text-primary)', marginBottom: '16px', fontSize: '1.2rem' }}>Profile Information</h4>
         <div style={{ display: 'grid', gap: '20px', marginBottom: '32px', maxWidth: '400px' }}>
           <div className="form-group" style={{ marginBottom: 0 }}>
-            <label className="form-label" style={{ color: 'var(--text-secondary)', fontSize: '0.85rem', marginBottom: '8px', display: 'block' }}>Full Name</label>
-            <input type="text" className="form-input" disabled defaultValue="Canary Admin" />
+            <label className="form-label" style={{ color: 'var(--text-secondary)', fontSize: '0.85rem', marginBottom: '8px', display: 'block' }}>Account</label>
+            <input type="text" className="form-input" disabled defaultValue={profileName} />
           </div>
           <div className="form-group" style={{ marginBottom: 0 }}>
-            <label className="form-label" style={{ color: 'var(--text-secondary)', fontSize: '0.85rem', marginBottom: '8px', display: 'block' }}>Email Address</label>
-            <input type="text" className="form-input" disabled defaultValue="admin@canary.data" />
+            <label className="form-label" style={{ color: 'var(--text-secondary)', fontSize: '0.85rem', marginBottom: '8px', display: 'block' }}>Access</label>
+            <input type="text" className="form-input" disabled defaultValue={profileDetail} />
           </div>
         </div>
 
@@ -1309,11 +1312,12 @@ function QueryMultiSelect({ allQueries, selectedQueries, onChange }) {
 }
 
 export default function DashboardClient({ articles, districts, queries: initialQueries, clients = [], userDistrictId, demoMode = false }) {
+  const defaultDistrictFilter = userDistrictId ?? districts[0]?.id ?? 'All';
   const [currentView, setCurrentView] = useState('dashboard');
   const [search, setSearch] = useState('');
   const [sourceFilter, setSourceFilter] = useState('All');
   const [tagFilter, setTagFilter] = useState('All');
-  const [districtFilter, setDistrictFilter] = useState(userDistrictId ?? 'All');
+  const [districtFilter, setDistrictFilter] = useState(defaultDistrictFilter);
   const [dateStart, setDateStart] = useState('');
   const [dateEnd, setDateEnd] = useState('');
   const [scoreMin, setScoreMin] = useState(1);
@@ -1474,7 +1478,7 @@ export default function DashboardClient({ articles, districts, queries: initialQ
   }
 
   function handleDistrictSelect(districtId) {
-    setDistrictFilter(districtId === districtFilter ? 'All' : districtId);
+    setDistrictFilter(districtId);
     setSidebarOpen(false);
   }
 
@@ -1528,6 +1532,20 @@ export default function DashboardClient({ articles, districts, queries: initialQ
     : '—';
 
   const topSource = sourceBreakdown[0];
+  const selectedDistrict = districts.find((d) => d.id === districtFilter);
+  const selectedDistrictName = districtFilter === 'All'
+    ? 'All Districts'
+    : selectedDistrict?.name ?? formatDistrictName(districtFilter);
+  const accountDisplayName = demoMode
+    ? 'Demo Account'
+    : userDistrictId
+      ? selectedDistrictName
+      : 'Canary Admin';
+  const accountDisplayDetail = demoMode
+    ? 'Fictional demo data'
+    : userDistrictId
+      ? 'Client view · 1 district'
+      : 'Admin view · all districts';
 
   return (
     <div className="dashboard-layout">
@@ -1594,6 +1612,16 @@ export default function DashboardClient({ articles, districts, queries: initialQ
             <div className="sidebar-section">
               <div className="sidebar-section-label">Admin</div>
               <button
+                className={`sidebar-link ${districtFilter === 'All' ? 'active' : ''}`}
+                onClick={() => handleDistrictSelect('All')}
+                style={{ width: '100%', background: 'none', border: 'none', textAlign: 'left', cursor: 'pointer' }}
+                title="Admin-only global view with rows from every district. Select a district below to QA a client view."
+              >
+                <span className="sidebar-link-icon">🌐</span>
+                All Districts
+                <span className="sidebar-link-badge">Admin</span>
+              </button>
+              <button
                 className={`sidebar-link ${currentView === 'clients' ? 'active' : ''}`}
                 onClick={() => handleNavSelect('clients')}
                 style={{ width: '100%', background: 'none', border: 'none', textAlign: 'left', cursor: 'pointer' }}
@@ -1651,8 +1679,8 @@ export default function DashboardClient({ articles, districts, queries: initialQ
           <div className="sidebar-user">
             <div className="sidebar-avatar">C</div>
             <div className="sidebar-user-info">
-              <div className="sidebar-user-name">{demoMode ? 'Demo Account' : 'Canary Admin'}</div>
-              <div className="sidebar-user-email">{demoMode ? 'Fictional demo data' : `${districts.length} districts`}</div>
+              <div className="sidebar-user-name">{accountDisplayName}</div>
+              <div className="sidebar-user-email">{accountDisplayDetail}</div>
             </div>
           </div>
         </div>
@@ -1692,9 +1720,7 @@ export default function DashboardClient({ articles, districts, queries: initialQ
                           ? 'How This Works'
                           : currentView === 'articles'
                             ? 'Media Articles'
-                            : districtFilter === 'All'
-                              ? 'All Districts'
-                            : formatDistrictName(districtFilter)}
+                            : selectedDistrictName}
               </div>
               <div className="topbar-breadcrumb">
                 {currentView === 'queries' ? 'Manage monitored search terms'
@@ -1735,6 +1761,11 @@ export default function DashboardClient({ articles, districts, queries: initialQ
               <strong>Interactive demo:</strong> sample public-media intelligence for Canary Falls Unified School District. Filters, Social aggregation, columns, notes, feedback, and PDF export are enabled; changes stay in this browser session.
             </div>
           )}
+          {!demoMode && !userDistrictId && districtFilter === 'All' && (
+            <div className="demo-mode-banner">
+              <strong>Admin global view:</strong> this view intentionally includes rows from every district. Select a specific district in the sidebar to QA the exact client view.
+            </div>
+          )}
           {currentView === 'clients' && <ClientsView clients={clients} />}
           {currentView === 'settings' && <SettingsView userDistrictId={userDistrictId} districts={districts} />}
           {currentView === 'howto' && <HowItWorksView />}
@@ -1756,7 +1787,7 @@ export default function DashboardClient({ articles, districts, queries: initialQ
           {(currentView === 'dashboard' || currentView === 'articles') && (<>
           <div className="print-report-header">
             <div>
-              <h1>{districtFilter === 'All' ? 'All Districts' : formatDistrictName(districtFilter)} Media Intelligence Dashboard</h1>
+              <h1>{selectedDistrictName} Media Intelligence Dashboard</h1>
               <p>
                 Exported {new Date().toLocaleDateString('en-US', { month: 'long', day: 'numeric', year: 'numeric' })}
                 {' · '}{filtered.length} visible articles
