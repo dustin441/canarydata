@@ -519,7 +519,7 @@ function QueriesView({ initialQueries, districts, userDistrictId, demoMode = fal
             <div style={{ display: 'grid', gridTemplateColumns: '1fr auto', gap: '12px', marginBottom: '12px' }}>
               <input
                 className="form-input"
-                placeholder="Query text (e.g. Bessemer City Schools budget)"
+                placeholder="Query text (e.g. Canary Falls Unified budget)"
                 value={form.query_text}
                 onChange={(e) => setForm((f) => ({ ...f, query_text: e.target.value }))}
                 required
@@ -1479,12 +1479,20 @@ export default function DashboardClient({ articles, districts, queries: initialQ
 
   function handleDistrictSelect(districtId) {
     setDistrictFilter(districtId);
+    setSearch('');
+    setSourceFilter('All');
+    setTagFilter('All');
+    clearSecondaryFilters();
+    setColMenuOpen(false);
     setSidebarOpen(false);
   }
 
   const filtered = useMemo(() => {
     const q = search.toLowerCase();
+    const seenArticleIds = new Set();
     return articles.filter((a) => {
+      if (seenArticleIds.has(a.id)) return false;
+      seenArticleIds.add(a.id);
       const matchSearch =
         !search ||
         a.headline?.toLowerCase().includes(q) ||
@@ -2013,7 +2021,7 @@ export default function DashboardClient({ articles, districts, queries: initialQ
               )}
             </div>
 
-            <div className="data-table-wrapper">
+            <div className="data-table-wrapper" key={`article-table-${districtFilter}-${currentView}`}>
               <table className="data-table">
                 <thead>
                   <tr>
