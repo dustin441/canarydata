@@ -7,6 +7,27 @@ export const metadata = {
   description: 'Track public news and social conversations with AI-powered summaries, geo-filtered relevance, and actionable communications recommendations.',
 };
 
+const testimonials = [
+  {
+    quote: 'I am sold. I think it’s amazing. I really like that it gives you a starting point.',
+    detail: 'Nicole highlighted the value of having news and social signals organized quickly, especially for a one-person communications shop that does not have time to scroll every channel manually.',
+    name: 'Nicole Wheeler',
+    role: 'Pelham City Schools',
+  },
+  {
+    quote: 'Had I had this tool when I encountered an employee crisis situation, the recommendations would have been spot on and perfect for me to have used at the time.',
+    detail: 'Cindy pointed to Canary Data’s recommendations, crisis interpretation, and school-PR nuance as practical support for experienced and newer communicators alike.',
+    name: 'Cindy Warner',
+    role: 'Shelby County Schools',
+  },
+  {
+    quote: 'This is a good training tool for those who may not be strategic thinking as of yet.',
+    detail: 'Beta feedback reinforced that Canary Data is useful not just for monitoring coverage, but for helping teams learn how to think strategically about community trust and response timing.',
+    name: 'Beta district feedback',
+    role: 'School communications leaders',
+  },
+];
+
 export default function Home() {
   return (
     <div className={styles.container}>
@@ -174,6 +195,29 @@ export default function Home() {
               </div>
             </div>
           </div>
+        </div>
+      </section>
+
+      {/* Social Proof */}
+      <section className={styles.testimonialsSection}>
+        <div className={styles.sectionHeader}>
+          <span className={styles.badge}>Early District Feedback</span>
+          <h2 className={styles.sectionTitle}>Built with school communicators, not around them.</h2>
+          <p className={styles.sectionDesc}>
+            Early reviewers are validating the same promise Canary Data was built around: less noise, faster context, and recommendations that understand the nuance of school communications.
+          </p>
+        </div>
+        <div className={styles.testimonialGrid}>
+          {testimonials.map((testimonial) => (
+            <figure className={styles.testimonialCard} key={testimonial.quote}>
+              <blockquote>“{testimonial.quote}”</blockquote>
+              <p>{testimonial.detail}</p>
+              <figcaption>
+                <strong>{testimonial.name}</strong>
+                <span>{testimonial.role}</span>
+              </figcaption>
+            </figure>
+          ))}
         </div>
       </section>
 

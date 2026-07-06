@@ -79,6 +79,19 @@ const SOURCE_COLORS = {
   other: '#94A3B8',
 };
 
+const DEMO_TESTIMONIALS = [
+  {
+    quote: 'I am sold. I think it’s amazing. I really like that it gives you a starting point.',
+    name: 'Nicole Wheeler',
+    role: 'Pelham City Schools',
+  },
+  {
+    quote: 'Had I had this tool during an employee crisis, the recommendations would have been spot on and perfect for me to have used at the time.',
+    name: 'Cindy Warner',
+    role: 'Shelby County Schools',
+  },
+];
+
 const SOCIAL_SOURCE_TYPES = new Set(['facebook', 'instagram', 'tiktok', 'twitter']);
 
 function formatSourceLabel(source) {
@@ -1768,6 +1781,25 @@ export default function DashboardClient({ articles, districts, queries: initialQ
             <div className="demo-mode-banner">
               <strong>Interactive demo:</strong> sample public-media intelligence for Canary Falls Unified School District. Filters, Social aggregation, columns, notes, feedback, and PDF export are enabled; changes stay in this browser session.
             </div>
+          )}
+          {demoMode && currentView === 'dashboard' && (
+            <section className="demo-testimonials" aria-label="Early district feedback">
+              <div className="demo-testimonials-header">
+                <span>Early district feedback</span>
+                <strong>School communicators are seeing the value.</strong>
+              </div>
+              <div className="demo-testimonials-grid">
+                {DEMO_TESTIMONIALS.map((testimonial) => (
+                  <figure className="demo-testimonial-card" key={testimonial.quote}>
+                    <blockquote>“{testimonial.quote}”</blockquote>
+                    <figcaption>
+                      <strong>{testimonial.name}</strong>
+                      <span>{testimonial.role}</span>
+                    </figcaption>
+                  </figure>
+                ))}
+              </div>
+            </section>
           )}
           {!demoMode && !userDistrictId && districtFilter === 'All' && (
             <div className="demo-mode-banner">
