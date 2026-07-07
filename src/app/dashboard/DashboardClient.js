@@ -761,7 +761,7 @@ function NotesView({ articles, getNoteText, openNoteModal }) {
   );
 }
 
-function BirdEyeView({ articles, strategicAlignmentData, selectedLabel, onSelectLabel, openNoteModal, getNoteText }) {
+function BirdEyeView({ articles, strategicAlignmentData, selectedLabel, onSelectLabel, isEarned }) {
   const highlightedArticles = selectedLabel === 'All'
     ? articles.filter((article) => extractStrategicAlignmentLabels(article.innovation_reason).length > 0)
     : articles.filter((article) => extractStrategicAlignmentLabels(article.innovation_reason).includes(selectedLabel));
@@ -793,16 +793,20 @@ function BirdEyeView({ articles, strategicAlignmentData, selectedLabel, onSelect
           <thead>
             <tr>
               <th>Date</th>
-              <th>Coverage</th>
-              <th>Strategic Alignment</th>
+              <th>Headline</th>
+              <th>Summary</th>
+              <th>Link</th>
+              <th>Source</th>
+              <th>Tags</th>
               <th>Score</th>
-              <th>Notes</th>
+              <th>Strategic Alignment</th>
+              <th>Earned Media</th>
             </tr>
           </thead>
           <tbody>
             {highlightedArticles.length === 0 ? (
               <tr>
-                <td colSpan={5}>
+                <td colSpan={9}>
                   <div className="empty-state">
                     <div className="empty-state-icon">🦅</div>
                     <h3>No Strategic Alignment coverage in this view</h3>
@@ -815,22 +819,54 @@ function BirdEyeView({ articles, strategicAlignmentData, selectedLabel, onSelect
               return (
                 <tr key={article.id}>
                   <td style={{ whiteSpace: 'nowrap', color: 'var(--text-tertiary)', fontSize: '0.78rem' }}>{formatDate(article.date)}</td>
-                  <td>
-                    <div style={{ fontWeight: 700, color: 'var(--text-primary)' }}>{article.headline}</div>
-                    <div style={{ color: 'var(--text-secondary)', fontSize: '0.82rem', marginTop: '4px' }}>{article.summary}</div>
+                  <td className="headline-cell">
+                    <div className="headline-text" style={{ color: 'var(--text-primary)', fontWeight: 700 }}>{article.headline}</div>
                   </td>
-                  <td style={{ minWidth: '220px' }}>
-                    <StrategicAlignmentPills labels={labels} selectedLabel={selectedLabel} onSelect={onSelectLabel} max={4} />
+                  <td className="summary-cell">
+                    <ExpandableText text={article.summary} />
+                  </td>
+                  <td style={{ whiteSpace: 'nowrap' }}>
+                    {article.link && (
+                      <a href={article.link} target="_blank" rel="noopener noreferrer" style={{ display: 'inline-flex', alignItems: 'center', gap: '4px', fontSize: '0.78rem', color: 'var(--blue-400)' }}>
+                        ↗ View Story
+                      </a>
+                    )}
+                  </td>
+                  <td>
+                    <span style={{
+                      padding: '3px 10px', borderRadius: 'var(--radius-full)',
+                      fontSize: '0.72rem', fontWeight: 600,
+                      background: SOURCE_COLORS[article.source_type] ? `${SOURCE_COLORS[article.source_type]}20` : 'var(--bg-elevated)',
+                      color: SOURCE_COLORS[article.source_type] ?? 'var(--text-secondary)',
+                    }}>
+                      {formatSourceLabel(article.source_type ?? 'other')}
+                    </span>
+                  </td>
+                  <td>
+                    <div style={{ display: 'flex', gap: '4px', flexWrap: 'wrap', maxWidth: '160px' }}>
+                      {Array.isArray(article.tags) && article.tags.map((tag) => (
+                        <span key={tag} style={{
+                          padding: '2px 8px', borderRadius: 'var(--radius-full)',
+                          fontSize: '0.68rem', fontWeight: 600,
+                          background: 'var(--bg-elevated)', color: 'var(--text-secondary)',
+                        }}>
+                          {tag}
+                        </span>
+                      ))}
+                    </div>
                   </td>
                   <td className="score-column">
                     <span className={`score-badge ${getScoreClass(article.canary_score)}`}>
                       {parseFloat(article.canary_score).toFixed(1)}
                     </span>
                   </td>
-                  <td className="summary-cell">
-                    {getNoteText(article)
-                      ? <ExpandableText text={getNoteText(article)} />
-                      : <button className="note-indicator" onClick={() => openNoteModal(article)}>📝 Add note</button>
+                  <td style={{ minWidth: '220px' }}>
+                    <StrategicAlignmentPills labels={labels} selectedLabel={selectedLabel} onSelect={onSelectLabel} max={4} />
+                  </td>
+                  <td style={{ textAlign: 'center' }}>
+                    {isEarned(article)
+                      ? <span style={{ fontSize: '0.7rem', fontWeight: 700, color: 'var(--canary-yellow)' }}>Earned</span>
+                      : <span style={{ color: 'var(--text-tertiary)' }}>—</span>
                     }
                   </td>
                 </tr>
@@ -2093,8 +2129,7 @@ export default function DashboardClient({ articles, districts, queries: initialQ
               strategicAlignmentData={strategicAlignmentData}
               selectedLabel={strategicAlignmentFilter}
               onSelectLabel={setStrategicAlignmentFilter}
-              openNoteModal={openNoteModal}
-              getNoteText={getNoteText}
+              isEarned={isEarned}
             />
           )}
           {(currentView === 'dashboard' || currentView === 'articles') && (<>
