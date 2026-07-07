@@ -1072,7 +1072,7 @@ function SettingsView({ userDistrictId, districts, billingInfo = null }) {
         <div style={{ background: 'var(--bg-elevated)', border: '1px solid var(--border-secondary)', borderRadius: 'var(--radius-lg)', padding: '32px', maxWidth: '800px', marginBottom: '24px' }}>
           <h4 style={{ color: 'var(--text-primary)', marginBottom: '8px', fontSize: '1.2rem' }}>Billing Documents</h4>
           <p style={{ color: 'var(--text-secondary)', fontSize: '0.9rem', marginBottom: '20px', lineHeight: 1.6 }}>
-            Download the Quote, Purchase Order/Invoice, and Receipt for your account. Purchase order terms are Net 30; access pauses if payment has not cleared after 30 days.
+            Download the Quote, Estimate / Price Quote, and Receipt for your account. Payment terms are Net 30; access pauses if payment has not cleared after 30 days.
           </p>
 
           <form onSubmit={handleBillingSubmit} style={{ display: 'grid', gap: '14px', marginBottom: '18px' }}>
@@ -1107,7 +1107,7 @@ function SettingsView({ userDistrictId, districts, billingInfo = null }) {
 
           <div style={{ display: 'grid', gridTemplateColumns: 'repeat(auto-fit, minmax(180px, 1fr))', gap: '12px' }}>
             <a className="btn btn-primary" href="/billing/quote" target="_blank" rel="noreferrer" style={{ textAlign: 'center' }}>Download Quote</a>
-            <a className="btn btn-primary" href="/billing/purchase-order" target="_blank" rel="noreferrer" style={{ textAlign: 'center' }}>Download Invoice</a>
+            <a className="btn btn-primary" href="/billing/purchase-order" target="_blank" rel="noreferrer" style={{ textAlign: 'center' }}>Download Estimate</a>
             <button className="btn btn-secondary" type="button" disabled title="Upload Canary W-9 after vendor details are finalized.">W-9 coming soon</button>
             {billingInfo?.paymentStatus === 'paid' ? (
               <a className="btn btn-secondary" href="/billing/receipt" target="_blank" rel="noreferrer" style={{ textAlign: 'center' }}>Download Receipt</a>

@@ -22,7 +22,7 @@ function PaymentTerms({ documentType, doc }) {
 
   return (
     <>
-      <strong>Payment terms:</strong> Net 30 from invoice issue date.<br />
+      <strong>Payment terms:</strong> Net 30 from estimate/price quote issue date.<br />
       <strong>Access policy:</strong> If payment is not received and cleared within 30 days, account access pauses until payment clears.<br />
       <strong>Renewal:</strong> Annual access renews yearly. If the account is not renewed annually, platform access ends at the renewal date.
     </>
@@ -53,7 +53,7 @@ export default async function BillingDocumentPage({ params }) {
           <Image src="/canary-logo.svg" alt="Canary Data" width={210} height={58} style={{ height: '46px', width: 'auto', marginBottom: '22px' }} />
           <h1 style={{ margin: '0 0 12px', fontSize: '1.65rem' }}>Receipt not available yet</h1>
           <p style={{ color: '#4b5563', lineHeight: 1.7, marginBottom: '22px' }}>
-            Receipts are only generated after payment is confirmed. You can still download the Quote and Invoice from Account Settings.
+            Receipts are only generated after payment is confirmed. You can still download the Quote and Estimate / Price Quote from Account Settings.
           </p>
           <a href="/dashboard" style={{ background: '#f5c518', color: '#111827', padding: '10px 14px', borderRadius: '8px', textDecoration: 'none', fontWeight: 700, fontSize: '0.9rem' }}>Back to dashboard</a>
         </section>
@@ -167,7 +167,7 @@ export default async function BillingDocumentPage({ params }) {
           </div>
 
           <div style={{ background: '#fffbeb', border: '1px solid #facc15', borderRadius: '12px', padding: '18px', color: '#713f12', lineHeight: 1.65, fontSize: '0.92rem' }}>
-            <strong>School finance note:</strong> Purchase order/invoice payment terms are Net 30. If payment is not received and cleared within 30 days, Canary Data access may pause until the payment clears. Check payments are recorded as paid only once cleared.
+            <strong>School finance note:</strong> Estimate/price quote payment terms are Net 30. If payment is not received and cleared within 30 days, Canary Data access may pause until payment clears. Check payments are recorded as paid only once cleared.
           </div>
         </div>
       </section>

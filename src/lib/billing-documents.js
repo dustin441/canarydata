@@ -31,7 +31,7 @@ export function billingDocumentNumbers({ districtId, email, year = new Date().ge
   const accountCode = billingAccountCode(districtId, email);
   return {
     quoteNumber: `CD-Q-${accountCode}-${year}`,
-    invoiceNumber: `CD-INV-${accountCode}-${year}`,
+    invoiceNumber: `CD-EST-${accountCode}-${year}`,
     receiptNumber: `CD-RCPT-${accountCode}-${year}`,
   };
 }
@@ -84,10 +84,10 @@ export const BILLING_DOCUMENT_COPY = {
     intro: 'This quote outlines annual Canary Data platform access after the approved 30-day trial period.',
   },
   'purchase-order': {
-    title: 'Canary Data Invoice',
-    label: 'Invoice',
-    statusLabel: 'Payment pending',
-    intro: 'This invoice may be used for district approval and payment processing. If the district supplies a purchase order number, it appears on this invoice and the paid receipt. Payment terms are Net 30 from the invoice issue date.',
+    title: 'Canary Data Estimate / Price Quote',
+    label: 'Estimate / Price Quote',
+    statusLabel: 'Estimate for approval',
+    intro: 'This estimate/price quote may be used for district approval and payment processing. If the district supplies a purchase order number, it appears on this estimate and the paid receipt. Payment terms are Net 30 from the estimate issue date.',
   },
   receipt: {
     title: 'Canary Data Receipt',
