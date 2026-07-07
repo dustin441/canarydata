@@ -3,7 +3,13 @@
 import { useState, useMemo, useEffect, useRef, useTransition, useCallback } from 'react';
 import Image from 'next/image';
 import Link from 'next/link';
+import { loadStripe } from '@stripe/stripe-js';
 import { setEarnedMedia, saveNote, addQuery, deleteQuery, submitFeedback } from '@/app/actions';
+import { createEmbeddedCanaryCheckout, confirmEmbeddedCanaryCheckout } from '@/app/payment/actions';
+
+const stripePromise = process.env.NEXT_PUBLIC_STRIPE_PUBLISHABLE_KEY
+  ? loadStripe(process.env.NEXT_PUBLIC_STRIPE_PUBLISHABLE_KEY)
+  : null;
 
 const ALL_COLUMNS = [
   { id: 'date',               label: 'Date',               required: true  },
@@ -1608,6 +1614,13 @@ export default function DashboardClient({ articles, districts, queries: initialQ
   const [sidebarOpen, setSidebarOpen] = useState(false);
   const [visibleColumns, setVisibleColumns] = useState(DEFAULT_VISIBLE);
   const [colMenuOpen, setColMenuOpen] = useState(false);
+  const [paymentModalOpen, setPaymentModalOpen] = useState(false);
+  const [paymentLoading, setPaymentLoading] = useState(false);
+  const [paymentError, setPaymentError] = useState('');
+  const [paymentSuccess, setPaymentSuccess] = useState(false);
+  const [embeddedCheckout, setEmbeddedCheckout] = useState(null);
+  const [embeddedCheckoutSessionId, setEmbeddedCheckoutSessionId] = useState('');
+  const embeddedCheckoutRef = useRef(null);
   const colMenuRef = useRef(null);
 
   // Load saved column prefs from localStorage
@@ -1628,6 +1641,62 @@ export default function DashboardClient({ articles, districts, queries: initialQ
     document.addEventListener('mousedown', handleClick);
     return () => document.removeEventListener('mousedown', handleClick);
   }, []);
+
+  useEffect(() => () => {
+    if (embeddedCheckoutRef.current) {
+      try { embeddedCheckoutRef.current.destroy(); } catch {}
+      embeddedCheckoutRef.current = null;
+    }
+  }, []);
+
+  async function openPaymentModal() {
+    setPaymentModalOpen(true);
+    setPaymentLoading(true);
+    setPaymentError('');
+    setPaymentSuccess(false);
+
+    try {
+      if (!stripePromise) throw new Error('Stripe publishable key is not configured.');
+      if (embeddedCheckoutRef.current) {
+        try { embeddedCheckoutRef.current.destroy(); } catch {}
+        embeddedCheckoutRef.current = null;
+      }
+      setEmbeddedCheckout(null);
+      const session = await createEmbeddedCanaryCheckout();
+      setEmbeddedCheckoutSessionId(session.sessionId);
+      const stripe = await stripePromise;
+      if (!stripe) throw new Error('Stripe could not load. Please refresh and try again.');
+      const checkout = await stripe.initEmbeddedCheckout({
+        clientSecret: session.clientSecret,
+        onComplete: async () => {
+          const result = await confirmEmbeddedCanaryCheckout(session.sessionId);
+          if (result?.ok) {
+            setPaymentSuccess(true);
+            setEmbeddedCheckout(null);
+          } else {
+            setPaymentError('Stripe finished, but payment is not marked paid yet. Please contact Canary if this does not update shortly.');
+          }
+        },
+      });
+      embeddedCheckoutRef.current = checkout;
+      setEmbeddedCheckout(checkout);
+      setTimeout(() => checkout.mount('#canary-embedded-checkout'), 0);
+    } catch (err) {
+      setPaymentError(err?.message || 'Unable to start payment. Please try again.');
+    } finally {
+      setPaymentLoading(false);
+    }
+  }
+
+  function closePaymentModal() {
+    if (embeddedCheckoutRef.current) {
+      try { embeddedCheckoutRef.current.destroy(); } catch {}
+      embeddedCheckoutRef.current = null;
+    }
+    setEmbeddedCheckout(null);
+    setEmbeddedCheckoutSessionId('');
+    setPaymentModalOpen(false);
+  }
 
   // Prompt demo visitors to join the release notification list after 30 seconds.
   useEffect(() => {
@@ -2085,7 +2154,7 @@ export default function DashboardClient({ articles, districts, queries: initialQ
             <div className="demo-mode-banner" style={{ borderColor: 'rgba(245,197,24,0.45)', background: 'rgba(245,197,24,0.1)' }}>
               <strong>Your free trial is {paymentNotice.daysUntilTrialEnds <= 0 ? 'ending now' : `up in ${paymentNotice.daysUntilTrialEnds} day${paymentNotice.daysUntilTrialEnds === 1 ? '' : 's'}`}.</strong>{' '}
               Add your card to keep Canary monitoring active.{' '}
-              <Link href="/payment" style={{ color: 'var(--brand-primary)', fontWeight: 700 }}>Click here to pay.</Link>
+              <button type="button" onClick={openPaymentModal} style={{ color: 'var(--brand-primary)', fontWeight: 700, background: 'none', border: 'none', padding: 0, cursor: 'pointer', textDecoration: 'underline' }}>Click here to pay.</button>
             </div>
           )}
           {demoMode && currentView === 'dashboard' && (
@@ -2661,6 +2730,48 @@ export default function DashboardClient({ articles, districts, queries: initialQ
           districtName={userDistrictId ? districts.find((d) => d.id === userDistrictId)?.name : (demoMode ? 'Canary Falls Unified School District' : null)}
           onClose={() => setFeedbackOpen(false)}
         />
+      )}
+
+      {paymentModalOpen && (
+        <div className="modal-overlay" onClick={(e) => e.target === e.currentTarget && closePaymentModal()}>
+          <div className="modal" onClick={(e) => e.stopPropagation()} style={{ maxWidth: '760px', width: 'min(760px, calc(100vw - 32px))', maxHeight: '90vh', overflow: 'auto' }}>
+            <div style={{ display: 'flex', alignItems: 'flex-start', justifyContent: 'space-between', gap: '1rem', marginBottom: '1rem' }}>
+              <div>
+                <h3 style={{ marginBottom: '0.35rem' }}>Complete Canary Data payment</h3>
+                <p style={{ color: 'var(--text-secondary)', fontSize: '0.9rem', lineHeight: 1.5 }}>
+                  $1,499 annual access. Add your card details below; payment stays tied to your logged-in district account.
+                </p>
+              </div>
+              <button className="btn btn-secondary btn-sm" onClick={closePaymentModal} type="button" style={{ width: 'auto' }}>×</button>
+            </div>
+
+            {paymentSuccess ? (
+              <div style={{ textAlign: 'center', padding: '2rem 1rem' }}>
+                <div style={{ fontSize: '3rem', marginBottom: '0.75rem' }}>✅</div>
+                <h3>Payment successful</h3>
+                <p style={{ color: 'var(--text-secondary)', lineHeight: 1.6 }}>
+                  Thanks — Stripe confirmed the payment and Canary updated the account status. You can close this and keep working.
+                </p>
+                <button className="btn btn-primary" type="button" onClick={closePaymentModal} style={{ marginTop: '1rem' }}>
+                  Back to Dashboard
+                </button>
+              </div>
+            ) : (
+              <>
+                {paymentError && <div className="auth-error" style={{ marginBottom: '1rem' }}><span>⚠</span> {paymentError}</div>}
+                {paymentLoading && (
+                  <div style={{ display: 'flex', alignItems: 'center', justifyContent: 'center', minHeight: '220px' }}>
+                    <span className="spinner" />
+                  </div>
+                )}
+                <div id="canary-embedded-checkout" style={{ minHeight: embeddedCheckout ? '560px' : '1px' }} />
+                {!paymentLoading && embeddedCheckoutSessionId && !embeddedCheckout && !paymentSuccess && !paymentError && (
+                  <p style={{ color: 'var(--text-secondary)', fontSize: '0.85rem' }}>Preparing secure Stripe checkout…</p>
+                )}
+              </>
+            )}
+          </div>
+        </div>
       )}
 
       {releaseSignupOpen && (
