@@ -972,7 +972,7 @@ function HowItWorksView() {
   );
 }
 
-function SettingsView({ userDistrictId, districts, billingInfo = null }) {
+function SettingsView({ userDistrictId, districts, billingInfo = null, onPayByCard = null }) {
   const [issue, setIssue] = useState('');
   const [isPending, startSupportTransition] = useTransition();
   const [isBillingPending, startBillingTransition] = useTransition();
@@ -1115,6 +1115,17 @@ function SettingsView({ userDistrictId, districts, billingInfo = null }) {
               <button className="btn btn-secondary" type="button" disabled title="Receipt is available after payment is confirmed.">Receipt available after payment</button>
             )}
           </div>
+
+          {billingInfo?.paymentStatus !== 'paid' && (
+            <div style={{ marginTop: '14px' }}>
+              <button className="btn btn-primary" type="button" onClick={onPayByCard} style={{ width: '100%' }}>
+                Pay by Credit Card
+              </button>
+              <p style={{ margin: '8px 0 0', color: 'var(--text-secondary)', fontSize: '0.82rem', lineHeight: 1.5 }}>
+                Opens secure Stripe payment inside the dashboard. Your payment stays tied to this logged-in district account.
+              </p>
+            </div>
+          )}
 
           <div style={{ marginTop: '16px', padding: '14px 16px', border: '1px solid var(--border-secondary)', borderRadius: 'var(--radius-md)', color: 'var(--text-secondary)', fontSize: '0.86rem', lineHeight: 1.55 }}>
             Status: <strong style={{ color: 'var(--text-primary)' }}>{billingInfo?.paymentStatus || 'pending'}</strong><br />
@@ -2273,7 +2284,7 @@ export default function DashboardClient({ articles, districts, queries: initialQ
             </div>
           )}
           {currentView === 'clients' && <ClientsView clients={clients} />}
-          {currentView === 'settings' && <SettingsView userDistrictId={userDistrictId} districts={districts} billingInfo={billingInfo} />}
+          {currentView === 'settings' && <SettingsView userDistrictId={userDistrictId} districts={districts} billingInfo={billingInfo} onPayByCard={openPaymentModal} />}
           {currentView === 'howto' && <HowItWorksView />}
           {currentView === 'queries' && (
             <QueriesView
