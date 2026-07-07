@@ -5,7 +5,7 @@ import Image from 'next/image';
 import Link from 'next/link';
 import { loadStripe } from '@stripe/stripe-js';
 import { setEarnedMedia, saveNote, addQuery, deleteQuery, submitFeedback } from '@/app/actions';
-import { createEmbeddedCanaryCheckout, confirmEmbeddedCanaryCheckout } from '@/app/payment/actions';
+import { createEmbeddedCanaryCheckout, confirmEmbeddedCanaryCheckout, saveBillingPurchaseOrder } from '@/app/payment/actions';
 
 const stripePromise = process.env.NEXT_PUBLIC_STRIPE_PUBLISHABLE_KEY
   ? loadStripe(process.env.NEXT_PUBLIC_STRIPE_PUBLISHABLE_KEY)
@@ -972,11 +972,16 @@ function HowItWorksView() {
   );
 }
 
-function SettingsView({ userDistrictId, districts }) {
+function SettingsView({ userDistrictId, districts, billingInfo = null }) {
   const [issue, setIssue] = useState('');
   const [isPending, startSupportTransition] = useTransition();
+  const [isBillingPending, startBillingTransition] = useTransition();
   const [submitted, setSubmitted] = useState(false);
+  const [billingSaved, setBillingSaved] = useState(false);
   const [supportError, setSupportError] = useState(null);
+  const [billingError, setBillingError] = useState(null);
+  const [poNumber, setPoNumber] = useState(billingInfo?.poNumber || '');
+  const [billingContactName, setBillingContactName] = useState(billingInfo?.billingContactName || '');
   const assignedDistrict = userDistrictId ? districts?.find((d) => d.id === userDistrictId) : null;
   const profileName = assignedDistrict?.name ?? 'Canary Admin';
   const profileDetail = userDistrictId ? 'Client view · 1 district' : 'Admin view · all districts';
@@ -1008,6 +1013,23 @@ function SettingsView({ userDistrictId, districts }) {
     });
   }
 
+  function handleBillingSubmit(e) {
+    e.preventDefault();
+    setBillingError(null);
+    setBillingSaved(false);
+    const fd = new FormData();
+    fd.append('po_number', poNumber);
+    fd.append('billing_contact_name', billingContactName);
+    startBillingTransition(async () => {
+      try {
+        await saveBillingPurchaseOrder(fd);
+        setBillingSaved(true);
+      } catch (err) {
+        setBillingError(err.message || 'Could not save billing details. Please try again.');
+      }
+    });
+  }
+
   return (
     <div className="data-section">
       <div className="data-header">
@@ -1034,6 +1056,46 @@ function SettingsView({ userDistrictId, districts }) {
           </button>
         </div>
       </div>
+
+      {/* Billing Documents */}
+      {userDistrictId && (
+        <div style={{ background: 'var(--bg-elevated)', border: '1px solid var(--border-secondary)', borderRadius: 'var(--radius-lg)', padding: '32px', maxWidth: '800px', marginBottom: '24px' }}>
+          <h4 style={{ color: 'var(--text-primary)', marginBottom: '8px', fontSize: '1.2rem' }}>Billing Documents</h4>
+          <p style={{ color: 'var(--text-secondary)', fontSize: '0.9rem', marginBottom: '20px', lineHeight: 1.6 }}>
+            Download the Quote, Purchase Order/Invoice, and Receipt for your account. Purchase order terms are Net 30; access pauses if payment has not cleared after 30 days.
+          </p>
+
+          <form onSubmit={handleBillingSubmit} style={{ display: 'grid', gap: '14px', marginBottom: '18px' }}>
+            <div className="form-group" style={{ marginBottom: 0 }}>
+              <label className="form-label" style={{ color: 'var(--text-secondary)', fontSize: '0.85rem', marginBottom: '8px', display: 'block' }}>Billing contact name</label>
+              <input type="text" className="form-input" value={billingContactName} onChange={(e) => setBillingContactName(e.target.value)} placeholder="Optional" />
+            </div>
+            <div className="form-group" style={{ marginBottom: 0 }}>
+              <label className="form-label" style={{ color: 'var(--text-secondary)', fontSize: '0.85rem', marginBottom: '8px', display: 'block' }}>Purchase order number</label>
+              <input type="text" className="form-input" value={poNumber} onChange={(e) => setPoNumber(e.target.value)} placeholder="Enter PO number when your district provides it" />
+            </div>
+            {billingError && <p style={{ color: 'var(--status-negative)', fontSize: '0.82rem', margin: 0 }}>{billingError}</p>}
+            {billingSaved && <p style={{ color: '#22C55E', fontSize: '0.82rem', margin: 0 }}>Billing details saved. Reopen documents to see the latest PO/contact details.</p>}
+            <div style={{ display: 'flex', justifyContent: 'flex-end' }}>
+              <button type="submit" className="btn btn-secondary" disabled={isBillingPending}>
+                {isBillingPending ? <span className="spinner" style={{ margin: '0 auto' }} /> : 'Save Billing Details'}
+              </button>
+            </div>
+          </form>
+
+          <div style={{ display: 'grid', gridTemplateColumns: 'repeat(auto-fit, minmax(180px, 1fr))', gap: '12px' }}>
+            <a className="btn btn-primary" href="/billing/quote" target="_blank" rel="noreferrer" style={{ textAlign: 'center' }}>Download Quote</a>
+            <a className="btn btn-primary" href="/billing/purchase-order" target="_blank" rel="noreferrer" style={{ textAlign: 'center' }}>Download PO / Invoice</a>
+            <a className="btn btn-secondary" href="/billing/receipt" target="_blank" rel="noreferrer" style={{ textAlign: 'center' }}>Download Receipt</a>
+          </div>
+
+          <div style={{ marginTop: '16px', padding: '14px 16px', border: '1px solid var(--border-secondary)', borderRadius: 'var(--radius-md)', color: 'var(--text-secondary)', fontSize: '0.86rem', lineHeight: 1.55 }}>
+            Status: <strong style={{ color: 'var(--text-primary)' }}>{billingInfo?.paymentStatus || 'pending'}</strong><br />
+            Trial ends: <strong style={{ color: 'var(--text-primary)' }}>{billingInfo?.trialEndsAt ? new Date(billingInfo.trialEndsAt).toLocaleDateString() : 'Not set'}</strong><br />
+            Annual access: <strong style={{ color: 'var(--text-primary)' }}>$1,499</strong>
+          </div>
+        </div>
+      )}
 
       {/* Contact Support */}
       <div style={{ background: 'var(--bg-elevated)', border: '1px solid var(--border-secondary)', borderRadius: 'var(--radius-lg)', padding: '32px', maxWidth: '800px' }}>
@@ -1594,7 +1656,7 @@ function QueryMultiSelect({ allQueries, selectedQueries, onChange }) {
   );
 }
 
-export default function DashboardClient({ articles, districts, queries: initialQueries, clients = [], userDistrictId, paymentNotice = null, demoMode = false }) {
+export default function DashboardClient({ articles, districts, queries: initialQueries, clients = [], userDistrictId, paymentNotice = null, billingInfo = null, demoMode = false }) {
   const defaultDistrictFilter = userDistrictId ?? districts[0]?.id ?? 'All';
   const [currentView, setCurrentView] = useState('dashboard');
   const [search, setSearch] = useState('');
@@ -2184,7 +2246,7 @@ export default function DashboardClient({ articles, districts, queries: initialQ
             </div>
           )}
           {currentView === 'clients' && <ClientsView clients={clients} />}
-          {currentView === 'settings' && <SettingsView userDistrictId={userDistrictId} districts={districts} />}
+          {currentView === 'settings' && <SettingsView userDistrictId={userDistrictId} districts={districts} billingInfo={billingInfo} />}
           {currentView === 'howto' && <HowItWorksView />}
           {currentView === 'queries' && (
             <QueriesView

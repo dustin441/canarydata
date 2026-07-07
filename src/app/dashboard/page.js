@@ -35,6 +35,13 @@ export default async function DashboardPage() {
         paymentStatus: billingContext?.onboardingRequest?.payment_status || 'pending',
       }
     : null;
+  const billingInfo = billingContext ? {
+    paymentStatus: billingContext.onboardingRequest?.payment_status || billingContext.user?.user_metadata?.payment_status || 'pending',
+    trialStartsAt: billingContext.onboardingRequest?.trial_starts_at || billingContext.user?.user_metadata?.trial_starts_at || null,
+    trialEndsAt,
+    poNumber: billingContext.user?.user_metadata?.po_number || '',
+    billingContactName: billingContext.user?.user_metadata?.billing_contact_name || '',
+  } : null;
 
   return (
     <DashboardClient
@@ -44,6 +51,7 @@ export default async function DashboardPage() {
       clients={clients}
       userDistrictId={userDistrictId}
       paymentNotice={paymentNotice}
+      billingInfo={billingInfo}
     />
   );
 }

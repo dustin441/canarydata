@@ -71,6 +71,27 @@ export async function createEmbeddedCanaryCheckout() {
   };
 }
 
+export async function saveBillingPurchaseOrder(formData) {
+  const context = requireBillingContext(await getAuthenticatedBillingContext());
+  const poNumber = String(formData.get('po_number') || '').trim().slice(0, 80);
+  const billingContactName = String(formData.get('billing_contact_name') || '').trim().slice(0, 120);
+  const supabase = createAdminClient();
+  const mergedMetadata = {
+    ...(context.user?.user_metadata || {}),
+    po_number: poNumber,
+    billing_contact_name: billingContactName,
+    billing_email: context.email,
+    billing_terms: 'Net 30',
+    amount_due_cents: 149900,
+  };
+  if (context.districtId) mergedMetadata.district_id = context.districtId;
+  if (context.organizationName) mergedMetadata.district_name = context.organizationName;
+  await supabase.auth.admin.updateUserById(context.user.id, {
+    user_metadata: mergedMetadata,
+  });
+  return { ok: true, poNumber, billingContactName };
+}
+
 export async function confirmEmbeddedCanaryCheckout(sessionId) {
   const context = requireBillingContext(await getAuthenticatedBillingContext());
   const session = await retrieveCheckoutSession(sessionId);

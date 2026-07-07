@@ -30,6 +30,17 @@ export async function getAuthenticatedBillingContext() {
       .order('created_at', { ascending: false })
       .limit(1);
     onboardingRequest = data?.[0] || null;
+    const metadata = { ...(sessionUser?.user_metadata || {}), ...(user?.user_metadata || {}) };
+    if (onboardingRequest) {
+      onboardingRequest = {
+        ...onboardingRequest,
+        payment_status: metadata.payment_status || onboardingRequest.payment_status,
+        trial_status: metadata.trial_status || onboardingRequest.trial_status,
+        access_status: metadata.access_status || onboardingRequest.access_status,
+        trial_ends_at: metadata.trial_ends_at || onboardingRequest.trial_ends_at,
+        stripe_customer_id: metadata.stripe_customer_id || onboardingRequest.stripe_customer_id,
+      };
+    }
   }
 
   const metadata = { ...(sessionUser?.user_metadata || {}), ...(user?.user_metadata || {}) };
