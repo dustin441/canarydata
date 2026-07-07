@@ -1,6 +1,6 @@
 'use client';
 
-import { useState, useMemo, useEffect, useRef, useTransition } from 'react';
+import { useState, useMemo, useEffect, useRef, useTransition, useCallback } from 'react';
 import Image from 'next/image';
 import Link from 'next/link';
 import { setEarnedMedia, saveNote, addQuery, deleteQuery, submitFeedback } from '@/app/actions';
@@ -24,7 +24,7 @@ const DEFAULT_VISIBLE = new Set(
   ALL_COLUMNS.filter((c) => c.required || c.defaultOn).map((c) => c.id)
 );
 import {
-  AreaChart, Area, LineChart, Line, PieChart, Pie, Cell,
+  AreaChart, Area, LineChart, Line, PieChart, Pie, Cell, BarChart, Bar,
   XAxis, YAxis, CartesianGrid, Tooltip, ResponsiveContainer, Legend,
 } from 'recharts';
 
@@ -244,6 +244,73 @@ function formatDistrictName(id) {
     .split('-')
     .map((w) => w.charAt(0).toUpperCase() + w.slice(1))
     .join(' ');
+}
+
+function extractStrategicAlignmentLabels(text) {
+  if (!text || text === 'N/A') return [];
+  const normalized = normalizeEscapedRecommendationText(text);
+  const labels = [];
+
+  normalized.split('\n').forEach((line) => {
+    const boldMatches = [...line.matchAll(/\*\*([^*]+)\*\*/g)].map((m) => m[1]);
+    const candidates = boldMatches.length ? boldMatches : [line.split(/[–-]/)[0]];
+    candidates.forEach((candidate) => {
+      candidate
+        .split('|')
+        .map((part) => part.replace(/^#+\s*/, '').replace(/[*:]/g, '').trim())
+        .filter(Boolean)
+        .filter((label) => label.length <= 120)
+        .filter((label) => !isHiddenRoadmapMetricLine(label))
+        .filter((label) => !/^(strategic alignment|visibility intelligence|n\/a)$/i.test(label))
+        .forEach((label) => labels.push(label));
+    });
+  });
+
+  return [...new Set(labels)];
+}
+
+function buildStrategicAlignmentData(articles) {
+  const counts = new Map();
+  articles.forEach((article) => {
+    extractStrategicAlignmentLabels(article.innovation_reason).forEach((label) => {
+      counts.set(label, (counts.get(label) ?? 0) + 1);
+    });
+  });
+  return [...counts.entries()]
+    .map(([label, count]) => ({ label, count }))
+    .sort((a, b) => b.count - a.count || a.label.localeCompare(b.label));
+}
+
+function StrategicAlignmentPills({ labels, selectedLabel, onSelect, max = 3 }) {
+  const visible = labels.slice(0, max);
+  if (!visible.length) return <span style={{ color: 'var(--text-tertiary)', fontStyle: 'italic' }}>—</span>;
+  return (
+    <div style={{ display: 'flex', gap: '5px', flexWrap: 'wrap' }}>
+      {visible.map((label) => (
+        <button
+          key={label}
+          type="button"
+          onClick={() => onSelect(label)}
+          title={`Filter to ${label}`}
+          style={{
+            border: selectedLabel === label ? '1px solid var(--canary-yellow)' : '1px solid var(--border-secondary)',
+            background: selectedLabel === label ? 'rgba(245,197,24,0.14)' : 'var(--bg-elevated)',
+            color: selectedLabel === label ? 'var(--canary-yellow)' : 'var(--text-secondary)',
+            borderRadius: '999px',
+            padding: '3px 8px',
+            fontSize: '0.68rem',
+            fontWeight: 700,
+            cursor: 'pointer',
+          }}
+        >
+          {label}
+        </button>
+      ))}
+      {labels.length > max && (
+        <span style={{ color: 'var(--text-tertiary)', fontSize: '0.7rem', alignSelf: 'center' }}>+{labels.length - max}</span>
+      )}
+    </div>
+  );
 }
 
 function ScoreGauge({ score }) {
@@ -618,7 +685,14 @@ function QueriesView({ initialQueries, districts, userDistrictId, demoMode = fal
 }
 
 function NotesView({ articles, getNoteText, openNoteModal }) {
+  const [noteSearch, setNoteSearch] = useState('');
   const noted = articles.filter((a) => getNoteText(a));
+  const q = noteSearch.trim().toLowerCase();
+  const visibleNotes = !q
+    ? noted
+    : noted.filter((a) => [a.headline, a.summary, getNoteText(a), a.innovation_reason, a.recommendation]
+        .filter(Boolean)
+        .some((value) => String(value).toLowerCase().includes(q)));
 
   if (noted.length === 0) {
     return (
@@ -636,7 +710,14 @@ function NotesView({ articles, getNoteText, openNoteModal }) {
   return (
     <div className="data-section">
       <div className="data-header">
-        <h3>📝 Analyst Notes <span style={{ color: 'var(--text-tertiary)', fontSize: '0.85rem', fontWeight: 400 }}>({noted.length})</span></h3>
+        <h3>📝 Analyst Notes <span style={{ color: 'var(--text-tertiary)', fontSize: '0.85rem', fontWeight: 400 }}>({visibleNotes.length} of {noted.length})</span></h3>
+        <input
+          className="filter-input"
+          placeholder="Search notes, headlines, or training examples..."
+          value={noteSearch}
+          onChange={(e) => setNoteSearch(e.target.value)}
+          style={{ maxWidth: '360px' }}
+        />
       </div>
       <div className="data-table-wrapper">
         <table className="data-table">
@@ -649,7 +730,17 @@ function NotesView({ articles, getNoteText, openNoteModal }) {
             </tr>
           </thead>
           <tbody>
-            {noted.map((a) => (
+            {visibleNotes.length === 0 ? (
+              <tr>
+                <td colSpan={4}>
+                  <div className="empty-state">
+                    <div className="empty-state-icon">🔍</div>
+                    <h3>No matching notes</h3>
+                    <p>Try another keyword like training, crisis, board, or alignment.</p>
+                  </div>
+                </td>
+              </tr>
+            ) : visibleNotes.map((a) => (
               <tr key={a.id}>
                 <td style={{ whiteSpace: 'nowrap', color: 'var(--text-secondary)', fontSize: '0.82rem' }}>{formatDate(a.date)}</td>
                 <td style={{ fontWeight: 500, color: 'var(--text-primary)' }}>
@@ -666,6 +757,138 @@ function NotesView({ articles, getNoteText, openNoteModal }) {
           </tbody>
         </table>
       </div>
+    </div>
+  );
+}
+
+function BirdEyeView({ articles, strategicAlignmentData, selectedLabel, onSelectLabel, openNoteModal, getNoteText }) {
+  const highlightedArticles = selectedLabel === 'All'
+    ? articles.filter((article) => extractStrategicAlignmentLabels(article.innovation_reason).length > 0)
+    : articles.filter((article) => extractStrategicAlignmentLabels(article.innovation_reason).includes(selectedLabel));
+
+  return (
+    <div className="data-section">
+      <div className="data-header">
+        <div>
+          <h3>🦅 Bird’s Eye View <span style={{ color: 'var(--text-tertiary)', fontSize: '0.85rem', fontWeight: 400 }}>({highlightedArticles.length} aligned articles)</span></h3>
+          <p style={{ color: 'var(--text-secondary)', fontSize: '0.86rem', marginTop: '6px' }}>
+            A lightweight Strategic Alignment report for quickly showing which district priorities are showing up in coverage.
+          </p>
+        </div>
+        {selectedLabel !== 'All' && (
+          <button className="btn btn-secondary btn-sm" onClick={() => onSelectLabel('All')}>
+            {selectedLabel} ✕
+          </button>
+        )}
+      </div>
+
+      <StrategicAlignmentChart
+        data={strategicAlignmentData}
+        selectedLabel={selectedLabel}
+        onSelectLabel={onSelectLabel}
+      />
+
+      <div className="data-table-wrapper" style={{ marginTop: '18px' }}>
+        <table className="data-table">
+          <thead>
+            <tr>
+              <th>Date</th>
+              <th>Coverage</th>
+              <th>Strategic Alignment</th>
+              <th>Score</th>
+              <th>Notes</th>
+            </tr>
+          </thead>
+          <tbody>
+            {highlightedArticles.length === 0 ? (
+              <tr>
+                <td colSpan={5}>
+                  <div className="empty-state">
+                    <div className="empty-state-icon">🦅</div>
+                    <h3>No Strategic Alignment coverage in this view</h3>
+                    <p>Try clearing filters or selecting another district/date range.</p>
+                  </div>
+                </td>
+              </tr>
+            ) : highlightedArticles.slice(0, 25).map((article) => {
+              const labels = extractStrategicAlignmentLabels(article.innovation_reason);
+              return (
+                <tr key={article.id}>
+                  <td style={{ whiteSpace: 'nowrap', color: 'var(--text-tertiary)', fontSize: '0.78rem' }}>{formatDate(article.date)}</td>
+                  <td>
+                    <div style={{ fontWeight: 700, color: 'var(--text-primary)' }}>{article.headline}</div>
+                    <div style={{ color: 'var(--text-secondary)', fontSize: '0.82rem', marginTop: '4px' }}>{article.summary}</div>
+                  </td>
+                  <td style={{ minWidth: '220px' }}>
+                    <StrategicAlignmentPills labels={labels} selectedLabel={selectedLabel} onSelect={onSelectLabel} max={4} />
+                  </td>
+                  <td className="score-column">
+                    <span className={`score-badge ${getScoreClass(article.canary_score)}`}>
+                      {parseFloat(article.canary_score).toFixed(1)}
+                    </span>
+                  </td>
+                  <td className="summary-cell">
+                    {getNoteText(article)
+                      ? <ExpandableText text={getNoteText(article)} />
+                      : <button className="note-indicator" onClick={() => openNoteModal(article)}>📝 Add note</button>
+                    }
+                  </td>
+                </tr>
+              );
+            })}
+          </tbody>
+        </table>
+      </div>
+    </div>
+  );
+}
+
+function StrategicAlignmentChart({ data, selectedLabel, onSelectLabel }) {
+  const chartData = data.slice(0, 8).map((item) => ({
+    ...item,
+    shortLabel: item.label.length > 34 ? `${item.label.slice(0, 31)}…` : item.label,
+  }));
+
+  return (
+    <div className="chart-card" style={{ minHeight: '320px' }}>
+      <h4>Strategic Alignment <span>Click a focus area to filter coverage</span></h4>
+      {chartData.length === 0 ? (
+        <div className="empty-state" style={{ padding: '36px 16px' }}>
+          <div className="empty-state-icon">🎯</div>
+          <h3>No Strategic Alignment labels yet</h3>
+          <p>Aligned coverage will appear here once stories have Strategic Alignment output.</p>
+        </div>
+      ) : (
+        <>
+          <ResponsiveContainer width="100%" height={230}>
+            <BarChart data={chartData} layout="vertical" margin={{ top: 8, right: 18, bottom: 8, left: 8 }}>
+              <CartesianGrid strokeDasharray="3 3" stroke="#1E2D40" horizontal={false} />
+              <XAxis type="number" allowDecimals={false} tick={{ fill: '#64748B', fontSize: 10 }} axisLine={false} tickLine={false} />
+              <YAxis dataKey="shortLabel" type="category" width={170} tick={{ fill: '#94A3B8', fontSize: 10 }} axisLine={false} tickLine={false} />
+              <Tooltip contentStyle={TOOLTIP_STYLE} formatter={(val) => [`${val} articles`, 'Coverage']} labelFormatter={(_, payload) => payload?.[0]?.payload?.label ?? ''} />
+              <Bar dataKey="count" radius={[0, 8, 8, 0]} onClick={(entry) => onSelectLabel(entry.label)} cursor="pointer">
+                {chartData.map((entry) => (
+                  <Cell key={entry.label} fill={selectedLabel === entry.label ? '#F5C518' : '#3B82F6'} />
+                ))}
+              </Bar>
+            </BarChart>
+          </ResponsiveContainer>
+          <div style={{ display: 'flex', gap: '6px', flexWrap: 'wrap', marginTop: '12px' }}>
+            {data.slice(0, 12).map((item) => (
+              <button
+                key={item.label}
+                type="button"
+                onClick={() => onSelectLabel(item.label)}
+                className="btn btn-secondary btn-sm"
+                style={{ borderColor: selectedLabel === item.label ? 'var(--canary-yellow)' : undefined, color: selectedLabel === item.label ? 'var(--canary-yellow)' : undefined }}
+              >
+                {item.label} ({item.count})
+              </button>
+            ))}
+            {selectedLabel !== 'All' && <button type="button" className="btn btn-ghost btn-sm" onClick={() => onSelectLabel('All')}>Clear Strategic Alignment filter</button>}
+          </div>
+        </>
+      )}
     </div>
   );
 }
@@ -1341,6 +1564,7 @@ export default function DashboardClient({ articles, districts, queries: initialQ
   const [scoreMin, setScoreMin] = useState(1);
   const [scoreMax, setScoreMax] = useState(10);
   const [selectedQueries, setSelectedQueries] = useState(new Set());
+  const [strategicAlignmentFilter, setStrategicAlignmentFilter] = useState('All');
   const [noteModal, setNoteModal] = useState(null);
   const [feedbackOpen, setFeedbackOpen] = useState(false);
   const [releaseSignupOpen, setReleaseSignupOpen] = useState(false);
@@ -1419,9 +1643,9 @@ export default function DashboardClient({ articles, districts, queries: initialQ
     }
   }
 
-  function getNoteText(article) {
+  const getNoteText = useCallback((article) => {
     return article.id in noteOverrides ? noteOverrides[article.id] : article.notes;
-  }
+  }, [noteOverrides]);
 
   // Optimistic earned media state — tracks checkbox changes before DB confirms
   const [earnedOverrides, setEarnedOverrides] = useState({});
@@ -1469,7 +1693,14 @@ export default function DashboardClient({ articles, districts, queries: initialQ
     return Array.from(qs).sort();
   }, [articles]);
 
-  const hasSecondaryFilters = dateStart || dateEnd || scoreMin !== 1 || scoreMax !== 10 || selectedQueries.size > 0;
+  const allStrategicLabels = useMemo(() => {
+    const scoped = districtFilter === 'All'
+      ? articles
+      : articles.filter((a) => a.district_id === districtFilter);
+    return buildStrategicAlignmentData(scoped).map((item) => item.label);
+  }, [articles, districtFilter]);
+
+  const hasSecondaryFilters = dateStart || dateEnd || scoreMin !== 1 || scoreMax !== 10 || selectedQueries.size > 0 || strategicAlignmentFilter !== 'All';
 
   function clearSecondaryFilters() {
     setDateStart('');
@@ -1477,6 +1708,7 @@ export default function DashboardClient({ articles, districts, queries: initialQ
     setScoreMin(1);
     setScoreMax(10);
     setSelectedQueries(new Set());
+    setStrategicAlignmentFilter('All');
   }
 
   function handleExportPdf() {
@@ -1514,7 +1746,11 @@ export default function DashboardClient({ articles, districts, queries: initialQ
       const matchSearch =
         !search ||
         a.headline?.toLowerCase().includes(q) ||
-        a.summary?.toLowerCase().includes(q);
+        a.summary?.toLowerCase().includes(q) ||
+        getNoteText(a)?.toLowerCase().includes(q) ||
+        a.recommendation?.toLowerCase().includes(q) ||
+        a.innovation_reason?.toLowerCase().includes(q) ||
+        a.source_query?.toLowerCase().includes(q);
       const articleSource = a.source_type ?? 'other';
       const matchSource =
         sourceFilter === 'All' ||
@@ -1532,13 +1768,16 @@ export default function DashboardClient({ articles, districts, queries: initialQ
       const matchQuery =
         selectedQueries.size === 0 ||
         (a.source_query && selectedQueries.has(a.source_query));
-      return matchSearch && matchSource && matchTag && matchDistrict && matchDateStart && matchDateEnd && matchScore && matchQuery;
+      const matchStrategicAlignment =
+        strategicAlignmentFilter === 'All' ||
+        extractStrategicAlignmentLabels(a.innovation_reason).includes(strategicAlignmentFilter);
+      return matchSearch && matchSource && matchTag && matchDistrict && matchDateStart && matchDateEnd && matchScore && matchQuery && matchStrategicAlignment;
     }).sort((a, b) => {
       const dateCompare = String(b.date || '').localeCompare(String(a.date || ''));
       if (dateCompare !== 0) return dateCompare;
       return String(b.created_at || '').localeCompare(String(a.created_at || ''));
     });
-  }, [articles, search, sourceFilter, tagFilter, districtFilter, dateStart, dateEnd, scoreMin, scoreMax, selectedQueries]);
+  }, [articles, search, sourceFilter, tagFilter, districtFilter, dateStart, dateEnd, scoreMin, scoreMax, selectedQueries, strategicAlignmentFilter, getNoteText]);
 
   // Keep KPI/charts aligned with the visible article table. This prevents cases
   // where a filtered table shows only TikTok rows but the source wheel still
@@ -1549,6 +1788,13 @@ export default function DashboardClient({ articles, districts, queries: initialQ
     () => buildChartData(chartArticles),
     [chartArticles]
   );
+
+  const strategicAlignmentData = useMemo(
+    () => buildStrategicAlignmentData(chartArticles),
+    [chartArticles]
+  );
+
+  const strategicAlignedCount = chartArticles.filter((article) => extractStrategicAlignmentLabels(article.innovation_reason).length > 0).length;
 
   const avgScore = chartArticles.length
     ? (
@@ -1632,6 +1878,15 @@ export default function DashboardClient({ articles, districts, queries: initialQ
               <span className="sidebar-link-icon">📝</span>
               Notes
               <span className="sidebar-link-badge">{notesCount}</span>
+            </button>
+            <button
+              className={`sidebar-link ${currentView === 'birdseye' ? 'active' : ''}`}
+              onClick={() => handleNavSelect('birdseye')}
+              style={{ width: '100%', background: 'none', border: 'none', textAlign: 'left', cursor: 'pointer' }}
+            >
+              <span className="sidebar-link-icon">🦅</span>
+              Bird’s Eye View
+              <span className="sidebar-link-badge">v1</span>
             </button>
           </div>
           {!userDistrictId && (
@@ -1740,7 +1995,9 @@ export default function DashboardClient({ articles, districts, queries: initialQ
                     ? 'Settings'
                     : currentView === 'notes'
                       ? 'Analyst Notes'
-                      : currentView === 'clients'
+                      : currentView === 'birdseye'
+                        ? 'Bird’s Eye View'
+                        : currentView === 'clients'
                         ? 'Beta Testers'
                         : currentView === 'howto'
                           ? 'How This Works'
@@ -1752,6 +2009,7 @@ export default function DashboardClient({ articles, districts, queries: initialQ
                 {currentView === 'queries' ? 'Manage monitored search terms'
                   : currentView === 'settings' ? 'Manage your account and preferences'
                   : currentView === 'notes' ? 'Articles with analyst annotations'
+                  : currentView === 'birdseye' ? 'Strategic Alignment themes, counts, and supporting coverage'
                   : currentView === 'clients' ? 'Login credentials for beta testers'
                   : currentView === 'howto' ? 'Platform walkthrough video'
                   : currentView === 'articles' ? 'Browse, filter, annotate, and export article-level coverage'
@@ -1829,6 +2087,16 @@ export default function DashboardClient({ articles, districts, queries: initialQ
               openNoteModal={openNoteModal}
             />
           )}
+          {currentView === 'birdseye' && (
+            <BirdEyeView
+              articles={chartArticles}
+              strategicAlignmentData={strategicAlignmentData}
+              selectedLabel={strategicAlignmentFilter}
+              onSelectLabel={setStrategicAlignmentFilter}
+              openNoteModal={openNoteModal}
+              getNoteText={getNoteText}
+            />
+          )}
           {(currentView === 'dashboard' || currentView === 'articles') && (<>
           <div className="print-report-header">
             <div>
@@ -1894,6 +2162,17 @@ export default function DashboardClient({ articles, districts, queries: initialQ
                 Across {articles.length} articles
               </span>
             </div>
+
+            <div className="kpi-card">
+              <div className="kpi-header">
+                <div className="kpi-label">Strategic Hits</div>
+                <div className="kpi-icon blue">🎯</div>
+              </div>
+              <div className="kpi-value">{strategicAlignedCount}</div>
+              <span className="kpi-change positive">
+                {strategicAlignmentData.length} focus areas
+              </span>
+            </div>
           </div>
 
           {/* Charts */}
@@ -1950,6 +2229,12 @@ export default function DashboardClient({ articles, districts, queries: initialQ
               </ResponsiveContainer>
             </div>
 
+            <StrategicAlignmentChart
+              data={strategicAlignmentData}
+              selectedLabel={strategicAlignmentFilter}
+              onSelectLabel={setStrategicAlignmentFilter}
+            />
+
           </div>
           </>)}
 
@@ -1960,7 +2245,7 @@ export default function DashboardClient({ articles, districts, queries: initialQ
               <div className="data-filters">
                 <input
                   className="filter-input"
-                  placeholder="Search headlines..."
+                  placeholder="Search headlines, summaries, notes, or alignment..."
                   value={search}
                   onChange={(e) => setSearch(e.target.value)}
                 />
@@ -2049,6 +2334,19 @@ export default function DashboardClient({ articles, districts, queries: initialQ
                 selectedQueries={selectedQueries}
                 onChange={setSelectedQueries}
               />
+
+              <div className="filter-control-group">
+                <span className="filter-group-label">Strategic Alignment</span>
+                <select
+                  className="filter-select"
+                  value={strategicAlignmentFilter}
+                  onChange={(e) => setStrategicAlignmentFilter(e.target.value)}
+                  style={{ maxWidth: '260px' }}
+                >
+                  <option value="All">All focus areas</option>
+                  {allStrategicLabels.map((label) => <option key={label} value={label}>{label}</option>)}
+                </select>
+              </div>
 
               {/* Clear all secondary filters */}
               {hasSecondaryFilters && (
@@ -2163,6 +2461,11 @@ export default function DashboardClient({ articles, districts, queries: initialQ
                       {/* Strategic Alignment */}
                       {col('innovation_reason') && (
                         <td className="summary-cell">
+                          <StrategicAlignmentPills
+                            labels={extractStrategicAlignmentLabels(article.innovation_reason)}
+                            selectedLabel={strategicAlignmentFilter}
+                            onSelect={setStrategicAlignmentFilter}
+                          />
                           <RecommendationText
                             text={article.innovation_reason !== 'N/A' ? article.innovation_reason : null}
                           />
