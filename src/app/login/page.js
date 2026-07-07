@@ -1,13 +1,15 @@
 'use client';
 
-import { useState } from 'react';
+import { Suspense, useState } from 'react';
 import { createClient } from '@/lib/supabase/client';
-import { useRouter } from 'next/navigation';
+import { useRouter, useSearchParams } from 'next/navigation';
 import Link from 'next/link';
 import Image from 'next/image';
 
-export default function Login() {
+function LoginForm() {
   const router = useRouter();
+  const searchParams = useSearchParams();
+  const redirectTo = searchParams.get('redirect_to') || '/dashboard';
   const [email, setEmail] = useState('');
   const [password, setPassword] = useState('');
   const [error, setError] = useState('');
@@ -30,7 +32,7 @@ export default function Login() {
       return;
     }
 
-    router.push('/dashboard');
+    router.push(redirectTo.startsWith('/') ? redirectTo : '/dashboard');
     router.refresh();
   }
 
@@ -82,8 +84,8 @@ export default function Login() {
                 autoComplete="current-password"
               />
               <div style={{ textAlign: 'right', marginTop: '8px' }}>
-                <Link 
-                  href="/forgot-password" 
+                <Link
+                  href="/forgot-password"
                   style={{ fontSize: '0.8rem', color: 'var(--text-tertiary)', textDecoration: 'none' }}
                   onMouseOver={(e) => e.target.style.color = 'var(--canary-yellow)'}
                   onMouseOut={(e) => e.target.style.color = 'var(--text-tertiary)'}
@@ -127,5 +129,13 @@ export default function Login() {
         </p>
       </div>
     </div>
+  );
+}
+
+export default function Login() {
+  return (
+    <Suspense fallback={null}>
+      <LoginForm />
+    </Suspense>
   );
 }

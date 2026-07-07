@@ -162,8 +162,9 @@ function taskDescriptionForOnboardingRequest(request) {
     '3. Customer confirms strategic language and handles if needed.',
     '4. Canary runs clean-results test/backfill.',
     '5. Admin creates login and starts 30-day trial.',
-    `6. If the candidate is approved for card payment, send: https://www.canarydata.media/payment?request_id=${encodeURIComponent(request.id || '')}&email=${encodeURIComponent(request.contact_email || '')}&organization_name=${encodeURIComponent(request.organization_name || '')}`,
-    '7. Check/ACH can still be handled manually when needed.',
+    `6. If the signed-in client is approved for card payment, tell them to log in and open: https://www.canarydata.media/payment`,
+    '7. The payment page derives district/account and billing email from the authenticated login; do not send public/prefilled payment links.',
+    '8. Check/ACH can still be handled manually when needed.',
   ].join('\n');
 }
 

@@ -1,19 +1,20 @@
 import Link from 'next/link';
 import Image from 'next/image';
+import { redirect } from 'next/navigation';
 import { startCanaryCheckout } from './actions';
+import { getAuthenticatedBillingContext } from '@/lib/billing';
 
 export const metadata = {
   title: 'Canary Data Payment | Annual Access',
   description: 'Secure Canary Data annual access payment through Stripe.',
 };
 
-const fieldStyle = { marginBottom: '1rem' };
+export default async function PaymentPage() {
+  const { user, districtId, districtName, email, onboardingRequest } = await getAuthenticatedBillingContext();
+  if (!user) redirect('/login?redirect_to=/payment');
 
-export default async function PaymentPage({ searchParams }) {
-  const params = await searchParams;
-  const organizationName = params?.organization_name || params?.district || '';
-  const contactEmail = params?.email || '';
-  const requestId = params?.request_id || '';
+  const organizationName = districtName || onboardingRequest?.organization_name || '';
+  const alreadyPaid = onboardingRequest?.payment_status === 'paid';
 
   return (
     <div className="auth-page">
@@ -24,9 +25,9 @@ export default async function PaymentPage({ searchParams }) {
         </div>
 
         <div className="auth-card">
-          <h2>Complete Canary Data payment</h2>
+          <h2>{alreadyPaid ? 'Payment already recorded' : 'Complete Canary Data payment'}</h2>
           <p className="auth-subtitle">
-            Use this secure Stripe checkout after your trial/onboarding has been approved. If you still need setup review, use the onboarding link first.
+            You’re signed in, so Canary will apply this payment to the district/account tied to your login.
           </p>
 
           <div style={{
@@ -34,31 +35,34 @@ export default async function PaymentPage({ searchParams }) {
             border: '1px solid rgba(245,197,24,0.25)', borderRadius: '10px', color: 'var(--text-secondary)',
             fontSize: '0.86rem', lineHeight: '1.55',
           }}>
+            <strong style={{ color: 'var(--text-primary)' }}>Account</strong><br />
+            District: <span style={{ color: 'var(--text-primary)' }}>{organizationName || 'Not linked yet'}</span><br />
+            Billing user: <span style={{ color: 'var(--text-primary)' }}>{email}</span><br />
+            {districtId && <>District ID: <span style={{ color: 'var(--text-primary)' }}>{districtId}</span><br /></>}
+            <br />
             <strong style={{ color: 'var(--text-primary)' }}>$1,499 annual access</strong><br />
-            Card payment is processed by Stripe. Canary can still handle check/ACH separately when needed.
+            Add card details in Stripe Checkout, click pay, and Canary will bring you back to the confirmation page.
           </div>
 
-          <form action={startCanaryCheckout}>
-            <input type="hidden" name="request_id" value={requestId} />
-
-            <div className="form-group" style={fieldStyle}>
-              <label htmlFor="organization_name">District / organization</label>
-              <input id="organization_name" name="organization_name" className="form-input" defaultValue={organizationName} placeholder="Example City Schools" required />
+          {!organizationName ? (
+            <div className="auth-error">
+              <span>⚠</span> This login is not tied to a district/account yet. Contact Canary before submitting payment.
             </div>
-
-            <div className="form-group" style={fieldStyle}>
-              <label htmlFor="contact_email">Billing email</label>
-              <input id="contact_email" name="contact_email" type="email" className="form-input" defaultValue={contactEmail} placeholder="you@district.org" required />
-            </div>
-
-            <button type="submit" className="btn btn-primary">
-              Continue to Secure Checkout
-            </button>
-          </form>
+          ) : alreadyPaid ? (
+            <Link href="/dashboard" className="btn btn-primary" style={{ width: '100%', textAlign: 'center' }}>
+              Return to Dashboard
+            </Link>
+          ) : (
+            <form action={startCanaryCheckout}>
+              <button type="submit" className="btn btn-primary">
+                Pay with Card
+              </button>
+            </form>
+          )}
         </div>
 
         <div className="auth-footer">
-          Not ready to pay? <Link href="/onboarding">Complete onboarding first</Link>
+          Questions about check/ACH? <a href="mailto:hello@canarydata.media">Contact Canary</a>
         </div>
       </div>
     </div>

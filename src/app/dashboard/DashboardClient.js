@@ -1588,7 +1588,7 @@ function QueryMultiSelect({ allQueries, selectedQueries, onChange }) {
   );
 }
 
-export default function DashboardClient({ articles, districts, queries: initialQueries, clients = [], userDistrictId, demoMode = false }) {
+export default function DashboardClient({ articles, districts, queries: initialQueries, clients = [], userDistrictId, paymentNotice = null, demoMode = false }) {
   const defaultDistrictFilter = userDistrictId ?? districts[0]?.id ?? 'All';
   const [currentView, setCurrentView] = useState('dashboard');
   const [search, setSearch] = useState('');
@@ -2079,6 +2079,13 @@ export default function DashboardClient({ articles, districts, queries: initialQ
           {demoMode && (
             <div className="demo-mode-banner">
               <strong>Interactive demo:</strong> sample public-media intelligence for Canary Falls Unified School District. Filters, Social aggregation, columns, notes, feedback, and PDF export are enabled; changes stay in this browser session.
+            </div>
+          )}
+          {!demoMode && paymentNotice && (
+            <div className="demo-mode-banner" style={{ borderColor: 'rgba(245,197,24,0.45)', background: 'rgba(245,197,24,0.1)' }}>
+              <strong>Your free trial is {paymentNotice.daysUntilTrialEnds <= 0 ? 'ending now' : `up in ${paymentNotice.daysUntilTrialEnds} day${paymentNotice.daysUntilTrialEnds === 1 ? '' : 's'}`}.</strong>{' '}
+              Add your card to keep Canary monitoring active.{' '}
+              <Link href="/payment" style={{ color: 'var(--brand-primary)', fontWeight: 700 }}>Click here to pay.</Link>
             </div>
           )}
           {demoMode && currentView === 'dashboard' && (

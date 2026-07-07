@@ -41,7 +41,6 @@ export async function updateSession(request) {
     !request.nextUrl.pathname.startsWith('/login') &&
     !request.nextUrl.pathname.startsWith('/signup') &&
     !request.nextUrl.pathname.startsWith('/onboarding') &&
-    !request.nextUrl.pathname.startsWith('/payment') &&
     !request.nextUrl.pathname.startsWith('/auth') &&
     !request.nextUrl.pathname.startsWith('/privacy') &&
     !request.nextUrl.pathname.startsWith('/forgot-password') &&
@@ -49,6 +48,7 @@ export async function updateSession(request) {
   ) {
     const url = request.nextUrl.clone();
     url.pathname = '/login';
+    url.searchParams.set('redirect_to', `${request.nextUrl.pathname}${request.nextUrl.search}`);
     return NextResponse.redirect(url);
   }
 

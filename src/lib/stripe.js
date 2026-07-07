@@ -40,7 +40,7 @@ async function stripeRequest(path, { method = 'GET', body } = {}) {
   return payload;
 }
 
-export async function createCanaryCheckoutSession({ organizationName, contactEmail, requestId, origin }) {
+export async function createCanaryCheckoutSession({ organizationName, contactEmail, requestId, districtId, userId, origin }) {
   const cleanOrigin = String(origin || 'https://www.canarydata.media').replace(/\/$/, '');
   const priceCents = getAnnualPriceCents();
   const productName = process.env.CANARY_STRIPE_PRODUCT_NAME || 'Canary Data Annual Access';
@@ -58,9 +58,13 @@ export async function createCanaryCheckoutSession({ organizationName, contactEma
       'line_items[0][price_data][product_data][name]': productName,
       'line_items[0][price_data][product_data][description]': 'Annual Canary Data access after approved trial/onboarding review.',
       'metadata[canary_request_id]': requestId || '',
+      'metadata[district_id]': districtId || '',
+      'metadata[user_id]': userId || '',
       'metadata[organization_name]': organizationName || '',
       'metadata[contact_email]': contactEmail || '',
       'payment_intent_data[metadata][canary_request_id]': requestId || '',
+      'payment_intent_data[metadata][district_id]': districtId || '',
+      'payment_intent_data[metadata][user_id]': userId || '',
       'payment_intent_data[metadata][organization_name]': organizationName || '',
       'payment_intent_data[metadata][contact_email]': contactEmail || '',
     }),
