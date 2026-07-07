@@ -83,12 +83,17 @@ const DEMO_TESTIMONIALS = [
   {
     quote: 'I am sold. I think it’s amazing. I really like that it gives you a starting point.',
     name: 'Nicole Wheeler',
-    role: 'Pelham City Schools',
+    role: 'School communicator, Alabama',
   },
   {
     quote: 'Had I had this tool during an employee crisis, the recommendations would have been spot on and perfect for me to have used at the time.',
     name: 'Cindy Warner',
-    role: 'Shelby County Schools',
+    role: 'School communicator, Alabama',
+  },
+  {
+    quote: 'This just seems like such a game changer for me. It is so much more in depth.',
+    name: 'Merrick Wilson',
+    role: 'School communicator, Alabama',
   },
 ];
 

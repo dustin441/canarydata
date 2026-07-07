@@ -12,18 +12,24 @@ const testimonials = [
     quote: 'I am sold. I think it’s amazing. I really like that it gives you a starting point.',
     detail: 'Nicole highlighted the value of having news and social signals organized quickly, especially for a one-person communications shop that does not have time to scroll every channel manually.',
     name: 'Nicole Wheeler',
-    role: 'Pelham City Schools',
+    role: 'School communicator, Alabama',
   },
   {
     quote: 'Had I had this tool when I encountered an employee crisis situation, the recommendations would have been spot on and perfect for me to have used at the time.',
     detail: 'Cindy pointed to Canary Data’s recommendations, crisis interpretation, and school-PR nuance as practical support for experienced and newer communicators alike.',
     name: 'Cindy Warner',
-    role: 'Shelby County Schools',
+    role: 'School communicator, Alabama',
+  },
+  {
+    quote: 'This just seems like such a game changer for me. It is so much more in depth.',
+    detail: 'Merrick pointed to strategic alignment, social awareness, and training value as practical ways Canary Data can help communications teams show impact and coach school-level communicators.',
+    name: 'Merrick Wilson',
+    role: 'School communicator, Alabama',
   },
   {
     quote: 'This is a good training tool for those who may not be strategic thinking as of yet.',
-    detail: 'Beta feedback reinforced that Canary Data is useful not just for monitoring coverage, but for helping teams learn how to think strategically about community trust and response timing.',
-    name: 'Beta district feedback',
+    detail: 'Early feedback reinforced that Canary Data is useful not just for monitoring coverage, but for helping teams learn how to think strategically about community trust and response timing.',
+    name: 'Early reviewer feedback',
     role: 'School communications leaders',
   },
 ];
