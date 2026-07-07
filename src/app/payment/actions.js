@@ -109,6 +109,19 @@ export async function confirmEmbeddedCanaryCheckout(sessionId) {
       .eq('id', targetId);
   }
 
+  const mergedMetadata = {
+    ...(context.user?.user_metadata || {}),
+    payment_status: 'paid',
+    payment_paid_at: new Date().toISOString(),
+    stripe_customer_id: typeof session.customer === 'string' ? session.customer : (context.user?.user_metadata?.stripe_customer_id || null),
+    stripe_checkout_session_id: session.id,
+  };
+  if (context.districtId) mergedMetadata.district_id = context.districtId;
+  if (context.organizationName) mergedMetadata.district_name = context.organizationName;
+  await supabase.auth.admin.updateUserById(context.user.id, {
+    user_metadata: mergedMetadata,
+  });
+
   return {
     ok: true,
     paymentStatus: 'paid',
