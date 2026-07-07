@@ -1618,6 +1618,7 @@ export default function DashboardClient({ articles, districts, queries: initialQ
   const [paymentLoading, setPaymentLoading] = useState(false);
   const [paymentError, setPaymentError] = useState('');
   const [paymentSuccess, setPaymentSuccess] = useState(false);
+  const [paymentAmountLabel, setPaymentAmountLabel] = useState('$1,499 annual access');
   const [embeddedCheckout, setEmbeddedCheckout] = useState(null);
   const [embeddedCheckoutSessionId, setEmbeddedCheckoutSessionId] = useState('');
   const embeddedCheckoutRef = useRef(null);
@@ -1663,6 +1664,7 @@ export default function DashboardClient({ articles, districts, queries: initialQ
       }
       setEmbeddedCheckout(null);
       const session = await createEmbeddedCanaryCheckout();
+      setPaymentAmountLabel(session.amountLabel || '$1,499 annual access');
       setEmbeddedCheckoutSessionId(session.sessionId);
       const stripe = await stripePromise;
       if (!stripe) throw new Error('Stripe could not load. Please refresh and try again.');
@@ -2739,7 +2741,7 @@ export default function DashboardClient({ articles, districts, queries: initialQ
               <div>
                 <h3 style={{ marginBottom: '0.35rem' }}>Complete Canary Data payment</h3>
                 <p style={{ color: 'var(--text-secondary)', fontSize: '0.9rem', lineHeight: 1.5 }}>
-                  $1,499 annual access. Add your card details below; payment stays tied to your logged-in district account.
+                  {paymentAmountLabel}. Add your card details below; payment stays tied to your logged-in district account.
                 </p>
               </div>
               <button className="btn btn-secondary btn-sm" onClick={closePaymentModal} type="button" style={{ width: 'auto' }}>×</button>

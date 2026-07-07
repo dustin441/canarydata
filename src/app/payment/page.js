@@ -3,6 +3,7 @@ import Image from 'next/image';
 import { redirect } from 'next/navigation';
 import { startCanaryCheckout } from './actions';
 import { getAuthenticatedBillingContext } from '@/lib/billing';
+import { getCanaryCheckoutAmountLabel } from '@/lib/stripe';
 
 export const metadata = {
   title: 'Canary Data Payment | Annual Access',
@@ -15,6 +16,7 @@ export default async function PaymentPage() {
 
   const organizationName = districtName || onboardingRequest?.organization_name || '';
   const alreadyPaid = onboardingRequest?.payment_status === 'paid';
+  const amountLabel = getCanaryCheckoutAmountLabel(email);
 
   return (
     <div className="auth-page">
@@ -40,7 +42,7 @@ export default async function PaymentPage() {
             Billing user: <span style={{ color: 'var(--text-primary)' }}>{email}</span><br />
             {districtId && <>District ID: <span style={{ color: 'var(--text-primary)' }}>{districtId}</span><br /></>}
             <br />
-            <strong style={{ color: 'var(--text-primary)' }}>$1,499 annual access</strong><br />
+            <strong style={{ color: 'var(--text-primary)' }}>{amountLabel}</strong><br />
             Add card details in Stripe Checkout, click pay, and Canary will bring you back to the confirmation page.
           </div>
 

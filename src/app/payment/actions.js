@@ -3,7 +3,7 @@
 import { redirect } from 'next/navigation';
 import { headers } from 'next/headers';
 import { createAdminClient } from '@/lib/supabase/admin';
-import { createCanaryCheckoutSession, createCanaryEmbeddedCheckoutSession, retrieveCheckoutSession } from '@/lib/stripe';
+import { createCanaryCheckoutSession, createCanaryEmbeddedCheckoutSession, getCanaryCheckoutAmountLabel, retrieveCheckoutSession } from '@/lib/stripe';
 import { getAuthenticatedBillingContext } from '@/lib/billing';
 
 function requireBillingContext(context) {
@@ -67,7 +67,7 @@ export async function createEmbeddedCanaryCheckout() {
     clientSecret: session.client_secret,
     organizationName: context.organizationName,
     email: context.email,
-    amountLabel: '$1,499 annual access',
+    amountLabel: getCanaryCheckoutAmountLabel(context.email),
   };
 }
 

@@ -9,6 +9,21 @@ function getAnnualPriceCents() {
   return Number.isFinite(configured) && configured > 0 ? Math.round(configured) : 149900;
 }
 
+function getTestPriceCents() {
+  const configured = Number(process.env.CANARY_TEST_PRICE_CENTS || 100);
+  return Number.isFinite(configured) && configured > 0 ? Math.round(configured) : 100;
+}
+
+function isTestPaymentAccount(contactEmail) {
+  const email = String(contactEmail || '').trim().toLowerCase();
+  if (!email) return false;
+  return String(process.env.CANARY_TEST_PAYMENT_EMAILS || '')
+    .split(',')
+    .map((value) => value.trim().toLowerCase())
+    .filter(Boolean)
+    .includes(email);
+}
+
 function encodeForm(params) {
   const body = new URLSearchParams();
   Object.entries(params).forEach(([key, value]) => {
@@ -40,7 +55,14 @@ async function stripeRequest(path, { method = 'GET', body } = {}) {
   return payload;
 }
 
-function checkoutLineItemParams({ productName, priceCents }) {
+function checkoutLineItemParams({ productName, priceCents, priceId }) {
+  if (priceId) {
+    return {
+      'line_items[0][quantity]': 1,
+      'line_items[0][price]': priceId,
+    };
+  }
+
   return {
     'line_items[0][quantity]': 1,
     'line_items[0][price_data][currency]': process.env.CANARY_PAYMENT_CURRENCY || 'usd',
@@ -50,25 +72,50 @@ function checkoutLineItemParams({ productName, priceCents }) {
   };
 }
 
-function checkoutMetadataParams({ organizationName, contactEmail, requestId, districtId, userId }) {
+function resolveCheckoutLineItem(contactEmail) {
+  if (isTestPaymentAccount(contactEmail)) {
+    return {
+      productName: process.env.CANARY_TEST_STRIPE_PRODUCT_NAME || 'Canary Data Test Purchase',
+      priceCents: getTestPriceCents(),
+      priceId: process.env.CANARY_TEST_STRIPE_PRICE_ID || '',
+      amountLabel: '$1 test purchase',
+      isTestPurchase: true,
+    };
+  }
+
+  return {
+    productName: process.env.CANARY_STRIPE_PRODUCT_NAME || 'Canary Data Annual Access',
+    priceCents: getAnnualPriceCents(),
+    priceId: process.env.CANARY_STRIPE_PRICE_ID || '',
+    amountLabel: '$1,499 annual access',
+    isTestPurchase: false,
+  };
+}
+
+export function getCanaryCheckoutAmountLabel(contactEmail) {
+  return resolveCheckoutLineItem(contactEmail).amountLabel;
+}
+
+function checkoutMetadataParams({ organizationName, contactEmail, requestId, districtId, userId, isTestPurchase }) {
   return {
     'metadata[canary_request_id]': requestId || '',
     'metadata[district_id]': districtId || '',
     'metadata[user_id]': userId || '',
     'metadata[organization_name]': organizationName || '',
     'metadata[contact_email]': contactEmail || '',
+    'metadata[canary_test_purchase]': isTestPurchase ? 'true' : 'false',
     'payment_intent_data[metadata][canary_request_id]': requestId || '',
     'payment_intent_data[metadata][district_id]': districtId || '',
     'payment_intent_data[metadata][user_id]': userId || '',
     'payment_intent_data[metadata][organization_name]': organizationName || '',
     'payment_intent_data[metadata][contact_email]': contactEmail || '',
+    'payment_intent_data[metadata][canary_test_purchase]': isTestPurchase ? 'true' : 'false',
   };
 }
 
 export async function createCanaryCheckoutSession({ organizationName, contactEmail, requestId, districtId, userId, origin }) {
   const cleanOrigin = String(origin || 'https://www.canarydata.media').replace(/\/$/, '');
-  const priceCents = getAnnualPriceCents();
-  const productName = process.env.CANARY_STRIPE_PRODUCT_NAME || 'Canary Data Annual Access';
+  const lineItem = resolveCheckoutLineItem(contactEmail);
 
   return stripeRequest('/checkout/sessions', {
     method: 'POST',
@@ -77,15 +124,21 @@ export async function createCanaryCheckoutSession({ organizationName, contactEma
       customer_email: contactEmail,
       success_url: `${cleanOrigin}/payment/success?session_id={CHECKOUT_SESSION_ID}`,
       cancel_url: `${cleanOrigin}/payment/cancel`,
-      ...checkoutLineItemParams({ productName, priceCents }),
-      ...checkoutMetadataParams({ organizationName, contactEmail, requestId, districtId, userId }),
+      ...checkoutLineItemParams(lineItem),
+      ...checkoutMetadataParams({
+        organizationName,
+        contactEmail,
+        requestId,
+        districtId,
+        userId,
+        isTestPurchase: lineItem.isTestPurchase,
+      }),
     }),
   });
 }
 
 export async function createCanaryEmbeddedCheckoutSession({ organizationName, contactEmail, requestId, districtId, userId }) {
-  const priceCents = getAnnualPriceCents();
-  const productName = process.env.CANARY_STRIPE_PRODUCT_NAME || 'Canary Data Annual Access';
+  const lineItem = resolveCheckoutLineItem(contactEmail);
 
   return stripeRequest('/checkout/sessions', {
     method: 'POST',
@@ -94,8 +147,15 @@ export async function createCanaryEmbeddedCheckoutSession({ organizationName, co
       ui_mode: 'embedded_page',
       redirect_on_completion: 'never',
       customer_email: contactEmail,
-      ...checkoutLineItemParams({ productName, priceCents }),
-      ...checkoutMetadataParams({ organizationName, contactEmail, requestId, districtId, userId }),
+      ...checkoutLineItemParams(lineItem),
+      ...checkoutMetadataParams({
+        organizationName,
+        contactEmail,
+        requestId,
+        districtId,
+        userId,
+        isTestPurchase: lineItem.isTestPurchase,
+      }),
     }),
   });
 }
