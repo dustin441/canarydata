@@ -115,9 +115,9 @@ export default function Login() {
             color: 'var(--text-secondary)',
           }}
         >
-          Don&apos;t have an account?{' '}
-          <Link href="/signup" style={{ color: 'var(--brand-primary)', textDecoration: 'none', fontWeight: '500' }}>
-            Sign up
+          Want to see Canary first?{' '}
+          <Link href="/demo" style={{ color: 'var(--brand-primary)', textDecoration: 'none', fontWeight: '500' }}>
+            Try the demo
           </Link>
           <br />
           <br />

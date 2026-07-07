@@ -115,6 +115,8 @@ function formatConfirmedProfile(profile = {}) {
     '',
     `Known exclusions / lookalikes:\n${profile.known_exclusions || 'None confirmed'}`,
     '',
+    `Public pages reviewed:\n${profile.discovered_source_urls || 'Not captured'}`,
+    '',
     `Customer confirmation notes:\n${profile.discovery_notes || 'None'}`,
   ];
   return lines.join('\n');

@@ -23,83 +23,199 @@ function cleanHtmlText(html) {
     .replace(/&amp;/gi, '&')
     .replace(/&#39;/g, "'")
     .replace(/&quot;/gi, '"')
+    .replace(/&rsquo;/gi, "'")
+    .replace(/&ldquo;|&rdquo;/gi, '"')
     .replace(/\s+/g, ' ')
     .trim();
 }
 
-function findNearbyText(text, terms) {
-  const lower = text.toLowerCase();
-  for (const term of terms) {
-    const idx = lower.indexOf(term);
-    if (idx >= 0) {
-      const start = Math.max(0, idx - 80);
-      const end = Math.min(text.length, idx + 520);
-      return text.slice(start, end).trim();
-    }
-  }
-  return '';
+function compactText(value, maxLength = 900) {
+  return String(value || '').replace(/\s+/g, ' ').trim().slice(0, maxLength).trim();
 }
 
-function extractSocialLinks(html, baseUrl) {
+function findNearbySnippets(text, terms, max = 3) {
+  const lower = String(text || '').toLowerCase();
+  const snippets = [];
+  for (const term of terms) {
+    let cursor = 0;
+    while (snippets.length < max) {
+      const idx = lower.indexOf(term.toLowerCase(), cursor);
+      if (idx < 0) break;
+      const start = Math.max(0, idx - 120);
+      const end = Math.min(text.length, idx + 760);
+      const snippet = compactText(text.slice(start, end));
+      if (snippet && !snippets.some((existing) => existing.includes(snippet.slice(0, 120)))) {
+        snippets.push(snippet);
+      }
+      cursor = idx + term.length;
+    }
+    if (snippets.length >= max) break;
+  }
+  return snippets;
+}
+
+function extractSocialLinksFromPages(pages, baseUrl) {
   const links = new Set();
   const domains = /(facebook\.com|instagram\.com|twitter\.com|x\.com|tiktok\.com|youtube\.com|linkedin\.com)/i;
-  for (const match of String(html || '').matchAll(/href=["']([^"']+)["']/gi)) {
-    const raw = match[1];
-    if (!domains.test(raw)) continue;
+  for (const page of pages) {
+    for (const match of String(page.html || '').matchAll(/href=["']([^"']+)["']/gi)) {
+      const raw = match[1];
+      if (!domains.test(raw)) continue;
+      try {
+        const url = new URL(raw, page.url || baseUrl);
+        url.hash = '';
+        links.add(url.toString());
+      } catch {}
+    }
+  }
+  return [...links].slice(0, 16).join('\n');
+}
+
+function sameHost(url, root) {
+  try {
+    return new URL(url).hostname.replace(/^www\./, '') === new URL(root).hostname.replace(/^www\./, '');
+  } catch {
+    return false;
+  }
+}
+
+function discoverCandidateUrls(homeHtml, website) {
+  const root = new URL(website);
+  const urls = new Map([[root.toString(), 100]]);
+  const keywords = /(about|mission|vision|values|strategic|plan|goals|board|district|schools|campus|directory|departments|leadership|superintendent|profile)/i;
+  const boosts = [
+    '/about', '/about-us', '/district', '/our-district', '/mission', '/vision', '/strategic-plan',
+    '/strategic-plan-2024', '/board', '/schools', '/campuses', '/departments', '/superintendent',
+  ];
+  for (const path of boosts) {
+    try { urls.set(new URL(path, root).toString(), 10); } catch {}
+  }
+  for (const match of String(homeHtml || '').matchAll(/href=["']([^"'#]+)["'][^>]*>([\s\S]*?)<\/a>/gi)) {
+    const href = match[1];
+    const label = cleanHtmlText(match[2] || '');
     try {
-      links.add(new URL(raw, baseUrl).toString());
+      const url = new URL(href, root);
+      url.hash = '';
+      if (!sameHost(url.toString(), root.toString())) continue;
+      if (!/^https?:$/i.test(url.protocol)) continue;
+      const haystack = `${url.pathname} ${label}`;
+      if (keywords.test(haystack)) {
+        const score = /strategic|mission|vision|values|goals|plan/i.test(haystack) ? 80 : 40;
+        urls.set(url.toString(), Math.max(urls.get(url.toString()) || 0, score));
+      }
     } catch {}
   }
-  return [...links].slice(0, 12).join('\n');
+  return [...urls.entries()]
+    .sort((a, b) => b[1] - a[1])
+    .map(([url]) => url)
+    .slice(0, 10);
+}
+
+async function fetchPage(url) {
+  const response = await fetch(url, {
+    headers: { 'User-Agent': 'CanaryDataTrialSetup/1.0 (+https://www.canarydata.media)' },
+    signal: AbortSignal.timeout(10000),
+  });
+  if (!response.ok) throw new Error(`${response.status}`);
+  const contentType = response.headers.get('content-type') || '';
+  const html = await response.text();
+  return { url, html, text: cleanHtmlText(html), contentType };
+}
+
+function extractSchoolNames(text) {
+  const names = new Set();
+  const patterns = [
+    /\b([A-Z][A-Za-z'’.-]+(?:\s+[A-Z][A-Za-z'’.-]+){0,5}\s+(?:Elementary|Middle|High|Intermediate|Primary|Junior High|Magnet|Academy|School))\b/g,
+    /\b([A-Z][A-Za-z'’.-]+(?:\s+[A-Z][A-Za-z'’.-]+){0,4}\s+(?:Campus|Center))\b/g,
+  ];
+  for (const pattern of patterns) {
+    for (const match of String(text || '').matchAll(pattern)) {
+      const name = compactText(match[1], 90);
+      if (!/^(Home|About|Contact|Search|Find|Our|The)\b/.test(name)) names.add(name);
+    }
+  }
+  return [...names].slice(0, 30).join('\n');
+}
+
+function buildKeywords({ organizationName, city, state, schoolNames }) {
+  const base = new Set([organizationName].filter(Boolean));
+  const acronym = String(organizationName || '')
+    .replace(/\b(independent|unified|city|county|community|public|school|schools|district|isd|usd|csd)\b/gi, '')
+    .split(/\s+/)
+    .filter(Boolean)
+    .map((word) => word[0])
+    .join('')
+    .toUpperCase();
+  if (acronym.length >= 2 && acronym.length <= 6) base.add(acronym);
+  if (city && state) base.add(`${city} ${state}`);
+  String(schoolNames || '').split('\n').slice(0, 8).forEach((name) => base.add(name.trim()));
+  return [...base].filter(Boolean).join('\n');
 }
 
 export async function discoverOnboardingProfile(formData) {
   const organizationName = cleanFormValue(formData, 'organization_name');
   const website = normalizeWebsite(formData.get('website'));
+  const city = cleanFormValue(formData, 'city');
+  const state = cleanFormValue(formData, 'state');
   if (!organizationName) throw new Error('District or organization name is required');
   if (!website) throw new Error('Website is required');
 
-  let html = '';
-  let fetchError = '';
+  const pages = [];
+  const errors = [];
+  let candidateUrls = [website];
+
   try {
-    const response = await fetch(website, {
-      headers: { 'User-Agent': 'CanaryDataTrialSetup/1.0 (+https://www.canarydata.media)' },
-      signal: AbortSignal.timeout(12000),
-    });
-    if (!response.ok) throw new Error(`Website returned ${response.status}`);
-    html = await response.text();
+    const home = await fetchPage(website);
+    pages.push(home);
+    candidateUrls = discoverCandidateUrls(home.html, website);
   } catch (error) {
-    fetchError = error.message || 'Unable to fetch website';
+    errors.push(`${website}: ${error.message || 'Unable to fetch website'}`);
   }
 
-  const text = cleanHtmlText(html);
-  const missionVisionValues = findNearbyText(text, ['mission', 'vision', 'values', 'beliefs', 'strategic plan']);
-  const strategicPriorities = findNearbyText(text, ['strategic plan', 'priority', 'priorities', 'goals', 'focus areas', 'board goals']);
-  const discoveredSocials = extractSocialLinks(html, website);
+  for (const url of candidateUrls) {
+    if (pages.some((page) => page.url === url)) continue;
+    if (pages.length >= 8) break;
+    try {
+      pages.push(await fetchPage(url));
+    } catch (error) {
+      errors.push(`${url}: ${error.message || 'Unable to fetch page'}`);
+    }
+  }
+
+  const combinedText = pages.map((page) => page.text).join('\n\n');
+  const missionSnippets = findNearbySnippets(combinedText, ['mission', 'vision', 'values', 'beliefs', 'we believe', 'core values'], 4);
+  const prioritySnippets = findNearbySnippets(combinedText, ['strategic plan', 'priority', 'priorities', 'goals', 'focus areas', 'board goals', 'portrait of a graduate'], 4);
+  const discoveredSocials = extractSocialLinksFromPages(pages, website);
+  const discoveredSchools = extractSchoolNames(combinedText);
+  const sourceUrls = pages.map((page) => page.url).join('\n');
+  const fetchError = errors.length ? errors.slice(0, 5).join('\n') : '';
 
   const confirmedProfile = {
     organization_name: organizationName,
     website,
-    location: [cleanFormValue(formData, 'city'), cleanFormValue(formData, 'state'), cleanFormValue(formData, 'zip')].filter(Boolean).join(', '),
+    location: [city, state, cleanFormValue(formData, 'zip')].filter(Boolean).join(', '),
     social_handles: cleanFormValue(formData, 'social_handles') || discoveredSocials,
-    keywords: cleanFormValue(formData, 'keywords'),
-    school_names: cleanFormValue(formData, 'school_names'),
+    keywords: cleanFormValue(formData, 'keywords') || buildKeywords({ organizationName, city, state, schoolNames: discoveredSchools }),
+    school_names: cleanFormValue(formData, 'school_names') || discoveredSchools,
     known_exclusions: cleanFormValue(formData, 'known_exclusions'),
-    mission_vision_values: missionVisionValues,
-    strategic_priorities: strategicPriorities,
-    discovery_notes: fetchError
-      ? `Website discovery needs manual review: ${fetchError}`
-      : 'Drafted from the submitted website. Please review/edit before approval.',
+    mission_vision_values: missionSnippets.join('\n\n'),
+    strategic_priorities: prioritySnippets.join('\n\n'),
+    discovered_source_urls: sourceUrls,
+    discovery_notes: pages.length
+      ? `Canary reviewed ${pages.length} public page${pages.length === 1 ? '' : 's'}. Please approve or edit before review.${fetchError ? `\n\nPages needing manual review:\n${fetchError}` : ''}`
+      : `Website discovery needs manual review.${fetchError ? `\n\n${fetchError}` : ''}`,
   };
 
   return {
     ok: true,
     discovered_profile: {
-      website_fetched: Boolean(html),
+      website_fetched: pages.length > 0,
       fetch_error: fetchError || null,
+      pages_reviewed: pages.map((page) => page.url),
       discovered_socials: discoveredSocials,
-      mission_vision_values: missionVisionValues,
-      strategic_priorities: strategicPriorities,
+      mission_vision_values: missionSnippets.join('\n\n'),
+      strategic_priorities: prioritySnippets.join('\n\n'),
+      school_names: discoveredSchools,
     },
     confirmed_profile: confirmedProfile,
   };

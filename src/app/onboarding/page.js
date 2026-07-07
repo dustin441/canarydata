@@ -13,6 +13,7 @@ const DRAFT_FIELDS = [
   ['keywords', 'Keywords, nicknames, mascots, or terms to monitor'],
   ['school_names', 'School names'],
   ['known_exclusions', 'Known lookalikes or exclusions'],
+  ['discovered_source_urls', 'Public pages Canary reviewed'],
   ['discovery_notes', 'Notes for Canary review'],
 ];
 
@@ -140,7 +141,7 @@ export default function Onboarding() {
                   <textarea
                     id={key}
                     className="form-input"
-                    rows={key.includes('mission') || key.includes('strategic') ? 5 : 3}
+                    rows={key.includes('mission') || key.includes('strategic') ? 5 : key.includes('source') ? 4 : 3}
                     value={draft[key] || ''}
                     onChange={(e) => updateDraft(key, e.target.value)}
                     placeholder={key.includes('mission') ? 'Paste or edit mission, vision, values, beliefs...' : undefined}
