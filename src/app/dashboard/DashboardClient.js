@@ -1086,7 +1086,11 @@ function SettingsView({ userDistrictId, districts, billingInfo = null }) {
           <div style={{ display: 'grid', gridTemplateColumns: 'repeat(auto-fit, minmax(180px, 1fr))', gap: '12px' }}>
             <a className="btn btn-primary" href="/billing/quote" target="_blank" rel="noreferrer" style={{ textAlign: 'center' }}>Download Quote</a>
             <a className="btn btn-primary" href="/billing/purchase-order" target="_blank" rel="noreferrer" style={{ textAlign: 'center' }}>Download PO / Invoice</a>
-            <a className="btn btn-secondary" href="/billing/receipt" target="_blank" rel="noreferrer" style={{ textAlign: 'center' }}>Download Receipt</a>
+            {billingInfo?.paymentStatus === 'paid' ? (
+              <a className="btn btn-secondary" href="/billing/receipt" target="_blank" rel="noreferrer" style={{ textAlign: 'center' }}>Download Receipt</a>
+            ) : (
+              <button className="btn btn-secondary" type="button" disabled title="Receipt is available after payment is confirmed.">Receipt available after payment</button>
+            )}
           </div>
 
           <div style={{ marginTop: '16px', padding: '14px 16px', border: '1px solid var(--border-secondary)', borderRadius: 'var(--radius-md)', color: 'var(--text-secondary)', fontSize: '0.86rem', lineHeight: 1.55 }}>

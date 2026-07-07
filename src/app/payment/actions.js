@@ -136,6 +136,9 @@ export async function confirmEmbeddedCanaryCheckout(sessionId) {
     payment_paid_at: new Date().toISOString(),
     stripe_customer_id: typeof session.customer === 'string' ? session.customer : (context.user?.user_metadata?.stripe_customer_id || null),
     stripe_checkout_session_id: session.id,
+    quote_number: session.metadata?.canary_quote_number || context.user?.user_metadata?.quote_number || '',
+    invoice_number: session.metadata?.canary_invoice_number || context.user?.user_metadata?.invoice_number || '',
+    receipt_number: session.metadata?.canary_receipt_number || context.user?.user_metadata?.receipt_number || '',
   };
   if (context.districtId) mergedMetadata.district_id = context.districtId;
   if (context.organizationName) mergedMetadata.district_name = context.organizationName;

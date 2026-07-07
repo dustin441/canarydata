@@ -46,6 +46,21 @@ export default async function BillingDocumentPage({ params }) {
   const isReceipt = documentType === 'receipt';
   const isPaid = doc.paymentStatus === 'paid';
 
+  if (isReceipt && !isPaid) {
+    return (
+      <main style={{ minHeight: '100vh', background: '#f3f4f6', padding: '28px 16px', color: '#111827' }}>
+        <section style={{ maxWidth: '720px', margin: '60px auto', background: '#fff', boxShadow: '0 18px 50px rgba(15,23,42,0.14)', borderRadius: '16px', padding: '34px' }}>
+          <Image src="/canary-logo.svg" alt="Canary Data" width={210} height={58} style={{ height: '46px', width: 'auto', marginBottom: '22px' }} />
+          <h1 style={{ margin: '0 0 12px', fontSize: '1.65rem' }}>Receipt not available yet</h1>
+          <p style={{ color: '#4b5563', lineHeight: 1.7, marginBottom: '22px' }}>
+            Receipts are only generated after payment is confirmed. You can still download the Quote and PO / Invoice from Account Settings.
+          </p>
+          <a href="/dashboard" style={{ background: '#f5c518', color: '#111827', padding: '10px 14px', borderRadius: '8px', textDecoration: 'none', fontWeight: 700, fontSize: '0.9rem' }}>Back to dashboard</a>
+        </section>
+      </main>
+    );
+  }
+
   return (
     <main style={{ minHeight: '100vh', background: '#f3f4f6', padding: '28px 16px', color: '#111827' }}>
       <style>{`

@@ -17,16 +17,25 @@ export function formatDate(value) {
   return date.toLocaleDateString('en-US', { year: 'numeric', month: 'long', day: 'numeric' });
 }
 
-function shortAccountCode(districtId, email) {
+export function billingAccountCode(districtId, email) {
   const seed = String(districtId || email || 'CANARY').replace(/[^a-z0-9]/gi, '').toUpperCase();
   return (seed || 'CANARY').slice(0, 8);
+}
+
+export function billingDocumentNumbers({ districtId, email, year = new Date().getFullYear() } = {}) {
+  const accountCode = billingAccountCode(districtId, email);
+  return {
+    quoteNumber: `CD-Q-${accountCode}-${year}`,
+    invoiceNumber: `CD-INV-${accountCode}-${year}`,
+    receiptNumber: `CD-RCPT-${accountCode}-${year}`,
+  };
 }
 
 export function buildBillingDocumentContext({ user, districtId, districtName, email, onboardingRequest }) {
   const metadata = user?.user_metadata || {};
   const issuedAt = new Date();
   const dueAt = addDays(issuedAt, 30);
-  const accountCode = shortAccountCode(districtId, email);
+  const numbers = billingDocumentNumbers({ districtId, email });
   const poNumber = metadata.po_number || onboardingRequest?.po_number || '';
   const paymentStatus = metadata.payment_status || onboardingRequest?.payment_status || 'pending';
   const paidAt = metadata.payment_paid_at || onboardingRequest?.paid_at || null;
@@ -37,9 +46,9 @@ export function buildBillingDocumentContext({ user, districtId, districtName, em
     billingEmail: email || onboardingRequest?.contact_email || user?.email || '',
     billingContactName: metadata.billing_contact_name || onboardingRequest?.contact_name || '',
     poNumber,
-    quoteNumber: metadata.quote_number || `CD-Q-${accountCode}`,
-    invoiceNumber: metadata.invoice_number || `CD-INV-${accountCode}`,
-    receiptNumber: metadata.receipt_number || `CD-RCPT-${accountCode}`,
+    quoteNumber: metadata.quote_number || numbers.quoteNumber,
+    invoiceNumber: metadata.invoice_number || numbers.invoiceNumber,
+    receiptNumber: metadata.receipt_number || numbers.receiptNumber,
     issuedAt,
     dueAt,
     trialStartsAt: metadata.trial_starts_at || onboardingRequest?.trial_starts_at || null,

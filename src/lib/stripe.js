@@ -1,3 +1,5 @@
+import { billingDocumentNumbers } from './billing-documents';
+
 const STRIPE_API_BASE = 'https://api.stripe.com/v1';
 
 function getStripeSecretKey() {
@@ -97,6 +99,7 @@ export function getCanaryCheckoutAmountLabel(contactEmail) {
 }
 
 function checkoutMetadataParams({ organizationName, contactEmail, requestId, districtId, userId, isTestPurchase }) {
+  const numbers = billingDocumentNumbers({ districtId, email: contactEmail });
   return {
     'metadata[canary_request_id]': requestId || '',
     'metadata[district_id]': districtId || '',
@@ -104,12 +107,18 @@ function checkoutMetadataParams({ organizationName, contactEmail, requestId, dis
     'metadata[organization_name]': organizationName || '',
     'metadata[contact_email]': contactEmail || '',
     'metadata[canary_test_purchase]': isTestPurchase ? 'true' : 'false',
+    'metadata[canary_quote_number]': numbers.quoteNumber,
+    'metadata[canary_invoice_number]': numbers.invoiceNumber,
+    'metadata[canary_receipt_number]': numbers.receiptNumber,
     'payment_intent_data[metadata][canary_request_id]': requestId || '',
     'payment_intent_data[metadata][district_id]': districtId || '',
     'payment_intent_data[metadata][user_id]': userId || '',
     'payment_intent_data[metadata][organization_name]': organizationName || '',
     'payment_intent_data[metadata][contact_email]': contactEmail || '',
     'payment_intent_data[metadata][canary_test_purchase]': isTestPurchase ? 'true' : 'false',
+    'payment_intent_data[metadata][canary_quote_number]': numbers.quoteNumber,
+    'payment_intent_data[metadata][canary_invoice_number]': numbers.invoiceNumber,
+    'payment_intent_data[metadata][canary_receipt_number]': numbers.receiptNumber,
   };
 }
 
