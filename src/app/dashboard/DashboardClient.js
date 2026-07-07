@@ -1666,7 +1666,7 @@ export default function DashboardClient({ articles, districts, queries: initialQ
       setEmbeddedCheckoutSessionId(session.sessionId);
       const stripe = await stripePromise;
       if (!stripe) throw new Error('Stripe could not load. Please refresh and try again.');
-      const checkout = await stripe.initEmbeddedCheckout({
+      const checkout = await stripe.createEmbeddedCheckoutPage({
         clientSecret: session.clientSecret,
         onComplete: async () => {
           const result = await confirmEmbeddedCanaryCheckout(session.sessionId);
