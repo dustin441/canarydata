@@ -49,7 +49,7 @@ export default function Home() {
             Canary Data gives school communicators a daily review of the news and public social conversation that matters most — with sentiment scores, summaries, local context, and strategic recommendations before small issues become bigger questions.
           </p>
           <div className={styles.heroButtons}>
-            <Link href="/login" className={styles.primaryBtn}>Start Tracking Today</Link>
+            <Link href="/signup" className={styles.primaryBtn}>Request a Demo</Link>
             <Link href="/demo" className={styles.secondaryBtn}>Try the Demo Dashboard</Link>
           </div>
         </div>
@@ -249,7 +249,7 @@ export default function Home() {
             <li>PDF Report Export</li>
             <li>Intuitive, Zero-Learning-Curve Dashboard</li>
           </ul>
-          <Link href="/login" className={styles.primaryBtn} style={{ display: 'block' }}>Get Started Today</Link>
+          <Link href="/signup" className={styles.primaryBtn} style={{ display: 'block' }}>Request Demo Follow-Up</Link>
           <div style={{
             marginTop: '1.5rem',
             padding: '1rem 1.25rem',

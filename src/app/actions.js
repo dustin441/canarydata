@@ -105,6 +105,65 @@ export async function discoverOnboardingProfile(formData) {
   };
 }
 
+export async function submitLeadRequest(formData) {
+  const supabase = createAdminClient();
+  const lead = {
+    organization_name: cleanFormValue(formData, 'organization_name'),
+    website: normalizeWebsite(formData.get('website')),
+    contact_name: cleanFormValue(formData, 'contact_name'),
+    contact_email: cleanFormValue(formData, 'contact_email').toLowerCase(),
+    contact_title: cleanFormValue(formData, 'contact_title'),
+    notes: cleanFormValue(formData, 'notes'),
+  };
+
+  if (!lead.organization_name) throw new Error('District or organization name is required');
+  if (!lead.contact_name) throw new Error('Contact name is required');
+  if (!lead.contact_email) throw new Error('Contact email is required');
+
+  const message = [
+    'Light demo/sign-up lead submitted.',
+    '',
+    `Contact: ${lead.contact_name} <${lead.contact_email}>`,
+    `Title: ${lead.contact_title || 'Unknown'}`,
+    `Organization: ${lead.organization_name}`,
+    `Website: ${lead.website || 'Not provided'}`,
+    '',
+    `Notes:\n${lead.notes || 'None provided'}`,
+    '',
+    'Workflow note: keep this as a light lead capture. If approved for a trial, send the hidden /onboarding link so the prospect can confirm mission/vision/values, strategic priorities, socials, keywords, schools, and exclusions before Canary runs manual review/backfill.',
+  ].join('\n');
+
+  const { data: feedback, error } = await supabase.from('feedback').insert({
+    message,
+    district_name: lead.organization_name,
+    district_id: null,
+    status: 'lead_request',
+  }).select('*').single();
+
+  if (error) throw error;
+
+  if (isClickUpConfigured()) {
+    try {
+      const task = await createClickUpFeedbackTask(feedback);
+      await supabase.from('feedback').update({
+        status: 'lead_clickup_synced',
+        clickup_task_id: task?.id || null,
+        clickup_task_url: task?.url || null,
+        clickup_synced_at: new Date().toISOString(),
+        clickup_sync_error: null,
+      }).eq('id', feedback.id);
+    } catch (clickupError) {
+      await supabase.from('feedback').update({
+        status: 'lead_clickup_failed',
+        clickup_sync_error: clickupError.message || 'Unknown ClickUp error',
+      }).eq('id', feedback.id);
+    }
+  }
+
+  revalidatePath('/signup');
+  return { ok: true, id: feedback.id };
+}
+
 export async function submitOnboardingRequest(formData) {
   const supabase = createAdminClient();
   let confirmedProfile = {};
