@@ -32,5 +32,19 @@ export async function getAuthenticatedBillingContext() {
     onboardingRequest = data?.[0] || null;
   }
 
+  const metadata = { ...(sessionUser?.user_metadata || {}), ...(user?.user_metadata || {}) };
+  if (!onboardingRequest && (metadata.trial_ends_at || metadata.payment_status || metadata.trial_status)) {
+    onboardingRequest = {
+      id: '',
+      organization_name: districtName || metadata.district_name || districtId || '',
+      contact_email: email,
+      payment_status: metadata.payment_status || 'pending',
+      trial_status: metadata.trial_status || 'active',
+      access_status: metadata.access_status || 'active',
+      trial_ends_at: metadata.trial_ends_at || null,
+      stripe_customer_id: metadata.stripe_customer_id || null,
+    };
+  }
+
   return { user: user || sessionUser, districtId, districtName, email, onboardingRequest };
 }
