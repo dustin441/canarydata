@@ -22,7 +22,7 @@ function PaymentTerms({ documentType, doc }) {
 
   return (
     <>
-      <strong>Payment terms:</strong> Net 30 from purchase order/invoice issue date.<br />
+      <strong>Payment terms:</strong> Net 30 from invoice issue date.<br />
       <strong>Access policy:</strong> If payment is not received and cleared within 30 days, account access pauses until payment clears.<br />
       <strong>Renewal:</strong> Annual access renews yearly. If the account is not renewed annually, platform access ends at the renewal date.
     </>
@@ -53,7 +53,7 @@ export default async function BillingDocumentPage({ params }) {
           <Image src="/canary-logo.svg" alt="Canary Data" width={210} height={58} style={{ height: '46px', width: 'auto', marginBottom: '22px' }} />
           <h1 style={{ margin: '0 0 12px', fontSize: '1.65rem' }}>Receipt not available yet</h1>
           <p style={{ color: '#4b5563', lineHeight: 1.7, marginBottom: '22px' }}>
-            Receipts are only generated after payment is confirmed. You can still download the Quote and PO / Invoice from Account Settings.
+            Receipts are only generated after payment is confirmed. You can still download the Quote and Invoice from Account Settings.
           </p>
           <a href="/dashboard" style={{ background: '#f5c518', color: '#111827', padding: '10px 14px', borderRadius: '8px', textDecoration: 'none', fontWeight: 700, fontSize: '0.9rem' }}>Back to dashboard</a>
         </section>
@@ -96,8 +96,11 @@ export default async function BillingDocumentPage({ params }) {
             <div>
               <h2 style={{ fontSize: '1rem', margin: '0 0 10px', color: '#111827' }}>Bill to</h2>
               <div style={{ lineHeight: 1.65, color: '#374151' }}>
-                <strong style={{ color: '#111827' }}>{doc.organizationName}</strong><br />
-                {doc.billingContactName && <>{doc.billingContactName}<br /></>}
+                <strong style={{ color: '#111827' }}>{doc.billingContactName || doc.organizationName}</strong><br />
+                {doc.billingContactName && <>{doc.organizationName}<br /></>}
+                {doc.billingAddressLine1 ? <>{doc.billingAddressLine1}<br /></> : <span style={{ color: '#9ca3af' }}>District billing address pending<br /></span>}
+                {doc.billingAddressLine2 && <>{doc.billingAddressLine2}<br /></>}
+                {(doc.billingCity || doc.billingState || doc.billingZip) && <>{[doc.billingCity, doc.billingState, doc.billingZip].filter(Boolean).join(', ').replace(', ', ', ')}<br /></>}
                 {doc.billingEmail}<br />
                 {doc.districtId && <>Account ID: {doc.districtId}<br /></>}
                 {documentType !== 'quote' && <>PO Number: <strong>{doc.poNumber || 'Pending / to be provided by district'}</strong></>}
@@ -109,7 +112,17 @@ export default async function BillingDocumentPage({ params }) {
               {!isReceipt && <><strong>Due:</strong> {formatDate(doc.dueAt)}<br /></>}
               <strong>Terms:</strong> {doc.netTerms}<br />
               <strong>Status:</strong> {isReceipt ? (isPaid ? 'Paid' : 'Not paid') : copy.statusLabel}
+            <div>
+              <h2 style={{ fontSize: '1rem', margin: '18px 0 10px', color: '#111827' }}>Vendor</h2>
+              <div style={{ lineHeight: 1.65, color: '#374151' }}>
+                <strong style={{ color: '#111827' }}>{doc.vendorName}</strong><br />
+                {doc.vendorAddressLine1}<br />
+                {doc.vendorAddressLine2 && <>{doc.vendorAddressLine2}<br /></>}
+                {doc.vendorEmail}<br />
+                <span style={{ color: '#6b7280' }}>W-9 available separately for vendor setup.</span>
+              </div>
             </div>
+          </div>
           </div>
 
           <p style={{ color: '#4b5563', lineHeight: 1.7, marginBottom: '24px' }}>{copy.intro}</p>

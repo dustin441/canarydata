@@ -982,6 +982,11 @@ function SettingsView({ userDistrictId, districts, billingInfo = null }) {
   const [billingError, setBillingError] = useState(null);
   const [poNumber, setPoNumber] = useState(billingInfo?.poNumber || '');
   const [billingContactName, setBillingContactName] = useState(billingInfo?.billingContactName || '');
+  const [billingAddressLine1, setBillingAddressLine1] = useState(billingInfo?.billingAddressLine1 || '');
+  const [billingAddressLine2, setBillingAddressLine2] = useState(billingInfo?.billingAddressLine2 || '');
+  const [billingCity, setBillingCity] = useState(billingInfo?.billingCity || '');
+  const [billingState, setBillingState] = useState(billingInfo?.billingState || '');
+  const [billingZip, setBillingZip] = useState(billingInfo?.billingZip || '');
   const assignedDistrict = userDistrictId ? districts?.find((d) => d.id === userDistrictId) : null;
   const profileName = assignedDistrict?.name ?? 'Canary Admin';
   const profileDetail = userDistrictId ? 'Client view · 1 district' : 'Admin view · all districts';
@@ -1020,6 +1025,11 @@ function SettingsView({ userDistrictId, districts, billingInfo = null }) {
     const fd = new FormData();
     fd.append('po_number', poNumber);
     fd.append('billing_contact_name', billingContactName);
+    fd.append('billing_address_line1', billingAddressLine1);
+    fd.append('billing_address_line2', billingAddressLine2);
+    fd.append('billing_city', billingCity);
+    fd.append('billing_state', billingState);
+    fd.append('billing_zip', billingZip);
     startBillingTransition(async () => {
       try {
         await saveBillingPurchaseOrder(fd);
@@ -1071,6 +1081,18 @@ function SettingsView({ userDistrictId, districts, billingInfo = null }) {
               <input type="text" className="form-input" value={billingContactName} onChange={(e) => setBillingContactName(e.target.value)} placeholder="Optional" />
             </div>
             <div className="form-group" style={{ marginBottom: 0 }}>
+              <label className="form-label" style={{ color: 'var(--text-secondary)', fontSize: '0.85rem', marginBottom: '8px', display: 'block' }}>District billing address</label>
+              <input type="text" className="form-input" value={billingAddressLine1} onChange={(e) => setBillingAddressLine1(e.target.value)} placeholder="Street address" />
+            </div>
+            <div className="form-group" style={{ marginBottom: 0 }}>
+              <input type="text" className="form-input" value={billingAddressLine2} onChange={(e) => setBillingAddressLine2(e.target.value)} placeholder="Suite, building, or department" />
+            </div>
+            <div style={{ display: 'grid', gridTemplateColumns: '1fr 90px 120px', gap: '10px' }}>
+              <input type="text" className="form-input" value={billingCity} onChange={(e) => setBillingCity(e.target.value)} placeholder="City" />
+              <input type="text" className="form-input" value={billingState} onChange={(e) => setBillingState(e.target.value)} placeholder="State" />
+              <input type="text" className="form-input" value={billingZip} onChange={(e) => setBillingZip(e.target.value)} placeholder="ZIP" />
+            </div>
+            <div className="form-group" style={{ marginBottom: 0 }}>
               <label className="form-label" style={{ color: 'var(--text-secondary)', fontSize: '0.85rem', marginBottom: '8px', display: 'block' }}>Purchase order number</label>
               <input type="text" className="form-input" value={poNumber} onChange={(e) => setPoNumber(e.target.value)} placeholder="Enter PO number when your district provides it" />
             </div>
@@ -1085,7 +1107,8 @@ function SettingsView({ userDistrictId, districts, billingInfo = null }) {
 
           <div style={{ display: 'grid', gridTemplateColumns: 'repeat(auto-fit, minmax(180px, 1fr))', gap: '12px' }}>
             <a className="btn btn-primary" href="/billing/quote" target="_blank" rel="noreferrer" style={{ textAlign: 'center' }}>Download Quote</a>
-            <a className="btn btn-primary" href="/billing/purchase-order" target="_blank" rel="noreferrer" style={{ textAlign: 'center' }}>Download PO / Invoice</a>
+            <a className="btn btn-primary" href="/billing/purchase-order" target="_blank" rel="noreferrer" style={{ textAlign: 'center' }}>Download Invoice</a>
+            <button className="btn btn-secondary" type="button" disabled title="Upload Canary W-9 after vendor details are finalized.">W-9 coming soon</button>
             {billingInfo?.paymentStatus === 'paid' ? (
               <a className="btn btn-secondary" href="/billing/receipt" target="_blank" rel="noreferrer" style={{ textAlign: 'center' }}>Download Receipt</a>
             ) : (

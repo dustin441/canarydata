@@ -1,5 +1,10 @@
 const ANNUAL_PRICE_CENTS = 149900;
 
+const CANARY_VENDOR_NAME = process.env.CANARY_VENDOR_NAME || 'Canary Data';
+const CANARY_VENDOR_ADDRESS_LINE1 = process.env.CANARY_VENDOR_ADDRESS_LINE1 || 'Vendor address to be provided';
+const CANARY_VENDOR_ADDRESS_LINE2 = process.env.CANARY_VENDOR_ADDRESS_LINE2 || '';
+const CANARY_VENDOR_EMAIL = process.env.CANARY_VENDOR_EMAIL || 'hello@canarydata.media';
+
 export function formatCurrency(cents = ANNUAL_PRICE_CENTS) {
   return new Intl.NumberFormat('en-US', { style: 'currency', currency: 'USD' }).format((Number(cents) || 0) / 100);
 }
@@ -45,6 +50,15 @@ export function buildBillingDocumentContext({ user, districtId, districtName, em
     districtId: districtId || metadata.district_id || '',
     billingEmail: email || onboardingRequest?.contact_email || user?.email || '',
     billingContactName: metadata.billing_contact_name || onboardingRequest?.contact_name || '',
+    billingAddressLine1: metadata.billing_address_line1 || onboardingRequest?.billing_address_line1 || '',
+    billingAddressLine2: metadata.billing_address_line2 || onboardingRequest?.billing_address_line2 || '',
+    billingCity: metadata.billing_city || onboardingRequest?.billing_city || '',
+    billingState: metadata.billing_state || onboardingRequest?.billing_state || '',
+    billingZip: metadata.billing_zip || onboardingRequest?.billing_zip || '',
+    vendorName: CANARY_VENDOR_NAME,
+    vendorAddressLine1: CANARY_VENDOR_ADDRESS_LINE1,
+    vendorAddressLine2: CANARY_VENDOR_ADDRESS_LINE2,
+    vendorEmail: CANARY_VENDOR_EMAIL,
     poNumber,
     quoteNumber: metadata.quote_number || numbers.quoteNumber,
     invoiceNumber: metadata.invoice_number || numbers.invoiceNumber,
@@ -70,10 +84,10 @@ export const BILLING_DOCUMENT_COPY = {
     intro: 'This quote outlines annual Canary Data platform access after the approved 30-day trial period.',
   },
   'purchase-order': {
-    title: 'Canary Data Purchase Order / Invoice',
-    label: 'Purchase Order / Invoice',
+    title: 'Canary Data Invoice',
+    label: 'Invoice',
     statusLabel: 'Payment pending',
-    intro: 'This purchase order/invoice may be used for district approval and payment processing. Payment terms are Net 30 from the purchase order/invoice issue date.',
+    intro: 'This invoice may be used for district approval and payment processing. If the district supplies a purchase order number, it appears on this invoice and the paid receipt. Payment terms are Net 30 from the invoice issue date.',
   },
   receipt: {
     title: 'Canary Data Receipt',

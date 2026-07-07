@@ -75,11 +75,21 @@ export async function saveBillingPurchaseOrder(formData) {
   const context = requireBillingContext(await getAuthenticatedBillingContext());
   const poNumber = String(formData.get('po_number') || '').trim().slice(0, 80);
   const billingContactName = String(formData.get('billing_contact_name') || '').trim().slice(0, 120);
+  const billingAddressLine1 = String(formData.get('billing_address_line1') || '').trim().slice(0, 160);
+  const billingAddressLine2 = String(formData.get('billing_address_line2') || '').trim().slice(0, 160);
+  const billingCity = String(formData.get('billing_city') || '').trim().slice(0, 80);
+  const billingState = String(formData.get('billing_state') || '').trim().slice(0, 40);
+  const billingZip = String(formData.get('billing_zip') || '').trim().slice(0, 20);
   const supabase = createAdminClient();
   const mergedMetadata = {
     ...(context.user?.user_metadata || {}),
     po_number: poNumber,
     billing_contact_name: billingContactName,
+    billing_address_line1: billingAddressLine1,
+    billing_address_line2: billingAddressLine2,
+    billing_city: billingCity,
+    billing_state: billingState,
+    billing_zip: billingZip,
     billing_email: context.email,
     billing_terms: 'Net 30',
     amount_due_cents: 149900,
@@ -89,7 +99,7 @@ export async function saveBillingPurchaseOrder(formData) {
   await supabase.auth.admin.updateUserById(context.user.id, {
     user_metadata: mergedMetadata,
   });
-  return { ok: true, poNumber, billingContactName };
+  return { ok: true, poNumber, billingContactName, billingAddressLine1, billingAddressLine2, billingCity, billingState, billingZip };
 }
 
 export async function confirmEmbeddedCanaryCheckout(sessionId) {
