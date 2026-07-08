@@ -107,7 +107,7 @@ function checkoutMetadataParams({ organizationName, contactEmail, requestId, dis
     'metadata[organization_name]': organizationName || '',
     'metadata[contact_email]': contactEmail || '',
     'metadata[canary_test_purchase]': isTestPurchase ? 'true' : 'false',
-    'metadata[canary_quote_number]': numbers.quoteNumber,
+    'metadata[canary_estimate_number]': numbers.estimateNumber,
     'metadata[canary_invoice_number]': numbers.invoiceNumber,
     'metadata[canary_receipt_number]': numbers.receiptNumber,
     'payment_intent_data[metadata][canary_request_id]': requestId || '',
@@ -116,7 +116,7 @@ function checkoutMetadataParams({ organizationName, contactEmail, requestId, dis
     'payment_intent_data[metadata][organization_name]': organizationName || '',
     'payment_intent_data[metadata][contact_email]': contactEmail || '',
     'payment_intent_data[metadata][canary_test_purchase]': isTestPurchase ? 'true' : 'false',
-    'payment_intent_data[metadata][canary_quote_number]': numbers.quoteNumber,
+    'payment_intent_data[metadata][canary_estimate_number]': numbers.estimateNumber,
     'payment_intent_data[metadata][canary_invoice_number]': numbers.invoiceNumber,
     'payment_intent_data[metadata][canary_receipt_number]': numbers.receiptNumber,
   };

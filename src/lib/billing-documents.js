@@ -15,11 +15,22 @@ export function addDays(date, days) {
   return next;
 }
 
+export function addYears(date, years) {
+  const next = new Date(date);
+  next.setFullYear(next.getFullYear() + years);
+  return next;
+}
+
 export function formatDate(value) {
   if (!value) return '—';
   const date = value instanceof Date ? value : new Date(value);
   if (Number.isNaN(date.getTime())) return '—';
   return date.toLocaleDateString('en-US', { year: 'numeric', month: 'long', day: 'numeric' });
+}
+
+export function formatCityStateZip(city, state, zip) {
+  const cityState = [city, state].filter(Boolean).join(', ');
+  return [cityState, zip].filter(Boolean).join(' ');
 }
 
 export function billingAccountCode(districtId, email) {
@@ -30,8 +41,8 @@ export function billingAccountCode(districtId, email) {
 export function billingDocumentNumbers({ districtId, email, year = new Date().getFullYear() } = {}) {
   const accountCode = billingAccountCode(districtId, email);
   return {
-    quoteNumber: `CD-Q-${accountCode}-${year}`,
-    invoiceNumber: `CD-EST-${accountCode}-${year}`,
+    estimateNumber: `CD-EST-${accountCode}-${year}`,
+    invoiceNumber: `CD-INV-${accountCode}-${year}`,
     receiptNumber: `CD-RCPT-${accountCode}-${year}`,
   };
 }
@@ -44,9 +55,11 @@ export function buildBillingDocumentContext({ user, districtId, districtName, em
   const poNumber = metadata.po_number || onboardingRequest?.po_number || '';
   const paymentStatus = metadata.payment_status || onboardingRequest?.payment_status || 'pending';
   const paidAt = metadata.payment_paid_at || onboardingRequest?.paid_at || null;
+  const paidThrough = metadata.paid_through || onboardingRequest?.paid_through || (paidAt ? addYears(new Date(paidAt), 1).toISOString() : null);
+  const organizationName = metadata.billing_organization_name || districtName || onboardingRequest?.organization_name || metadata.district_name || 'School District';
 
   return {
-    organizationName: districtName || onboardingRequest?.organization_name || metadata.district_name || 'School District',
+    organizationName,
     districtId: districtId || metadata.district_id || '',
     billingEmail: email || onboardingRequest?.contact_email || user?.email || '',
     billingContactName: metadata.billing_contact_name || onboardingRequest?.contact_name || '',
@@ -60,7 +73,7 @@ export function buildBillingDocumentContext({ user, districtId, districtName, em
     vendorAddressLine2: CANARY_VENDOR_ADDRESS_LINE2,
     vendorEmail: CANARY_VENDOR_EMAIL,
     poNumber,
-    quoteNumber: metadata.quote_number || numbers.quoteNumber,
+    estimateNumber: metadata.estimate_number || metadata.quote_number || numbers.estimateNumber,
     invoiceNumber: metadata.invoice_number || numbers.invoiceNumber,
     receiptNumber: metadata.receipt_number || numbers.receiptNumber,
     issuedAt,
@@ -69,7 +82,7 @@ export function buildBillingDocumentContext({ user, districtId, districtName, em
     trialEndsAt: metadata.trial_ends_at || onboardingRequest?.trial_ends_at || null,
     paymentStatus,
     paidAt,
-    paidThrough: metadata.paid_through || onboardingRequest?.paid_through || null,
+    paidThrough,
     amountCents: ANNUAL_PRICE_CENTS,
     amountLabel: formatCurrency(ANNUAL_PRICE_CENTS),
     netTerms: 'Net 30',
@@ -77,17 +90,29 @@ export function buildBillingDocumentContext({ user, districtId, districtName, em
 }
 
 export const BILLING_DOCUMENT_COPY = {
-  quote: {
-    title: 'Canary Data Quote',
-    label: 'Quote',
-    statusLabel: 'Quote for approval',
-    intro: 'This quote outlines annual Canary Data platform access after the approved 30-day trial period.',
-  },
-  'purchase-order': {
+  estimate: {
     title: 'Canary Data Estimate / Price Quote',
     label: 'Estimate / Price Quote',
     statusLabel: 'Estimate for approval',
-    intro: 'This estimate/price quote may be used for district approval and payment processing. If the district supplies a purchase order number, it appears on this estimate and the paid receipt. Payment terms are Net 30 from the estimate issue date.',
+    intro: 'This estimate/price quote may be used for district approval and payment processing. Generating this document does not extend the 30-day trial period.',
+  },
+  quote: {
+    title: 'Canary Data Estimate / Price Quote',
+    label: 'Estimate / Price Quote',
+    statusLabel: 'Estimate for approval',
+    intro: 'This estimate/price quote may be used for district approval and payment processing. Generating this document does not extend the 30-day trial period.',
+  },
+  invoice: {
+    title: 'Canary Data Invoice',
+    label: 'Invoice',
+    statusLabel: 'Invoice pending payment',
+    intro: 'This invoice is for districts paying by purchase order, check, or ACH after approval. Payment terms are Net 30 from the invoice issue date.',
+  },
+  'purchase-order': {
+    title: 'Canary Data Invoice',
+    label: 'Invoice',
+    statusLabel: 'Invoice pending payment',
+    intro: 'This invoice is for districts paying by purchase order, check, or ACH after approval. Payment terms are Net 30 from the invoice issue date.',
   },
   receipt: {
     title: 'Canary Data Receipt',

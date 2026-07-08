@@ -74,6 +74,7 @@ export async function createEmbeddedCanaryCheckout() {
 export async function saveBillingPurchaseOrder(formData) {
   const context = requireBillingContext(await getAuthenticatedBillingContext());
   const poNumber = String(formData.get('po_number') || '').trim().slice(0, 80);
+  const billingOrganizationName = String(formData.get('billing_organization_name') || context.organizationName || '').trim().slice(0, 160);
   const billingContactName = String(formData.get('billing_contact_name') || '').trim().slice(0, 120);
   const billingAddressLine1 = String(formData.get('billing_address_line1') || '').trim().slice(0, 160);
   const billingAddressLine2 = String(formData.get('billing_address_line2') || '').trim().slice(0, 160);
@@ -84,6 +85,7 @@ export async function saveBillingPurchaseOrder(formData) {
   const mergedMetadata = {
     ...(context.user?.user_metadata || {}),
     po_number: poNumber,
+    billing_organization_name: billingOrganizationName,
     billing_contact_name: billingContactName,
     billing_address_line1: billingAddressLine1,
     billing_address_line2: billingAddressLine2,
@@ -99,7 +101,7 @@ export async function saveBillingPurchaseOrder(formData) {
   await supabase.auth.admin.updateUserById(context.user.id, {
     user_metadata: mergedMetadata,
   });
-  return { ok: true, poNumber, billingContactName, billingAddressLine1, billingAddressLine2, billingCity, billingState, billingZip };
+  return { ok: true, poNumber, billingOrganizationName, billingContactName, billingAddressLine1, billingAddressLine2, billingCity, billingState, billingZip };
 }
 
 export async function confirmEmbeddedCanaryCheckout(sessionId) {
@@ -140,13 +142,20 @@ export async function confirmEmbeddedCanaryCheckout(sessionId) {
       .eq('id', targetId);
   }
 
+  const paidAt = new Date();
+  const paidThrough = new Date(paidAt);
+  paidThrough.setFullYear(paidThrough.getFullYear() + 1);
+
   const mergedMetadata = {
     ...(context.user?.user_metadata || {}),
     payment_status: 'paid',
-    payment_paid_at: new Date().toISOString(),
+    payment_paid_at: paidAt.toISOString(),
+    paid_through: paidThrough.toISOString(),
+    access_status: 'active',
+    trial_status: 'converted',
     stripe_customer_id: typeof session.customer === 'string' ? session.customer : (context.user?.user_metadata?.stripe_customer_id || null),
     stripe_checkout_session_id: session.id,
-    quote_number: session.metadata?.canary_quote_number || context.user?.user_metadata?.quote_number || '',
+    estimate_number: session.metadata?.canary_estimate_number || context.user?.user_metadata?.estimate_number || context.user?.user_metadata?.quote_number || '',
     invoice_number: session.metadata?.canary_invoice_number || context.user?.user_metadata?.invoice_number || '',
     receipt_number: session.metadata?.canary_receipt_number || context.user?.user_metadata?.receipt_number || '',
   };

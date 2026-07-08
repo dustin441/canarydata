@@ -981,6 +981,7 @@ function SettingsView({ userDistrictId, districts, billingInfo = null, onPayByCa
   const [supportError, setSupportError] = useState(null);
   const [billingError, setBillingError] = useState(null);
   const [poNumber, setPoNumber] = useState(billingInfo?.poNumber || '');
+  const [billingOrganizationName, setBillingOrganizationName] = useState(billingInfo?.billingOrganizationName || '');
   const [billingContactName, setBillingContactName] = useState(billingInfo?.billingContactName || '');
   const [billingAddressLine1, setBillingAddressLine1] = useState(billingInfo?.billingAddressLine1 || '');
   const [billingAddressLine2, setBillingAddressLine2] = useState(billingInfo?.billingAddressLine2 || '');
@@ -1024,6 +1025,7 @@ function SettingsView({ userDistrictId, districts, billingInfo = null, onPayByCa
     setBillingSaved(false);
     const fd = new FormData();
     fd.append('po_number', poNumber);
+    fd.append('billing_organization_name', billingOrganizationName || profileName);
     fd.append('billing_contact_name', billingContactName);
     fd.append('billing_address_line1', billingAddressLine1);
     fd.append('billing_address_line2', billingAddressLine2);
@@ -1072,10 +1074,14 @@ function SettingsView({ userDistrictId, districts, billingInfo = null, onPayByCa
         <div style={{ background: 'var(--bg-elevated)', border: '1px solid var(--border-secondary)', borderRadius: 'var(--radius-lg)', padding: '32px', maxWidth: '800px', marginBottom: '24px' }}>
           <h4 style={{ color: 'var(--text-primary)', marginBottom: '8px', fontSize: '1.2rem' }}>Billing Documents</h4>
           <p style={{ color: 'var(--text-secondary)', fontSize: '0.9rem', marginBottom: '20px', lineHeight: 1.6 }}>
-            Download the Quote, Estimate / Price Quote, and Receipt for your account. Payment terms are Net 30; access pauses if payment has not cleared after 30 days.
+            Use the Estimate / Price Quote for internal approval. If your district will pay by PO, check, or ACH, enter the PO number and generate an invoice. The receipt becomes available after payment is confirmed.
           </p>
 
           <form onSubmit={handleBillingSubmit} style={{ display: 'grid', gap: '14px', marginBottom: '18px' }}>
+            <div className="form-group" style={{ marginBottom: 0 }}>
+              <label className="form-label" style={{ color: 'var(--text-secondary)', fontSize: '0.85rem', marginBottom: '8px', display: 'block' }}>District / Organization</label>
+              <input type="text" className="form-input" value={billingOrganizationName} onChange={(e) => setBillingOrganizationName(e.target.value)} placeholder={profileName} />
+            </div>
             <div className="form-group" style={{ marginBottom: 0 }}>
               <label className="form-label" style={{ color: 'var(--text-secondary)', fontSize: '0.85rem', marginBottom: '8px', display: 'block' }}>Billing contact name</label>
               <input type="text" className="form-input" value={billingContactName} onChange={(e) => setBillingContactName(e.target.value)} placeholder="Optional" />
@@ -1106,8 +1112,12 @@ function SettingsView({ userDistrictId, districts, billingInfo = null, onPayByCa
           </form>
 
           <div style={{ display: 'grid', gridTemplateColumns: 'repeat(auto-fit, minmax(180px, 1fr))', gap: '12px' }}>
-            <a className="btn btn-primary" href="/billing/quote" target="_blank" rel="noreferrer" style={{ textAlign: 'center' }}>Download Quote</a>
-            <a className="btn btn-primary" href="/billing/purchase-order" target="_blank" rel="noreferrer" style={{ textAlign: 'center' }}>Download Estimate</a>
+            <a className="btn btn-primary" href="/billing/estimate" target="_blank" rel="noreferrer" style={{ textAlign: 'center' }}>Download Estimate / Price Quote</a>
+            {poNumber.trim() ? (
+              <a className="btn btn-primary" href="/billing/invoice" target="_blank" rel="noreferrer" style={{ textAlign: 'center' }}>Generate Invoice</a>
+            ) : (
+              <button className="btn btn-secondary" type="button" disabled title="Enter and save a PO number to generate an invoice for PO/check/ACH processing.">Generate Invoice after PO #</button>
+            )}
             <button className="btn btn-secondary" type="button" disabled title="Upload Canary W-9 after vendor details are finalized.">W-9 coming soon</button>
             {billingInfo?.paymentStatus === 'paid' ? (
               <a className="btn btn-secondary" href="/billing/receipt" target="_blank" rel="noreferrer" style={{ textAlign: 'center' }}>Download Receipt</a>
@@ -1119,17 +1129,21 @@ function SettingsView({ userDistrictId, districts, billingInfo = null, onPayByCa
           {billingInfo?.paymentStatus !== 'paid' && (
             <div style={{ marginTop: '14px' }}>
               <button className="btn btn-primary" type="button" onClick={onPayByCard} style={{ width: '100%' }}>
-                Pay by Credit Card
+                Pay by Card
               </button>
               <p style={{ margin: '8px 0 0', color: 'var(--text-secondary)', fontSize: '0.82rem', lineHeight: 1.5 }}>
-                Opens secure Stripe payment inside the dashboard. Your payment stays tied to this logged-in district account.
+                Opens secure Stripe payment inside the dashboard. If your district pays by PO, check, or ACH, save the PO number above and generate an invoice instead.
               </p>
             </div>
           )}
 
           <div style={{ marginTop: '16px', padding: '14px 16px', border: '1px solid var(--border-secondary)', borderRadius: 'var(--radius-md)', color: 'var(--text-secondary)', fontSize: '0.86rem', lineHeight: 1.55 }}>
-            Status: <strong style={{ color: 'var(--text-primary)' }}>{billingInfo?.paymentStatus || 'pending'}</strong><br />
-            Trial ends: <strong style={{ color: 'var(--text-primary)' }}>{billingInfo?.trialEndsAt ? new Date(billingInfo.trialEndsAt).toLocaleDateString() : 'Not set'}</strong><br />
+            Status: <strong style={{ color: 'var(--text-primary)' }}>{billingInfo?.paymentStatus === 'paid' ? 'paid / active' : (billingInfo?.paymentStatus || 'pending')}</strong><br />
+            {billingInfo?.paymentStatus === 'paid' ? (
+              <>Annual access through: <strong style={{ color: 'var(--text-primary)' }}>{billingInfo?.paidThrough ? new Date(billingInfo.paidThrough).toLocaleDateString() : 'Active'}</strong><br /></>
+            ) : (
+              <>Trial ends: <strong style={{ color: 'var(--text-primary)' }}>{billingInfo?.trialEndsAt ? new Date(billingInfo.trialEndsAt).toLocaleDateString() : 'Not set'}</strong><br /></>
+            )}
             Annual access: <strong style={{ color: 'var(--text-primary)' }}>$1,499</strong>
           </div>
         </div>
@@ -2254,9 +2268,11 @@ export default function DashboardClient({ articles, districts, queries: initialQ
           )}
           {!demoMode && paymentNotice && (
             <div className="demo-mode-banner" style={{ borderColor: 'rgba(245,197,24,0.45)', background: 'rgba(245,197,24,0.1)' }}>
-              <strong>Your free trial is {paymentNotice.daysUntilTrialEnds <= 0 ? 'ending now' : `up in ${paymentNotice.daysUntilTrialEnds} day${paymentNotice.daysUntilTrialEnds === 1 ? '' : 's'}`}.</strong>{' '}
-              Add your card to keep Canary monitoring active.{' '}
-              <button type="button" onClick={openPaymentModal} style={{ color: 'var(--brand-primary)', fontWeight: 700, background: 'none', border: 'none', padding: 0, cursor: 'pointer', textDecoration: 'underline' }}>Click here to pay.</button>
+              <strong>Your Canary Data trial {paymentNotice.daysUntilTrialEnds <= 0 ? 'is ending now' : `ends in ${paymentNotice.daysUntilTrialEnds} day${paymentNotice.daysUntilTrialEnds === 1 ? '' : 's'}`}.</strong>{' '}
+              To keep access uninterrupted, pay by card or open Settings for PO/check/ACH billing documents.{' '}
+              <button type="button" onClick={openPaymentModal} style={{ color: 'var(--brand-primary)', fontWeight: 700, background: 'none', border: 'none', padding: 0, cursor: 'pointer', textDecoration: 'underline' }}>Pay by Card</button>
+              {' · '}
+              <button type="button" onClick={() => handleNavSelect('settings')} style={{ color: 'var(--brand-primary)', fontWeight: 700, background: 'none', border: 'none', padding: 0, cursor: 'pointer', textDecoration: 'underline' }}>Billing Documents</button>
             </div>
           )}
           {demoMode && currentView === 'dashboard' && (
@@ -2850,9 +2866,9 @@ export default function DashboardClient({ articles, districts, queries: initialQ
             {paymentSuccess ? (
               <div style={{ textAlign: 'center', padding: '2rem 1rem' }}>
                 <div style={{ fontSize: '3rem', marginBottom: '0.75rem' }}>✅</div>
-                <h3>Payment successful</h3>
+                <h3>Payment Successful</h3>
                 <p style={{ color: 'var(--text-secondary)', lineHeight: 1.6 }}>
-                  Thanks — Stripe confirmed the payment and Canary updated the account status. You can close this and keep working.
+                  Thanks — Stripe confirmed your Canary Data payment and your account has been updated. Open Settings to download your receipt, or refresh the dashboard if the paid status is not visible yet.
                 </p>
                 <button className="btn btn-primary" type="button" onClick={closePaymentModal} style={{ marginTop: '1rem' }}>
                   Back to Dashboard
