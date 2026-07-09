@@ -23,7 +23,7 @@ function resolveDocumentNumber(documentType, doc) {
 function resolveDocumentNumberLabel(documentType) {
   if (documentType === 'receipt') return 'Receipt #';
   if (documentType === 'invoice' || documentType === 'purchase-order') return 'Invoice #';
-  return 'Estimate #';
+  return 'Price Quote #';
 }
 
 function PaymentTerms({ documentType, doc }) {
@@ -43,7 +43,7 @@ function PaymentTerms({ documentType, doc }) {
       <>
         <strong>Payment terms:</strong> Net 30 from invoice issue date.<br />
         <strong>Payment methods:</strong> Card, check, or ACH/manual reconciliation.<br />
-        <strong>Access policy:</strong> To keep access uninterrupted, complete card payment or submit PO/check/ACH approval before the trial ends. Account access may pause if payment is not received and cleared by the due date.
+        <strong>Access policy:</strong> To keep access uninterrupted, complete card payment or enter the district PO number and route payment by check/ACH before the trial ends. Account access may pause if payment is not received and cleared by the due date.
       </>
     );
   }
@@ -51,7 +51,7 @@ function PaymentTerms({ documentType, doc }) {
   return (
     <>
       <strong>Payment terms:</strong> Net 30 from document issue date.<br />
-      <strong>Trial policy:</strong> The 30-day trial begins when the account is activated. Generating this document does not extend the trial period.<br />
+      <strong>Trial policy:</strong> The 30-day trial begins when the account is activated. Generating this price quote does not extend the trial period.<br />
       <strong>Renewal:</strong> Annual access does not automatically renew unless a renewal agreement is completed.
     </>
   );
@@ -68,7 +68,7 @@ function FinanceNote({ documentType, doc }) {
 
   return (
     <div style={{ background: '#fffbeb', border: '1px solid #facc15', borderRadius: '12px', padding: '18px', color: '#713f12', lineHeight: 1.65, fontSize: '0.92rem' }}>
-      <strong>School finance note:</strong> Your 30-day free trial begins when your account is activated. Estimate, quote, or invoice documents may be used for district approval and payment processing, but generating a document does not extend the trial period. To maintain uninterrupted access, complete card payment or submit PO/check/ACH approval before the trial ends. Invoice/payment terms are Net 30 from the document issue date.
+      <strong>School finance note:</strong> Your 30-day free trial begins when your account is activated. Price quotes and invoices may be used for district approval and payment processing, but generating a document does not extend the trial period. To maintain uninterrupted access, pay by card or enter the district PO number and route check/ACH payment before the trial ends. Invoice/payment terms are Net 30 from the invoice issue date.
     </div>
   );
 }
@@ -95,7 +95,7 @@ export default async function BillingDocumentPage({ params }) {
           <Image src="/canary-logo.svg" alt="Canary Data" width={210} height={58} style={{ height: '46px', width: 'auto', marginBottom: '22px' }} />
           <h1 style={{ margin: '0 0 12px', fontSize: '1.65rem' }}>Receipt not available yet</h1>
           <p style={{ color: '#4b5563', lineHeight: 1.7, marginBottom: '22px' }}>
-            Receipts are only generated after payment is confirmed. You can still download the Estimate / Price Quote from Account Settings.
+            Receipts are only generated after payment is confirmed. You can still download the Price Quote from Account Settings.
           </p>
           <a href="/dashboard" style={{ background: '#f5c518', color: '#111827', padding: '10px 14px', borderRadius: '8px', textDecoration: 'none', fontWeight: 700, fontSize: '0.9rem' }}>Back to dashboard</a>
         </section>
@@ -110,7 +110,7 @@ export default async function BillingDocumentPage({ params }) {
           <Image src="/canary-logo.svg" alt="Canary Data" width={210} height={58} style={{ height: '46px', width: 'auto', marginBottom: '22px' }} />
           <h1 style={{ margin: '0 0 12px', fontSize: '1.65rem' }}>Invoice needs a PO number</h1>
           <p style={{ color: '#4b5563', lineHeight: 1.7, marginBottom: '22px' }}>
-            Enter and save the district purchase order number in Account Settings before generating an invoice for PO/check/ACH processing.
+            Enter and save the district purchase order number in Account Settings before generating an invoice for check/ACH payment processing.
           </p>
           <a href="/dashboard" style={{ background: '#f5c518', color: '#111827', padding: '10px 14px', borderRadius: '8px', textDecoration: 'none', fontWeight: 700, fontSize: '0.9rem' }}>Back to dashboard</a>
         </section>
@@ -156,6 +156,7 @@ export default async function BillingDocumentPage({ params }) {
               <div style={{ lineHeight: 1.65, color: '#374151' }}>
                 <strong style={{ color: '#111827' }}>District / Organization: {doc.organizationName}</strong><br />
                 {doc.billingContactName && <>Billing contact: {doc.billingContactName}<br /></>}
+                {doc.billingPhone && <>Billing phone: {doc.billingPhone}<br /></>}
                 {doc.billingAddressLine1 ? <>{doc.billingAddressLine1}<br /></> : <span style={{ color: '#9ca3af' }}>District billing address pending<br /></span>}
                 {doc.billingAddressLine2 && <>{doc.billingAddressLine2}<br /></>}
                 {formatCityStateZip(doc.billingCity, doc.billingState, doc.billingZip) && <>{formatCityStateZip(doc.billingCity, doc.billingState, doc.billingZip)}<br /></>}
@@ -198,7 +199,7 @@ export default async function BillingDocumentPage({ params }) {
               <tr>
                 <td style={{ padding: '16px 14px', borderBottom: '1px solid #e5e7eb', color: '#374151' }}>
                   <strong style={{ color: '#111827' }}>Canary Data Annual Access</strong><br />
-                  Daily media monitoring, dashboard access, AI-assisted summaries, strategic recommendations, and PDF exports after approved trial/onboarding review.
+                  Annual Canary Data platform access, including daily media monitoring, dashboard access, reporting, AI-assisted summaries, strategic recommendations, and exports.
                 </td>
                 <td style={{ padding: '16px 14px', borderBottom: '1px solid #e5e7eb', textAlign: 'center', color: '#374151' }}>Annual</td>
                 <td style={{ padding: '16px 14px', borderBottom: '1px solid #e5e7eb', textAlign: 'right', color: '#111827', fontWeight: 800 }}>{doc.amountLabel}</td>

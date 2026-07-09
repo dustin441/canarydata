@@ -76,6 +76,7 @@ export async function saveBillingPurchaseOrder(formData) {
   const poNumber = String(formData.get('po_number') || '').trim().slice(0, 80);
   const billingOrganizationName = String(formData.get('billing_organization_name') || context.organizationName || '').trim().slice(0, 160);
   const billingContactName = String(formData.get('billing_contact_name') || '').trim().slice(0, 120);
+  const billingPhone = String(formData.get('billing_phone') || '').trim().slice(0, 40);
   const billingAddressLine1 = String(formData.get('billing_address_line1') || '').trim().slice(0, 160);
   const billingAddressLine2 = String(formData.get('billing_address_line2') || '').trim().slice(0, 160);
   const billingCity = String(formData.get('billing_city') || '').trim().slice(0, 80);
@@ -87,6 +88,7 @@ export async function saveBillingPurchaseOrder(formData) {
     po_number: poNumber,
     billing_organization_name: billingOrganizationName,
     billing_contact_name: billingContactName,
+    billing_phone: billingPhone,
     billing_address_line1: billingAddressLine1,
     billing_address_line2: billingAddressLine2,
     billing_city: billingCity,
@@ -101,7 +103,7 @@ export async function saveBillingPurchaseOrder(formData) {
   await supabase.auth.admin.updateUserById(context.user.id, {
     user_metadata: mergedMetadata,
   });
-  return { ok: true, poNumber, billingOrganizationName, billingContactName, billingAddressLine1, billingAddressLine2, billingCity, billingState, billingZip };
+  return { ok: true, poNumber, billingOrganizationName, billingContactName, billingPhone, billingAddressLine1, billingAddressLine2, billingCity, billingState, billingZip };
 }
 
 export async function confirmEmbeddedCanaryCheckout(sessionId) {

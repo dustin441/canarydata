@@ -43,6 +43,7 @@ export default async function DashboardPage() {
     billingOrganizationName: billingContext.user?.user_metadata?.billing_organization_name || billingContext.districtName || billingContext.onboardingRequest?.organization_name || billingContext.user?.user_metadata?.district_name || '',
     poNumber: billingContext.user?.user_metadata?.po_number || '',
     billingContactName: billingContext.user?.user_metadata?.billing_contact_name || '',
+    billingPhone: billingContext.user?.user_metadata?.billing_phone || '',
     billingAddressLine1: billingContext.user?.user_metadata?.billing_address_line1 || '',
     billingAddressLine2: billingContext.user?.user_metadata?.billing_address_line2 || '',
     billingCity: billingContext.user?.user_metadata?.billing_city || '',

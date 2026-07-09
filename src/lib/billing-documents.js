@@ -41,7 +41,7 @@ export function billingAccountCode(districtId, email) {
 export function billingDocumentNumbers({ districtId, email, year = new Date().getFullYear() } = {}) {
   const accountCode = billingAccountCode(districtId, email);
   return {
-    estimateNumber: `CD-EST-${accountCode}-${year}`,
+    estimateNumber: `CD-PQ-${accountCode}-${year}`,
     invoiceNumber: `CD-INV-${accountCode}-${year}`,
     receiptNumber: `CD-RCPT-${accountCode}-${year}`,
   };
@@ -63,6 +63,7 @@ export function buildBillingDocumentContext({ user, districtId, districtName, em
     districtId: districtId || metadata.district_id || '',
     billingEmail: email || onboardingRequest?.contact_email || user?.email || '',
     billingContactName: metadata.billing_contact_name || onboardingRequest?.contact_name || '',
+    billingPhone: metadata.billing_phone || onboardingRequest?.billing_phone || '',
     billingAddressLine1: metadata.billing_address_line1 || onboardingRequest?.billing_address_line1 || '',
     billingAddressLine2: metadata.billing_address_line2 || onboardingRequest?.billing_address_line2 || '',
     billingCity: metadata.billing_city || onboardingRequest?.billing_city || '',
@@ -91,16 +92,16 @@ export function buildBillingDocumentContext({ user, districtId, districtName, em
 
 export const BILLING_DOCUMENT_COPY = {
   estimate: {
-    title: 'Canary Data Estimate / Price Quote',
-    label: 'Estimate / Price Quote',
-    statusLabel: 'Estimate for approval',
-    intro: 'This estimate/price quote may be used for district approval and payment processing. Generating this document does not extend the 30-day trial period.',
+    title: 'Canary Data Price Quote',
+    label: 'Price Quote',
+    statusLabel: 'Price quote for approval',
+    intro: 'This price quote may be used for district approval and payment processing. Generating this document does not extend the 30-day trial period.',
   },
   quote: {
-    title: 'Canary Data Estimate / Price Quote',
-    label: 'Estimate / Price Quote',
-    statusLabel: 'Estimate for approval',
-    intro: 'This estimate/price quote may be used for district approval and payment processing. Generating this document does not extend the 30-day trial period.',
+    title: 'Canary Data Price Quote',
+    label: 'Price Quote',
+    statusLabel: 'Price quote for approval',
+    intro: 'This price quote may be used for district approval and payment processing. Generating this document does not extend the 30-day trial period.',
   },
   invoice: {
     title: 'Canary Data Invoice',

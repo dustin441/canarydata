@@ -270,7 +270,7 @@ export default function Home() {
             </p>
           </div>
           <p style={{ marginTop: '1.5rem', fontSize: '0.9rem', color: '#94a3b8', lineHeight: '1.6' }}>
-            We believe in our product. Start your 30-day free trial today—no payment upfront, no barriers to entry. We know school district payment cycles take time, so we&apos;re giving you full access now. Just submit payment within 30 days to keep monitoring without interruption. We&apos;ll provide an estimate/price quote that you can use for approval, then payment can be made by check, ACH, or credit card. Let&apos;s get started!
+            We believe in our product. Start your 30-day free trial today—no payment upfront, no barriers to entry. We know school district payment cycles take time, so we&apos;re giving you full access now. Just submit payment within 30 days to keep monitoring without interruption. We&apos;ll provide a price quote that you can use for approval, then payment can be made by check, ACH, or credit card. Let&apos;s get started!
           </p>
         </div>
       </section>

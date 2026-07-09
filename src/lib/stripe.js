@@ -70,7 +70,7 @@ function checkoutLineItemParams({ productName, priceCents, priceId }) {
     'line_items[0][price_data][currency]': process.env.CANARY_PAYMENT_CURRENCY || 'usd',
     'line_items[0][price_data][unit_amount]': priceCents,
     'line_items[0][price_data][product_data][name]': productName,
-    'line_items[0][price_data][product_data][description]': 'Annual Canary Data access after approved trial/onboarding review.',
+    'line_items[0][price_data][product_data][description]': 'Annual Canary Data platform access, including monitoring, reporting, AI-assisted summaries, and exports.',
   };
 }
 
