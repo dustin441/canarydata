@@ -307,37 +307,31 @@ function downloadCsv(filename, headers, rows) {
   document.body.removeChild(link);
   URL.revokeObjectURL(url);
 }
-function articleCsvRow(article, { isEarned, getNoteText } = {}) {
-  return [
-    article.date || '',
-    article.headline || '',
-    article.source || formatSourceLabel(article.source_type ?? 'other'),
-    article.link || '',
-    article.summary || '',
-    Array.isArray(article.tags) ? article.tags.join('; ') : '',
-    article.canary_score ?? '',
-    extractStrategicAlignmentLabels(article.innovation_reason).join('; '),
-    isEarned?.(article) ? 'Yes' : 'No',
-    getNoteText ? (getNoteText(article) || '') : (article.notes || ''),
-    article.source_query || '',
-    article.district_id || '',
-  ];
+function articleCsvValue(article, columnId, { isEarned, getNoteText } = {}) {
+  switch (columnId) {
+    case 'date': return article.date || '';
+    case 'headline': return article.headline || '';
+    case 'summary': return article.summary || '';
+    case 'link': return article.link || '';
+    case 'source': return article.source || formatSourceLabel(article.source_type ?? 'other');
+    case 'tags': return Array.isArray(article.tags) ? article.tags.join('; ') : '';
+    case 'score': return article.canary_score ?? '';
+    case 'innovation_reason': return extractStrategicAlignmentLabels(article.innovation_reason).join('; ');
+    case 'recommendation': return normalizeEscapedRecommendationText(article.recommendation || '');
+    case 'earned_media': return isEarned?.(article) ? 'Yes' : 'No';
+    case 'notes': return getNoteText ? (getNoteText(article) || '') : (article.notes || '');
+    case 'query': return article.source_query || '';
+    default: return '';
+  }
 }
 
-const ARTICLE_CSV_HEADERS = [
-  'Date',
-  'Headline',
-  'Source',
-  'Link',
-  'Summary',
-  'Tags',
-  'Canary Score',
-  'Strategic Alignment',
-  'Earned Media',
-  'Notes',
-  'Source Query',
-  'District ID',
-];
+function articleCsvRow(article, columns, helpers = {}) {
+  return columns.map((column) => articleCsvValue(article, column.id, helpers));
+}
+
+const BIRD_EYE_CSV_COLUMNS = ALL_COLUMNS.filter((column) =>
+  ['date', 'headline', 'summary', 'link', 'source', 'tags', 'score', 'innovation_reason', 'earned_media'].includes(column.id)
+);
 
 function StrategicAlignmentPills({ labels, selectedLabel, onSelect, max = 3 }) {
   const visible = labels.slice(0, max);
@@ -831,8 +825,8 @@ function BirdEyeView({ articles, strategicAlignmentData, selectedLabel, onSelect
   function exportBirdEyeCsv() {
     downloadCsv(
       `canary-birdseye-${new Date().toISOString().slice(0, 10)}.csv`,
-      ARTICLE_CSV_HEADERS,
-      highlightedArticles.map((article) => articleCsvRow(article, { isEarned }))
+      BIRD_EYE_CSV_COLUMNS.map((column) => column.label),
+      highlightedArticles.map((article) => articleCsvRow(article, BIRD_EYE_CSV_COLUMNS, { isEarned }))
     );
   }
 
@@ -2057,8 +2051,12 @@ export default function DashboardClient({ articles, districts, queries: initialQ
   function handleExportCsv() {
     downloadCsv(
       `canary-articles-${new Date().toISOString().slice(0, 10)}.csv`,
-      ARTICLE_CSV_HEADERS,
-      filtered.map((article) => articleCsvRow(article, { isEarned, getNoteText }))
+      ALL_COLUMNS.filter((column) => visibleColumns.has(column.id)).map((column) => column.label),
+      filtered.map((article) => articleCsvRow(
+        article,
+        ALL_COLUMNS.filter((column) => visibleColumns.has(column.id)),
+        { isEarned, getNoteText }
+      ))
     );
   }
 
