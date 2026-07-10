@@ -28,7 +28,7 @@ export default async function DashboardPage() {
   const trialEndsAt = billingContext?.onboardingRequest?.trial_ends_at || billingContext?.user?.user_metadata?.trial_ends_at || null;
   // eslint-disable-next-line react-hooks/purity -- Server-rendered billing notice intentionally compares trial date to current time.
   const daysUntilTrialEnds = trialEndsAt ? Math.ceil((new Date(trialEndsAt).getTime() - Date.now()) / 86400000) : null;
-  const paymentNotice = userDistrictId && billingContext?.onboardingRequest?.payment_status !== 'paid' && daysUntilTrialEnds !== null && daysUntilTrialEnds <= 7
+  const paymentNotice = userDistrictId && billingContext?.onboardingRequest?.payment_status !== 'paid' && daysUntilTrialEnds !== null
     ? {
         daysUntilTrialEnds,
         trialEndsAt,
