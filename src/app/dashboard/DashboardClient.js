@@ -1224,12 +1224,12 @@ function SettingsView({ userDistrictId, districts, billingInfo = null, onPayByCa
 
           <div style={{ display: 'grid', gridTemplateColumns: 'repeat(auto-fit, minmax(180px, 1fr))', gap: '12px' }}>
             <a className="btn btn-primary" href="/billing/estimate" target="_blank" rel="noreferrer" style={{ textAlign: 'center' }}>Download Price Quote</a>
+            <a className="btn btn-secondary" href="https://drive.google.com/file/d/1IjnCcx3O16KI8SZMe7oqfAkVn66_gfNC/view?usp=sharing" target="_blank" rel="noreferrer" style={{ textAlign: 'center' }}>Download W-9</a>
             {poNumber.trim() ? (
               <a className="btn btn-primary" href="/billing/invoice" target="_blank" rel="noreferrer" style={{ textAlign: 'center' }}>Generate Invoice</a>
             ) : (
               <button className="btn btn-secondary" type="button" disabled title="Enter and save a PO number to generate an invoice for check/ACH payment processing.">Generate Invoice after PO #</button>
             )}
-            <a className="btn btn-secondary" href="https://drive.google.com/file/d/1IjnCcx3O16KI8SZMe7oqfAkVn66_gfNC/view?usp=sharing" target="_blank" rel="noreferrer" style={{ textAlign: 'center' }}>Download W-9</a>
             {billingInfo?.paymentStatus === 'paid' ? (
               <a className="btn btn-secondary" href="/billing/receipt" target="_blank" rel="noreferrer" style={{ textAlign: 'center' }}>Download Receipt</a>
             ) : (
