@@ -2275,10 +2275,8 @@ export default function DashboardClient({ articles, districts, queries: initialQ
           {!demoMode && paymentNotice && (
             <div className="demo-mode-banner" style={{ borderColor: 'rgba(245,197,24,0.45)', background: 'rgba(245,197,24,0.1)' }}>
               <strong>Your Canary Data trial {paymentNotice.daysUntilTrialEnds <= 0 ? 'is ending now' : `ends in ${paymentNotice.daysUntilTrialEnds} day${paymentNotice.daysUntilTrialEnds === 1 ? '' : 's'}`}.</strong>{' '}
-              To keep access uninterrupted, pay by card or open Settings to enter a PO number and generate billing documents for check/ACH payment.{' '}
-              <button type="button" onClick={openPaymentModal} style={{ color: 'var(--brand-primary)', fontWeight: 700, background: 'none', border: 'none', padding: 0, cursor: 'pointer', textDecoration: 'underline' }}>Pay by Card</button>
-              {' · '}
-              <button type="button" onClick={() => handleNavSelect('settings')} style={{ color: 'var(--brand-primary)', fontWeight: 700, background: 'none', border: 'none', padding: 0, cursor: 'pointer', textDecoration: 'underline' }}>Billing Documents</button>
+              To keep access uninterrupted, review billing details, add any PO number, and confirm the correct district information before payment.{' '}
+              <button type="button" onClick={() => handleNavSelect('settings')} style={{ color: 'var(--brand-primary)', fontWeight: 700, background: 'none', border: 'none', padding: 0, cursor: 'pointer', textDecoration: 'underline' }}>Review Billing</button>
             </div>
           )}
           {demoMode && currentView === 'dashboard' && (
