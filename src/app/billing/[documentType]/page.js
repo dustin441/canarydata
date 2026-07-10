@@ -138,7 +138,7 @@ export default async function BillingDocumentPage({ params }) {
           <div>
             <Image src="/canary-logo.svg" alt="Canary Data" width={210} height={58} style={{ height: '46px', width: 'auto', marginBottom: '18px' }} />
             <div style={{ color: '#cbd5e1', fontSize: '0.92rem', lineHeight: 1.6 }}>
-              Media intelligence and daily monitoring for school districts.
+              Strategic communications intelligence for school districts.
             </div>
           </div>
           <div style={{ textAlign: 'right' }}>
