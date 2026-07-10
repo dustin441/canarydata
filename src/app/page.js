@@ -3,8 +3,8 @@ import Header from './Header';
 import styles from './page.module.css';
 
 export const metadata = {
-  title: 'Canary Data | AI-Powered Intelligence for School District Communications',
-  description: 'Track public news and social conversations with AI-powered summaries, geo-filtered relevance, and actionable communications recommendations.',
+  title: 'Canary Data | Strategic Communications Intelligence for School Districts',
+  description: 'Turn daily public coverage into awareness, strategy, and leadership-ready reporting for school districts.',
 };
 
 const testimonials = [
@@ -44,9 +44,9 @@ export default function Home() {
       <section className={styles.hero}>
         <div className={styles.heroBackground}></div>
         <div className={styles.heroContent}>
-          <h1 className={styles.title}>Know What Matters. Before Everyone Else Asks About It.</h1>
+          <h1 className={styles.title}>Strategic Communications Intelligence for School Districts</h1>
           <p className={styles.subtitle}>
-            Canary Data gives school communicators a daily review of the news and public social conversation that matters most — with sentiment scores, summaries, local context, and strategic recommendations before small issues become bigger questions.
+            Canary Data turns daily public coverage into awareness, strategy, and leadership-ready reporting — so school teams can see what is being said, understand what it means, and show how communications advance district priorities.
           </p>
           <div className={styles.heroButtons}>
             <Link href="/demo" className={styles.primaryBtn}>Try the Demo Dashboard</Link>
@@ -58,10 +58,10 @@ export default function Home() {
       {/* The Differentiator */}
       <section id="features" className={styles.section}>
         <div className={styles.sectionHeader}>
-          <span className={styles.badge}>Our Differentiator</span>
-          <h2 className={styles.sectionTitle}>Stop Drowning in Irrelevant National News</h2>
+          <span className={styles.badge}>Awareness → Strategy → Leadership</span>
+          <h2 className={styles.sectionTitle}>More than media monitoring</h2>
           <p className={styles.sectionDesc}>
-            Most monitoring tools are built to capture everything, everywhere. That often means more noise than insight. Canary Data focuses on your district — using geographic context to keep results relevant and local.
+            Most monitoring tools stop at clips and mentions. Canary Data connects relevant coverage to sentiment, Strategic Alignment, earned media, and practical next steps so communicators can brief leadership with clarity.
           </p>
         </div>
 
@@ -91,8 +91,8 @@ export default function Home() {
       {/* Feature Grid */}
       <section className={styles.section}>
         <div className={styles.sectionHeader}>
-          <span className={styles.badge}>Fueled by AI</span>
-          <h2 className={styles.sectionTitle}>Intelligence, Not Just Data</h2>
+          <span className={styles.badge}>Fueled by school-communications context</span>
+          <h2 className={styles.sectionTitle}>A thought partner for district communications</h2>
         </div>
         
         <div className={styles.grid}>
@@ -131,9 +131,9 @@ export default function Home() {
       <section className={styles.section}>
         <div className={styles.sectionHeader}>
           <span className={styles.badge}>Built for the reality of school communications</span>
-          <h2 className={styles.sectionTitle}>Start your day with clarity, not noise.</h2>
+          <h2 className={styles.sectionTitle}>Give leadership more than screenshots and gut feel.</h2>
           <p className={styles.sectionDesc}>
-            Most weeks bring multiple priorities at once. A transportation concern, a personnel rumor, a board discussion, and a student achievement story can all surface over the course of a week. Canary Data helps you quickly understand what’s been said, how it’s being received, whether communication action may be needed, and when something is simply informational.
+            Most weeks bring multiple priorities at once. Canary Data helps teams quickly understand what was said, how it was received, whether action is needed, and how coverage connects to the strategic goals superintendents and boards already care about.
           </p>
         </div>
       </section>
@@ -159,8 +159,8 @@ export default function Home() {
             <div className={styles.metricGrid}>
               <div className={styles.metricCard}><span>Total Mentions</span><strong>16</strong><small>Visible in the demo dashboard</small></div>
               <div className={styles.metricCard}><span>Avg. Sentiment Score</span><strong>6.6</strong><small>Concern / Neutral / Positive</small></div>
-              <div className={styles.metricCard}><span>Top Source</span><strong>News</strong><small>Source breakdown by type</small></div>
-              <div className={styles.metricCard}><span>Notes Added</span><strong>10</strong><small>Analyst notes in the feed</small></div>
+              <div className={styles.metricCard}><span>Strategic Hits</span><strong>9</strong><small>Coverage tied to district priorities</small></div>
+              <div className={styles.metricCard}><span>Earned Media</span><strong>6</strong><small>Proactive coverage wins</small></div>
             </div>
 
             <div className={styles.demoColumns}>

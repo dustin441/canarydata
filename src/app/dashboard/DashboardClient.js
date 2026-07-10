@@ -287,6 +287,58 @@ function buildStrategicAlignmentData(articles) {
     .sort((a, b) => b.count - a.count || a.label.localeCompare(b.label));
 }
 
+function csvEscape(value) {
+  if (value === null || value === undefined) return '';
+  const text = Array.isArray(value) ? value.join('; ') : String(value);
+  return `"${text.replace(/"/g, '""').replace(/\r?\n/g, ' ')}"`;
+}
+
+function downloadCsv(filename, headers, rows) {
+  const csv = [headers, ...rows]
+    .map((row) => row.map(csvEscape).join(','))
+    .join('\n');
+  const blob = new Blob([csv], { type: 'text/csv;charset=utf-8;' });
+  const url = URL.createObjectURL(blob);
+  const link = document.createElement('a');
+  link.href = url;
+  link.download = filename;
+  document.body.appendChild(link);
+  link.click();
+  document.body.removeChild(link);
+  URL.revokeObjectURL(url);
+}
+function articleCsvRow(article, { isEarned, getNoteText } = {}) {
+  return [
+    article.date || '',
+    article.headline || '',
+    article.source || formatSourceLabel(article.source_type ?? 'other'),
+    article.link || '',
+    article.summary || '',
+    Array.isArray(article.tags) ? article.tags.join('; ') : '',
+    article.canary_score ?? '',
+    extractStrategicAlignmentLabels(article.innovation_reason).join('; '),
+    isEarned?.(article) ? 'Yes' : 'No',
+    getNoteText ? (getNoteText(article) || '') : (article.notes || ''),
+    article.source_query || '',
+    article.district_id || '',
+  ];
+}
+
+const ARTICLE_CSV_HEADERS = [
+  'Date',
+  'Headline',
+  'Source',
+  'Link',
+  'Summary',
+  'Tags',
+  'Canary Score',
+  'Strategic Alignment',
+  'Earned Media',
+  'Notes',
+  'Source Query',
+  'District ID',
+];
+
 function StrategicAlignmentPills({ labels, selectedLabel, onSelect, max = 3 }) {
   const visible = labels.slice(0, max);
   if (!visible.length) return <span style={{ color: 'var(--text-tertiary)', fontStyle: 'italic' }}>—</span>;
@@ -767,10 +819,22 @@ function NotesView({ articles, getNoteText, openNoteModal }) {
   );
 }
 
-function BirdEyeView({ articles, strategicAlignmentData, selectedLabel, onSelectLabel, isEarned }) {
+function BirdEyeView({ articles, strategicAlignmentData, selectedLabel, onSelectLabel, isEarned, dateStart, dateEnd, setDateStart, setDateEnd, onExportPdf }) {
   const highlightedArticles = selectedLabel === 'All'
     ? articles.filter((article) => extractStrategicAlignmentLabels(article.innovation_reason).length > 0)
     : articles.filter((article) => extractStrategicAlignmentLabels(article.innovation_reason).includes(selectedLabel));
+  const totalMentions = articles.length;
+  const strategicHitCount = highlightedArticles.length;
+  const earnedCount = highlightedArticles.filter((article) => isEarned(article)).length;
+  const percent = (count, total = totalMentions) => total ? `${Math.round((count / total) * 100)}%` : '0%';
+
+  function exportBirdEyeCsv() {
+    downloadCsv(
+      `canary-birdseye-${new Date().toISOString().slice(0, 10)}.csv`,
+      ARTICLE_CSV_HEADERS,
+      highlightedArticles.map((article) => articleCsvRow(article, { isEarned }))
+    );
+  }
 
   return (
     <div className="data-section">
@@ -778,14 +842,55 @@ function BirdEyeView({ articles, strategicAlignmentData, selectedLabel, onSelect
         <div>
           <h3>🦅 Bird’s Eye View <span style={{ color: 'var(--text-tertiary)', fontSize: '0.85rem', fontWeight: 400 }}>({highlightedArticles.length} aligned articles)</span></h3>
           <p style={{ color: 'var(--text-secondary)', fontSize: '0.86rem', marginTop: '6px' }}>
-            A lightweight Strategic Alignment report for quickly showing which district priorities are showing up in coverage.
+            Executive Strategic Alignment report for superintendent, cabinet, board, accreditation, and evaluation conversations.
           </p>
         </div>
-        {selectedLabel !== 'All' && (
-          <button className="btn btn-secondary btn-sm" onClick={() => onSelectLabel('All')}>
-            {selectedLabel} ✕
-          </button>
-        )}
+        <div style={{ display: 'flex', gap: '8px', flexWrap: 'wrap', alignItems: 'center', justifyContent: 'flex-end' }}>
+          {selectedLabel !== 'All' && (
+            <button className="btn btn-secondary btn-sm" onClick={() => onSelectLabel('All')}>
+              {selectedLabel} ✕
+            </button>
+          )}
+          <button className="btn btn-secondary btn-sm" type="button" onClick={exportBirdEyeCsv}>⬇ Export CSV</button>
+          <button className="btn btn-secondary btn-sm" type="button" onClick={onExportPdf}>⬇ Export PDF</button>
+        </div>
+      </div>
+
+      <div className="filter-secondary-bar" style={{ marginTop: 0, marginBottom: '18px' }}>
+        <div className="filter-control-group date-filter-group">
+          <span className="filter-group-label">Report Date Range</span>
+          <input type="date" className="filter-date" value={dateStart} onChange={(e) => setDateStart(e.target.value)} />
+          <span style={{ color: 'var(--text-tertiary)', fontSize: '0.8rem' }}>–</span>
+          <input type="date" className="filter-date" value={dateEnd} onChange={(e) => setDateEnd(e.target.value)} />
+          {(dateStart || dateEnd) && (
+            <button type="button" className="btn btn-ghost btn-sm" onClick={() => { setDateStart(''); setDateEnd(''); }}>
+              Clear dates
+            </button>
+          )}
+        </div>
+      </div>
+
+      <div className="kpi-grid" style={{ marginBottom: '18px' }}>
+        <div className="kpi-card">
+          <div className="kpi-header"><div className="kpi-label">Total Mentions</div><div className="kpi-icon yellow">📰</div></div>
+          <div className="kpi-value">{totalMentions}</div>
+          <span className="kpi-change positive">Filtered report set</span>
+        </div>
+        <div className="kpi-card">
+          <div className="kpi-header"><div className="kpi-label">Canary Score</div><div className="kpi-icon green">📈</div></div>
+          <div className="kpi-value">{totalMentions ? (articles.reduce((sum, a) => sum + parseFloat(a.canary_score ?? 0), 0) / totalMentions).toFixed(1) : '—'}</div>
+          <span className="kpi-change positive">Average for report set</span>
+        </div>
+        <div className="kpi-card">
+          <div className="kpi-header"><div className="kpi-label">Strategic Hits</div><div className="kpi-icon blue">🎯</div></div>
+          <div className="kpi-value">{strategicHitCount}</div>
+          <span className="kpi-change positive">{percent(strategicHitCount)} of mentions · {strategicAlignmentData.length} focus areas</span>
+        </div>
+        <div className="kpi-card">
+          <div className="kpi-header"><div className="kpi-label">Earned Media</div><div className="kpi-icon yellow">⭐</div></div>
+          <div className="kpi-value">{earnedCount}</div>
+          <span className="kpi-change positive">{percent(earnedCount, strategicHitCount)} of strategic hits</span>
+        </div>
       </div>
 
       <StrategicAlignmentChart
@@ -820,7 +925,7 @@ function BirdEyeView({ articles, strategicAlignmentData, selectedLabel, onSelect
                   </div>
                 </td>
               </tr>
-            ) : highlightedArticles.slice(0, 25).map((article) => {
+            ) : highlightedArticles.map((article) => {
               const labels = extractStrategicAlignmentLabels(article.innovation_reason);
               return (
                 <tr key={article.id}>
@@ -1124,7 +1229,7 @@ function SettingsView({ userDistrictId, districts, billingInfo = null, onPayByCa
             ) : (
               <button className="btn btn-secondary" type="button" disabled title="Enter and save a PO number to generate an invoice for check/ACH payment processing.">Generate Invoice after PO #</button>
             )}
-            <button className="btn btn-secondary" type="button" disabled title="Upload Canary W-9 after vendor details are finalized.">W-9 coming soon</button>
+            <a className="btn btn-secondary" href="https://drive.google.com/file/d/1IjnCcx3O16KI8SZMe7oqfAkVn66_gfNC/view?usp=sharing" target="_blank" rel="noreferrer" style={{ textAlign: 'center' }}>Download W-9</a>
             {billingInfo?.paymentStatus === 'paid' ? (
               <a className="btn btn-secondary" href="/billing/receipt" target="_blank" rel="noreferrer" style={{ textAlign: 'center' }}>Download Receipt</a>
             ) : (
@@ -1949,6 +2054,21 @@ export default function DashboardClient({ articles, districts, queries: initialQ
     window.setTimeout(() => window.print(), 250);
   }
 
+  function handleExportCsv() {
+    downloadCsv(
+      `canary-articles-${new Date().toISOString().slice(0, 10)}.csv`,
+      ARTICLE_CSV_HEADERS,
+      filtered.map((article) => articleCsvRow(article, { isEarned, getNoteText }))
+    );
+  }
+
+  function handleBirdEyePdf() {
+    setColMenuOpen(false);
+    setFeedbackOpen(false);
+    setSidebarOpen(false);
+    window.setTimeout(() => window.print(), 250);
+  }
+
   function handleNavSelect(view) {
     setCurrentView(view);
     setSidebarOpen(false);
@@ -2328,6 +2448,11 @@ export default function DashboardClient({ articles, districts, queries: initialQ
               selectedLabel={strategicAlignmentFilter}
               onSelectLabel={setStrategicAlignmentFilter}
               isEarned={isEarned}
+              dateStart={dateStart}
+              dateEnd={dateEnd}
+              setDateStart={setDateStart}
+              setDateEnd={setDateEnd}
+              onExportPdf={handleBirdEyePdf}
             />
           )}
           {(currentView === 'dashboard' || currentView === 'articles') && (<>
@@ -2493,6 +2618,10 @@ export default function DashboardClient({ articles, districts, queries: initialQ
                     {formatDistrictName(districtFilter)} ✕
                   </button>
                 )}
+
+                <button className="btn btn-secondary btn-sm" type="button" onClick={handleExportCsv}>
+                  ⬇ CSV
+                </button>
 
                 {/* Column Manager */}
                 <div ref={colMenuRef} style={{ position: 'relative' }}>
