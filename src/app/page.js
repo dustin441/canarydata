@@ -88,6 +88,40 @@ export default function Home() {
         </div>
       </section>
 
+      {/* Strategic Priority Proof */}
+      <section className={styles.section}>
+        <div className={styles.sectionHeader}>
+          <span className={styles.badge}>Built for board-adopted priorities</span>
+          <h2 className={styles.sectionTitle}>Communication is already in the strategic plan.</h2>
+          <p className={styles.sectionDesc}>
+            In our beta group, 13 of 16 districts — 81% — identified communication, stakeholder engagement, trust, transparency, or community partnership as a strategic priority. Canary Data helps teams connect daily coverage to those district goals, then turn that evidence into leadership, board, and district accreditation conversations.
+          </p>
+        </div>
+        <div className={styles.grid}>
+          <div className={styles.card}>
+            <div className={styles.cardIcon}>81%</div>
+            <h3 className={styles.cardTitle}>Strategic priority alignment</h3>
+            <p className={styles.cardText}>
+              Most beta districts already name communication, engagement, trust, transparency, or partnership in their strategic plans.
+            </p>
+          </div>
+          <div className={styles.card}>
+            <div className={styles.cardIcon}>🦅</div>
+            <h3 className={styles.cardTitle}>Bird’s Eye View</h3>
+            <p className={styles.cardText}>
+              A cleaner executive artifact for showing which daily mentions support board-adopted goals without overwhelming leaders with every operational detail.
+            </p>
+          </div>
+          <div className={styles.card}>
+            <div className={styles.cardIcon}>🏛️</div>
+            <h3 className={styles.cardTitle}>District accreditation support</h3>
+            <p className={styles.cardText}>
+              Export aligned coverage as evidence for superintendent updates, board reporting, evaluation conversations, and district accreditation documentation.
+            </p>
+          </div>
+        </div>
+      </section>
+
       {/* Feature Grid */}
       <section className={styles.section}>
         <div className={styles.sectionHeader}>

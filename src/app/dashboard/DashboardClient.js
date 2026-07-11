@@ -836,7 +836,7 @@ function BirdEyeView({ articles, strategicAlignmentData, selectedLabel, onSelect
         <div>
           <h3>🦅 Bird’s Eye View <span style={{ color: 'var(--text-tertiary)', fontSize: '0.85rem', fontWeight: 400 }}>({highlightedArticles.length} aligned articles)</span></h3>
           <p style={{ color: 'var(--text-secondary)', fontSize: '0.86rem', marginTop: '6px' }}>
-            Executive Strategic Alignment report for superintendent, cabinet, board, accreditation, and evaluation conversations.
+            Executive Strategic Alignment report for superintendent, cabinet, board, district accreditation, and evaluation conversations.
           </p>
         </div>
         <div style={{ display: 'flex', gap: '8px', flexWrap: 'wrap', alignItems: 'center', justifyContent: 'flex-end' }}>
@@ -862,6 +862,21 @@ function BirdEyeView({ articles, strategicAlignmentData, selectedLabel, onSelect
             </button>
           )}
         </div>
+      </div>
+
+      <div style={{
+        marginBottom: '18px',
+        padding: '18px 20px',
+        border: '1px solid rgba(245,197,24,0.28)',
+        borderRadius: 'var(--radius-lg)',
+        background: 'linear-gradient(135deg, rgba(245,197,24,0.12), rgba(15,42,68,0.32))',
+      }}>
+        <div style={{ color: 'var(--canary-yellow)', fontSize: '0.72rem', fontWeight: 800, letterSpacing: '0.08em', textTransform: 'uppercase', marginBottom: '6px' }}>
+          Leadership-ready evidence
+        </div>
+        <p style={{ color: 'var(--text-secondary)', fontSize: '0.9rem', lineHeight: 1.6, margin: 0 }}>
+          Communication, stakeholder engagement, trust, transparency, and community partnership are board-adopted priorities for many districts. Bird’s Eye View helps communicators show where daily coverage supports those strategic goals and creates a cleaner artifact for superintendent, board, and district accreditation conversations.
+        </p>
       </div>
 
       <div className="kpi-grid" style={{ marginBottom: '18px' }}>

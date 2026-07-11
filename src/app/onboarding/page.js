@@ -229,7 +229,7 @@ export default function Onboarding() {
 
               <div className="form-group" style={fieldStyle}>
                 <label htmlFor="notes">Anything else we should know?</label>
-                <textarea id="notes" name="notes" className="form-input" rows={3} defaultValue={intake.notes || ''} placeholder="Priority topics, board reporting needs, accreditation artifacts, crisis concerns, launch timing..." />
+                <textarea id="notes" name="notes" className="form-input" rows={3} defaultValue={intake.notes || ''} placeholder="Priority topics, board reporting needs, district accreditation artifacts, crisis concerns, launch timing..." />
               </div>
 
               <button type="submit" className="btn btn-primary" disabled={loading}>
