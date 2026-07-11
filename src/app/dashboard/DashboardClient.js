@@ -2364,14 +2364,24 @@ export default function DashboardClient({ articles, districts, queries: initialQ
           </div>
           <div className="topbar-right">
             {currentView === 'dashboard' && (
-              <button
-                className="btn btn-secondary btn-sm export-pdf-btn"
-                onClick={handleExportPdf}
-                title="For the cleanest report, choose Tabloid / 11×17 and Landscape in the print dialog."
-              >
-                ⬇ Export PDF
-                <span className="export-pdf-hint">Tabloid landscape works best</span>
-              </button>
+              <>
+                <button
+                  className="btn btn-secondary btn-sm"
+                  type="button"
+                  onClick={handleExportCsv}
+                  title="Exports the currently filtered table using your visible Columns selection."
+                >
+                  ⬇ Export CSV
+                </button>
+                <button
+                  className="btn btn-secondary btn-sm export-pdf-btn"
+                  onClick={handleExportPdf}
+                  title="For the cleanest report, choose Tabloid / 11×17 and Landscape in the print dialog."
+                >
+                  ⬇ Export PDF
+                  <span className="export-pdf-hint">Tabloid landscape works best</span>
+                </button>
+              </>
             )}
             {demoMode && (
               <a className="privacy-topbar-link" href="/privacy" target="_blank" rel="noreferrer">
@@ -2616,10 +2626,6 @@ export default function DashboardClient({ articles, districts, queries: initialQ
                     {formatDistrictName(districtFilter)} ✕
                   </button>
                 )}
-
-                <button className="btn btn-secondary btn-sm" type="button" onClick={handleExportCsv}>
-                  ⬇ CSV
-                </button>
 
                 {/* Column Manager */}
                 <div ref={colMenuRef} style={{ position: 'relative' }}>
