@@ -46,7 +46,7 @@ export default function Home() {
         <div className={styles.heroContent}>
           <h1 className={styles.title}>Strategic Communications Intelligence for School Districts</h1>
           <p className={styles.subtitle}>
-            Canary Data turns daily public coverage into awareness, strategy, and leadership-ready reporting — so school teams can see what is being said, understand what it means, and show how communications advance district priorities.
+            Canary Data turns daily public coverage into awareness, strategy, and leadership-ready reporting — so school teams can see what is being said, understand what it means, and show how communications advance board-adopted district priorities.
           </p>
           <div className={styles.heroButtons}>
             <Link href="/demo" className={styles.primaryBtn}>Try the Demo Dashboard</Link>
@@ -94,7 +94,7 @@ export default function Home() {
           <span className={styles.badge}>Built for board-adopted priorities</span>
           <h2 className={styles.sectionTitle}>Communication is already in the strategic plan.</h2>
           <p className={styles.sectionDesc}>
-            In our beta group, 13 of 16 districts — 81% — identified communication, stakeholder engagement, trust, transparency, or community partnership as a strategic priority. Canary Data helps teams connect daily coverage to those district goals, then turn that evidence into leadership, board, and district accreditation conversations.
+            In our beta group, 13 of 16 districts — 81% — identified communication, stakeholder engagement, trust, transparency, or community partnership as a strategic priority. Canary Data helps teams connect daily coverage to those district goals, then package the evidence for superintendent updates, board reporting, and district accreditation conversations.
           </p>
         </div>
         <div className={styles.grid}>
@@ -178,7 +178,7 @@ export default function Home() {
           <span className={styles.badge}>See It in Action</span>
           <h2 className={styles.sectionTitle}>What You’ll See Inside Canary Data</h2>
           <p className={styles.sectionDesc}>
-            Show prospects how Canary Data turns messy coverage into a practical daily briefing: what happened, why it matters, whether action is needed, and how to communicate next.
+            Show prospects how Canary Data turns messy coverage into a practical daily briefing: what happened, why it matters, whether action is needed, and where communications activity supports board-adopted district priorities.
           </p>
 
           <div className={styles.demoShell}>
@@ -229,8 +229,9 @@ export default function Home() {
                   <li>Geo-validation keeps lookalike districts out of the feed.</li>
                   <li>News and public social sources can be filtered separately or viewed as an aggregate Social feed.</li>
                   <li>Strategic recommendations stay focused on communications action, not student discipline or private surveillance.</li>
+                  <li>Strategic Hits and Bird’s Eye View help teams show how daily coverage supports board-adopted priorities.</li>
                   <li>Earned-story counts help teams show coverage wins without overcomplicating launch metrics.</li>
-                  <li>PDF export, notes, feedback, and stakeholder-ready reports support cabinet and board updates.</li>
+                  <li>CSV/PDF exports, notes, feedback, and leadership-ready reports support superintendent, cabinet, board, and district accreditation conversations.</li>
                 </ul>
               </div>
             </div>

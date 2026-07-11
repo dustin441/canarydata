@@ -1190,7 +1190,7 @@ function SettingsView({ userDistrictId, districts, billingInfo = null, onPayByCa
         <div style={{ background: 'var(--bg-elevated)', border: '1px solid var(--border-secondary)', borderRadius: 'var(--radius-lg)', padding: '32px', maxWidth: '800px', marginBottom: '24px' }}>
           <h4 style={{ color: 'var(--text-primary)', marginBottom: '8px', fontSize: '1.2rem' }}>Billing Documents</h4>
           <p style={{ color: 'var(--text-secondary)', fontSize: '0.9rem', marginBottom: '20px', lineHeight: 1.6 }}>
-            Use the Price Quote for internal approval. If your district will pay by PO, check, or ACH, enter the PO number and generate an invoice. The receipt becomes available after payment is confirmed.
+            Recommended school-finance flow: download the Price Quote for internal approval, download the W-9 for vendor setup, save the PO number when your district provides it, then generate the invoice for PO/check/ACH payment. The receipt becomes available after payment is confirmed.
           </p>
 
           <form onSubmit={handleBillingSubmit} style={{ display: 'grid', gap: '14px', marginBottom: '18px' }}>
@@ -1244,6 +1244,10 @@ function SettingsView({ userDistrictId, districts, billingInfo = null, onPayByCa
             ) : (
               <button className="btn btn-secondary" type="button" disabled title="Receipt is available after payment is confirmed.">Receipt available after payment</button>
             )}
+          </div>
+
+          <div style={{ marginTop: '12px', padding: '12px 14px', border: '1px solid rgba(250,204,21,0.24)', borderRadius: 'var(--radius-md)', background: 'rgba(250,204,21,0.06)', color: 'var(--text-secondary)', fontSize: '0.84rem', lineHeight: 1.55 }}>
+            <strong style={{ color: 'var(--text-primary)' }}>Finance packet order:</strong> Price Quote → W-9 → PO # → Invoice → Receipt after payment.
           </div>
 
           {billingInfo?.paymentStatus !== 'paid' && (
