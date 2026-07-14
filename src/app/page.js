@@ -29,8 +29,8 @@ const testimonials = [
   {
     quote: 'This is a good training tool for those who may not be strategic thinking as of yet.',
     detail: 'Early feedback reinforced that Canary Data is useful not just for monitoring coverage, but for helping teams learn how to think strategically about community trust and response timing.',
-    name: 'Early reviewer feedback',
-    role: 'School communications leaders',
+    name: 'Shayla Canaday, PhD',
+    role: 'School communicator, Florida',
   },
 ];
 

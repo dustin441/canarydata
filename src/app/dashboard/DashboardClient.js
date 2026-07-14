@@ -6,6 +6,7 @@ import Link from 'next/link';
 import { loadStripe } from '@stripe/stripe-js';
 import { setEarnedMedia, saveNote, addQuery, deleteQuery, submitFeedback } from '@/app/actions';
 import { createEmbeddedCanaryCheckout, confirmEmbeddedCanaryCheckout, saveBillingPurchaseOrder } from '@/app/payment/actions';
+import { compareStrategicAlignmentRows } from '@/lib/strategicAlignmentSort.mjs';
 
 const stripePromise = process.env.NEXT_PUBLIC_STRIPE_PUBLISHABLE_KEY
   ? loadStripe(process.env.NEXT_PUBLIC_STRIPE_PUBLISHABLE_KEY)
@@ -291,7 +292,7 @@ function buildStrategicAlignmentData(articles) {
   });
   return [...counts.entries()]
     .map(([label, count]) => ({ label, count }))
-    .sort((a, b) => b.count - a.count || a.label.localeCompare(b.label));
+    .sort(compareStrategicAlignmentRows);
 }
 
 function csvEscape(value) {
