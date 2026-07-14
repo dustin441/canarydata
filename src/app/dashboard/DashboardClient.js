@@ -257,19 +257,26 @@ function extractStrategicAlignmentLabels(text) {
   const normalized = normalizeEscapedRecommendationText(text);
   const labels = [];
 
-  normalized.split('\n').forEach((line) => {
-    const boldMatches = [...line.matchAll(/\*\*([^*]+)\*\*/g)].map((m) => m[1]);
-    const candidates = boldMatches.length ? boldMatches : [line.split(/[–-]/)[0]];
-    candidates.forEach((candidate) => {
-      candidate
-        .split('|')
-        .map((part) => part.replace(/^#+\s*/, '').replace(/[*:]/g, '').trim())
-        .filter(Boolean)
-        .filter((label) => label.length <= 120)
-        .filter((label) => !isHiddenRoadmapMetricLine(label))
-        .filter((label) => !/^(strategic alignment|visibility intelligence|n\/a)$/i.test(label))
-        .forEach((label) => labels.push(label));
-    });
+  // Strategic Alignment output stores approved labels in bold and the supporting
+  // explanation as plain text. Multi-label reasons are normalized onto separate
+  // bold lines, so parsing every unbolded line would incorrectly turn explanation
+  // sentences (for example, "The fabrication lab at Cabrillo Middle...") into
+  // chart/filter focus areas. Prefer bold labels across the entire value; retain a
+  // first-line fallback only for older rows that predate the bold-label format.
+  const boldMatches = [...normalized.matchAll(/\*\*([^*]+)\*\*/g)].map((m) => m[1]);
+  const candidates = boldMatches.length
+    ? boldMatches
+    : [normalized.split('\n')[0].split(/[–-]/)[0]];
+
+  candidates.forEach((candidate) => {
+    candidate
+      .split('|')
+      .map((part) => part.replace(/^#+\s*/, '').replace(/[*:]/g, '').trim())
+      .filter(Boolean)
+      .filter((label) => label.length <= 120)
+      .filter((label) => !isHiddenRoadmapMetricLine(label))
+      .filter((label) => !/^(strategic alignment|visibility intelligence|n\/a)$/i.test(label))
+      .forEach((label) => labels.push(label));
   });
 
   return [...new Set(labels)];
