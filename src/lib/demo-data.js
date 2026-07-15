@@ -279,7 +279,7 @@ Monitor questions throughout the summer and continuously update resources.`,
     summary: 'This sample illustrates a lookalike mention that would be filtered out by geo-validation because the article is about a Beacon Ridge High in a different community.',
     link: 'https://example.com/demo/filtered-lookalike', canary_score: 1.8,
     tags: ['Operations & Finance'], notes: 'Analyst note: Demo-only row; keep it as a visible example of wrong-district validation logic.', is_earned_media: false, is_perched: false,
-    innovation_reason: '**Geo-Validation** – Shows the product differentiator: school-name matching is not enough without local context.',
+    innovation_reason: 'N/A',
     recommendation: `**Strategic Intent**
 This result demonstrates a common monitoring problem: stories about a different school with the same or similar name. In the live Canary Data platform, geo-filtering automatically removes these false matches, helping ensure your results are accurate and actionable.`,
     source_query: 'Beacon Ridge High School wrong district examples',

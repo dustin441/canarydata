@@ -7,6 +7,7 @@ import { loadStripe } from '@stripe/stripe-js';
 import { setEarnedMedia, saveNote, addQuery, deleteQuery, submitFeedback } from '@/app/actions';
 import { createEmbeddedCanaryCheckout, confirmEmbeddedCanaryCheckout, saveBillingPurchaseOrder } from '@/app/payment/actions';
 import { compareStrategicAlignmentRows } from '@/lib/strategicAlignmentSort.mjs';
+import { CORE_TAGS, canonicalTags } from '@/lib/canonicalTags.mjs';
 
 const stripePromise = process.env.NEXT_PUBLIC_STRIPE_PUBLISHABLE_KEY
   ? loadStripe(process.env.NEXT_PUBLIC_STRIPE_PUBLISHABLE_KEY)
@@ -20,8 +21,8 @@ const ALL_COLUMNS = [
   { id: 'source',             label: 'Source',             defaultOn: true },
   { id: 'tags',               label: 'Tags',               defaultOn: true },
   { id: 'score',              label: 'Score',              defaultOn: true },
-  { id: 'innovation_reason',  label: 'Strategic Alignment', defaultOn: false },
-  { id: 'recommendation',     label: 'Recommendation',     defaultOn: false },
+  { id: 'innovation_reason',  label: 'Strategic Alignment', defaultOn: true  },
+  { id: 'recommendation',     label: 'Recommendation',     defaultOn: true  },
   { id: 'earned_media',       label: 'Earned Media',       defaultOn: true },
   { id: 'notes',              label: 'Notes',              defaultOn: true },
   { id: 'query',              label: 'Source Query',       defaultOn: false },
@@ -322,7 +323,7 @@ function articleCsvValue(article, columnId, { isEarned, getNoteText } = {}) {
     case 'summary': return article.summary || '';
     case 'link': return article.link || '';
     case 'source': return article.source || formatSourceLabel(article.source_type ?? 'other');
-    case 'tags': return Array.isArray(article.tags) ? article.tags.join('; ') : '';
+    case 'tags': return canonicalTags(article.tags).join('; ');
     case 'score': return article.canary_score ?? '';
     case 'innovation_reason': return extractStrategicAlignmentLabels(article.innovation_reason).join('; ');
     case 'recommendation': return normalizeEscapedRecommendationText(article.recommendation || '');
@@ -972,7 +973,7 @@ function BirdEyeView({ articles, strategicAlignmentData, selectedLabel, onSelect
                   </td>
                   <td>
                     <div style={{ display: 'flex', gap: '4px', flexWrap: 'wrap', maxWidth: '160px' }}>
-                      {Array.isArray(article.tags) && article.tags.map((tag) => (
+                      {canonicalTags(article.tags).map((tag) => (
                         <span key={tag} style={{
                           padding: '2px 8px', borderRadius: 'var(--radius-full)',
                           fontSize: '0.68rem', fontWeight: 600,
@@ -1873,7 +1874,7 @@ export default function DashboardClient({ articles, districts, queries: initialQ
   // Load saved column prefs from localStorage
   useEffect(() => {
     try {
-      const saved = localStorage.getItem('canary_columns');
+      const saved = localStorage.getItem('canary_columns_v2');
       if (saved) setVisibleColumns(new Set(JSON.parse(saved)));
     } catch {}
   }, []);
@@ -1967,7 +1968,7 @@ export default function DashboardClient({ articles, districts, queries: initialQ
       const next = new Set(prev);
       if (next.has(id)) next.delete(id);
       else next.add(id);
-      try { localStorage.setItem('canary_columns', JSON.stringify([...next])); } catch {}
+      try { localStorage.setItem('canary_columns_v2', JSON.stringify([...next])); } catch {}
       return next;
     });
   }
@@ -2025,13 +2026,7 @@ export default function DashboardClient({ articles, districts, queries: initialQ
 
   const notesCount = articles.filter((a) => a.notes).length;
 
-  const allTags = useMemo(() => {
-    const tagSet = new Set();
-    articles.forEach((a) => {
-      if (Array.isArray(a.tags)) a.tags.forEach((t) => tagSet.add(t));
-    });
-    return ['All', ...Array.from(tagSet).sort()];
-  }, [articles]);
+  const allTags = useMemo(() => ['All', ...CORE_TAGS], []);
 
   const allSources = useMemo(() => {
     const s = new Set(articles.map((a) => a.source_type ?? 'other'));
@@ -2129,8 +2124,7 @@ export default function DashboardClient({ articles, districts, queries: initialQ
         articleSource === sourceFilter ||
         (sourceFilter === 'Social' && SOCIAL_SOURCE_TYPES.has(articleSource));
       const matchTag =
-        tagFilter === 'All' ||
-        (Array.isArray(a.tags) && a.tags.includes(tagFilter));
+        tagFilter === 'All' || canonicalTags(a.tags).includes(tagFilter);
       const matchDistrict =
         districtFilter === 'All' || a.district_id === districtFilter;
       const matchDateStart = !dateStart || a.date >= dateStart;
@@ -2829,7 +2823,7 @@ export default function DashboardClient({ articles, districts, queries: initialQ
                       {col('tags') && (
                         <td>
                           <div style={{ display: 'flex', gap: '4px', flexWrap: 'wrap', maxWidth: '160px' }}>
-                            {Array.isArray(article.tags) && article.tags.map((tag) => (
+                            {canonicalTags(article.tags).map((tag) => (
                               <span key={tag} style={{
                                 padding: '2px 8px', borderRadius: 'var(--radius-full)',
                                 fontSize: '0.68rem', fontWeight: 600,
