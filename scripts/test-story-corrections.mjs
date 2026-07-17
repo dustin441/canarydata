@@ -27,4 +27,15 @@ assert.match(actions, /canary_restore_story/);
 const data = await readFile(new URL('../src/lib/data.js', import.meta.url), 'utf8');
 assert.match(data, /\.eq\('visibility_status', 'active'\)/);
 
+const dashboard = await readFile(new URL('../src/app/dashboard/DashboardClient.js', import.meta.url), 'utf8');
+assert.match(dashboard, /canary_columns_v3/);
+assert.match(dashboard, /legacySaved[\s\S]*next\.add\('earned_media'\)/);
+assert.ok(
+  dashboard.indexOf("id: 'earned_media'") < dashboard.indexOf("id: 'innovation_reason'"),
+  'Earned Media should appear before Strategic Alignment in the main table',
+);
+assert.match(dashboard, /Add \/ Correct Stories/);
+assert.match(dashboard, /\+ Add Story/);
+assert.match(dashboard, /setCurrentView\('corrections'\)/);
+
 console.log('Manual story correction tests passed.');

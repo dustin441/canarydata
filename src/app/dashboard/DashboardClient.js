@@ -21,9 +21,9 @@ const ALL_COLUMNS = [
   { id: 'source',             label: 'Source',             defaultOn: true },
   { id: 'tags',               label: 'Tags',               defaultOn: true },
   { id: 'score',              label: 'Score',              defaultOn: true },
+  { id: 'earned_media',       label: 'Earned Media',       defaultOn: true },
   { id: 'innovation_reason',  label: 'Strategic Alignment', defaultOn: true  },
   { id: 'recommendation',     label: 'Recommendation',     defaultOn: true  },
-  { id: 'earned_media',       label: 'Earned Media',       defaultOn: true },
   { id: 'notes',              label: 'Notes',              defaultOn: true },
   { id: 'query',              label: 'Source Query',       defaultOn: false },
 ];
@@ -31,6 +31,8 @@ const ALL_COLUMNS = [
 const DEFAULT_VISIBLE = new Set(
   ALL_COLUMNS.filter((c) => c.required || c.defaultOn).map((c) => c.id)
 );
+const COLUMN_PREFS_KEY = 'canary_columns_v3';
+const LEGACY_COLUMN_PREFS_KEY = 'canary_columns_v2';
 import {
   AreaChart, Area, LineChart, Line, PieChart, Pie, Cell, BarChart, Bar,
   XAxis, YAxis, CartesianGrid, Tooltip, ResponsiveContainer, Legend,
@@ -2012,8 +2014,19 @@ export default function DashboardClient({ articles, districts, queries: initialQ
   // Load saved column prefs from localStorage
   useEffect(() => {
     try {
-      const saved = localStorage.getItem('canary_columns_v2');
-      if (saved) setVisibleColumns(new Set(JSON.parse(saved)));
+      const saved = localStorage.getItem(COLUMN_PREFS_KEY);
+      if (saved) {
+        setVisibleColumns(new Set(JSON.parse(saved)));
+        return;
+      }
+
+      const legacySaved = localStorage.getItem(LEGACY_COLUMN_PREFS_KEY);
+      if (legacySaved) {
+        const next = new Set(JSON.parse(legacySaved));
+        next.add('earned_media');
+        localStorage.setItem(COLUMN_PREFS_KEY, JSON.stringify([...next]));
+        setVisibleColumns(next);
+      }
     } catch {}
   }, []);
 
@@ -2106,7 +2119,7 @@ export default function DashboardClient({ articles, districts, queries: initialQ
       const next = new Set(prev);
       if (next.has(id)) next.delete(id);
       else next.add(id);
-      try { localStorage.setItem('canary_columns_v2', JSON.stringify([...next])); } catch {}
+      try { localStorage.setItem(COLUMN_PREFS_KEY, JSON.stringify([...next])); } catch {}
       return next;
     });
   }
@@ -2413,7 +2426,7 @@ export default function DashboardClient({ articles, districts, queries: initialQ
                 style={{ width: '100%', background: 'none', border: 'none', textAlign: 'left', cursor: 'pointer' }}
               >
                 <span className="sidebar-link-icon">🛠️</span>
-                Corrections
+                Add / Correct Stories
                 <span className="sidebar-link-badge">{excludedStories.length}</span>
               </button>
             )}
@@ -2534,7 +2547,7 @@ export default function DashboardClient({ articles, districts, queries: initialQ
                     : currentView === 'notes'
                       ? 'Analyst Notes'
                       : currentView === 'corrections'
-                        ? 'Story Corrections'
+                        ? 'Add / Correct Stories'
                         : currentView === 'birdseye'
                         ? 'Bird’s Eye View'
                         : currentView === 'clients'
@@ -2814,6 +2827,11 @@ export default function DashboardClient({ articles, districts, queries: initialQ
             <div className="data-header">
               <h3>📰 Media Articles</h3>
               <div className="data-filters">
+                {!demoMode && (
+                  <button className="btn btn-primary btn-sm" onClick={() => setCurrentView('corrections')}>
+                    + Add Story
+                  </button>
+                )}
                 <input
                   className="filter-input"
                   placeholder="Search headlines, summaries, notes, or alignment..."
