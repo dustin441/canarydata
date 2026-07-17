@@ -1,8 +1,31 @@
 'use server';
 
 import { createAdminClient } from '@/lib/supabase/admin';
+import { createClient as createServerClient } from '@/lib/supabase/server';
 import { createClickUpFeedbackTask, createClickUpOnboardingTask, isClickUpConfigured } from '@/lib/clickup';
 import { revalidatePath } from 'next/cache';
+
+async function requireCanaryActor() {
+  const sessionClient = await createServerClient();
+  const { data: { user: sessionUser } } = await sessionClient.auth.getUser();
+  if (!sessionUser?.id) throw new Error('Authentication required.');
+
+  const admin = createAdminClient();
+  const { data: { user } } = await admin.auth.admin.getUserById(sessionUser.id);
+  const actor = {
+    id: user?.id || sessionUser.id,
+    isAdmin: user?.app_metadata?.role === 'admin',
+    districtId: user?.app_metadata?.district_id || null,
+  };
+  if (!actor.isAdmin && !actor.districtId) throw new Error('Canary account access is not configured.');
+  return { actor, admin };
+}
+
+function assertDistrictAccess(actor, districtId) {
+  if (!actor.isAdmin && (!districtId || districtId !== actor.districtId)) {
+    throw new Error('You do not have access to this district.');
+  }
+}
 
 function cleanFormValue(formData, key) {
   return String(formData.get(key) || '').trim();
@@ -411,7 +434,9 @@ export async function submitOnboardingRequest(formData) {
 }
 
 export async function setEarnedMedia(id, value) {
-  const supabase = createAdminClient();
+  const { actor, admin: supabase } = await requireCanaryActor();
+  const { data: story } = await supabase.from('news_stories').select('district_id').eq('id', id).maybeSingle();
+  assertDistrictAccess(actor, story?.district_id);
   const { error } = await supabase
     .from('news_stories')
     .update({ is_earned_media: value })
@@ -420,7 +445,9 @@ export async function setEarnedMedia(id, value) {
 }
 
 export async function saveNote(id, notes) {
-  const supabase = createAdminClient();
+  const { actor, admin: supabase } = await requireCanaryActor();
+  const { data: story } = await supabase.from('news_stories').select('district_id').eq('id', id).maybeSingle();
+  assertDistrictAccess(actor, story?.district_id);
   const { error } = await supabase
     .from('news_stories')
     .update({ notes: notes || null })
@@ -429,7 +456,8 @@ export async function saveNote(id, notes) {
 }
 
 export async function addQuery({ query_text, district_id, district_name, geo_city, geo_state, geo_zip, channels }) {
-  const supabase = createAdminClient();
+  const { actor, admin: supabase } = await requireCanaryActor();
+  assertDistrictAccess(actor, district_id);
   const { data, error } = await supabase
     .from('search_queries')
     .insert({
@@ -449,16 +477,20 @@ export async function addQuery({ query_text, district_id, district_name, geo_cit
 }
 
 export async function deleteQuery(id) {
-  const supabase = createAdminClient();
+  const { actor, admin: supabase } = await requireCanaryActor();
+  const { data: query } = await supabase.from('search_queries').select('district_id').eq('id', id).maybeSingle();
+  assertDistrictAccess(actor, query?.district_id);
   const { error } = await supabase.from('search_queries').delete().eq('id', id);
   if (error) throw error;
 }
 
 export async function submitFeedback(formData) {
-  const supabase = createAdminClient();
+  const { actor, admin: supabase } = await requireCanaryActor();
 
   const message = formData.get('message');
-  const districtId = formData.get('district_id') || null;
+  const requestedDistrictId = formData.get('district_id') || null;
+  const districtId = actor.isAdmin ? requestedDistrictId : actor.districtId;
+  assertDistrictAccess(actor, districtId);
   const districtName = formData.get('district_name') || null;
   const file = formData.get('photo');
 

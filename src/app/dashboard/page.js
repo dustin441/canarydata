@@ -3,6 +3,7 @@ import { createClient } from '@/lib/supabase/server';
 import { createAdminClient } from '@/lib/supabase/admin';
 import DashboardClient from './DashboardClient';
 import { getAuthenticatedBillingContext } from '@/lib/billing';
+import { redirect } from 'next/navigation';
 
 export default async function DashboardPage() {
   // Use anon client to identify the current user from their session cookie
@@ -11,17 +12,22 @@ export default async function DashboardPage() {
 
   // Use admin client to reliably fetch full user metadata
   let userDistrictId = null;
+  let isAdmin = false;
   if (sessionUser?.id) {
     const admin = createAdminClient();
     const { data: { user } } = await admin.auth.admin.getUserById(sessionUser.id);
     userDistrictId = user?.app_metadata?.district_id ?? null;
+    isAdmin = user?.app_metadata?.role === 'admin';
   }
+
+  if (!sessionUser?.id) redirect('/login?redirect_to=/dashboard');
+  if (!userDistrictId && !isAdmin) redirect('/demo?access=pending');
 
   const [articles, districts, queries, clients] = await Promise.all([
     getArticles(userDistrictId),
     getDistricts(),
     getQueries(userDistrictId),
-    userDistrictId ? Promise.resolve([]) : getClients(),
+    isAdmin ? getClients() : Promise.resolve([]),
   ]);
 
   const billingContext = userDistrictId ? await getAuthenticatedBillingContext() : null;
