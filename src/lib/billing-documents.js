@@ -49,18 +49,19 @@ export function billingDocumentNumbers({ districtId, email, year = new Date().ge
 
 export function buildBillingDocumentContext({ user, districtId, districtName, email, onboardingRequest }) {
   const metadata = user?.user_metadata || {};
+  const protectedMetadata = user?.app_metadata || {};
   const issuedAt = new Date();
   const dueAt = addDays(issuedAt, 30);
   const numbers = billingDocumentNumbers({ districtId, email });
   const poNumber = metadata.po_number || onboardingRequest?.po_number || '';
-  const paymentStatus = metadata.payment_status || onboardingRequest?.payment_status || 'pending';
-  const paidAt = metadata.payment_paid_at || onboardingRequest?.paid_at || null;
-  const paidThrough = metadata.paid_through || onboardingRequest?.paid_through || (paidAt ? addYears(new Date(paidAt), 1).toISOString() : null);
+  const paymentStatus = protectedMetadata.payment_status || onboardingRequest?.payment_status || 'pending';
+  const paidAt = protectedMetadata.payment_paid_at || onboardingRequest?.paid_at || null;
+  const paidThrough = protectedMetadata.paid_through || onboardingRequest?.paid_through || (paidAt ? addYears(new Date(paidAt), 1).toISOString() : null);
   const organizationName = metadata.billing_organization_name || districtName || onboardingRequest?.organization_name || metadata.district_name || 'School District';
 
   return {
     organizationName,
-    districtId: districtId || metadata.district_id || '',
+    districtId: districtId || protectedMetadata.district_id || '',
     billingEmail: email || onboardingRequest?.contact_email || user?.email || '',
     billingContactName: metadata.billing_contact_name || onboardingRequest?.contact_name || '',
     billingPhone: metadata.billing_phone || onboardingRequest?.billing_phone || '',
@@ -74,13 +75,13 @@ export function buildBillingDocumentContext({ user, districtId, districtName, em
     vendorAddressLine2: CANARY_VENDOR_ADDRESS_LINE2,
     vendorEmail: CANARY_VENDOR_EMAIL,
     poNumber,
-    estimateNumber: metadata.estimate_number || metadata.quote_number || numbers.estimateNumber,
-    invoiceNumber: metadata.invoice_number || numbers.invoiceNumber,
-    receiptNumber: metadata.receipt_number || numbers.receiptNumber,
+    estimateNumber: protectedMetadata.estimate_number || numbers.estimateNumber,
+    invoiceNumber: protectedMetadata.invoice_number || numbers.invoiceNumber,
+    receiptNumber: protectedMetadata.receipt_number || numbers.receiptNumber,
     issuedAt,
     dueAt,
-    trialStartsAt: metadata.trial_starts_at || onboardingRequest?.trial_starts_at || null,
-    trialEndsAt: metadata.trial_ends_at || onboardingRequest?.trial_ends_at || null,
+    trialStartsAt: protectedMetadata.trial_starts_at || onboardingRequest?.trial_starts_at || null,
+    trialEndsAt: protectedMetadata.trial_ends_at || onboardingRequest?.trial_ends_at || null,
     paymentStatus,
     paidAt,
     paidThrough,
