@@ -16,7 +16,6 @@ const stripePromise = process.env.NEXT_PUBLIC_STRIPE_PUBLISHABLE_KEY
 const ALL_COLUMNS = [
   { id: 'date',               label: 'Date',               required: true  },
   { id: 'headline',           label: 'Headline',           required: true  },
-  { id: 'earned_media',       label: 'Earned Media',       defaultOn: true },
   { id: 'summary',            label: 'Summary',            defaultOn: true },
   { id: 'link',               label: 'Link',               defaultOn: true },
   { id: 'source',             label: 'Source',             defaultOn: true },
@@ -24,6 +23,7 @@ const ALL_COLUMNS = [
   { id: 'score',              label: 'Score',              defaultOn: true },
   { id: 'innovation_reason',  label: 'Strategic Alignment', defaultOn: true  },
   { id: 'recommendation',     label: 'Recommendation',     defaultOn: true  },
+  { id: 'earned_media',       label: 'Earned Media',       defaultOn: true },
   { id: 'notes',              label: 'Notes',              defaultOn: true },
   { id: 'query',              label: 'Source Query',       defaultOn: false },
 ];
@@ -1017,7 +1017,7 @@ function StrategicAlignmentChart({ data, selectedLabel, onSelectLabel }) {
   }));
 
   return (
-    <div className="chart-card" style={{ minHeight: '320px' }}>
+    <div className="chart-card strategic-performance-chart" style={{ minHeight: '320px' }}>
       <h4>Strategic Alignment <span>Click a focus area to filter coverage</span></h4>
       {chartData.length === 0 ? (
         <div className="empty-state" style={{ padding: '36px 16px' }}>
@@ -1635,119 +1635,27 @@ function FeedbackModal({ districtId, districtName, onClose }) {
 }
 
 function ReleaseSignupModal({ onClose }) {
-  const [name, setName] = useState('');
-  const [email, setEmail] = useState('');
-  const [schoolDistrict, setSchoolDistrict] = useState('');
-  const [isPending, startTransition] = useTransition();
-  const [submitted, setSubmitted] = useState(false);
-  const [error, setError] = useState(null);
-
-  function handleSubmit(e) {
-    e.preventDefault();
-    setError(null);
-    const trimmedName = name.trim();
-    const trimmedEmail = email.trim();
-    const trimmedSchoolDistrict = schoolDistrict.trim();
-    if (!trimmedName || !trimmedEmail || !trimmedSchoolDistrict) {
-      setError('Please add your name, email, and school or district.');
-      return;
-    }
-    const fd = new FormData();
-    fd.append('district_id', 'demo-release-notification');
-    fd.append('district_name', trimmedSchoolDistrict);
-    fd.append('message', [
-      'Release notification signup from Canary Data demo.',
-      `Name: ${trimmedName}`,
-      `Email: ${trimmedEmail}`,
-      `School/District: ${trimmedSchoolDistrict}`,
-    ].join('\n'));
-    startTransition(async () => {
-      try {
-        await submitFeedback(fd);
-        setSubmitted(true);
-      } catch (err) {
-        setError(err.message || 'Something went wrong. Please try again.');
-      }
-    });
-  }
-
   return (
     <div className="modal-overlay" onClick={(e) => e.target === e.currentTarget && onClose()}>
       <div className="modal-box release-signup-modal">
-        {submitted ? (
-          <>
-            <h3>You’re on the list! 🐤</h3>
-            <p className="modal-success">We’ll notify you when Canary Data is ready for broader release.</p>
-            <div className="modal-actions">
-              <button className="modal-submit-btn" onClick={onClose}>Close</button>
-            </div>
-          </>
-        ) : (
-          <>
-            <div>
-              <h3>Notify Me When Canary Data Launches</h3>
-              <div className="release-pricing-card">
-                <span className="release-pricing-eyebrow">Early adopter launch offer</span>
-                <div className="release-pricing-price">$1,499 <small>/ year</small></div>
-                <p>Built for school communicators who need clarity without enterprise software sticker shock.</p>
-                <ul>
-                  <li>Unlimited users for the district team</li>
-                  <li>Daily AI-summarized news and public social monitoring</li>
-                  <li>Hyper-local filtering, strategic recommendations, and PDF exports</li>
-                </ul>
-              </div>
-              <p>Leave your contact information and we’ll follow up when Canary Data is ready for more schools and districts.</p>
-            </div>
-            <form onSubmit={handleSubmit} style={{ display: 'contents' }}>
-              <label className="modal-field-label">
-                Name
-                <input
-                  className="modal-input"
-                  name="release_name"
-                  type="text"
-                  value={name}
-                  onChange={(e) => setName(e.target.value)}
-                  placeholder="Your name"
-                  autoComplete="name"
-                  required
-                />
-              </label>
-              <label className="modal-field-label">
-                Email
-                <input
-                  className="modal-input"
-                  name="release_email"
-                  type="email"
-                  value={email}
-                  onChange={(e) => setEmail(e.target.value)}
-                  placeholder="you@district.org"
-                  autoComplete="email"
-                  required
-                />
-              </label>
-              <label className="modal-field-label">
-                School or district
-                <input
-                  className="modal-input"
-                  name="release_school_district"
-                  type="text"
-                  value={schoolDistrict}
-                  onChange={(e) => setSchoolDistrict(e.target.value)}
-                  placeholder="School or district name"
-                  autoComplete="organization"
-                  required
-                />
-              </label>
-              {error && <p style={{ color: 'var(--status-negative)', fontSize: '0.82rem', margin: 0 }}>{error}</p>}
-              <div className="modal-actions">
-                <button type="button" className="modal-cancel-btn" onClick={onClose}>Cancel</button>
-                <button type="submit" className="modal-submit-btn" disabled={isPending || !name.trim() || !email.trim() || !schoolDistrict.trim()}>
-                  {isPending ? 'Saving…' : 'Notify Me'}
-                </button>
-              </div>
-            </form>
-          </>
-        )}
+        <div>
+          <h3>Set Up Your 30-Day Trial</h3>
+          <div className="release-pricing-card">
+            <span className="release-pricing-eyebrow">Early adopter launch offer</span>
+            <div className="release-pricing-price">$1,499 <small>/ year</small></div>
+            <p>Built for school communicators who need clarity without enterprise software sticker shock.</p>
+            <ul>
+              <li>Unlimited users for the district team</li>
+              <li>Daily AI-summarized news and public social monitoring</li>
+              <li>Hyper-local filtering, strategic recommendations, and PDF exports</li>
+            </ul>
+          </div>
+          <p>Start with your district website. Canary will draft your setup, strategic priorities, and official social sources for your review before any login is created.</p>
+        </div>
+        <div className="modal-actions">
+          <button type="button" className="modal-cancel-btn" onClick={onClose}>Not Yet</button>
+          <Link className="modal-submit-btn" href="/onboarding">Start Trial Setup</Link>
+        </div>
       </div>
     </div>
   );
@@ -2323,6 +2231,7 @@ export default function DashboardClient({ articles, districts, queries: initialQ
   // where a filtered table shows only TikTok rows but the source wheel still
   // reflects the broader district/all-article set.
   const chartArticles = filtered;
+  const earnedMediaCount = chartArticles.filter((article) => isEarned(article)).length;
 
   const { mentionTrend, sentimentTrend, sourceBreakdown } = useMemo(
     () => buildChartData(chartArticles),
@@ -2385,6 +2294,15 @@ export default function DashboardClient({ articles, districts, queries: initialQ
               Dashboard
             </button>
             <button
+              className={`sidebar-link ${currentView === 'birdseye' ? 'active' : ''}`}
+              onClick={() => handleNavSelect('birdseye')}
+              style={{ width: '100%', background: 'none', border: 'none', textAlign: 'left', cursor: 'pointer' }}
+            >
+              <span className="sidebar-link-icon">🦅</span>
+              Bird’s Eye View
+              <span className="sidebar-link-badge">v1</span>
+            </button>
+            <button
               className={`sidebar-link ${currentView === 'howto' ? 'active' : ''}`}
               onClick={() => handleNavSelect('howto')}
               style={{ width: '100%', background: 'none', border: 'none', textAlign: 'left', cursor: 'pointer' }}
@@ -2430,15 +2348,6 @@ export default function DashboardClient({ articles, districts, queries: initialQ
                 <span className="sidebar-link-badge">{excludedStories.length}</span>
               </button>
             )}
-            <button
-              className={`sidebar-link ${currentView === 'birdseye' ? 'active' : ''}`}
-              onClick={() => handleNavSelect('birdseye')}
-              style={{ width: '100%', background: 'none', border: 'none', textAlign: 'left', cursor: 'pointer' }}
-            >
-              <span className="sidebar-link-icon">🦅</span>
-              Bird’s Eye View
-              <span className="sidebar-link-badge">v1</span>
-            </button>
           </div>
           {!userDistrictId && (
             <div className="sidebar-section">
@@ -2530,12 +2439,12 @@ export default function DashboardClient({ articles, districts, queries: initialQ
             </button>
             {demoMode && (
               <button className="release-cta release-cta-left" onClick={() => setReleaseSignupOpen(true)}>
-                Notify Me When Canary Data Launches
+                Set Up Your 30-Day Trial
               </button>
             )}
             {demoMode && (
               <button className="release-cta release-cta-mobile" onClick={() => setReleaseSignupOpen(true)}>
-                Notify Me
+                Start Trial
               </button>
             )}
             <div>
@@ -2708,6 +2617,15 @@ export default function DashboardClient({ articles, districts, queries: initialQ
               </div>
               <div className="kpi-value">{chartArticles.length}</div>
               <span className="kpi-change positive">↑ Active monitoring</span>
+            </div>
+
+            <div className="kpi-card">
+              <div className="kpi-header">
+                <div className="kpi-label">Earned Media</div>
+                <div className="kpi-icon yellow">🏆</div>
+              </div>
+              <div className="kpi-value">{earnedMediaCount}</div>
+              <span className="kpi-change positive">Filtered timeframe</span>
             </div>
 
             <div className="kpi-card">
@@ -2951,7 +2869,6 @@ export default function DashboardClient({ articles, districts, queries: initialQ
                   <tr>
                     <th>Date</th>
                     <th>Headline</th>
-                    {col('earned_media')      && <th>Earned Media</th>}
                     {col('summary')           && <th>Summary</th>}
                     {col('link')              && <th>Link</th>}
                     {col('source')            && <th>Source</th>}
@@ -2959,6 +2876,7 @@ export default function DashboardClient({ articles, districts, queries: initialQ
                     {col('score')             && <th className="score-column">Score<InfoTooltip text={SCORE_TOOLTIP} /></th>}
                     {col('innovation_reason') && <th>Strategic Alignment</th>}
                     {col('recommendation')    && <th>Recommendation</th>}
+                    {col('earned_media')      && <th>Earned Media</th>}
                     {col('notes')             && <th>Notes</th>}
                     {col('query')             && <th>Source Query</th>}
                   </tr>
@@ -2997,24 +2915,6 @@ export default function DashboardClient({ articles, districts, queries: initialQ
                           </button>
                         )}
                       </td>
-
-                      {/* Earned Media */}
-                      {col('earned_media') && (
-                        <td style={{ textAlign: 'center' }}>
-                          <label style={{ display: 'inline-flex', alignItems: 'center', gap: '6px', cursor: 'pointer' }}>
-                            <input
-                              type="checkbox"
-                              checked={isEarned(article)}
-                              onChange={(e) => handleEarnedMedia(article, e.target.checked)}
-                              aria-label={`Mark ${article.headline} as earned media`}
-                              style={{ accentColor: 'var(--canary-yellow)', width: '16px', height: '16px', cursor: 'pointer' }}
-                            />
-                            <span style={{ fontSize: '0.7rem', fontWeight: 700, color: isEarned(article) ? 'var(--canary-yellow)' : 'var(--text-tertiary)' }}>
-                              {isEarned(article) ? 'Earned' : 'Mark earned'}
-                            </span>
-                          </label>
-                        </td>
-                      )}
 
                       {/* Summary */}
                       {col('summary') && (
@@ -3093,6 +2993,24 @@ export default function DashboardClient({ articles, districts, queries: initialQ
                       {col('recommendation') && (
                         <td className="summary-cell">
                           <RecommendationText text={article.recommendation} />
+                        </td>
+                      )}
+
+                      {/* Earned Media */}
+                      {col('earned_media') && (
+                        <td style={{ textAlign: 'center' }}>
+                          <label style={{ display: 'inline-flex', alignItems: 'center', gap: '6px', cursor: 'pointer' }}>
+                            <input
+                              type="checkbox"
+                              checked={isEarned(article)}
+                              onChange={(e) => handleEarnedMedia(article, e.target.checked)}
+                              aria-label={`Mark ${article.headline} as earned media`}
+                              style={{ accentColor: 'var(--canary-yellow)', width: '16px', height: '16px', cursor: 'pointer' }}
+                            />
+                            <span style={{ fontSize: '0.7rem', fontWeight: 700, color: isEarned(article) ? 'var(--canary-yellow)' : 'var(--text-tertiary)' }}>
+                              {isEarned(article) ? 'Earned' : 'Mark earned'}
+                            </span>
+                          </label>
                         </td>
                       )}
 

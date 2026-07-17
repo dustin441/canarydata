@@ -31,17 +31,28 @@ const dashboard = await readFile(new URL('../src/app/dashboard/DashboardClient.j
 assert.match(dashboard, /canary_columns_v3/);
 assert.match(dashboard, /legacySaved[\s\S]*next\.add\('earned_media'\)/);
 assert.ok(
-  dashboard.indexOf("id: 'earned_media'") < dashboard.indexOf("id: 'summary'"),
-  'Earned Media should appear immediately after the required columns',
+  dashboard.indexOf("id: 'recommendation'") < dashboard.indexOf("id: 'earned_media'"),
+  'Earned Media should return to the right side after Recommendation',
+);
+assert.ok(
+  dashboard.indexOf("id: 'earned_media'") < dashboard.indexOf("id: 'notes'"),
+  'Earned Media should remain before Notes',
 );
 assert.match(
   dashboard,
-  /<th>Headline<\/th>[\s\S]*?col\('earned_media'\)[\s\S]*?<th>Earned Media<\/th>[\s\S]*?col\('summary'\)/,
+  /col\('recommendation'\)[\s\S]*?<th>Recommendation<\/th>[\s\S]*?col\('earned_media'\)[\s\S]*?<th>Earned Media<\/th>[\s\S]*?col\('notes'\)/,
 );
 assert.match(
   dashboard,
-  /\{\/\* Headline \*\/[\s\S]*?\{\/\* Earned Media \*\/[\s\S]*?\{\/\* Summary \*\//,
+  /\{\/\* Recommendation \*\/[\s\S]*?\{\/\* Earned Media \*\/[\s\S]*?\{\/\* Notes \*\//,
 );
+assert.match(dashboard, /const earnedMediaCount = chartArticles\.filter\(\(article\) => isEarned\(article\)\)\.length/);
+assert.match(dashboard, /<div className="kpi-label">Earned Media<\/div>[\s\S]*?<div className="kpi-value">\{earnedMediaCount\}<\/div>[\s\S]*?Filtered timeframe/);
+assert.match(dashboard, /Dashboard[\s\S]*?handleNavSelect\('birdseye'\)[\s\S]*?Bird’s Eye View[\s\S]*?handleNavSelect\('howto'\)/);
+assert.match(dashboard, /className="chart-card strategic-performance-chart"/);
+const dashboardCss = await readFile(new URL('../src/app/globals.css', import.meta.url), 'utf8');
+assert.match(dashboardCss, /\.headline-cell \.headline-text[\s\S]*?-webkit-line-clamp: 3/);
+assert.match(dashboardCss, /\.strategic-performance-chart[\s\S]*?grid-column: 1 \/ -1/);
 assert.match(dashboard, /Add \/ Correct Stories/);
 assert.match(dashboard, /\+ Add Story/);
 assert.match(dashboard, /setCurrentView\('corrections'\)/);

@@ -11,16 +11,19 @@
     "test:authz": "node scripts/test-authz-metadata.mjs",
     "test:quality": "node scripts/test-canary-quality.mjs",
     "test:corrections": "node scripts/test-story-corrections.mjs",
+    "test:onboarding": "node scripts/test-onboarding-discovery.mjs",
     "health:canary": "node scripts/check-canary-health.mjs"
   },
   "dependencies": {
     "@stripe/stripe-js": "^9.9.0",
     "@supabase/ssr": "^0.10.0",
     "@supabase/supabase-js": "^2.101.1",
+    "mammoth": "^1.12.0",
     "next": "16.2.2",
     "react": "19.2.4",
     "react-dom": "19.2.4",
-    "recharts": "^3.8.1"
+    "recharts": "^3.8.1",
+    "unpdf": "^1.6.2"
   },
   "devDependencies": {
     "eslint": "^9",

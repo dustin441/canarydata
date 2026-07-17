@@ -9,6 +9,7 @@ const fieldStyle = { marginBottom: '1rem' };
 const DRAFT_FIELDS = [
   ['mission_vision_values', 'Mission / vision / values'],
   ['strategic_priorities', 'Strategic priorities / focus areas'],
+  ['strategic_plan_text', 'Full strategic plan text'],
   ['social_handles', 'Official social handles'],
   ['keywords', 'Keywords, nicknames, mascots, or terms to monitor'],
   ['school_names', 'School names'],
@@ -34,6 +35,7 @@ export default function Onboarding() {
   const [draft, setDraft] = useState({});
   const [discovery, setDiscovery] = useState(null);
 
+
   async function handleDiscover(e) {
     e.preventDefault();
     setError('');
@@ -42,6 +44,7 @@ export default function Onboarding() {
     try {
       const formData = new FormData(e.currentTarget);
       const values = formDataToObject(formData);
+      delete values.strategic_plan_file;
       const result = await discoverOnboardingProfile(formData);
       setIntake(values);
       setDraft(result.confirmed_profile || {});
@@ -141,7 +144,7 @@ export default function Onboarding() {
                   <textarea
                     id={key}
                     className="form-input"
-                    rows={key.includes('mission') || key.includes('strategic') ? 5 : key.includes('source') ? 4 : 3}
+                    rows={key === 'strategic_plan_text' ? 10 : key.includes('mission') || key.includes('strategic') ? 5 : key.includes('source') ? 4 : 3}
                     value={draft[key] || ''}
                     onChange={(e) => updateDraft(key, e.target.value)}
                     placeholder={key.includes('mission') ? 'Paste or edit mission, vision, values, beliefs...' : undefined}
@@ -159,7 +162,7 @@ export default function Onboarding() {
               </div>
             </form>
           ) : (
-            <form onSubmit={handleDiscover}>
+            <form onSubmit={handleDiscover} encType="multipart/form-data">
               <div style={{ display: 'grid', gridTemplateColumns: 'repeat(auto-fit, minmax(240px, 1fr))', gap: '0.85rem' }}>
                 <div className="form-group" style={fieldStyle}>
                   <label htmlFor="organization_name">District / organization name</label>
@@ -169,6 +172,17 @@ export default function Onboarding() {
                 <div className="form-group" style={fieldStyle}>
                   <label htmlFor="website">Website</label>
                   <input id="website" name="website" className="form-input" defaultValue={intake.website || ''} placeholder="examplek12.org" required />
+                </div>
+
+                <div className="form-group" style={fieldStyle}>
+                  <label htmlFor="strategic_plan_url">Strategic plan URL (optional)</label>
+                  <input id="strategic_plan_url" name="strategic_plan_url" className="form-input" defaultValue={intake.strategic_plan_url || ''} placeholder="Public webpage, Google Drive link, or PDF URL" />
+                </div>
+
+                <div className="form-group" style={fieldStyle}>
+                  <label htmlFor="strategic_plan_file">Strategic plan document (optional)</label>
+                  <input id="strategic_plan_file" name="strategic_plan_file" type="file" className="form-input" accept=".pdf,.docx,.txt,.md,text/plain,application/pdf,application/vnd.openxmlformats-officedocument.wordprocessingml.document" />
+                  <small style={{ color: 'var(--text-tertiary)' }}>PDF, DOCX, TXT, or Markdown · 10 MB maximum</small>
                 </div>
 
                 <div className="form-group" style={fieldStyle}>

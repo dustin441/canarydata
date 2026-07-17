@@ -5,6 +5,8 @@ import { createClient as createServerClient } from '@/lib/supabase/server';
 import { createClickUpFeedbackTask, createClickUpOnboardingTask, isClickUpConfigured } from '@/lib/clickup';
 import { revalidatePath } from 'next/cache';
 import { canonicalizeStoryUrl, requireCorrectionReason } from '@/lib/storyCorrections.mjs';
+import { lookup } from 'node:dns/promises';
+import { isIP } from 'node:net';
 
 async function requireCanaryActor() {
   const sessionClient = await createServerClient();
@@ -36,6 +38,77 @@ function normalizeWebsite(value) {
   const trimmed = String(value || '').trim();
   if (!trimmed) return '';
   return /^https?:\/\//i.test(trimmed) ? trimmed : `https://${trimmed}`;
+}
+
+function normalizePublicDocumentUrl(value) {
+  const normalized = normalizeWebsite(value);
+  if (!normalized) return '';
+  const googleDoc = normalized.match(/^https:\/\/docs\.google\.com\/document\/d\/([^/]+)/i);
+  if (googleDoc) return `https://docs.google.com/document/d/${googleDoc[1]}/export?format=txt`;
+  const driveFile = normalized.match(/^https:\/\/(?:drive|docs)\.google\.com\/(?:file\/d\/|open\?id=)([^/?&]+)/i);
+  if (driveFile) return `https://drive.usercontent.google.com/download?id=${driveFile[1]}&export=download`;
+  return normalized;
+}
+
+function isPrivateAddress(address) {
+  const value = String(address || '').toLowerCase();
+  if (isIP(value) === 4) {
+    const [a, b] = value.split('.').map(Number);
+    return a === 10 || a === 127 || a === 0 || (a === 169 && b === 254) ||
+      (a === 172 && b >= 16 && b <= 31) || (a === 192 && b === 168) ||
+      (a === 100 && b >= 64 && b <= 127) || a >= 224;
+  }
+  if (isIP(value) === 6) {
+    return value === '::' || value === '::1' || value.startsWith('fc') || value.startsWith('fd') ||
+      value.startsWith('fe8') || value.startsWith('fe9') || value.startsWith('fea') || value.startsWith('feb') ||
+      value.startsWith('::ffff:127.') || value.startsWith('::ffff:10.') || value.startsWith('::ffff:192.168.');
+  }
+  return true;
+}
+
+async function assertPublicUrl(value) {
+  const url = new URL(value);
+  if (!['http:', 'https:'].includes(url.protocol) || url.username || url.password) {
+    throw new Error('Only public HTTP or HTTPS URLs are supported');
+  }
+  const hostname = url.hostname.toLowerCase();
+  if (hostname === 'localhost' || hostname.endsWith('.local') || hostname === 'metadata.google.internal') {
+    throw new Error('Private network URLs are not supported');
+  }
+  const addresses = isIP(hostname)
+    ? [{ address: hostname }]
+    : await lookup(hostname, { all: true, verbatim: true });
+  if (!addresses.length || addresses.some((item) => isPrivateAddress(item.address))) {
+    throw new Error('Private network URLs are not supported');
+  }
+  return url;
+}
+
+async function fetchPublicResource(initialUrl, maxBytes = 10 * 1024 * 1024) {
+  let currentUrl = normalizeWebsite(initialUrl);
+  for (let redirect = 0; redirect <= 3; redirect += 1) {
+    await assertPublicUrl(currentUrl);
+    const response = await fetch(currentUrl, {
+      headers: { 'User-Agent': 'CanaryDataTrialSetup/1.0 (+https://www.canarydata.media)' },
+      signal: AbortSignal.timeout(12000),
+      redirect: 'manual',
+    });
+    if (response.status >= 300 && response.status < 400 && response.headers.get('location')) {
+      currentUrl = new URL(response.headers.get('location'), currentUrl).toString();
+      continue;
+    }
+    if (!response.ok) throw new Error(`${response.status}`);
+    const declaredLength = Number(response.headers.get('content-length') || 0);
+    if (declaredLength > maxBytes) throw new Error('Document is too large');
+    const buffer = await response.arrayBuffer();
+    if (buffer.byteLength > maxBytes) throw new Error('Document is too large');
+    return {
+      url: currentUrl,
+      contentType: response.headers.get('content-type') || '',
+      bytes: new Uint8Array(buffer),
+    };
+  }
+  throw new Error('Too many redirects');
 }
 
 function cleanHtmlText(html) {
@@ -135,15 +208,37 @@ function discoverCandidateUrls(homeHtml, website) {
     .slice(0, 10);
 }
 
+async function extractDocumentText({ bytes, contentType = '', name = '' }) {
+  const kind = `${contentType} ${name}`.toLowerCase();
+  if (kind.includes('pdf') || kind.endsWith('.pdf')) {
+    const { extractText, getDocumentProxy } = await import('unpdf');
+    const pdf = await getDocumentProxy(bytes);
+    const result = await extractText(pdf, { mergePages: true });
+    return String(result.text || '');
+  }
+  if (kind.includes('wordprocessingml') || kind.endsWith('.docx')) {
+    const mammothModule = await import('mammoth');
+    const mammoth = mammothModule.default || mammothModule;
+    const result = await mammoth.extractRawText({ buffer: Buffer.from(bytes) });
+    return String(result.value || '');
+  }
+  if (kind.includes('text/') || kind.includes('html') || /\.(txt|md|html?|csv)$/i.test(name)) {
+    const decoded = new TextDecoder().decode(bytes);
+    return kind.includes('html') || /\.html?$/i.test(name) ? cleanHtmlText(decoded) : decoded;
+  }
+  throw new Error('Use a public webpage, PDF, DOCX, TXT, or Markdown document');
+}
+
 async function fetchPage(url) {
-  const response = await fetch(url, {
-    headers: { 'User-Agent': 'CanaryDataTrialSetup/1.0 (+https://www.canarydata.media)' },
-    signal: AbortSignal.timeout(10000),
-  });
-  if (!response.ok) throw new Error(`${response.status}`);
-  const contentType = response.headers.get('content-type') || '';
-  const html = await response.text();
-  return { url, html, text: cleanHtmlText(html), contentType };
+  const resource = await fetchPublicResource(url, 3 * 1024 * 1024);
+  const decoded = new TextDecoder().decode(resource.bytes);
+  const isHtml = resource.contentType.includes('html');
+  return {
+    url: resource.url,
+    html: isHtml ? decoded : '',
+    text: await extractDocumentText({ bytes: resource.bytes, contentType: resource.contentType, name: resource.url }),
+    contentType: resource.contentType,
+  };
 }
 
 function extractSchoolNames(text) {
@@ -179,12 +274,15 @@ function buildKeywords({ organizationName, city, state, schoolNames }) {
 export async function discoverOnboardingProfile(formData) {
   const organizationName = cleanFormValue(formData, 'organization_name');
   const website = normalizeWebsite(formData.get('website'));
+  const strategicPlanUrl = normalizePublicDocumentUrl(formData.get('strategic_plan_url'));
+  const strategicPlanFile = formData.get('strategic_plan_file');
   const city = cleanFormValue(formData, 'city');
   const state = cleanFormValue(formData, 'state');
   if (!organizationName) throw new Error('District or organization name is required');
   if (!website) throw new Error('Website is required');
 
   const pages = [];
+  const strategicDocuments = [];
   const errors = [];
   let candidateUrls = [website];
 
@@ -206,17 +304,53 @@ export async function discoverOnboardingProfile(formData) {
     }
   }
 
-  const combinedText = pages.map((page) => page.text).join('\n\n');
+  if (strategicPlanUrl) {
+    try {
+      const plan = await fetchPage(strategicPlanUrl);
+      strategicDocuments.push({ label: plan.url, text: plan.text });
+    } catch (error) {
+      errors.push(`${strategicPlanUrl}: ${error.message || 'Unable to read strategic plan'}`);
+    }
+  }
+
+  if (strategicPlanFile && typeof strategicPlanFile.arrayBuffer === 'function' && strategicPlanFile.size > 0) {
+    try {
+      if (strategicPlanFile.size > 10 * 1024 * 1024) throw new Error('Document is too large (10 MB maximum)');
+      const bytes = new Uint8Array(await strategicPlanFile.arrayBuffer());
+      const text = await extractDocumentText({
+        bytes,
+        contentType: strategicPlanFile.type || '',
+        name: strategicPlanFile.name || '',
+      });
+      strategicDocuments.push({ label: strategicPlanFile.name || 'Uploaded strategic plan', text });
+    } catch (error) {
+      errors.push(`${strategicPlanFile.name || 'Uploaded strategic plan'}: ${error.message || 'Unable to read document'}`);
+    }
+  }
+
+  const websiteText = pages.map((page) => page.text).join('\n\n');
+  const strategicPlanText = strategicDocuments
+    .map((document) => document.text)
+    .join('\n\n')
+    .replace(/\u0000/g, '')
+    .trim()
+    .slice(0, 60000);
+  const combinedText = [websiteText, strategicPlanText].filter(Boolean).join('\n\n');
   const missionSnippets = findNearbySnippets(combinedText, ['mission', 'vision', 'values', 'beliefs', 'we believe', 'core values'], 4);
   const prioritySnippets = findNearbySnippets(combinedText, ['strategic plan', 'priority', 'priorities', 'goals', 'focus areas', 'board goals', 'portrait of a graduate'], 4);
   const discoveredSocials = extractSocialLinksFromPages(pages, website);
   const discoveredSchools = extractSchoolNames(combinedText);
-  const sourceUrls = pages.map((page) => page.url).join('\n');
-  const fetchError = errors.length ? errors.slice(0, 5).join('\n') : '';
+  const sourceUrls = [
+    ...pages.map((page) => page.url),
+    ...strategicDocuments.map((document) => document.label),
+  ].join('\n');
+  const fetchError = errors.length ? errors.slice(0, 8).join('\n') : '';
 
   const confirmedProfile = {
     organization_name: organizationName,
     website,
+    strategic_plan_url: strategicPlanUrl,
+    strategic_plan_text: strategicPlanText,
     location: [city, state, cleanFormValue(formData, 'zip')].filter(Boolean).join(', '),
     social_handles: cleanFormValue(formData, 'social_handles') || discoveredSocials,
     keywords: cleanFormValue(formData, 'keywords') || buildKeywords({ organizationName, city, state, schoolNames: discoveredSchools }),
@@ -225,8 +359,8 @@ export async function discoverOnboardingProfile(formData) {
     mission_vision_values: missionSnippets.join('\n\n'),
     strategic_priorities: prioritySnippets.join('\n\n'),
     discovered_source_urls: sourceUrls,
-    discovery_notes: pages.length
-      ? `Canary reviewed ${pages.length} public page${pages.length === 1 ? '' : 's'}. Please approve or edit before review.${fetchError ? `\n\nPages needing manual review:\n${fetchError}` : ''}`
+    discovery_notes: pages.length || strategicDocuments.length
+      ? `Canary reviewed ${pages.length} public page${pages.length === 1 ? '' : 's'} and ${strategicDocuments.length} strategic plan document${strategicDocuments.length === 1 ? '' : 's'}. Please approve or edit before review.${fetchError ? `\n\nSources needing manual review:\n${fetchError}` : ''}`
       : `Website discovery needs manual review.${fetchError ? `\n\n${fetchError}` : ''}`,
   };
 
@@ -236,6 +370,8 @@ export async function discoverOnboardingProfile(formData) {
       website_fetched: pages.length > 0,
       fetch_error: fetchError || null,
       pages_reviewed: pages.map((page) => page.url),
+      strategic_plan_sources: strategicDocuments.map((document) => document.label),
+      strategic_plan_characters: strategicPlanText.length,
       discovered_socials: discoveredSocials,
       mission_vision_values: missionSnippets.join('\n\n'),
       strategic_priorities: prioritySnippets.join('\n\n'),
