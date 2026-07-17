@@ -1,6 +1,8 @@
 # Canary manual story corrections
 
-Status: **proposal only — no production schema change has been applied**
+Status: **implemented in production on 2026-07-17**
+
+Production verification completed after application: schema/function read-back, canonical-URL collision analysis, backup-first canonical backfill, audited add → exclude → restore smoke test, dashboard release checks, and ingestion duplicate/tombstone protection.
 
 ## Objective
 

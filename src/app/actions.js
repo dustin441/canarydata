@@ -4,6 +4,7 @@ import { createAdminClient } from '@/lib/supabase/admin';
 import { createClient as createServerClient } from '@/lib/supabase/server';
 import { createClickUpFeedbackTask, createClickUpOnboardingTask, isClickUpConfigured } from '@/lib/clickup';
 import { revalidatePath } from 'next/cache';
+import { canonicalizeStoryUrl, requireCorrectionReason } from '@/lib/storyCorrections.mjs';
 
 async function requireCanaryActor() {
   const sessionClient = await createServerClient();
@@ -453,6 +454,105 @@ export async function saveNote(id, notes) {
     .update({ notes: notes || null })
     .eq('id', id);
   if (error) throw error;
+}
+
+export async function addManualStory({ districtId, link, headline, source, date, summary, reason }) {
+  const { actor, admin: supabase } = await requireCanaryActor();
+  const targetDistrictId = String(districtId || '').trim();
+  assertDistrictAccess(actor, targetDistrictId);
+  if (!targetDistrictId) throw new Error('Select a district.');
+
+  const canonicalUrl = canonicalizeStoryUrl(link);
+  const cleanHeadline = String(headline || '').trim();
+  const cleanSource = String(source || '').trim();
+  const cleanDate = String(date || '').trim();
+  const cleanReason = requireCorrectionReason(reason);
+  if (!cleanHeadline) throw new Error('Headline is required.');
+  if (!cleanSource) throw new Error('Source is required.');
+  if (!/^\d{4}-\d{2}-\d{2}$/.test(cleanDate)) throw new Error('A valid story date is required.');
+
+  const [{ data: canonicalMatch, error: canonicalError }, { data: linkMatch, error: linkError }] = await Promise.all([
+    supabase.from('news_stories').select('id, visibility_status').eq('district_id', targetDistrictId).eq('canonical_url', canonicalUrl).maybeSingle(),
+    supabase.from('news_stories').select('id, visibility_status').eq('district_id', targetDistrictId).eq('link', String(link).trim()).maybeSingle(),
+  ]);
+  if (canonicalError) throw canonicalError;
+  if (linkError) throw linkError;
+  const existing = canonicalMatch || linkMatch;
+  if (existing) {
+    const nextStep = existing.visibility_status === 'excluded' ? 'Restore it from Corrections instead.' : 'Open the existing story instead.';
+    throw new Error(`This story already exists. ${nextStep}`);
+  }
+
+  const { data, error } = await supabase.rpc('canary_add_manual_story', {
+    p_actor_user_id: actor.id,
+    p_district_id: targetDistrictId,
+    p_canonical_url: canonicalUrl,
+    p_link: String(link).trim(),
+    p_headline: cleanHeadline,
+    p_source: cleanSource,
+    p_date: cleanDate,
+    p_reason: cleanReason,
+    p_summary: String(summary || '').trim() || null,
+  });
+  if (error) throw error;
+  revalidatePath('/dashboard');
+  return data;
+}
+
+export async function excludeStory({ storyId, reason, expectedVersion }) {
+  const { actor, admin: supabase } = await requireCanaryActor();
+  const { data: story, error: storyError } = await supabase
+    .from('news_stories')
+    .select('id, district_id, correction_version, visibility_status')
+    .eq('id', storyId)
+    .maybeSingle();
+  if (storyError) throw storyError;
+  if (!story) throw new Error('Story not found.');
+  assertDistrictAccess(actor, story.district_id);
+  if (story.visibility_status === 'excluded') throw new Error('Story is already excluded.');
+
+  const { data, error } = await supabase.rpc('canary_exclude_story', {
+    p_actor_user_id: actor.id,
+    p_story_id: story.id,
+    p_reason: requireCorrectionReason(reason),
+    p_expected_version: Number.isInteger(expectedVersion) ? expectedVersion : story.correction_version,
+  });
+  if (error) throw error;
+  revalidatePath('/dashboard');
+  return data;
+}
+
+export async function restoreStory({ storyId, exclusionEventId, reason, expectedVersion }) {
+  const { actor, admin: supabase } = await requireCanaryActor();
+  const { data: story, error: storyError } = await supabase
+    .from('news_stories')
+    .select('id, district_id, correction_version, visibility_status')
+    .eq('id', storyId)
+    .maybeSingle();
+  if (storyError) throw storyError;
+  if (!story) throw new Error('Story not found.');
+  assertDistrictAccess(actor, story.district_id);
+  if (story.visibility_status !== 'excluded') throw new Error('Story is not excluded.');
+
+  const { data: event, error: eventError } = await supabase
+    .from('story_correction_events')
+    .select('id, district_id, story_id, action')
+    .eq('id', exclusionEventId)
+    .maybeSingle();
+  if (eventError) throw eventError;
+  if (!event || event.story_id !== story.id || event.action !== 'exclude') throw new Error('Matching exclusion event not found.');
+  assertDistrictAccess(actor, event.district_id);
+
+  const { data, error } = await supabase.rpc('canary_restore_story', {
+    p_actor_user_id: actor.id,
+    p_story_id: story.id,
+    p_exclusion_event_id: event.id,
+    p_reason: requireCorrectionReason(reason),
+    p_expected_version: Number.isInteger(expectedVersion) ? expectedVersion : story.correction_version,
+  });
+  if (error) throw error;
+  revalidatePath('/dashboard');
+  return data;
 }
 
 export async function addQuery({ query_text, district_id, district_name, geo_city, geo_state, geo_zip, channels }) {

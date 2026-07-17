@@ -1,4 +1,4 @@
-import { getArticles, getDistricts, getQueries, getClients } from '@/lib/data';
+import { getArticles, getDistricts, getQueries, getClients, getExcludedStories, getStoryCorrectionEvents } from '@/lib/data';
 import { createClient } from '@/lib/supabase/server';
 import { createAdminClient } from '@/lib/supabase/admin';
 import DashboardClient from './DashboardClient';
@@ -23,11 +23,13 @@ export default async function DashboardPage() {
   if (!sessionUser?.id) redirect('/login?redirect_to=/dashboard');
   if (!userDistrictId && !isAdmin) redirect('/demo?access=pending');
 
-  const [articles, districts, queries, clients] = await Promise.all([
+  const [articles, districts, queries, clients, excludedStories, correctionEvents] = await Promise.all([
     getArticles(userDistrictId),
     getDistricts(),
     getQueries(userDistrictId),
     isAdmin ? getClients() : Promise.resolve([]),
+    getExcludedStories(userDistrictId),
+    getStoryCorrectionEvents(userDistrictId),
   ]);
 
   const billingContext = userDistrictId ? await getAuthenticatedBillingContext() : null;
@@ -66,6 +68,8 @@ export default async function DashboardPage() {
       userDistrictId={userDistrictId}
       paymentNotice={paymentNotice}
       billingInfo={billingInfo}
+      excludedStories={excludedStories}
+      correctionEvents={correctionEvents}
     />
   );
 }

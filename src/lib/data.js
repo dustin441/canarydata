@@ -1,6 +1,6 @@
 import { createAdminClient } from '@/lib/supabase/admin';
 
-const ARTICLE_COLUMNS = 'id, created_at, date, headline, summary, source, source_type, canary_score, tags, notes, is_earned_media, is_perched, link, district_id, innovation_reason, recommendation, source_query';
+const ARTICLE_COLUMNS = 'id, created_at, date, headline, summary, source, source_type, canary_score, tags, notes, is_earned_media, is_perched, link, district_id, innovation_reason, recommendation, source_query, canonical_url, visibility_status, manual_override, correction_version';
 const ARTICLE_PAGE_SIZE = 1000;
 
 export async function getArticles(districtId = null) {
@@ -11,6 +11,7 @@ export async function getArticles(districtId = null) {
     let query = supabase
       .from('news_stories')
       .select(ARTICLE_COLUMNS)
+      .eq('visibility_status', 'active')
       .order('date', { ascending: false })
       .range(from, from + ARTICLE_PAGE_SIZE - 1);
 
@@ -28,6 +29,33 @@ export async function getArticles(districtId = null) {
   }
 
   return allArticles;
+}
+
+export async function getExcludedStories(districtId = null) {
+  const supabase = createAdminClient();
+  let query = supabase
+    .from('news_stories')
+    .select(ARTICLE_COLUMNS)
+    .eq('visibility_status', 'excluded')
+    .order('created_at', { ascending: false })
+    .limit(250);
+  if (districtId) query = query.eq('district_id', districtId);
+  const { data, error } = await query;
+  if (error) throw error;
+  return data ?? [];
+}
+
+export async function getStoryCorrectionEvents(districtId = null) {
+  const supabase = createAdminClient();
+  let query = supabase
+    .from('story_correction_events')
+    .select('id, correlation_id, district_id, story_id, action, reason, before_state, after_state, reverses_event_id, resulting_version, created_at')
+    .order('created_at', { ascending: false })
+    .limit(500);
+  if (districtId) query = query.eq('district_id', districtId);
+  const { data, error } = await query;
+  if (error) throw error;
+  return data ?? [];
 }
 
 export async function getDistricts() {

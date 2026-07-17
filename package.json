@@ -10,6 +10,7 @@
     "test:webhook": "node scripts/test-stripe-webhook.mjs",
     "test:authz": "node scripts/test-authz-metadata.mjs",
     "test:quality": "node scripts/test-canary-quality.mjs",
+    "test:corrections": "node scripts/test-story-corrections.mjs",
     "health:canary": "node scripts/check-canary-health.mjs"
   },
   "dependencies": {

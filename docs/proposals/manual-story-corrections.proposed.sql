@@ -1,4 +1,5 @@
--- PROPOSAL ONLY. DO NOT APPLY WITHOUT APPROVAL AND A CANONICAL-URL COLLISION REPORT.
+-- APPLIED WITH USER APPROVAL ON 2026-07-17. Retained as the canonical migration record.
+-- A backup and canonical-URL collision report were created before the canonical backfill.
 -- Assumes public.news_stories.id is uuid and district_id is text (verified 2026-07-17).
 
 begin;

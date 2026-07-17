@@ -4,7 +4,7 @@ import { useState, useMemo, useEffect, useRef, useTransition, useCallback } from
 import Image from 'next/image';
 import Link from 'next/link';
 import { loadStripe } from '@stripe/stripe-js';
-import { setEarnedMedia, saveNote, addQuery, deleteQuery, submitFeedback } from '@/app/actions';
+import { setEarnedMedia, saveNote, addQuery, deleteQuery, submitFeedback, addManualStory, excludeStory, restoreStory } from '@/app/actions';
 import { createEmbeddedCanaryCheckout, confirmEmbeddedCanaryCheckout, saveBillingPurchaseOrder } from '@/app/payment/actions';
 import { compareStrategicAlignmentRows } from '@/lib/strategicAlignmentSort.mjs';
 import { CORE_TAGS, canonicalTags } from '@/lib/canonicalTags.mjs';
@@ -1841,7 +1841,141 @@ function QueryMultiSelect({ allQueries, selectedQueries, onChange }) {
   );
 }
 
-export default function DashboardClient({ articles, districts, queries: initialQueries, clients = [], userDistrictId, paymentNotice = null, billingInfo = null, demoMode = false }) {
+function CorrectionsView({ districts, userDistrictId, districtFilter, excludedStories, correctionEvents }) {
+  const initialDistrict = userDistrictId || (districtFilter !== 'All' ? districtFilter : '');
+  const [districtId, setDistrictId] = useState(initialDistrict);
+  const [saving, setSaving] = useState(false);
+  const [message, setMessage] = useState('');
+  const scopedExcluded = districtId ? excludedStories.filter((story) => story.district_id === districtId) : excludedStories;
+  const scopedEvents = districtId ? correctionEvents.filter((event) => event.district_id === districtId) : correctionEvents;
+
+  async function handleAdd(event) {
+    event.preventDefault();
+    setSaving(true);
+    setMessage('');
+    const form = new FormData(event.currentTarget);
+    try {
+      await addManualStory({
+        districtId: userDistrictId || form.get('district_id'),
+        link: form.get('link'),
+        headline: form.get('headline'),
+        source: form.get('source'),
+        date: form.get('date'),
+        summary: form.get('summary'),
+        reason: form.get('reason'),
+      });
+      window.location.reload();
+    } catch (error) {
+      setMessage(error?.message || 'Unable to add the story.');
+      setSaving(false);
+    }
+  }
+
+  async function handleRestore(story) {
+    const exclusion = scopedEvents.find((event) => event.story_id === story.id && event.action === 'exclude');
+    if (!exclusion) {
+      setMessage('The matching exclusion event could not be found.');
+      return;
+    }
+    const reason = window.prompt('Why should this story be restored? (at least 10 characters)');
+    if (reason === null) return;
+    setSaving(true);
+    setMessage('');
+    try {
+      await restoreStory({ storyId: story.id, exclusionEventId: exclusion.id, reason, expectedVersion: story.correction_version });
+      window.location.reload();
+    } catch (error) {
+      setMessage(error?.message || 'Unable to restore the story.');
+      setSaving(false);
+    }
+  }
+
+  return (
+    <div style={{ display: 'grid', gap: '24px' }}>
+      <section className="data-section">
+        <div className="data-header">
+          <div>
+            <h3>➕ Add a missing story</h3>
+            <p style={{ color: 'var(--text-secondary)', fontSize: '0.84rem', marginTop: '4px' }}>Manual additions are district-scoped, deduplicated by canonical URL, and recorded in the immutable audit trail.</p>
+          </div>
+        </div>
+        <form onSubmit={handleAdd} style={{ padding: '20px', display: 'grid', gap: '14px' }}>
+          {!userDistrictId && (
+            <label className="form-group">District
+              <select className="form-input" name="district_id" value={districtId} onChange={(event) => setDistrictId(event.target.value)} required>
+                <option value="">Select a district</option>
+                {districts.map((district) => <option key={district.id} value={district.id}>{district.name}</option>)}
+              </select>
+            </label>
+          )}
+          <label className="form-group">Story URL
+            <input className="form-input" name="link" type="url" required placeholder="https://publisher.com/story" />
+          </label>
+          <div style={{ display: 'grid', gridTemplateColumns: 'minmax(0, 2fr) minmax(180px, 1fr)', gap: '14px' }}>
+            <label className="form-group">Headline
+              <input className="form-input" name="headline" required />
+            </label>
+            <label className="form-group">Source
+              <input className="form-input" name="source" required placeholder="Publisher name" />
+            </label>
+          </div>
+          <label className="form-group">Story date
+            <input className="form-input" name="date" type="date" required />
+          </label>
+          <label className="form-group">Summary <span style={{ color: 'var(--text-tertiary)' }}>(optional)</span>
+            <textarea className="form-textarea" name="summary" rows={3} />
+          </label>
+          <label className="form-group">Reason for manual addition
+            <textarea className="form-textarea" name="reason" minLength={10} required rows={3} placeholder="Why this story belongs in this district’s coverage…" />
+          </label>
+          {message && <p style={{ color: 'var(--red-400)', fontSize: '0.85rem' }}>{message}</p>}
+          <button className="btn btn-primary" type="submit" disabled={saving} style={{ width: 'fit-content' }}>{saving ? 'Saving…' : 'Add story'}</button>
+        </form>
+      </section>
+
+      <section className="data-section">
+        <div className="data-header"><h3>🚫 Excluded stories <span style={{ color: 'var(--text-tertiary)', fontSize: '0.85rem' }}>({scopedExcluded.length})</span></h3></div>
+        <div className="data-table-wrapper">
+          <table className="data-table">
+            <thead><tr><th>Date</th><th>Headline</th><th>District</th><th>Action</th></tr></thead>
+            <tbody>
+              {scopedExcluded.length === 0 ? <tr><td colSpan={4} style={{ color: 'var(--text-tertiary)' }}>No excluded stories.</td></tr> : scopedExcluded.map((story) => (
+                <tr key={story.id}>
+                  <td>{formatDate(story.date)}</td>
+                  <td>{story.link ? <a href={story.link} target="_blank" rel="noreferrer">{story.headline}</a> : story.headline}</td>
+                  <td>{formatDistrictName(story.district_id)}</td>
+                  <td><button className="btn btn-secondary btn-sm" disabled={saving} onClick={() => handleRestore(story)}>Restore</button></td>
+                </tr>
+              ))}
+            </tbody>
+          </table>
+        </div>
+      </section>
+
+      <section className="data-section">
+        <div className="data-header"><h3>🧾 Correction history <span style={{ color: 'var(--text-tertiary)', fontSize: '0.85rem' }}>({scopedEvents.length})</span></h3></div>
+        <div className="data-table-wrapper">
+          <table className="data-table">
+            <thead><tr><th>When</th><th>Action</th><th>Story</th><th>Reason</th><th>District</th></tr></thead>
+            <tbody>
+              {scopedEvents.length === 0 ? <tr><td colSpan={5} style={{ color: 'var(--text-tertiary)' }}>No correction events yet.</td></tr> : scopedEvents.map((event) => (
+                <tr key={event.id}>
+                  <td style={{ whiteSpace: 'nowrap' }}>{new Date(event.created_at).toLocaleString()}</td>
+                  <td><strong>{event.action.replace('_', ' ')}</strong></td>
+                  <td>{event.after_state?.headline || event.before_state?.headline || event.story_id}</td>
+                  <td>{event.reason}</td>
+                  <td>{formatDistrictName(event.district_id)}</td>
+                </tr>
+              ))}
+            </tbody>
+          </table>
+        </div>
+      </section>
+    </div>
+  );
+}
+
+export default function DashboardClient({ articles, districts, queries: initialQueries, clients = [], userDistrictId, paymentNotice = null, billingInfo = null, excludedStories = [], correctionEvents = [], demoMode = false }) {
   const defaultDistrictFilter = userDistrictId ?? districts[0]?.id ?? 'All';
   const [currentView, setCurrentView] = useState('dashboard');
   const [search, setSearch] = useState('');
@@ -1855,6 +1989,10 @@ export default function DashboardClient({ articles, districts, queries: initialQ
   const [selectedQueries, setSelectedQueries] = useState(new Set());
   const [strategicAlignmentFilter, setStrategicAlignmentFilter] = useState('All');
   const [noteModal, setNoteModal] = useState(null);
+  const [correctionModal, setCorrectionModal] = useState(null);
+  const [correctionReason, setCorrectionReason] = useState('');
+  const [correctionSaving, setCorrectionSaving] = useState(false);
+  const [correctionError, setCorrectionError] = useState('');
   const [feedbackOpen, setFeedbackOpen] = useState(false);
   const [releaseSignupOpen, setReleaseSignupOpen] = useState(false);
   const [releaseAutoPromptShown, setReleaseAutoPromptShown] = useState(false);
@@ -1994,6 +2132,29 @@ export default function DashboardClient({ articles, districts, queries: initialQ
       setNoteModal(null);
     } finally {
       setNoteSaving(false);
+    }
+  }
+
+  function openExcludeModal(article) {
+    setCorrectionReason('');
+    setCorrectionError('');
+    setCorrectionModal(article);
+  }
+
+  async function handleExcludeStory() {
+    if (!correctionModal) return;
+    setCorrectionSaving(true);
+    setCorrectionError('');
+    try {
+      await excludeStory({
+        storyId: correctionModal.id,
+        reason: correctionReason,
+        expectedVersion: correctionModal.correction_version ?? 0,
+      });
+      window.location.reload();
+    } catch (error) {
+      setCorrectionError(error?.message || 'Unable to exclude the story.');
+      setCorrectionSaving(false);
     }
   }
 
@@ -2245,6 +2406,17 @@ export default function DashboardClient({ articles, districts, queries: initialQ
               Notes
               <span className="sidebar-link-badge">{notesCount}</span>
             </button>
+            {!demoMode && (
+              <button
+                className={`sidebar-link ${currentView === 'corrections' ? 'active' : ''}`}
+                onClick={() => handleNavSelect('corrections')}
+                style={{ width: '100%', background: 'none', border: 'none', textAlign: 'left', cursor: 'pointer' }}
+              >
+                <span className="sidebar-link-icon">🛠️</span>
+                Corrections
+                <span className="sidebar-link-badge">{excludedStories.length}</span>
+              </button>
+            )}
             <button
               className={`sidebar-link ${currentView === 'birdseye' ? 'active' : ''}`}
               onClick={() => handleNavSelect('birdseye')}
@@ -2361,7 +2533,9 @@ export default function DashboardClient({ articles, districts, queries: initialQ
                     ? 'Settings'
                     : currentView === 'notes'
                       ? 'Analyst Notes'
-                      : currentView === 'birdseye'
+                      : currentView === 'corrections'
+                        ? 'Story Corrections'
+                        : currentView === 'birdseye'
                         ? 'Bird’s Eye View'
                         : currentView === 'clients'
                         ? 'Beta Testers'
@@ -2375,6 +2549,7 @@ export default function DashboardClient({ articles, districts, queries: initialQ
                 {currentView === 'queries' ? 'Manage monitored search terms'
                   : currentView === 'settings' ? 'Manage your account and preferences'
                   : currentView === 'notes' ? 'Articles with analyst annotations'
+                  : currentView === 'corrections' ? 'Add, exclude, restore, and audit district stories'
                   : currentView === 'birdseye' ? 'Strategic Alignment themes, counts, and supporting coverage'
                   : currentView === 'clients' ? 'Login credentials for beta testers'
                   : currentView === 'howto' ? 'Platform walkthrough video'
@@ -2468,6 +2643,15 @@ export default function DashboardClient({ articles, districts, queries: initialQ
               articles={articles}
               getNoteText={getNoteText}
               openNoteModal={openNoteModal}
+            />
+          )}
+          {currentView === 'corrections' && (
+            <CorrectionsView
+              districts={districts}
+              userDistrictId={userDistrictId}
+              districtFilter={districtFilter}
+              excludedStories={excludedStories}
+              correctionEvents={correctionEvents}
             />
           )}
           {currentView === 'birdseye' && (
@@ -2784,6 +2968,16 @@ export default function DashboardClient({ articles, districts, queries: initialQ
                         <div className="headline-text" style={{ color: 'var(--text-primary)', fontWeight: 600 }}>
                           {article.headline}
                         </div>
+                        {!demoMode && (
+                          <button
+                            type="button"
+                            className="expand-btn"
+                            onClick={() => openExcludeModal(article)}
+                            style={{ marginTop: '6px', color: 'var(--red-400)' }}
+                          >
+                            Exclude story
+                          </button>
+                        )}
                       </td>
 
                       {/* Summary */}
@@ -2947,6 +3141,31 @@ export default function DashboardClient({ articles, districts, queries: initialQ
           </>)}
         </main>
       </div>
+
+      {/* Exclude Story Modal */}
+      {correctionModal && (
+        <div className="modal-overlay" onClick={() => !correctionSaving && setCorrectionModal(null)}>
+          <div className="modal" onClick={(event) => event.stopPropagation()} style={{ maxWidth: '540px' }}>
+            <h3>🚫 Exclude story</h3>
+            <p style={{ color: 'var(--canary-yellow)', fontWeight: 600, fontSize: '0.85rem', marginBottom: '12px', lineHeight: 1.4 }}>{correctionModal.headline}</p>
+            <p style={{ color: 'var(--text-secondary)', fontSize: '0.84rem', marginBottom: '14px' }}>The story will be hidden, not deleted. The change will be audited and can be restored from Corrections.</p>
+            <textarea
+              className="form-textarea"
+              placeholder="Why should this story be excluded? (at least 10 characters)"
+              value={correctionReason}
+              onChange={(event) => setCorrectionReason(event.target.value)}
+              rows={4}
+              minLength={10}
+              autoFocus
+            />
+            {correctionError && <p style={{ color: 'var(--red-400)', fontSize: '0.84rem', marginTop: '10px' }}>{correctionError}</p>}
+            <div className="modal-actions" style={{ marginTop: '16px' }}>
+              <button className="btn btn-secondary btn-sm" disabled={correctionSaving} onClick={() => setCorrectionModal(null)}>Cancel</button>
+              <button className="btn btn-danger btn-sm" disabled={correctionSaving || correctionReason.trim().length < 10} onClick={handleExcludeStory}>{correctionSaving ? 'Excluding…' : 'Exclude story'}</button>
+            </div>
+          </div>
+        </div>
+      )}
 
       {/* Note Modal */}
       {noteModal && (
