@@ -122,8 +122,17 @@ function checkoutMetadataParams({ organizationName, contactEmail, requestId, dis
   };
 }
 
-function checkoutCustomerParams({ contactEmail, customerId }) {
-  if (customerId) return { customer: customerId };
+async function checkoutCustomerParams({ contactEmail, customerId, userId }) {
+  if (customerId) {
+    const customer = await stripeRequest(`/customers/${encodeURIComponent(customerId)}`);
+    const customerEmail = String(customer?.email || '').trim().toLowerCase();
+    const expectedEmail = String(contactEmail || '').trim().toLowerCase();
+    const ownerId = String(customer?.metadata?.user_id || '');
+    if (customer?.deleted || !expectedEmail || customerEmail !== expectedEmail || (ownerId && ownerId !== userId)) {
+      throw new Error('The saved Stripe customer does not match this Canary account.');
+    }
+    return { customer: customerId };
+  }
   return {
     customer_email: contactEmail,
     customer_creation: 'always',
@@ -133,12 +142,13 @@ function checkoutCustomerParams({ contactEmail, customerId }) {
 export async function createCanaryCheckoutSession({ organizationName, contactEmail, requestId, districtId, userId, customerId, origin }) {
   const cleanOrigin = String(origin || 'https://www.canarydata.media').replace(/\/$/, '');
   const lineItem = resolveCheckoutLineItem(contactEmail);
+  const customerParams = await checkoutCustomerParams({ contactEmail, customerId, userId });
 
   return stripeRequest('/checkout/sessions', {
     method: 'POST',
     body: encodeForm({
       mode: 'payment',
-      ...checkoutCustomerParams({ contactEmail, customerId }),
+      ...customerParams,
       success_url: `${cleanOrigin}/payment/success?session_id={CHECKOUT_SESSION_ID}`,
       cancel_url: `${cleanOrigin}/payment/cancel`,
       ...checkoutLineItemParams(lineItem),
@@ -156,6 +166,7 @@ export async function createCanaryCheckoutSession({ organizationName, contactEma
 
 export async function createCanaryEmbeddedCheckoutSession({ organizationName, contactEmail, requestId, districtId, userId, customerId }) {
   const lineItem = resolveCheckoutLineItem(contactEmail);
+  const customerParams = await checkoutCustomerParams({ contactEmail, customerId, userId });
 
   return stripeRequest('/checkout/sessions', {
     method: 'POST',
@@ -163,7 +174,7 @@ export async function createCanaryEmbeddedCheckoutSession({ organizationName, co
       mode: 'payment',
       ui_mode: 'embedded_page',
       redirect_on_completion: 'never',
-      ...checkoutCustomerParams({ contactEmail, customerId }),
+      ...customerParams,
       ...checkoutLineItemParams(lineItem),
       ...checkoutMetadataParams({
         organizationName,

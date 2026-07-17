@@ -25,7 +25,7 @@ function requireBillingContext(context) {
     organizationName,
     email,
     requestId: onboardingRequest?.id || '',
-    customerId: user?.user_metadata?.stripe_customer_id || onboardingRequest?.stripe_customer_id || '',
+    customerId: user?.app_metadata?.stripe_customer_id || onboardingRequest?.stripe_customer_id || '',
   };
 }
 
@@ -102,7 +102,6 @@ export async function saveBillingPurchaseOrder(formData) {
     billing_terms: 'Net 30',
     amount_due_cents: 149900,
   };
-  if (context.districtId) mergedMetadata.district_id = context.districtId;
   if (context.organizationName) mergedMetadata.district_name = context.organizationName;
   await supabase.auth.admin.updateUserById(context.user.id, {
     user_metadata: mergedMetadata,

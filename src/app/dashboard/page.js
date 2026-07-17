@@ -14,7 +14,7 @@ export default async function DashboardPage() {
   if (sessionUser?.id) {
     const admin = createAdminClient();
     const { data: { user } } = await admin.auth.admin.getUserById(sessionUser.id);
-    userDistrictId = user?.user_metadata?.district_id ?? null;
+    userDistrictId = user?.app_metadata?.district_id ?? null;
   }
 
   const [articles, districts, queries, clients] = await Promise.all([
@@ -25,7 +25,7 @@ export default async function DashboardPage() {
   ]);
 
   const billingContext = userDistrictId ? await getAuthenticatedBillingContext() : null;
-  const trialEndsAt = billingContext?.onboardingRequest?.trial_ends_at || billingContext?.user?.user_metadata?.trial_ends_at || null;
+  const trialEndsAt = billingContext?.onboardingRequest?.trial_ends_at || billingContext?.user?.app_metadata?.trial_ends_at || null;
   // eslint-disable-next-line react-hooks/purity -- Server-rendered billing notice intentionally compares trial date to current time.
   const daysUntilTrialEnds = trialEndsAt ? Math.ceil((new Date(trialEndsAt).getTime() - Date.now()) / 86400000) : null;
   const paymentNotice = userDistrictId && billingContext?.onboardingRequest?.payment_status !== 'paid' && daysUntilTrialEnds !== null
@@ -36,10 +36,10 @@ export default async function DashboardPage() {
       }
     : null;
   const billingInfo = billingContext ? {
-    paymentStatus: billingContext.onboardingRequest?.payment_status || billingContext.user?.user_metadata?.payment_status || 'pending',
-    trialStartsAt: billingContext.onboardingRequest?.trial_starts_at || billingContext.user?.user_metadata?.trial_starts_at || null,
+    paymentStatus: billingContext.onboardingRequest?.payment_status || billingContext.user?.app_metadata?.payment_status || 'pending',
+    trialStartsAt: billingContext.onboardingRequest?.trial_starts_at || billingContext.user?.app_metadata?.trial_starts_at || null,
     trialEndsAt,
-    paidThrough: billingContext.user?.user_metadata?.paid_through || billingContext.onboardingRequest?.paid_through || null,
+    paidThrough: billingContext.user?.app_metadata?.paid_through || billingContext.onboardingRequest?.paid_through || null,
     billingOrganizationName: billingContext.user?.user_metadata?.billing_organization_name || billingContext.districtName || billingContext.onboardingRequest?.organization_name || billingContext.user?.user_metadata?.district_name || '',
     poNumber: billingContext.user?.user_metadata?.po_number || '',
     billingContactName: billingContext.user?.user_metadata?.billing_contact_name || '',

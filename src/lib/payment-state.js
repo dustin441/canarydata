@@ -33,18 +33,19 @@ export async function markCanaryPaymentPaid({ session, paidAt } = {}) {
     throw new Error(`Unable to load Canary billing user for Stripe session ${session.id}.`);
   }
 
-  const existing = user.user_metadata || {};
-  const sameSession = existing.stripe_checkout_session_id === session.id;
-  const paymentPaidAt = sameSession && existing.payment_paid_at
-    ? existing.payment_paid_at
+  const existingProtected = user.app_metadata || {};
+  const existingDisplay = user.user_metadata || {};
+  const sameSession = existingProtected.stripe_checkout_session_id === session.id;
+  const paymentPaidAt = sameSession && existingProtected.payment_paid_at
+    ? existingProtected.payment_paid_at
     : toIsoDate(paidAt) || toIsoDate(Number(session.created) * 1000) || new Date().toISOString();
-  const paidThrough = sameSession && existing.paid_through
-    ? existing.paid_through
+  const paidThrough = sameSession && existingProtected.paid_through
+    ? existingProtected.paid_through
     : addOneYear(paymentPaidAt);
-  const customerId = sessionCustomerId(session) || existing.stripe_customer_id || null;
+  const customerId = sessionCustomerId(session) || existingProtected.stripe_customer_id || null;
 
-  const mergedMetadata = {
-    ...existing,
+  const protectedMetadata = {
+    ...existingProtected,
     payment_status: 'paid',
     payment_paid_at: paymentPaidAt,
     paid_through: paidThrough,
@@ -52,16 +53,24 @@ export async function markCanaryPaymentPaid({ session, paidAt } = {}) {
     trial_status: 'converted',
     stripe_customer_id: customerId,
     stripe_checkout_session_id: session.id,
-    estimate_number: session.metadata?.canary_estimate_number || existing.estimate_number || existing.quote_number || '',
-    invoice_number: session.metadata?.canary_invoice_number || existing.invoice_number || '',
-    receipt_number: session.metadata?.canary_receipt_number || existing.receipt_number || '',
+    estimate_number: session.metadata?.canary_estimate_number || existingProtected.estimate_number || existingDisplay.estimate_number || existingDisplay.quote_number || '',
+    invoice_number: session.metadata?.canary_invoice_number || existingProtected.invoice_number || existingDisplay.invoice_number || '',
+    receipt_number: session.metadata?.canary_receipt_number || existingProtected.receipt_number || existingDisplay.receipt_number || '',
   };
 
-  if (session.metadata?.district_id) mergedMetadata.district_id = session.metadata.district_id;
-  if (session.metadata?.organization_name) mergedMetadata.district_name = session.metadata.organization_name;
+  if (session.metadata?.district_id) protectedMetadata.district_id = session.metadata.district_id;
+
+  const displayMetadata = {
+    ...existingDisplay,
+    district_name: session.metadata?.organization_name || existingDisplay.district_name,
+    estimate_number: protectedMetadata.estimate_number,
+    invoice_number: protectedMetadata.invoice_number,
+    receipt_number: protectedMetadata.receipt_number,
+  };
 
   const { error: updateError } = await supabase.auth.admin.updateUserById(userId, {
-    user_metadata: mergedMetadata,
+    app_metadata: protectedMetadata,
+    user_metadata: displayMetadata,
   });
   if (updateError) {
     throw new Error(`Unable to persist paid Canary account state for Stripe session ${session.id}.`);
@@ -84,7 +93,7 @@ export async function markCanaryPaymentPaid({ session, paidAt } = {}) {
 
   return {
     ok: true,
-    alreadyProcessed: sameSession && existing.payment_status === 'paid',
+    alreadyProcessed: sameSession && existingProtected.payment_status === 'paid',
     onboardingUpdated,
     userId,
     paidAt: paymentPaidAt,
