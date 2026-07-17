@@ -5,6 +5,7 @@ import { headers } from 'next/headers';
 import { createAdminClient } from '@/lib/supabase/admin';
 import { createCanaryCheckoutSession, createCanaryEmbeddedCheckoutSession, getCanaryCheckoutAmountLabel, retrieveCheckoutSession } from '@/lib/stripe';
 import { getAuthenticatedBillingContext } from '@/lib/billing';
+import { markCanaryPaymentPaid } from '@/lib/payment-state';
 
 function requireBillingContext(context) {
   const { user, districtId, districtName, email, onboardingRequest } = context;
@@ -24,6 +25,7 @@ function requireBillingContext(context) {
     organizationName,
     email,
     requestId: onboardingRequest?.id || '',
+    customerId: user?.user_metadata?.stripe_customer_id || onboardingRequest?.stripe_customer_id || '',
   };
 }
 
@@ -40,6 +42,7 @@ export async function startCanaryCheckout() {
     requestId: context.requestId,
     districtId: context.districtId,
     userId: context.user.id || '',
+    customerId: context.customerId,
     origin: await getOrigin(),
   });
 
@@ -55,6 +58,7 @@ export async function createEmbeddedCanaryCheckout() {
     requestId: context.requestId,
     districtId: context.districtId,
     userId: context.user.id || '',
+    customerId: context.customerId,
     origin: await getOrigin(),
   });
 
@@ -120,52 +124,10 @@ export async function confirmEmbeddedCanaryCheckout(sessionId) {
     return { ok: false, paymentStatus: session?.payment_status || 'unknown' };
   }
 
-  const supabase = createAdminClient();
-  const requestId = session?.metadata?.canary_request_id || context.requestId;
-  let targetId = requestId || null;
-  if (!targetId && context.email) {
-    const { data: latest } = await supabase
-      .from('onboarding_requests')
-      .select('id')
-      .eq('contact_email', context.email)
-      .order('created_at', { ascending: false })
-      .limit(1);
-    targetId = latest?.[0]?.id || null;
+  const paidState = await markCanaryPaymentPaid({ session });
+  if (!paidState.ok) {
+    throw new Error('Unable to persist the confirmed payment state.');
   }
-
-  if (targetId) {
-    await supabase
-      .from('onboarding_requests')
-      .update({
-        payment_status: 'paid',
-        stripe_customer_id: typeof session.customer === 'string' ? session.customer : null,
-        access_status: 'active',
-      })
-      .eq('id', targetId);
-  }
-
-  const paidAt = new Date();
-  const paidThrough = new Date(paidAt);
-  paidThrough.setFullYear(paidThrough.getFullYear() + 1);
-
-  const mergedMetadata = {
-    ...(context.user?.user_metadata || {}),
-    payment_status: 'paid',
-    payment_paid_at: paidAt.toISOString(),
-    paid_through: paidThrough.toISOString(),
-    access_status: 'active',
-    trial_status: 'converted',
-    stripe_customer_id: typeof session.customer === 'string' ? session.customer : (context.user?.user_metadata?.stripe_customer_id || null),
-    stripe_checkout_session_id: session.id,
-    estimate_number: session.metadata?.canary_estimate_number || context.user?.user_metadata?.estimate_number || context.user?.user_metadata?.quote_number || '',
-    invoice_number: session.metadata?.canary_invoice_number || context.user?.user_metadata?.invoice_number || '',
-    receipt_number: session.metadata?.canary_receipt_number || context.user?.user_metadata?.receipt_number || '',
-  };
-  if (context.districtId) mergedMetadata.district_id = context.districtId;
-  if (context.organizationName) mergedMetadata.district_name = context.organizationName;
-  await supabase.auth.admin.updateUserById(context.user.id, {
-    user_metadata: mergedMetadata,
-  });
 
   return {
     ok: true,

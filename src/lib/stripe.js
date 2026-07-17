@@ -122,7 +122,15 @@ function checkoutMetadataParams({ organizationName, contactEmail, requestId, dis
   };
 }
 
-export async function createCanaryCheckoutSession({ organizationName, contactEmail, requestId, districtId, userId, origin }) {
+function checkoutCustomerParams({ contactEmail, customerId }) {
+  if (customerId) return { customer: customerId };
+  return {
+    customer_email: contactEmail,
+    customer_creation: 'always',
+  };
+}
+
+export async function createCanaryCheckoutSession({ organizationName, contactEmail, requestId, districtId, userId, customerId, origin }) {
   const cleanOrigin = String(origin || 'https://www.canarydata.media').replace(/\/$/, '');
   const lineItem = resolveCheckoutLineItem(contactEmail);
 
@@ -130,7 +138,7 @@ export async function createCanaryCheckoutSession({ organizationName, contactEma
     method: 'POST',
     body: encodeForm({
       mode: 'payment',
-      customer_email: contactEmail,
+      ...checkoutCustomerParams({ contactEmail, customerId }),
       success_url: `${cleanOrigin}/payment/success?session_id={CHECKOUT_SESSION_ID}`,
       cancel_url: `${cleanOrigin}/payment/cancel`,
       ...checkoutLineItemParams(lineItem),
@@ -146,7 +154,7 @@ export async function createCanaryCheckoutSession({ organizationName, contactEma
   });
 }
 
-export async function createCanaryEmbeddedCheckoutSession({ organizationName, contactEmail, requestId, districtId, userId }) {
+export async function createCanaryEmbeddedCheckoutSession({ organizationName, contactEmail, requestId, districtId, userId, customerId }) {
   const lineItem = resolveCheckoutLineItem(contactEmail);
 
   return stripeRequest('/checkout/sessions', {
@@ -155,7 +163,7 @@ export async function createCanaryEmbeddedCheckoutSession({ organizationName, co
       mode: 'payment',
       ui_mode: 'embedded_page',
       redirect_on_completion: 'never',
-      customer_email: contactEmail,
+      ...checkoutCustomerParams({ contactEmail, customerId }),
       ...checkoutLineItemParams(lineItem),
       ...checkoutMetadataParams({
         organizationName,

@@ -6,7 +6,8 @@
     "dev": "next dev",
     "build": "next build",
     "start": "next start",
-    "lint": "eslint"
+    "lint": "eslint",
+    "test:webhook": "node scripts/test-stripe-webhook.mjs"
   },
   "dependencies": {
     "@stripe/stripe-js": "^9.9.0",

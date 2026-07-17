@@ -1,50 +1,13 @@
 import Link from 'next/link';
 import Image from 'next/image';
 import { redirect } from 'next/navigation';
-import { createAdminClient } from '@/lib/supabase/admin';
 import { retrieveCheckoutSession } from '@/lib/stripe';
 import { getAuthenticatedBillingContext } from '@/lib/billing';
+import { markCanaryPaymentPaid } from '@/lib/payment-state';
 
 export const metadata = {
   title: 'Payment Confirmed | Canary Data',
 };
-
-async function markPaymentIfPossible(session, billingContext) {
-  if (session?.payment_status !== 'paid') return null;
-
-  const requestId = session?.metadata?.canary_request_id || billingContext?.onboardingRequest?.id || '';
-  const contactEmail = (billingContext?.email || session?.metadata?.contact_email || session?.customer_details?.email || session?.customer_email || '').toLowerCase();
-  const update = {
-    payment_status: 'paid',
-    stripe_customer_id: typeof session.customer === 'string' ? session.customer : null,
-    access_status: 'active',
-  };
-
-  try {
-    const supabase = createAdminClient();
-    let targetId = requestId || null;
-    if (!targetId && contactEmail) {
-      const { data: latest } = await supabase
-        .from('onboarding_requests')
-        .select('id')
-        .eq('contact_email', contactEmail)
-        .order('created_at', { ascending: false })
-        .limit(1);
-      targetId = latest?.[0]?.id || null;
-    }
-    if (!targetId) return null;
-
-    const { data, error } = await supabase
-      .from('onboarding_requests')
-      .update(update)
-      .eq('id', targetId)
-      .select('id, organization_name, contact_email, payment_status, access_status');
-    if (error) return null;
-    return data?.[0] || null;
-  } catch {
-    return null;
-  }
-}
 
 export default async function PaymentSuccessPage({ searchParams }) {
   const billingContext = await getAuthenticatedBillingContext();
@@ -66,7 +29,10 @@ export default async function PaymentSuccessPage({ searchParams }) {
         verified = false;
         error = 'This Stripe session does not match the signed-in user.';
       } else {
-        savedRequest = await markPaymentIfPossible(session, billingContext);
+        const paymentResult = await markCanaryPaymentPaid({ session });
+        savedRequest = paymentResult.ok
+          ? { organization_name: billingContext.districtName || session?.metadata?.organization_name || 'your account' }
+          : null;
       }
     } catch (err) {
       error = err?.message || 'Unable to verify payment yet.';
