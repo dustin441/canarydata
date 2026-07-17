@@ -31,8 +31,16 @@ const dashboard = await readFile(new URL('../src/app/dashboard/DashboardClient.j
 assert.match(dashboard, /canary_columns_v3/);
 assert.match(dashboard, /legacySaved[\s\S]*next\.add\('earned_media'\)/);
 assert.ok(
-  dashboard.indexOf("id: 'earned_media'") < dashboard.indexOf("id: 'innovation_reason'"),
-  'Earned Media should appear before Strategic Alignment in the main table',
+  dashboard.indexOf("id: 'earned_media'") < dashboard.indexOf("id: 'summary'"),
+  'Earned Media should appear immediately after the required columns',
+);
+assert.match(
+  dashboard,
+  /<th>Headline<\/th>[\s\S]*?col\('earned_media'\)[\s\S]*?<th>Earned Media<\/th>[\s\S]*?col\('summary'\)/,
+);
+assert.match(
+  dashboard,
+  /\{\/\* Headline \*\/[\s\S]*?\{\/\* Earned Media \*\/[\s\S]*?\{\/\* Summary \*\//,
 );
 assert.match(dashboard, /Add \/ Correct Stories/);
 assert.match(dashboard, /\+ Add Story/);

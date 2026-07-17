@@ -16,12 +16,12 @@ const stripePromise = process.env.NEXT_PUBLIC_STRIPE_PUBLISHABLE_KEY
 const ALL_COLUMNS = [
   { id: 'date',               label: 'Date',               required: true  },
   { id: 'headline',           label: 'Headline',           required: true  },
+  { id: 'earned_media',       label: 'Earned Media',       defaultOn: true },
   { id: 'summary',            label: 'Summary',            defaultOn: true },
   { id: 'link',               label: 'Link',               defaultOn: true },
   { id: 'source',             label: 'Source',             defaultOn: true },
   { id: 'tags',               label: 'Tags',               defaultOn: true },
   { id: 'score',              label: 'Score',              defaultOn: true },
-  { id: 'earned_media',       label: 'Earned Media',       defaultOn: true },
   { id: 'innovation_reason',  label: 'Strategic Alignment', defaultOn: true  },
   { id: 'recommendation',     label: 'Recommendation',     defaultOn: true  },
   { id: 'notes',              label: 'Notes',              defaultOn: true },
@@ -2951,6 +2951,7 @@ export default function DashboardClient({ articles, districts, queries: initialQ
                   <tr>
                     <th>Date</th>
                     <th>Headline</th>
+                    {col('earned_media')      && <th>Earned Media</th>}
                     {col('summary')           && <th>Summary</th>}
                     {col('link')              && <th>Link</th>}
                     {col('source')            && <th>Source</th>}
@@ -2958,7 +2959,6 @@ export default function DashboardClient({ articles, districts, queries: initialQ
                     {col('score')             && <th className="score-column">Score<InfoTooltip text={SCORE_TOOLTIP} /></th>}
                     {col('innovation_reason') && <th>Strategic Alignment</th>}
                     {col('recommendation')    && <th>Recommendation</th>}
-                    {col('earned_media')      && <th>Earned Media</th>}
                     {col('notes')             && <th>Notes</th>}
                     {col('query')             && <th>Source Query</th>}
                   </tr>
@@ -2997,6 +2997,24 @@ export default function DashboardClient({ articles, districts, queries: initialQ
                           </button>
                         )}
                       </td>
+
+                      {/* Earned Media */}
+                      {col('earned_media') && (
+                        <td style={{ textAlign: 'center' }}>
+                          <label style={{ display: 'inline-flex', alignItems: 'center', gap: '6px', cursor: 'pointer' }}>
+                            <input
+                              type="checkbox"
+                              checked={isEarned(article)}
+                              onChange={(e) => handleEarnedMedia(article, e.target.checked)}
+                              aria-label={`Mark ${article.headline} as earned media`}
+                              style={{ accentColor: 'var(--canary-yellow)', width: '16px', height: '16px', cursor: 'pointer' }}
+                            />
+                            <span style={{ fontSize: '0.7rem', fontWeight: 700, color: isEarned(article) ? 'var(--canary-yellow)' : 'var(--text-tertiary)' }}>
+                              {isEarned(article) ? 'Earned' : 'Mark earned'}
+                            </span>
+                          </label>
+                        </td>
+                      )}
 
                       {/* Summary */}
                       {col('summary') && (
@@ -3075,25 +3093,6 @@ export default function DashboardClient({ articles, districts, queries: initialQ
                       {col('recommendation') && (
                         <td className="summary-cell">
                           <RecommendationText text={article.recommendation} />
-                        </td>
-                      )}
-
-                      {/* Earned Media */}
-                      {col('earned_media') && (
-                        <td style={{ textAlign: 'center' }}>
-                          <label style={{ display: 'inline-flex', alignItems: 'center', gap: '6px', cursor: 'pointer' }}>
-                            <input
-                              type="checkbox"
-                              checked={isEarned(article)}
-                              onChange={(e) => handleEarnedMedia(article, e.target.checked)}
-                              style={{ accentColor: 'var(--canary-yellow)', width: '16px', height: '16px', cursor: 'pointer' }}
-                            />
-                            {isEarned(article) && (
-                              <span style={{ fontSize: '0.7rem', fontWeight: 700, color: 'var(--canary-yellow)' }}>
-                                Earned
-                              </span>
-                            )}
-                          </label>
                         </td>
                       )}
 
