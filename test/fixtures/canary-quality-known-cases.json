@@ -1,0 +1,124 @@
+[
+  {
+    "id": "hoover-sensitive-employee-arrest",
+    "kind": "sentiment",
+    "input": {
+      "raw_sentiment": 0.4,
+      "headline": "Hoover High School employee arrested after being charged with allegedly distributing sexual material involving children",
+      "summary": "A Hoover High School employee was arrested in an internet crimes investigation.",
+      "tags": "Innovation Safety & Wellness"
+    },
+    "expected": { "sentiment": -0.7, "sensitive_personnel": true }
+  },
+  {
+    "id": "longview-graduate-death-sad-not-district-fault",
+    "kind": "sentiment",
+    "input": {
+      "raw_sentiment": -0.8,
+      "headline": "Longview ISD mourns loss of recent graduate Jassiah Hill",
+      "summary": "The district expressed condolences and requested privacy for the family.",
+      "tags": "Safety & Wellness"
+    },
+    "expected": { "sentiment": -0.1, "sensitive_personnel": false }
+  },
+  {
+    "id": "longview-off-duty-fatal-crash-sad-not-district-fault",
+    "kind": "sentiment",
+    "input": {
+      "raw_sentiment": -0.9,
+      "headline": "Longview ISD teacher drove drunk in fatal off-duty wreck",
+      "summary": "The incident occurred away from school. The district expressed condolences to both families.",
+      "tags": "Safety & Wellness"
+    },
+    "expected": { "sentiment": -0.1, "sensitive_personnel": false }
+  },
+  {
+    "id": "cabrillo-exact-pillars-1-2-4",
+    "kind": "alignment",
+    "input": {
+      "ai": {
+        "strategic_alignment": "Pillar 1 | Pillar 2 | Pillar 4",
+        "alignment_explanation": "The Cabrillo program directly supports the three approved priorities."
+      },
+      "priorities": [
+        { "label": "Pillar 1" }, { "label": "Pillar 2" }, { "label": "Pillar 3" }, { "label": "Pillar 4" }
+      ]
+    },
+    "expected": { "flag": true, "labels": ["Pillar 1", "Pillar 2", "Pillar 4"] }
+  },
+  {
+    "id": "alief-earth-club-is-not-a-priority",
+    "kind": "alignment",
+    "input": {
+      "ai": { "strategic_alignment": "Earth Club", "alignment_explanation": "The article mentions the Earth Club." },
+      "priorities": [{ "label": "Student Achievement" }, { "label": "Safe and Supportive Schools" }]
+    },
+    "expected": { "flag": false, "labels": [] }
+  },
+  {
+    "id": "santa-clara-wilson-lookalike",
+    "kind": "geography",
+    "input": {
+      "title": "Wilson High School announces new principal in Pennsylvania",
+      "snippet": "News from Wilson School District in Pennsylvania.",
+      "url": "https://example.com/pennsylvania/wilson-high-school",
+      "profile": { "primary_city": "Santa Clara", "state_full": "California", "state_abbrev": "CA", "include_geo_terms": ["San Jose", "Sunnyvale"], "exclude_geo_terms": ["Pennsylvania", "Wilson School District"] },
+      "entities": [{ "name": "Wilson High School", "required": true, "aliases": [] }]
+    },
+    "expected": { "decision": "rejected", "exclusion": "Pennsylvania" }
+  },
+  {
+    "id": "santa-clara-mission-local-anchor",
+    "kind": "geography",
+    "input": {
+      "title": "Mission Early College program expands in Santa Clara",
+      "snippet": "Santa Clara Unified and Mission College in California announced the expansion.",
+      "url": "https://local.example.com/santa-clara/mission-early-college",
+      "profile": { "primary_city": "Santa Clara", "state_full": "California", "state_abbrev": "CA", "include_geo_terms": ["Mission College"], "exclude_geo_terms": ["Mission, Texas"] },
+      "entities": [{ "name": "Mission Early College", "required": true, "aliases": [] }]
+    },
+    "expected": { "decision": "accepted" }
+  },
+  {
+    "id": "huntsville-texas-lookalike",
+    "kind": "geography",
+    "input": {
+      "title": "Huntsville ISD names new superintendent",
+      "snippet": "The Texas district announced the appointment in Huntsville, TX.",
+      "url": "https://example.com/huntsvilletx",
+      "profile": { "primary_city": "Huntsville", "state_full": "Alabama", "state_abbrev": "AL", "exclude_geo_terms": ["Huntsville ISD", "Huntsville, TX", "huntsvilletx"] },
+      "entities": [{ "name": "Huntsville City Schools", "required": true, "aliases": ["Huntsville ISD"] }]
+    },
+    "expected": { "decision": "rejected", "exclusion": "Huntsville ISD" }
+  },
+  {
+    "id": "maxpreps-static-roster",
+    "kind": "source",
+    "input": { "title": "Wilcox Chargers Varsity Football Roster", "url": "https://www.maxpreps.com/ca/santa-clara/wilcox-chargers/football/roster/" },
+    "expected": { "decision": "reject", "reason": "static_sports_page" }
+  },
+  {
+    "id": "nfhs-static-live-stream",
+    "kind": "source",
+    "input": { "title": "Watch Longview vs Tyler Live", "url": "https://www.nfhsnetwork.com/events/longview-high-school/game123" },
+    "expected": { "decision": "reject", "reason": "static_or_stream_page" }
+  },
+  {
+    "id": "nfhs-championship-event-is-still-a-stream",
+    "kind": "source",
+    "input": { "title": "Watch the state championship game", "url": "https://www.nfhsnetwork.com/events/longview-high-school/championship-game" },
+    "expected": { "decision": "reject", "reason": "static_or_stream_page" }
+  },
+  {
+    "id": "maxpreps-editorial-championship",
+    "kind": "source",
+    "input": { "title": "Wilcox captures section championship after late comeback", "snippet": "The Chargers won the title Friday night.", "url": "https://www.maxpreps.com/news/abc123/wilcox-captures-section-championship.htm" },
+    "expected": { "decision": "accept", "reason": "editorial_sports_reporting" }
+  },
+  {
+    "id": "non-news-rental-page",
+    "kind": "source",
+    "input": { "title": "Apartments for rent near Hoover High School", "url": "https://example.com/rentals/hoover-high-school" },
+    "expected": { "decision": "reject", "reason": "static_or_non_news_content" }
+  }
+]

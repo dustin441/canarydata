@@ -8,7 +8,8 @@
     "start": "next start",
     "lint": "eslint",
     "test:webhook": "node scripts/test-stripe-webhook.mjs",
-    "test:authz": "node scripts/test-authz-metadata.mjs"
+    "test:authz": "node scripts/test-authz-metadata.mjs",
+    "test:quality": "node scripts/test-canary-quality.mjs"
   },
   "dependencies": {
     "@stripe/stripe-js": "^9.9.0",
