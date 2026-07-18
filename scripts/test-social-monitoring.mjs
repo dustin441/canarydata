@@ -5,6 +5,11 @@ import {
   summarizeSocialResults,
 } from '../src/lib/social.mjs';
 import { normalizeProviderBatch } from '../src/lib/socialIngestion.mjs';
+import { formatDisplayDate } from '../src/lib/date.mjs';
+
+assert.equal(formatDisplayDate('2026-06-09'), 'Jun 9, 2026');
+assert.equal(formatDisplayDate('2026-06-09T12:00:00Z'), 'Jun 9, 2026');
+assert.equal(formatDisplayDate('not-a-date'), 'Date unavailable');
 
 const legacyArticle = {
   id: 'legacy-1',

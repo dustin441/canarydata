@@ -9,6 +9,7 @@ import { createEmbeddedCanaryCheckout, confirmEmbeddedCanaryCheckout, saveBillin
 import { compareStrategicAlignmentRows } from '@/lib/strategicAlignmentSort.mjs';
 import { CORE_TAGS, canonicalTags } from '@/lib/canonicalTags.mjs';
 import { buildSocialResults, safeSocialUrl, summarizeSocialResults } from '@/lib/social.mjs';
+import { formatDisplayDate } from '@/lib/date.mjs';
 
 const stripePromise = process.env.NEXT_PUBLIC_STRIPE_PUBLISHABLE_KEY
   ? loadStripe(process.env.NEXT_PUBLIC_STRIPE_PUBLISHABLE_KEY)
@@ -244,11 +245,7 @@ function sanitizeRecommendationText(text) {
   return kept.join('\n').replace(/\n{3,}/g, '\n\n').trim();
 }
 
-function formatDate(dateStr) {
-  return new Date(dateStr + 'T00:00:00').toLocaleDateString('en-US', {
-    month: 'short', day: 'numeric', year: 'numeric',
-  });
-}
+const formatDate = formatDisplayDate;
 
 function formatDistrictName(id) {
   return id
