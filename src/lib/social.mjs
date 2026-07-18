@@ -85,13 +85,27 @@ export function normalizeSocialResult(item = {}) {
   };
 }
 
+function socialResultKey(item) {
+  if (item.url) {
+    try {
+      const url = new URL(item.url);
+      const host = url.hostname.replace(/^www\./, '').toLowerCase();
+      const path = url.pathname.replace(/\/+$/, '') || '/';
+      return `${item.platform}:${host}${path}`;
+    } catch {
+      // safeSocialUrl already filters malformed links; fall through to provider identity.
+    }
+  }
+  return `${item.platform}:${item.externalThreadId || item.id}`;
+}
+
 export function buildSocialResults(items = []) {
   const seen = new Set();
   return items
     .map(normalizeSocialResult)
     .filter((item) => item.id && item.platform)
     .filter((item) => {
-      const key = `${item.platform}:${item.externalThreadId || item.id || item.url}`;
+      const key = socialResultKey(item);
       if (seen.has(key)) return false;
       seen.add(key);
       return true;

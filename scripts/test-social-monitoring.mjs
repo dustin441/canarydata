@@ -67,6 +67,23 @@ const results = buildSocialResults([legacyArticle, canonicalThread, { ...canonic
 assert.equal(results.length, 2, 'duplicate platform thread IDs should collapse');
 assert.equal(results[0].id, 'thread-1', 'newest social result should sort first');
 
+const stagedInstagram = {
+  ...canonicalThread,
+  id: 'staged-instagram',
+  platform: 'instagram',
+  external_thread_id: 'example',
+  canonical_url: 'https://www.instagram.com/p/example/',
+  visibility_status: 'review',
+};
+const legacyDuplicate = {
+  ...legacyArticle,
+  id: 'legacy-duplicate',
+  canonical_url: 'https://instagram.com/p/example',
+};
+const transitionalResults = buildSocialResults([stagedInstagram, legacyDuplicate]);
+assert.equal(transitionalResults.length, 1, 'canonical permalink variants should deduplicate across staged and legacy records');
+assert.equal(transitionalResults[0].visibilityStatus, 'review', 'staged record should win transitional deduplication');
+
 const summary = summarizeSocialResults(results);
 assert.deepEqual(summary, {
   total: 2,
