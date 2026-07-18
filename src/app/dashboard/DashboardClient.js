@@ -1886,15 +1886,19 @@ function CorrectionsView({ districts, userDistrictId, districtFilter, excludedSt
   );
 }
 
-function SocialView({ articles, socialSources, districtFilter, districts }) {
+function SocialView({ articles, socialThreads, socialSources, districtFilter, districts }) {
   const [relationshipFilter, setRelationshipFilter] = useState('all');
   const [socialSearch, setSocialSearch] = useState('');
-  const scopedArticles = useMemo(() => articles.filter((article) => {
-    const platform = String(article.source_type || '').toLowerCase();
-    const districtMatches = districtFilter === 'All' || article.district_id === districtFilter;
-    return districtMatches && SOCIAL_SOURCE_TYPES.has(platform);
-  }), [articles, districtFilter]);
-  const results = useMemo(() => buildSocialResults(scopedArticles), [scopedArticles]);
+  const scopedRecords = useMemo(() => {
+    const legacyRecords = articles.filter((article) => {
+      const platform = String(article.source_type || '').toLowerCase();
+      const districtMatches = districtFilter === 'All' || article.district_id === districtFilter;
+      return districtMatches && SOCIAL_SOURCE_TYPES.has(platform);
+    });
+    const stagedRecords = socialThreads.filter((thread) => districtFilter === 'All' || thread.district_id === districtFilter);
+    return [...stagedRecords, ...legacyRecords];
+  }, [articles, socialThreads, districtFilter]);
+  const results = useMemo(() => buildSocialResults(scopedRecords), [scopedRecords]);
   const summary = useMemo(() => summarizeSocialResults(results), [results]);
   const visibleResults = useMemo(() => {
     const query = socialSearch.trim().toLowerCase();
@@ -1984,6 +1988,7 @@ function SocialView({ articles, socialSources, districtFilter, districts }) {
                 <div className="social-result-meta">
                   <span className={`social-platform-badge ${result.platform}`}>{formatSourceLabel(result.platform)}</span>
                   <span className={`social-relationship-badge ${result.relationshipType}`}>{result.relationshipLabel}</span>
+                  {result.visibilityStatus === 'review' && <span className="social-review-badge">Review</span>}
                   <time>{formatDate(result.date)}</time>
                 </div>
                 <h3>{result.headline}</h3>
@@ -2010,7 +2015,7 @@ function SocialView({ articles, socialSources, districtFilter, districts }) {
   );
 }
 
-export default function DashboardClient({ articles, districts, queries: initialQueries, clients = [], userDistrictId, paymentNotice = null, billingInfo = null, excludedStories = [], correctionEvents = [], socialSources = [], demoMode = false }) {
+export default function DashboardClient({ articles, districts, queries: initialQueries, clients = [], userDistrictId, paymentNotice = null, billingInfo = null, excludedStories = [], correctionEvents = [], socialSources = [], socialThreads = [], demoMode = false }) {
   const defaultDistrictFilter = userDistrictId ?? districts[0]?.id ?? 'All';
   const [currentView, setCurrentView] = useState('dashboard');
   const [search, setSearch] = useState('');
@@ -2697,6 +2702,7 @@ export default function DashboardClient({ articles, districts, queries: initialQ
           {currentView === 'social' && (
             <SocialView
               articles={articles}
+              socialThreads={socialThreads}
               socialSources={socialSources}
               districtFilter={districtFilter}
               districts={districts}

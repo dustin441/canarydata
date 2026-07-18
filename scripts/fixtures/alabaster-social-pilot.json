@@ -1,0 +1,55 @@
+{
+  "items": [
+    {
+      "platform": "instagram",
+      "external_thread_id": "DZXcOv8EjeD",
+      "canonical_url": "https://www.instagram.com/p/DZXcOv8EjeD/",
+      "relationship_type": "owned",
+      "author_name": "Alabaster City Schools",
+      "author_handle": "alabastercityschools",
+      "published_at": "2026-06-09T12:00:00Z",
+      "headline": "Alabaster Board of Education welcomes Jamie Parker",
+      "body": "Alabaster City Schools welcomed Jamie Parker as the newest member of the Alabaster Board of Education.",
+      "summary": "The district welcomed Jamie Parker following her appointment to the Alabaster Board of Education.",
+      "match_reason": "Published by the configured Alabaster City Schools Instagram account.",
+      "provider_metadata": {
+        "source": "verified_legacy_canary_record",
+        "legacy_story_id": "64ae42b8-9959-47b7-bf08-33a299aad62e"
+      }
+    },
+    {
+      "platform": "instagram",
+      "external_thread_id": "DYXKUjDlBeU",
+      "canonical_url": "https://www.instagram.com/p/DYXKUjDlBeU/",
+      "relationship_type": "owned",
+      "author_name": "Alabaster City Schools",
+      "author_handle": "alabastercityschools",
+      "published_at": "2026-05-15T12:00:00Z",
+      "headline": "Thompson High School recognizes the Class of 2026",
+      "body": "Thompson High School honored the Class of 2026 at Senior Honors Night.",
+      "summary": "The district highlighted graduating seniors and more than $31 million in scholarship offers.",
+      "match_reason": "Published by the configured Alabaster City Schools Instagram account.",
+      "provider_metadata": {
+        "source": "verified_legacy_canary_record",
+        "legacy_story_id": "98a13ff6-fbb8-4717-9a74-ca36beb52963"
+      }
+    },
+    {
+      "platform": "instagram",
+      "external_thread_id": "DYFrbULj39Z",
+      "canonical_url": "https://www.instagram.com/p/DYFrbULj39Z/",
+      "relationship_type": "owned",
+      "author_name": "Alabaster City Schools",
+      "author_handle": "alabastercityschools",
+      "published_at": "2026-05-08T12:00:00Z",
+      "headline": "Alabaster seniors participate in the Parade of Graduates",
+      "body": "Seniors reunited with former teachers during the annual Alabaster City Schools Parade of Graduates.",
+      "summary": "The district celebrated graduating seniors and their connections with former teachers.",
+      "match_reason": "Published by the configured Alabaster City Schools Instagram account.",
+      "provider_metadata": {
+        "source": "verified_legacy_canary_record",
+        "legacy_story_id": "4519eec5-ea79-4485-be29-3e76e5e441fc"
+      }
+    }
+  ]
+}

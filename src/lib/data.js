@@ -71,11 +71,30 @@ export async function getDistricts() {
 export async function getSocialSources(districtId = null) {
   const supabase = createAdminClient();
   let query = supabase
-    .from('social_sources')
-    .select('id, district_id, platform, url, handle, hashtags, active, created_at')
+    .from('social_accounts')
+    .select('id, district_id, platform, profile_url, handle, active, authorization_mode, connection_status, created_at')
     .eq('active', true)
     .order('district_id')
     .order('platform');
+  if (districtId) query = query.eq('district_id', districtId);
+  const { data, error } = await query;
+  if (error) throw error;
+  return (data ?? []).map((account) => ({
+    ...account,
+    url: account.profile_url,
+  }));
+}
+
+const SOCIAL_THREAD_COLUMNS = 'id, district_id, social_account_id, provider, platform, external_thread_id, canonical_url, relationship_type, author_name, author_handle, headline, body, summary, recommendation, published_at, comment_count, reply_count, reaction_count, share_count, view_count, engagement_total, sentiment, risk_level, canary_score, tags, strategic_alignment, matched_terms, match_reason, identity_confidence, visibility_status, created_at, updated_at';
+
+export async function getSocialThreads(districtId = null, includeReview = false) {
+  const supabase = createAdminClient();
+  let query = supabase
+    .from('social_threads')
+    .select(SOCIAL_THREAD_COLUMNS)
+    .in('visibility_status', includeReview ? ['active', 'review'] : ['active'])
+    .order('published_at', { ascending: false })
+    .limit(500);
   if (districtId) query = query.eq('district_id', districtId);
   const { data, error } = await query;
   if (error) throw error;

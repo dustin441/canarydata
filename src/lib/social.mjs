@@ -81,6 +81,7 @@ export function normalizeSocialResult(item = {}) {
     recommendation: conciseText(item.recommendation || '', 320),
     tags: Array.isArray(item.tags) ? item.tags : [],
     externalThreadId: item.external_thread_id || null,
+    visibilityStatus: item.visibility_status || 'active',
   };
 }
 

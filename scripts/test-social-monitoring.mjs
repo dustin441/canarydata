@@ -48,6 +48,8 @@ assert.equal(canonical.relationshipType, 'owned');
 assert.equal(canonical.commentCount, 24);
 assert.equal(canonical.engagementTotal, 159);
 assert.equal(canonical.url, canonicalThread.canonical_url);
+assert.equal(canonical.visibilityStatus, 'active');
+assert.equal(normalizeSocialResult({ ...canonicalThread, visibility_status: 'review' }).visibilityStatus, 'review');
 
 const concise = normalizeSocialResult({
   ...canonicalThread,

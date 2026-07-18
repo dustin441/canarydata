@@ -1,4 +1,4 @@
-import { getArticles, getDistricts, getQueries, getClients, getExcludedStories, getStoryCorrectionEvents, getSocialSources } from '@/lib/data';
+import { getArticles, getDistricts, getQueries, getClients, getExcludedStories, getStoryCorrectionEvents, getSocialSources, getSocialThreads } from '@/lib/data';
 import { createClient } from '@/lib/supabase/server';
 import { createAdminClient } from '@/lib/supabase/admin';
 import DashboardClient from './DashboardClient';
@@ -23,7 +23,7 @@ export default async function DashboardPage() {
   if (!sessionUser?.id) redirect('/login?redirect_to=/dashboard');
   if (!userDistrictId && !isAdmin) redirect('/demo?access=pending');
 
-  const [articles, districts, queries, clients, excludedStories, correctionEvents, socialSources] = await Promise.all([
+  const [articles, districts, queries, clients, excludedStories, correctionEvents, socialSources, socialThreads] = await Promise.all([
     getArticles(userDistrictId),
     getDistricts(),
     getQueries(userDistrictId),
@@ -31,6 +31,7 @@ export default async function DashboardPage() {
     getExcludedStories(userDistrictId),
     getStoryCorrectionEvents(userDistrictId),
     getSocialSources(userDistrictId),
+    getSocialThreads(userDistrictId, isAdmin),
   ]);
 
   const billingContext = userDistrictId ? await getAuthenticatedBillingContext() : null;
@@ -72,6 +73,7 @@ export default async function DashboardPage() {
       excludedStories={excludedStories}
       correctionEvents={correctionEvents}
       socialSources={socialSources}
+      socialThreads={socialThreads}
     />
   );
 }

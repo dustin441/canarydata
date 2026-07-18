@@ -13,7 +13,8 @@
     "test:corrections": "node scripts/test-story-corrections.mjs",
     "test:onboarding": "node scripts/test-onboarding-discovery.mjs",
     "health:canary": "node scripts/check-canary-health.mjs",
-    "test:social": "node scripts/test-social-monitoring.mjs"
+    "test:social": "node scripts/test-social-monitoring.mjs",
+    "pilot:social": "node scripts/ingest-social-pilot.mjs"
   },
   "dependencies": {
     "@stripe/stripe-js": "^9.9.0",
