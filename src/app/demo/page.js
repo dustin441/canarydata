@@ -1,5 +1,5 @@
 import DashboardClient from '@/app/dashboard/DashboardClient';
-import { demoArticles, demoDistricts, demoQueries } from '@/lib/demo-data';
+import { demoArticles, demoDistricts, demoQueries, demoSocialSources } from '@/lib/demo-data';
 
 export const metadata = {
   title: 'Canary Data Demo Dashboard | Canary Falls Unified School District',
@@ -13,6 +13,7 @@ export default function DemoDashboardPage() {
       districts={demoDistricts}
       queries={demoQueries}
       clients={[]}
+      socialSources={demoSocialSources}
       userDistrictId="canary-falls-usd"
       demoMode
     />

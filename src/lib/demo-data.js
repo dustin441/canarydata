@@ -11,6 +11,11 @@ export const demoQueries = [
   { id: 'demo-q-6', query_text: 'Beacon Ridge High lockdown safety communication', district_id: 'canary-falls-usd', district_name: 'Canary Falls Unified School District', geo_city: 'Canary Falls', geo_state: 'Demo State', geo_zip: '00000', channels: 'news', active: true, created_at: '2026-06-11' },
 ];
 
+export const demoSocialSources = [
+  { id: 'demo-social-facebook', district_id: 'canary-falls-usd', platform: 'facebook', url: 'https://www.facebook.com/', handle: 'BeaconRidgeHigh', active: true },
+  { id: 'demo-social-instagram', district_id: 'canary-falls-usd', platform: 'instagram', url: 'https://www.instagram.com/', handle: 'BeaconRidgeHigh', active: true },
+];
+
 export const demoArticles = [
   {
     id: 'demo-001', date: '2026-06-10', district_id: 'canary-falls-usd', source_type: 'news', source: 'Canary Falls Education Daily',

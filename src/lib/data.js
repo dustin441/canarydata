@@ -68,6 +68,20 @@ export async function getDistricts() {
   return data ?? [];
 }
 
+export async function getSocialSources(districtId = null) {
+  const supabase = createAdminClient();
+  let query = supabase
+    .from('social_sources')
+    .select('id, district_id, platform, url, handle, hashtags, active, created_at')
+    .eq('active', true)
+    .order('district_id')
+    .order('platform');
+  if (districtId) query = query.eq('district_id', districtId);
+  const { data, error } = await query;
+  if (error) throw error;
+  return data ?? [];
+}
+
 export async function updateArticleNote(id, notes) {
   const supabase = createAdminClient();
   const { error } = await supabase

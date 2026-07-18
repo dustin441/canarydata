@@ -8,6 +8,7 @@ import { setEarnedMedia, saveNote, addQuery, deleteQuery, submitFeedback, addMan
 import { createEmbeddedCanaryCheckout, confirmEmbeddedCanaryCheckout, saveBillingPurchaseOrder } from '@/app/payment/actions';
 import { compareStrategicAlignmentRows } from '@/lib/strategicAlignmentSort.mjs';
 import { CORE_TAGS, canonicalTags } from '@/lib/canonicalTags.mjs';
+import { buildSocialResults, safeSocialUrl, summarizeSocialResults } from '@/lib/social.mjs';
 
 const stripePromise = process.env.NEXT_PUBLIC_STRIPE_PUBLISHABLE_KEY
   ? loadStripe(process.env.NEXT_PUBLIC_STRIPE_PUBLISHABLE_KEY)
@@ -107,7 +108,7 @@ const DEMO_TESTIMONIALS = [
   },
 ];
 
-const SOCIAL_SOURCE_TYPES = new Set(['facebook', 'instagram', 'tiktok', 'twitter']);
+const SOCIAL_SOURCE_TYPES = new Set(['facebook', 'instagram', 'tiktok', 'twitter', 'x', 'youtube', 'threads', 'linkedin']);
 
 function formatSourceLabel(source) {
   if (source === 'All') return 'All';
@@ -1885,7 +1886,131 @@ function CorrectionsView({ districts, userDistrictId, districtFilter, excludedSt
   );
 }
 
-export default function DashboardClient({ articles, districts, queries: initialQueries, clients = [], userDistrictId, paymentNotice = null, billingInfo = null, excludedStories = [], correctionEvents = [], demoMode = false }) {
+function SocialView({ articles, socialSources, districtFilter, districts }) {
+  const [relationshipFilter, setRelationshipFilter] = useState('all');
+  const [socialSearch, setSocialSearch] = useState('');
+  const scopedArticles = useMemo(() => articles.filter((article) => {
+    const platform = String(article.source_type || '').toLowerCase();
+    const districtMatches = districtFilter === 'All' || article.district_id === districtFilter;
+    return districtMatches && SOCIAL_SOURCE_TYPES.has(platform);
+  }), [articles, districtFilter]);
+  const results = useMemo(() => buildSocialResults(scopedArticles), [scopedArticles]);
+  const summary = useMemo(() => summarizeSocialResults(results), [results]);
+  const visibleResults = useMemo(() => {
+    const query = socialSearch.trim().toLowerCase();
+    return results.filter((result) => {
+      const relationshipMatches = relationshipFilter === 'all' || result.relationshipType === relationshipFilter;
+      const searchMatches = !query || [result.headline, result.summary, result.authorName, result.platform, result.matchReason]
+        .some((value) => String(value || '').toLowerCase().includes(query));
+      return relationshipMatches && searchMatches;
+    });
+  }, [results, relationshipFilter, socialSearch]);
+  const scopedSources = socialSources.filter((source) => districtFilter === 'All' || source.district_id === districtFilter);
+
+  return (
+    <div className="social-monitor-view">
+      <section className="social-monitor-hero">
+        <div>
+          <span className="social-eyebrow">Public social intelligence</span>
+          <h2>Where your district is showing up</h2>
+          <p>Canary summarizes public posts and conversations without reproducing the full comment stream. Open the original post to review every available reaction, reply, and comment on the source platform.</p>
+        </div>
+        <div className="social-coverage-note">
+          <strong>Coverage boundary</strong>
+          <span>Public posts and authorized official accounts only. Private profiles, direct messages, and closed groups are excluded.</span>
+        </div>
+      </section>
+
+      <div className="social-summary-grid" aria-label="Social result summary">
+        <button type="button" className={relationshipFilter === 'all' ? 'active' : ''} onClick={() => setRelationshipFilter('all')}>
+          <span>All results</span><strong>{summary.total}</strong>
+        </button>
+        <button type="button" className={relationshipFilter === 'owned' ? 'active' : ''} onClick={() => setRelationshipFilter('owned')}>
+          <span>District posts</span><strong>{summary.owned}</strong>
+        </button>
+        <button type="button" className={relationshipFilter === 'direct' ? 'active' : ''} onClick={() => setRelationshipFilter('direct')}>
+          <span>Direct engagement</span><strong>{summary.direct}</strong>
+        </button>
+        <button type="button" className={relationshipFilter === 'ambient' ? 'active' : ''} onClick={() => setRelationshipFilter('ambient')}>
+          <span>Public mentions</span><strong>{summary.ambient}</strong>
+        </button>
+      </div>
+
+      <section className="social-account-section">
+        <div className="social-section-heading">
+          <div>
+            <h3>Official account registry</h3>
+            <p>These handles are configured for monitoring. “Configured” does not yet mean the district has authorized Canary through platform OAuth.</p>
+          </div>
+          <span>{scopedSources.length} configured source{scopedSources.length === 1 ? '' : 's'}</span>
+        </div>
+        <div className="social-account-list">
+          {scopedSources.length === 0 ? (
+            <div className="social-empty-inline">No official social sources are configured for this district yet.</div>
+          ) : scopedSources.map((source) => {
+            const district = districts.find((item) => item.id === source.district_id);
+            const sourceUrl = safeSocialUrl(source.url);
+            const AccountElement = sourceUrl ? 'a' : 'div';
+            return (
+              <AccountElement
+                key={source.id}
+                className="social-account-chip"
+                {...(sourceUrl ? { href: sourceUrl, target: '_blank', rel: 'noopener noreferrer' } : {})}
+              >
+                <span className={`social-platform-dot ${source.platform}`} aria-hidden="true" />
+                <span><strong>{source.handle ? `@${source.handle.replace(/^@/, '')}` : formatSourceLabel(source.platform)}</strong><small>{district?.name || formatDistrictName(source.district_id)} · {formatSourceLabel(source.platform)}</small></span>
+                <em>{sourceUrl ? 'Configured ↗' : 'Configured'}</em>
+              </AccountElement>
+            );
+          })}
+        </div>
+      </section>
+
+      <section className="social-results-section">
+        <div className="social-section-heading">
+          <div>
+            <h3>Social results</h3>
+            <p>One concise record per post or conversation. Comments remain collapsed into engagement totals and summaries.</p>
+          </div>
+          <input className="filter-input" value={socialSearch} onChange={(event) => setSocialSearch(event.target.value)} placeholder="Search social results…" />
+        </div>
+
+        <div className="social-result-list">
+          {visibleResults.length === 0 ? (
+            <div className="empty-state"><div className="empty-state-icon">💬</div><h3>No social results found</h3><p>Try another filter, or connect and collect an official account.</p></div>
+          ) : visibleResults.map((result) => (
+            <article className="social-result-card" key={`${result.platform}-${result.id}`}>
+              <div className="social-result-main">
+                <div className="social-result-meta">
+                  <span className={`social-platform-badge ${result.platform}`}>{formatSourceLabel(result.platform)}</span>
+                  <span className={`social-relationship-badge ${result.relationshipType}`}>{result.relationshipLabel}</span>
+                  <time>{formatDate(result.date)}</time>
+                </div>
+                <h3>{result.headline}</h3>
+                {result.authorName && <div className="social-author">{result.authorHandle ? `@${result.authorHandle.replace(/^@/, '')}` : result.authorName}</div>}
+                {result.summary && <p>{result.summary}</p>}
+                {result.matchReason && <div className="social-match-reason"><strong>Why Canary found it:</strong> {result.matchReason}</div>}
+                {result.recommendation && <div className="social-recommendation"><strong>Recommended action:</strong> {result.recommendation}</div>}
+              </div>
+              <aside className="social-result-actions">
+                <div className="social-engagement-grid">
+                  <span><strong>{result.commentCount}</strong> comments</span>
+                  <span><strong>{result.replyCount}</strong> replies</span>
+                  <span><strong>{result.engagementTotal}</strong> engagement</span>
+                </div>
+                {result.url ? (
+                  <a className="btn btn-primary btn-sm" href={result.url} target="_blank" rel="noopener noreferrer">View post & engagement ↗</a>
+                ) : <span className="social-link-unavailable">Original link unavailable</span>}
+              </aside>
+            </article>
+          ))}
+        </div>
+      </section>
+    </div>
+  );
+}
+
+export default function DashboardClient({ articles, districts, queries: initialQueries, clients = [], userDistrictId, paymentNotice = null, billingInfo = null, excludedStories = [], correctionEvents = [], socialSources = [], demoMode = false }) {
   const defaultDistrictFilter = userDistrictId ?? districts[0]?.id ?? 'All';
   const [currentView, setCurrentView] = useState('dashboard');
   const [search, setSearch] = useState('');
@@ -2107,6 +2232,11 @@ export default function DashboardClient({ articles, districts, queries: initialQ
   }
 
   const notesCount = articles.filter((a) => a.notes).length;
+  const socialResultCount = articles.filter((article) => {
+    const platform = String(article.source_type || '').toLowerCase();
+    const districtMatches = districtFilter === 'All' || article.district_id === districtFilter;
+    return districtMatches && SOCIAL_SOURCE_TYPES.has(platform);
+  }).length;
 
   const allTags = useMemo(() => ['All', ...CORE_TAGS], []);
 
@@ -2320,6 +2450,15 @@ export default function DashboardClient({ articles, districts, queries: initialQ
               <span className="sidebar-link-badge">{articles.length}</span>
             </button>
             <button
+              className={`sidebar-link ${currentView === 'social' ? 'active' : ''}`}
+              onClick={() => handleNavSelect('social')}
+              style={{ width: '100%', background: 'none', border: 'none', textAlign: 'left', cursor: 'pointer' }}
+            >
+              <span className="sidebar-link-icon">💬</span>
+              Social
+              <span className="sidebar-link-badge">{socialResultCount}</span>
+            </button>
+            <button
               className={`sidebar-link ${currentView === 'queries' ? 'active' : ''}`}
               onClick={() => handleNavSelect('queries')}
               style={{ width: '100%', background: 'none', border: 'none', textAlign: 'left', cursor: 'pointer' }}
@@ -2465,7 +2604,9 @@ export default function DashboardClient({ articles, districts, queries: initialQ
                           ? 'How This Works'
                           : currentView === 'articles'
                             ? 'Media Articles'
-                            : selectedDistrictName}
+                            : currentView === 'social'
+                              ? 'Social Intelligence'
+                              : selectedDistrictName}
               </div>
               <div className="topbar-breadcrumb">
                 {currentView === 'queries' ? 'Manage monitored search terms'
@@ -2476,6 +2617,7 @@ export default function DashboardClient({ articles, districts, queries: initialQ
                   : currentView === 'clients' ? 'Login credentials for beta testers'
                   : currentView === 'howto' ? 'Platform walkthrough video'
                   : currentView === 'articles' ? 'Browse, filter, annotate, and export article-level coverage'
+                  : currentView === 'social' ? 'District posts, direct engagement, and public mentions'
                   : 'Media Intelligence Dashboard'}
               </div>
             </div>
@@ -2552,6 +2694,14 @@ export default function DashboardClient({ articles, districts, queries: initialQ
           {currentView === 'clients' && <ClientsView clients={clients} />}
           {currentView === 'settings' && <SettingsView userDistrictId={userDistrictId} districts={districts} billingInfo={billingInfo} onPayByCard={openPaymentModal} />}
           {currentView === 'howto' && <HowItWorksView />}
+          {currentView === 'social' && (
+            <SocialView
+              articles={articles}
+              socialSources={socialSources}
+              districtFilter={districtFilter}
+              districts={districts}
+            />
+          )}
           {currentView === 'queries' && (
             <QueriesView
               initialQueries={initialQueries}
