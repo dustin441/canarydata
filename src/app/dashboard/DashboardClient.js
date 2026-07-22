@@ -243,6 +243,14 @@ function safeExternalHttpUrl(value) {
   }
 }
 
+function externalSourceLabel(value, fallback = 'Source') {
+  try {
+    return new URL(value).hostname.replace(/^www\./, '') || fallback;
+  } catch {
+    return fallback;
+  }
+}
+
 function sanitizeRecommendationText(text) {
   if (!text) return text;
 
@@ -904,7 +912,7 @@ function StrategicGovernancePanel({ governance, hasSelectedDistrict }) {
           <div className="strategic-governance-sources">
             {governance.sourceUrls.length > 0
               ? governance.sourceUrls.map((url, index) => (
-                  <a key={url} href={url} target="_blank" rel="noopener noreferrer">Source {index + 1} ↗</a>
+                  <a key={url} href={url} target="_blank" rel="noopener noreferrer">{externalSourceLabel(url, `Source ${index + 1}`)} ↗</a>
                 ))
               : <p>No public source links are recorded.</p>}
           </div>
