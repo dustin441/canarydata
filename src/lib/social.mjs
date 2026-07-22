@@ -85,9 +85,9 @@ export function socialActionLabel(value) {
 }
 
 function conciseArray(value, maxItems = 6, maxLength = 180) {
-  return (Array.isArray(value) ? value : [])
+  return [...new Set((Array.isArray(value) ? value : [])
     .map((item) => conciseText(item, maxLength))
-    .filter(Boolean)
+    .filter(Boolean))]
     .slice(0, maxItems);
 }
 
@@ -95,7 +95,10 @@ function normalizeActionIntelligence(value, fallbackRecommendation = '') {
   if (!value || typeof value !== 'object') return null;
   const actionType = String(value.action_type || value.actionType || '').toLowerCase();
   if (!SOCIAL_ACTION_TYPES.has(actionType)) return null;
-  const confidence = Number(value.confidence);
+  const rawConfidence = value.confidence;
+  const confidence = rawConfidence === null || rawConfidence === undefined || rawConfidence === ''
+    ? null
+    : Number(rawConfidence);
   return {
     actionType,
     actionLabel: socialActionLabel(actionType),
@@ -111,7 +114,7 @@ function normalizeActionIntelligence(value, fallbackRecommendation = '') {
     strategicAlignmentReason: conciseText(value.strategic_alignment_reason || value.strategicAlignmentReason, 500),
     missionOrValueEvidence: conciseArray(value.mission_or_value_evidence || value.missionOrValueEvidence, 6, 360),
     factsToVerify: conciseArray(value.facts_to_verify || value.factsToVerify, 8, 280),
-    confidence: Number.isFinite(confidence) ? Math.max(0, Math.min(1, confidence)) : null,
+    confidence: confidence !== null && Number.isFinite(confidence) ? Math.max(0, Math.min(1, confidence)) : null,
     reviewStatus: value.review_status === 'approved' ? 'approved' : 'review',
     modelVersion: conciseText(value.model_version || value.modelVersion, 80),
     generatedAt: value.generated_at || value.generatedAt || null,

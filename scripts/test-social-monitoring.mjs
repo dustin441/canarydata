@@ -125,10 +125,10 @@ const enrichedAction = normalizeSocialResult({
       draft_response: 'Thank you for supporting students.',
       content_opportunity: 'Partner recognition post.',
       strategic_priority_ids: ['priority-1'],
-      strategic_priority_labels: ['Engaged stakeholders'],
+      strategic_priority_labels: ['Engaged stakeholders', 'Engaged stakeholders'],
       strategic_alignment_reason: 'The partner is promoting student success.',
       mission_or_value_evidence: ['Preparing students for their future.'],
-      facts_to_verify: ['Confirm the event date.'],
+      facts_to_verify: ['Confirm the event date.', 'Confirm the event date.'],
       confidence: 0.94,
       review_status: 'review',
     },
@@ -138,6 +138,7 @@ assert.equal(enrichedAction.actionType, 'amplify');
 assert.equal(enrichedAction.actionIntelligence.actionLabel, 'Amplify');
 assert.equal(enrichedAction.actionIntelligence.situationSummary, 'A community partner shared a student opportunity.');
 assert.deepEqual(enrichedAction.actionIntelligence.strategicPriorityLabels, ['Engaged stakeholders']);
+assert.deepEqual(enrichedAction.actionIntelligence.factsToVerify, ['Confirm the event date.']);
 assert.equal(socialActionFilterMatches(enrichedAction, 'amplify'), true);
 assert.equal(socialActionFilterMatches(enrichedAction, 'respond'), false);
 assert.deepEqual(summarizeSocialActions([enrichedAction, canonical]), {
@@ -148,6 +149,18 @@ assert.deepEqual(summarizeSocialActions([enrichedAction, canonical]), {
   monitor: 0,
   elevate: 0,
 });
+
+const missingConfidenceAction = normalizeSocialResult({
+  ...canonicalThread,
+  id: 'missing-confidence-action',
+  provider_metadata: {
+    action_intelligence: {
+      action_type: 'monitor',
+      confidence: null,
+    },
+  },
+});
+assert.equal(missingConfidenceAction.actionIntelligence.confidence, null);
 
 const concise = normalizeSocialResult({
   ...canonicalThread,

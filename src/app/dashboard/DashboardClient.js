@@ -2032,10 +2032,14 @@ function SocialPostPreviewCard({ result, source, rank = null, showContext = fals
                 <div>{action.strategicPriorityLabels.map((label) => <span key={label}>{label}</span>)}</div>
               </div>
             )}
-            {(action.strategicAlignmentReason || action.contentOpportunity || action.draftResponse || action.factsToVerify.length > 0) && (
+            {(action.actionRationale || action.strategicAlignmentReason || action.missionOrValueEvidence.length > 0 || action.contentOpportunity || action.draftResponse || action.factsToVerify.length > 0) && (
               <details className="social-action-details">
                 <summary>Review strategy and draft</summary>
+                {action.actionRationale && <p><strong>Why this action:</strong> {action.actionRationale}</p>}
                 {action.strategicAlignmentReason && <p><strong>Why it aligns:</strong> {action.strategicAlignmentReason}</p>}
+                {action.missionOrValueEvidence.length > 0 && (
+                  <div><strong>District grounding:</strong><ul>{action.missionOrValueEvidence.map((evidence) => <li key={evidence}>{evidence}</li>)}</ul></div>
+                )}
                 {action.contentOpportunity && <p><strong>Communications opportunity:</strong> {action.contentOpportunity}</p>}
                 {action.factsToVerify.length > 0 && (
                   <div><strong>Verify before acting:</strong><ul>{action.factsToVerify.map((fact) => <li key={fact}>{fact}</li>)}</ul></div>
@@ -2122,12 +2126,7 @@ function SocialView({ articles, socialThreads, socialSources, districtFilter, di
     scopedSources.map((source) => [`${source.district_id}:${source.platform}`, source]),
   ), [scopedSources]);
   const platformOptions = useMemo(() => [...new Set(results.map((result) => result.platform))].sort(), [results]);
-  const actionSummary = useMemo(() => summarizeSocialActions(results.filter((result) => (
-    socialRelationshipFilterMatches(result, relationshipFilter)
-    && (platformFilter === 'all' || result.platform === platformFilter)
-  ))), [results, relationshipFilter, platformFilter]);
-  const selectedActionLabel = { respond: 'Respond', amplify: 'Amplify', strategy: 'Strategy', monitor: 'Monitor', elevate: 'Elevate' }[actionFilter] || null;
-  const visibleResults = useMemo(() => {
+  const facetedResults = useMemo(() => {
     const query = socialSearch.trim().toLowerCase();
     const minRate = minimumEngagementRate === '' ? null : Number(minimumEngagementRate);
     const maxRate = maximumEngagementRate === '' ? null : Number(maximumEngagementRate);
@@ -2135,21 +2134,29 @@ function SocialView({ articles, socialThreads, socialSources, districtFilter, di
       const source = sourceByDistrictPlatform.get(`${result.districtId}:${result.platform}`);
       return result.hasPerformanceData ? calculateSocialEngagementRate(result, Number(source?.metadata?.followers_count) || 0) : null;
     };
-    const filtered = results.filter((result) => {
+    return results.filter((result) => {
       const relationshipMatches = socialRelationshipFilterMatches(result, relationshipFilter);
       const platformMatches = platformFilter === 'all' || result.platform === platformFilter;
       const mediaCategory = result.mediaType === 'video' ? 'video' : (result.mediaUrl ? 'image' : 'text');
       const mediaMatches = mediaFilter === 'all' || mediaCategory === mediaFilter;
       const performanceMatches = performanceFilter === 'all'
         || (performanceFilter === 'available' ? result.hasPerformanceData : !result.hasPerformanceData);
-      const actionMatches = socialActionFilterMatches(result, actionFilter);
       const rate = rateFor(result);
       const minimumMatches = minRate === null || (rate !== null && Number.isFinite(minRate) && rate >= minRate);
       const maximumMatches = maxRate === null || (rate !== null && Number.isFinite(maxRate) && rate <= maxRate);
       const searchMatches = !query || [result.headline, result.summary, result.authorName, result.platform, result.matchReason, result.actionIntelligence?.actionLabel, result.actionIntelligence?.recommendedAction, result.actionIntelligence?.strategicAlignmentReason, ...(result.actionIntelligence?.strategicPriorityLabels || [])]
         .some((value) => String(value || '').toLowerCase().includes(query));
-      return relationshipMatches && platformMatches && mediaMatches && performanceMatches && actionMatches && minimumMatches && maximumMatches && searchMatches;
+      return relationshipMatches && platformMatches && mediaMatches && performanceMatches && minimumMatches && maximumMatches && searchMatches;
     });
+  }, [results, relationshipFilter, platformFilter, mediaFilter, performanceFilter, minimumEngagementRate, maximumEngagementRate, socialSearch, sourceByDistrictPlatform]);
+  const actionSummary = useMemo(() => summarizeSocialActions(facetedResults), [facetedResults]);
+  const selectedActionLabel = { respond: 'Respond', amplify: 'Amplify', strategy: 'Strategy', monitor: 'Monitor', elevate: 'Elevate' }[actionFilter] || null;
+  const visibleResults = useMemo(() => {
+    const rateFor = (result) => {
+      const source = sourceByDistrictPlatform.get(`${result.districtId}:${result.platform}`);
+      return result.hasPerformanceData ? calculateSocialEngagementRate(result, Number(source?.metadata?.followers_count) || 0) : null;
+    };
+    const filtered = facetedResults.filter((result) => socialActionFilterMatches(result, actionFilter));
     return filtered.sort((a, b) => {
       if (socialSort === 'engagement') return b.engagementTotal - a.engagementTotal;
       if (socialSort === 'engagement-rate') return (rateFor(b) ?? -1) - (rateFor(a) ?? -1);
@@ -2158,7 +2165,7 @@ function SocialView({ articles, socialThreads, socialSources, districtFilter, di
       if (socialSort === 'views') return b.viewCount - a.viewCount;
       return new Date(b.date).getTime() - new Date(a.date).getTime();
     });
-  }, [results, relationshipFilter, platformFilter, mediaFilter, performanceFilter, actionFilter, minimumEngagementRate, maximumEngagementRate, socialSearch, socialSort, sourceByDistrictPlatform]);
+  }, [facetedResults, actionFilter, socialSort, sourceByDistrictPlatform]);
   const pagedResults = visibleResults.slice(0, socialResultLimit);
   const changeSocialFilter = (setter, value) => {
     setter(value);
