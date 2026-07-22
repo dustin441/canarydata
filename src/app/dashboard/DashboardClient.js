@@ -116,6 +116,10 @@ function formatSocialMetric(value) {
   return Number.isFinite(number) && number > 0 ? Math.round(number).toLocaleString('en-US') : '0';
 }
 
+function formatAvailableSocialMetric(result, metric, value) {
+  return result?.metricAvailability?.[metric] ? formatSocialMetric(value) : 'N/A';
+}
+
 function formatSourceLabel(source) {
   if (source === 'All') return 'All';
   if (source === 'Social') return 'Social';
@@ -1894,84 +1898,117 @@ function formatSocialRate(rate) {
   return `${rate.toFixed(2)}%`;
 }
 
-function SocialPostPreviewCard({ result, source, rank }) {
+function SocialPostPreviewCard({ result, source, rank = null, showContext = false }) {
   const mediaUrl = safeSocialMediaUrl(result.mediaUrl);
+  const videoUrl = safeSocialMediaUrl(result.videoUrl);
   const profileImageUrl = safeSocialMediaUrl(result.profileImageUrl || source?.metadata?.profile_picture_url);
   const [failedMediaUrl, setFailedMediaUrl] = useState('');
   const [failedProfileImageUrl, setFailedProfileImageUrl] = useState('');
+  const [videoOpen, setVideoOpen] = useState(false);
   const imageFailed = Boolean(mediaUrl && failedMediaUrl === mediaUrl);
   const profileImageFailed = Boolean(profileImageUrl && failedProfileImageUrl === profileImageUrl);
 
   const followers = Number(source?.metadata?.followers_count) || 0;
-  const engagementRate = calculateSocialEngagementRate(result, followers);
-  const displayName = result.authorName || source?.display_name || source?.handle || 'District account';
+  const engagementRate = result.hasPerformanceData ? calculateSocialEngagementRate(result, followers) : null;
+  const displayName = result.authorName || source?.display_name || source?.handle || 'Public social account';
   const initials = displayName.split(/\s+/).map((part) => part[0]).join('').slice(0, 3).toUpperCase();
   const profileUrl = safeSocialUrl(source?.profile_url || source?.url);
   const postCopy = result.summary || result.headline;
+  const isVideo = result.mediaType === 'video';
 
   return (
-    <article className="social-post-preview-card">
-      <header className="social-post-preview-header">
-        <div className="social-post-preview-identity">
-          {profileImageUrl && !profileImageFailed ? (
+    <>
+      <article className="social-post-preview-card">
+        <header className="social-post-preview-header">
+          <div className="social-post-preview-identity">
+            {profileImageUrl && !profileImageFailed ? (
+              // eslint-disable-next-line @next/next/no-img-element
+              <img src={profileImageUrl} alt="" className="social-post-avatar" onError={() => setFailedProfileImageUrl(profileImageUrl)} />
+            ) : (
+              <span className="social-post-avatar social-post-avatar-fallback" aria-hidden="true">{initials}</span>
+            )}
+            <div>
+              {profileUrl ? <a href={profileUrl} target="_blank" rel="noopener noreferrer">{displayName}</a> : <strong>{displayName}</strong>}
+              <p>{formatDate(result.date)} · Public</p>
+            </div>
+          </div>
+          <div className="social-post-preview-badges">
+            {rank && <span className="social-top-rank">#{rank}</span>}
+            {result.visibilityStatus === 'review' && <span className="social-review-badge">Review</span>}
+          </div>
+        </header>
+
+        {postCopy && <p className="social-post-preview-copy">{postCopy}</p>}
+
+        <div className={`social-post-preview-media ${mediaUrl && !imageFailed ? 'has-media' : 'media-fallback'}`}>
+          {mediaUrl && !imageFailed ? (
             // eslint-disable-next-line @next/next/no-img-element
-            <img src={profileImageUrl} alt="" className="social-post-avatar" onError={() => setFailedProfileImageUrl(profileImageUrl)} />
+            <img src={mediaUrl} alt={result.headline || 'District social post'} loading="lazy" onError={() => setFailedMediaUrl(mediaUrl)} />
           ) : (
-            <span className="social-post-avatar social-post-avatar-fallback" aria-hidden="true">{initials}</span>
+            <div className="social-post-preview-fallback-copy">{result.headline}</div>
           )}
+          {isVideo && videoUrl ? (
+            <button type="button" className="social-post-video-launch" onClick={() => setVideoOpen(true)} aria-label={`Play video: ${result.headline}`}>
+              <span aria-hidden="true">▶</span><small>Play video</small>
+            </button>
+          ) : isVideo && result.url ? (
+            <a className="social-post-video-launch" href={result.url} target="_blank" rel="noopener noreferrer">
+              <span aria-hidden="true">▶</span><small>Watch on platform</small>
+            </a>
+          ) : null}
+        </div>
+
+        <div className="social-post-engagement-bar" aria-label="Public engagement counts">
+          <span>👍 <strong>{formatAvailableSocialMetric(result, 'reactions', result.reactionCount)}</strong> reactions</span>
+          <span>💬 <strong>{formatAvailableSocialMetric(result, 'comments', result.commentCount)}</strong> comments</span>
+          <span>↗ <strong>{formatAvailableSocialMetric(result, 'shares', result.shareCount)}</strong> shares</span>
+        </div>
+
+        <div className="social-post-performance-grid">
+          <div><strong>{formatAvailableSocialMetric(result, 'reactions', result.reactionCount)}</strong><span>Reactions</span></div>
+          <div><strong>{formatAvailableSocialMetric(result, 'comments', result.commentCount)}</strong><span>Comments</span></div>
+          <div title={result.hasPerformanceData && followers ? `${formatSocialMetric(result.engagementTotal)} available public interactions divided by ${formatSocialMetric(followers)} followers` : 'Performance or follower data unavailable'}>
+            <strong>{formatSocialRate(engagementRate)}</strong><span>Engagement rate</span>
+          </div>
+          <div><strong>{formatAvailableSocialMetric(result, 'views', result.viewCount)}</strong><span>Views</span></div>
+        </div>
+
+        <footer className="social-post-preview-footer">
           <div>
-            {profileUrl ? <a href={profileUrl} target="_blank" rel="noopener noreferrer">{displayName}</a> : <strong>{displayName}</strong>}
-            <p>{formatDate(result.date)} · Public</p>
+            <span>Total engagement</span>
+            <strong>{result.hasPerformanceData ? formatSocialMetric(result.engagementTotal) : 'N/A'}</strong>
+            {followers > 0 && <small>{formatSocialMetric(followers)} followers</small>}
+          </div>
+          {result.url && <a href={result.url} target="_blank" rel="noopener noreferrer">View original post ↗</a>}
+        </footer>
+
+        {showContext && (result.matchReason || result.recommendation) && (
+          <div className="social-post-canary-context">
+            {result.matchReason && <p><strong>Why Canary found it:</strong> {result.matchReason}</p>}
+            {result.recommendation && <p><strong>Recommended action:</strong> {result.recommendation}</p>}
+          </div>
+        )}
+      </article>
+
+      {videoOpen && videoUrl && (
+        <div className="social-video-modal" role="dialog" aria-modal="true" aria-label={`Video player for ${result.headline}`} onClick={() => setVideoOpen(false)}>
+          <div className="social-video-modal-panel" onClick={(event) => event.stopPropagation()}>
+            <header><strong>{displayName}</strong><button type="button" onClick={() => setVideoOpen(false)} aria-label="Close video player">✕</button></header>
+            <video src={videoUrl} poster={mediaUrl || undefined} controls autoPlay playsInline>
+              Your browser does not support video playback.
+            </video>
+            <footer><span>{result.headline}</span>{result.url && <a href={result.url} target="_blank" rel="noopener noreferrer">Open original post ↗</a>}</footer>
           </div>
         </div>
-        <div className="social-post-preview-badges">
-          <span className="social-top-rank">#{rank}</span>
-          {result.visibilityStatus === 'review' && <span className="social-review-badge">Review</span>}
-        </div>
-      </header>
-
-      {postCopy && <p className="social-post-preview-copy">{postCopy}</p>}
-
-      <div className={`social-post-preview-media ${mediaUrl && !imageFailed ? 'has-media' : 'media-fallback'}`}>
-        {mediaUrl && !imageFailed ? (
-          // eslint-disable-next-line @next/next/no-img-element
-          <img src={mediaUrl} alt={result.headline || 'District social post'} loading="lazy" onError={() => setFailedMediaUrl(mediaUrl)} />
-        ) : (
-          <div className="social-post-preview-fallback-copy">{result.headline}</div>
-        )}
-        {result.mediaType === 'video' && <span className="social-post-video-badge">▶ Video</span>}
-      </div>
-
-      <div className="social-post-engagement-bar" aria-label="Public engagement counts">
-        <span>👍 <strong>{formatSocialMetric(result.reactionCount)}</strong> reactions</span>
-        <span>💬 <strong>{formatSocialMetric(result.commentCount)}</strong> comments</span>
-        <span>↗ <strong>{formatSocialMetric(result.shareCount)}</strong> shares</span>
-      </div>
-
-      <div className="social-post-performance-grid">
-        <div><strong>{formatSocialMetric(result.reactionCount)}</strong><span>Reactions</span></div>
-        <div><strong>{formatSocialMetric(result.commentCount)}</strong><span>Comments</span></div>
-        <div title={followers ? `${formatSocialMetric(result.engagementTotal)} public interactions divided by ${formatSocialMetric(followers)} followers` : 'Follower count unavailable'}>
-          <strong>{formatSocialRate(engagementRate)}</strong><span>Engagement rate</span>
-        </div>
-        <div><strong>{formatSocialMetric(result.viewCount)}</strong><span>Views</span></div>
-      </div>
-
-      <footer className="social-post-preview-footer">
-        <div>
-          <span>Total engagement</span>
-          <strong>{formatSocialMetric(result.engagementTotal)}</strong>
-          {followers > 0 && <small>{formatSocialMetric(followers)} followers</small>}
-        </div>
-        {result.url && <a href={result.url} target="_blank" rel="noopener noreferrer">View original post ↗</a>}
-      </footer>
-    </article>
+      )}
+    </>
   );
 }
 
 function SocialView({ articles, socialThreads, socialSources, districtFilter, districts }) {
   const [relationshipFilter, setRelationshipFilter] = useState('all');
   const [socialSearch, setSocialSearch] = useState('');
+  const [socialResultLimit, setSocialResultLimit] = useState(24);
   const scopedRecords = useMemo(() => {
     const legacyRecords = articles.filter((article) => {
       const platform = String(article.source_type || '').toLowerCase();
@@ -2005,6 +2042,7 @@ function SocialView({ articles, socialThreads, socialSources, districtFilter, di
       return relationshipMatches && searchMatches;
     });
   }, [results, relationshipFilter, socialSearch]);
+  const pagedResults = visibleResults.slice(0, socialResultLimit);
   const scopedSources = socialSources.filter((source) => districtFilter === 'All' || source.district_id === districtFilter);
 
   return (
@@ -2103,45 +2141,39 @@ function SocialView({ articles, socialThreads, socialSources, districtFilter, di
       <section className="social-results-section">
         <div className="social-section-heading">
           <div>
-            <h3>Social results</h3>
-            <p>One concise record per post or conversation. Comments remain collapsed into engagement totals and summaries.</p>
+            <h3>All social posts and conversations</h3>
+            <p>Every result uses the same post scorecard. Metrics show N/A when the original monitoring record did not collect that field.</p>
           </div>
-          <input className="filter-input" value={socialSearch} onChange={(event) => setSocialSearch(event.target.value)} placeholder="Search social results…" />
+          <div className="social-results-heading-controls">
+            <span>{visibleResults.length} result{visibleResults.length === 1 ? '' : 's'}</span>
+            <input className="filter-input" value={socialSearch} onChange={(event) => setSocialSearch(event.target.value)} placeholder="Search social results…" />
+          </div>
         </div>
 
-        <div className="social-result-list">
-          {visibleResults.length === 0 ? (
-            <div className="empty-state"><div className="empty-state-icon">💬</div><h3>No social results found</h3><p>Try another filter, or connect and collect an official account.</p></div>
-          ) : visibleResults.map((result) => (
-            <article className="social-result-card" key={`${result.platform}-${result.id}`}>
-              <div className="social-result-main">
-                <div className="social-result-meta">
-                  <span className={`social-platform-badge ${result.platform}`}>{formatSourceLabel(result.platform)}</span>
-                  <span className={`social-relationship-badge ${result.relationshipType}`}>{result.relationshipLabel}</span>
-                  {result.visibilityStatus === 'review' && <span className="social-review-badge">Review</span>}
-                  <time>{formatDate(result.date)}</time>
-                </div>
-                <h3>{result.headline}</h3>
-                {result.authorName && <div className="social-author">{result.authorHandle ? `@${result.authorHandle.replace(/^@/, '')}` : result.authorName}</div>}
-                {result.summary && <p>{result.summary}</p>}
-                {result.matchReason && <div className="social-match-reason"><strong>Why Canary found it:</strong> {result.matchReason}</div>}
-                {result.recommendation && <div className="social-recommendation"><strong>Recommended action:</strong> {result.recommendation}</div>}
+        {visibleResults.length === 0 ? (
+          <div className="empty-state"><div className="empty-state-icon">💬</div><h3>No social results found</h3><p>Try another filter, or connect and collect an official account.</p></div>
+        ) : (
+          <>
+            <div className="social-scorecard-grid">
+              {pagedResults.map((result) => (
+                <SocialPostPreviewCard
+                  key={`${result.platform}-${result.id}`}
+                  result={result}
+                  source={scopedSources.find((source) => source.platform === result.platform && source.district_id === result.districtId)}
+                  showContext
+                />
+              ))}
+            </div>
+            {pagedResults.length < visibleResults.length && (
+              <div className="social-load-more">
+                <button type="button" className="btn btn-secondary" onClick={() => setSocialResultLimit((current) => current + 24)}>
+                  Load 24 more scorecards
+                </button>
+                <span>Showing {pagedResults.length} of {visibleResults.length}</span>
               </div>
-              <aside className="social-result-actions">
-                <div className="social-engagement-grid">
-                  <span><strong>{formatSocialMetric(result.reactionCount)}</strong> reactions</span>
-                  <span><strong>{formatSocialMetric(result.commentCount)}</strong> comments</span>
-                  <span><strong>{formatSocialMetric(result.shareCount)}</strong> shares</span>
-                  <span><strong>{formatSocialMetric(result.viewCount)}</strong> views</span>
-                  <span><strong>{formatSocialMetric(result.engagementTotal)}</strong> engagement</span>
-                </div>
-                {result.url ? (
-                  <a className="btn btn-primary btn-sm" href={result.url} target="_blank" rel="noopener noreferrer">View post & engagement ↗</a>
-                ) : <span className="social-link-unavailable">Original link unavailable</span>}
-              </aside>
-            </article>
-          ))}
-        </div>
+            )}
+          </>
+        )}
       </section>
     </div>
   );

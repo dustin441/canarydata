@@ -1331,15 +1331,49 @@ a:hover {
   text-align: center;
 }
 
-.social-post-video-badge {
+.social-post-video-launch {
   position: absolute;
-  right: 12px;
-  bottom: 12px;
-  padding: 6px 9px;
+  inset: 0;
+  display: flex;
+  align-items: center;
+  justify-content: center;
+  flex-direction: column;
+  gap: 8px;
   color: white;
+  border: 0;
+  background: rgba(0, 0, 0, 0.18);
+  cursor: pointer;
+  transition: background 160ms ease;
+}
+
+.social-post-video-launch:hover {
+  color: white;
+  background: rgba(0, 0, 0, 0.34);
+}
+
+.social-post-video-launch > span {
+  display: grid;
+  width: 64px;
+  height: 64px;
+  place-items: center;
+  padding-left: 4px;
+  border: 2px solid rgba(255, 255, 255, 0.75);
+  border-radius: 50%;
+  background: rgba(0, 0, 0, 0.58);
+  font-size: 1.4rem;
+  transition: transform 160ms ease, background 160ms ease;
+}
+
+.social-post-video-launch:hover > span {
+  transform: scale(1.08);
+  background: rgba(0, 0, 0, 0.76);
+}
+
+.social-post-video-launch small {
+  padding: 5px 9px;
   border-radius: var(--radius-full);
   background: rgba(0, 0, 0, 0.72);
-  font-size: 0.68rem;
+  font-size: 0.66rem;
   font-weight: 800;
 }
 
@@ -1432,6 +1466,124 @@ a:hover {
 .social-post-preview-footer > a:hover {
   color: white;
   background: #0f67dc;
+}
+
+.social-post-canary-context {
+  display: grid;
+  gap: 7px;
+  padding: 12px 15px;
+  border-top: 1px solid var(--border-primary);
+  background: rgba(245, 197, 24, 0.04);
+}
+
+.social-post-canary-context p {
+  margin: 0;
+  color: var(--text-tertiary);
+  font-size: 0.68rem;
+  line-height: 1.5;
+}
+
+.social-post-canary-context strong {
+  color: var(--text-secondary);
+}
+
+.social-video-modal {
+  position: fixed;
+  inset: 0;
+  z-index: 1000;
+  display: grid;
+  place-items: center;
+  padding: 22px;
+  background: rgba(0, 0, 0, 0.88);
+  backdrop-filter: blur(8px);
+}
+
+.social-video-modal-panel {
+  width: min(760px, 100%);
+  max-height: calc(100vh - 44px);
+  overflow: hidden;
+  border: 1px solid rgba(255, 255, 255, 0.15);
+  border-radius: 18px;
+  background: #07090d;
+  box-shadow: 0 28px 80px rgba(0, 0, 0, 0.55);
+}
+
+.social-video-modal-panel > header,
+.social-video-modal-panel > footer {
+  display: flex;
+  align-items: center;
+  justify-content: space-between;
+  gap: 14px;
+  padding: 13px 15px;
+}
+
+.social-video-modal-panel > header {
+  color: white;
+  border-bottom: 1px solid rgba(255, 255, 255, 0.1);
+}
+
+.social-video-modal-panel > header button {
+  display: grid;
+  width: 34px;
+  height: 34px;
+  place-items: center;
+  color: white;
+  border: 1px solid rgba(255, 255, 255, 0.16);
+  border-radius: 50%;
+  background: rgba(255, 255, 255, 0.08);
+  cursor: pointer;
+}
+
+.social-video-modal-panel video {
+  display: block;
+  width: 100%;
+  max-height: calc(100vh - 190px);
+  background: black;
+}
+
+.social-video-modal-panel > footer {
+  color: var(--text-secondary);
+  border-top: 1px solid rgba(255, 255, 255, 0.1);
+  font-size: 0.76rem;
+}
+
+.social-video-modal-panel > footer span {
+  overflow: hidden;
+  text-overflow: ellipsis;
+  white-space: nowrap;
+}
+
+.social-video-modal-panel > footer a {
+  flex: 0 0 auto;
+  color: #7cb4ff;
+  font-weight: 800;
+}
+
+.social-results-heading-controls {
+  display: flex;
+  align-items: center;
+  gap: 12px;
+}
+
+.social-results-heading-controls > span,
+.social-load-more span {
+  color: var(--text-tertiary);
+  font-size: 0.72rem;
+}
+
+.social-scorecard-grid {
+  display: grid;
+  grid-template-columns: repeat(2, minmax(0, 1fr));
+  gap: 16px;
+  padding: 20px;
+}
+
+.social-load-more {
+  display: flex;
+  align-items: center;
+  justify-content: center;
+  gap: 12px;
+  padding: 0 20px 20px;
 }
 
 .social-top-section > .social-empty-inline {
@@ -1665,6 +1817,10 @@ a:hover {
   .social-top-grid {
     grid-template-columns: repeat(2, minmax(0, 1fr));
   }
+
+  .social-scorecard-grid {
+    grid-template-columns: 1fr;
+  }
 }
 
 @media (max-width: 560px) {
@@ -1709,6 +1865,17 @@ a:hover {
 
   .social-section-heading .filter-input {
     width: 100%;
+  }
+
+  .social-results-heading-controls,
+  .social-load-more,
+  .social-video-modal-panel > footer {
+    align-items: stretch;
+    flex-direction: column;
+  }
+
+  .social-video-modal {
+    padding: 10px;
   }
 }
 

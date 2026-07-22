@@ -30,6 +30,7 @@ const legacyArticle = {
 const canonicalThread = {
   id: 'thread-1',
   district_id: 'alabaster-city-schools',
+  provider: 'apify',
   platform: 'facebook',
   relationship_type: 'owned',
   author_name: 'Alabaster City Schools',
@@ -39,8 +40,10 @@ const canonicalThread = {
   published_at: '2026-07-18T12:00:00Z',
   provider_metadata: {
     media_url: 'https://scontent-lga3-3.xx.fbcdn.net/example.jpg',
+    video_url: 'https://scontent-lga3-3.xx.fbcdn.net/example.mp4',
     profile_picture_url: 'https://scontent-lga3-1.xx.fbcdn.net/avatar.jpg',
-    media_type: 'image',
+    media_type: 'video',
+    metric_availability: { reactions: true, comments: false, shares: true, views: true },
   },
   comment_count: 24,
   reply_count: 6,
@@ -62,8 +65,12 @@ assert.equal(canonical.commentCount, 24);
 assert.equal(canonical.engagementTotal, 159);
 assert.equal(canonical.url, canonicalThread.canonical_url);
 assert.equal(canonical.mediaUrl, 'https://scontent-lga3-3.xx.fbcdn.net/example.jpg');
+assert.equal(canonical.videoUrl, 'https://scontent-lga3-3.xx.fbcdn.net/example.mp4');
 assert.equal(canonical.profileImageUrl, 'https://scontent-lga3-1.xx.fbcdn.net/avatar.jpg');
-assert.equal(canonical.mediaType, 'image');
+assert.equal(canonical.mediaType, 'video');
+assert.equal(canonical.hasPerformanceData, true);
+assert.equal(canonical.metricAvailability.comments, false);
+assert.equal(legacy.hasPerformanceData, false);
 assert.equal(canonical.visibilityStatus, 'active');
 assert.equal(normalizeSocialResult({ ...canonicalThread, visibility_status: 'review' }).visibilityStatus, 'review');
 

@@ -76,6 +76,16 @@ export function normalizeSocialResult(item = {}) {
   const providerMetadata = item.provider_metadata && typeof item.provider_metadata === 'object'
     ? item.provider_metadata
     : {};
+  const suppliedAvailability = providerMetadata.metric_availability && typeof providerMetadata.metric_availability === 'object'
+    ? providerMetadata.metric_availability
+    : {};
+  const providerHasPerformance = Boolean(item.provider && item.provider !== 'legacy_canary_replay');
+  const metricAvailability = {
+    reactions: Object.hasOwn(suppliedAvailability, 'reactions') ? Boolean(suppliedAvailability.reactions) : providerHasPerformance,
+    comments: Object.hasOwn(suppliedAvailability, 'comments') ? Boolean(suppliedAvailability.comments) : providerHasPerformance,
+    shares: Object.hasOwn(suppliedAvailability, 'shares') ? Boolean(suppliedAvailability.shares) : providerHasPerformance,
+    views: Object.hasOwn(suppliedAvailability, 'views') ? Boolean(suppliedAvailability.views) : providerHasPerformance,
+  };
 
   return {
     id: item.id || item.external_thread_id || item.canonical_url || item.link,
@@ -89,6 +99,7 @@ export function normalizeSocialResult(item = {}) {
     summary: conciseText(item.summary || item.body || '', 420),
     url: safeSocialUrl(item.canonical_url || item.link || item.permalink),
     mediaUrl: safeSocialMediaUrl(item.media_url || providerMetadata.media_url),
+    videoUrl: safeSocialMediaUrl(item.video_url || providerMetadata.video_url),
     profileImageUrl: safeSocialMediaUrl(item.profile_picture_url || providerMetadata.profile_picture_url),
     mediaType: providerMetadata.media_type === 'video' ? 'video' : 'image',
     date,
@@ -108,6 +119,8 @@ export function normalizeSocialResult(item = {}) {
     visibilityStatus: item.visibility_status || 'active',
     provider: item.provider || null,
     providerMetadata,
+    metricAvailability,
+    hasPerformanceData: Object.values(metricAvailability).some(Boolean),
   };
 }
 
