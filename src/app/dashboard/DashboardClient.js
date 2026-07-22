@@ -8,7 +8,7 @@ import { setEarnedMedia, saveNote, addQuery, deleteQuery, submitFeedback, addMan
 import { createEmbeddedCanaryCheckout, confirmEmbeddedCanaryCheckout, saveBillingPurchaseOrder } from '@/app/payment/actions';
 import { compareStrategicAlignmentRows } from '@/lib/strategicAlignmentSort.mjs';
 import { CORE_TAGS, canonicalTags } from '@/lib/canonicalTags.mjs';
-import { buildSocialResults, rankTopSocialResults, safeSocialUrl, summarizeSocialResults } from '@/lib/social.mjs';
+import { buildSocialResults, calculateSocialEngagementRate, rankTopSocialResults, safeSocialMediaUrl, safeSocialUrl, summarizeSocialResults } from '@/lib/social.mjs';
 import { formatDisplayDate } from '@/lib/date.mjs';
 
 const stripePromise = process.env.NEXT_PUBLIC_STRIPE_PUBLISHABLE_KEY
@@ -1888,6 +1888,87 @@ function CorrectionsView({ districts, userDistrictId, districtFilter, excludedSt
   );
 }
 
+function formatSocialRate(rate) {
+  if (rate === null || !Number.isFinite(rate)) return 'N/A';
+  if (rate > 0 && rate < 0.01) return '<0.01%';
+  return `${rate.toFixed(2)}%`;
+}
+
+function SocialPostPreviewCard({ result, source, rank }) {
+  const mediaUrl = safeSocialMediaUrl(result.mediaUrl);
+  const profileImageUrl = safeSocialMediaUrl(result.profileImageUrl || source?.metadata?.profile_picture_url);
+  const [failedMediaUrl, setFailedMediaUrl] = useState('');
+  const [failedProfileImageUrl, setFailedProfileImageUrl] = useState('');
+  const imageFailed = Boolean(mediaUrl && failedMediaUrl === mediaUrl);
+  const profileImageFailed = Boolean(profileImageUrl && failedProfileImageUrl === profileImageUrl);
+
+  const followers = Number(source?.metadata?.followers_count) || 0;
+  const engagementRate = calculateSocialEngagementRate(result, followers);
+  const displayName = result.authorName || source?.display_name || source?.handle || 'District account';
+  const initials = displayName.split(/\s+/).map((part) => part[0]).join('').slice(0, 3).toUpperCase();
+  const profileUrl = safeSocialUrl(source?.profile_url || source?.url);
+  const postCopy = result.summary || result.headline;
+
+  return (
+    <article className="social-post-preview-card">
+      <header className="social-post-preview-header">
+        <div className="social-post-preview-identity">
+          {profileImageUrl && !profileImageFailed ? (
+            // eslint-disable-next-line @next/next/no-img-element
+            <img src={profileImageUrl} alt="" className="social-post-avatar" onError={() => setFailedProfileImageUrl(profileImageUrl)} />
+          ) : (
+            <span className="social-post-avatar social-post-avatar-fallback" aria-hidden="true">{initials}</span>
+          )}
+          <div>
+            {profileUrl ? <a href={profileUrl} target="_blank" rel="noopener noreferrer">{displayName}</a> : <strong>{displayName}</strong>}
+            <p>{formatDate(result.date)} · Public</p>
+          </div>
+        </div>
+        <div className="social-post-preview-badges">
+          <span className="social-top-rank">#{rank}</span>
+          {result.visibilityStatus === 'review' && <span className="social-review-badge">Review</span>}
+        </div>
+      </header>
+
+      {postCopy && <p className="social-post-preview-copy">{postCopy}</p>}
+
+      <div className={`social-post-preview-media ${mediaUrl && !imageFailed ? 'has-media' : 'media-fallback'}`}>
+        {mediaUrl && !imageFailed ? (
+          // eslint-disable-next-line @next/next/no-img-element
+          <img src={mediaUrl} alt={result.headline || 'District social post'} loading="lazy" onError={() => setFailedMediaUrl(mediaUrl)} />
+        ) : (
+          <div className="social-post-preview-fallback-copy">{result.headline}</div>
+        )}
+        {result.mediaType === 'video' && <span className="social-post-video-badge">▶ Video</span>}
+      </div>
+
+      <div className="social-post-engagement-bar" aria-label="Public engagement counts">
+        <span>👍 <strong>{formatSocialMetric(result.reactionCount)}</strong> reactions</span>
+        <span>💬 <strong>{formatSocialMetric(result.commentCount)}</strong> comments</span>
+        <span>↗ <strong>{formatSocialMetric(result.shareCount)}</strong> shares</span>
+      </div>
+
+      <div className="social-post-performance-grid">
+        <div><strong>{formatSocialMetric(result.reactionCount)}</strong><span>Reactions</span></div>
+        <div><strong>{formatSocialMetric(result.commentCount)}</strong><span>Comments</span></div>
+        <div title={followers ? `${formatSocialMetric(result.engagementTotal)} public interactions divided by ${formatSocialMetric(followers)} followers` : 'Follower count unavailable'}>
+          <strong>{formatSocialRate(engagementRate)}</strong><span>Engagement rate</span>
+        </div>
+        <div><strong>{formatSocialMetric(result.viewCount)}</strong><span>Views</span></div>
+      </div>
+
+      <footer className="social-post-preview-footer">
+        <div>
+          <span>Total engagement</span>
+          <strong>{formatSocialMetric(result.engagementTotal)}</strong>
+          {followers > 0 && <small>{formatSocialMetric(followers)} followers</small>}
+        </div>
+        {result.url && <a href={result.url} target="_blank" rel="noopener noreferrer">View original post ↗</a>}
+      </footer>
+    </article>
+  );
+}
+
 function SocialView({ articles, socialThreads, socialSources, districtFilter, districts }) {
   const [relationshipFilter, setRelationshipFilter] = useState('all');
   const [socialSearch, setSocialSearch] = useState('');
@@ -1959,7 +2040,7 @@ function SocialView({ articles, socialThreads, socialSources, districtFilter, di
         <div className="social-section-heading">
           <div>
             <h3>Top district posts by platform</h3>
-            <p>Up to three owned posts per platform, ranked by public engagement. Views are shown separately when available.</p>
+            <p>Up to three owned posts per platform, ranked by public engagement. Engagement rate uses public interactions divided by the account’s public follower count.</p>
           </div>
           <span>{topPlatformGroups.reduce((total, group) => total + group.posts.length, 0)} ranked posts</span>
         </div>
@@ -1972,22 +2053,12 @@ function SocialView({ articles, socialThreads, socialSources, districtFilter, di
                 <h4><span className={`social-platform-dot ${group.platform}`} aria-hidden="true" />{formatSourceLabel(group.platform)}</h4>
                 <div className="social-top-grid">
                   {group.posts.map((result, index) => (
-                    <article className="social-top-card" key={`top-${result.platform}-${result.id}`}>
-                      <div className="social-top-rank">#{index + 1}</div>
-                      <div className="social-result-meta">
-                        {result.visibilityStatus === 'review' && <span className="social-review-badge">Review</span>}
-                        <time>{formatDate(result.date)}</time>
-                      </div>
-                      <h5>{result.headline}</h5>
-                      <div className="social-top-metrics" aria-label="Post engagement metrics">
-                        <span><strong>{formatSocialMetric(result.reactionCount)}</strong> reactions</span>
-                        <span><strong>{formatSocialMetric(result.commentCount)}</strong> comments</span>
-                        <span><strong>{formatSocialMetric(result.shareCount)}</strong> shares</span>
-                        <span><strong>{formatSocialMetric(result.viewCount)}</strong> views</span>
-                      </div>
-                      <div className="social-top-total"><span>Total engagement</span><strong>{formatSocialMetric(result.engagementTotal)}</strong></div>
-                      {result.url && <a href={result.url} target="_blank" rel="noopener noreferrer">View original post ↗</a>}
-                    </article>
+                    <SocialPostPreviewCard
+                      key={`top-${result.platform}-${result.id}`}
+                      result={result}
+                      source={scopedSources.find((source) => source.platform === result.platform && source.district_id === result.districtId)}
+                      rank={index + 1}
+                    />
                   ))}
                 </div>
               </div>
@@ -2018,8 +2089,11 @@ function SocialView({ articles, socialThreads, socialSources, districtFilter, di
                 {...(sourceUrl ? { href: sourceUrl, target: '_blank', rel: 'noopener noreferrer' } : {})}
               >
                 <span className={`social-platform-dot ${source.platform}`} aria-hidden="true" />
-                <span><strong>{source.handle ? `@${source.handle.replace(/^@/, '')}` : formatSourceLabel(source.platform)}</strong><small>{district?.name || formatDistrictName(source.district_id)} · {formatSourceLabel(source.platform)}</small></span>
-                <em>{sourceUrl ? 'Configured ↗' : 'Configured'}</em>
+                <span>
+                  <strong>{source.handle ? `@${source.handle.replace(/^@/, '')}` : formatSourceLabel(source.platform)}</strong>
+                  <small>{district?.name || formatDistrictName(source.district_id)} · {formatSourceLabel(source.platform)}{Number(source.metadata?.followers_count) > 0 ? ` · ${formatSocialMetric(source.metadata.followers_count)} followers` : ''}</small>
+                </span>
+                <em>{sourceUrl ? 'Public feed live ↗' : 'Public feed live'}</em>
               </AccountElement>
             );
           })}

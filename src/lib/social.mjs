@@ -30,6 +30,24 @@ export function safeSocialUrl(value) {
   }
 }
 
+export function safeSocialMediaUrl(value) {
+  try {
+    const url = new URL(String(value || ''));
+    if (url.protocol !== 'https:') return '';
+    const host = url.hostname.toLowerCase();
+    if (!['fbcdn.net', 'cdninstagram.com'].some((suffix) => host === suffix || host.endsWith(`.${suffix}`))) return '';
+    return url.toString();
+  } catch {
+    return '';
+  }
+}
+
+export function calculateSocialEngagementRate(item = {}, followerCount = 0) {
+  const followers = numberOrZero(followerCount);
+  if (!followers) return null;
+  return (numberOrZero(item.engagementTotal) / followers) * 100;
+}
+
 function normalizeRelationship(value) {
   const relationship = String(value || '').toLowerCase();
   if (relationship === 'owned') return 'owned';
@@ -55,6 +73,9 @@ export function normalizeSocialResult(item = {}) {
   const viewCount = numberOrZero(item.view_count);
   const calculatedEngagement = commentCount + replyCount + reactionCount + shareCount;
   const date = item.published_at || item.date || item.created_at || null;
+  const providerMetadata = item.provider_metadata && typeof item.provider_metadata === 'object'
+    ? item.provider_metadata
+    : {};
 
   return {
     id: item.id || item.external_thread_id || item.canonical_url || item.link,
@@ -67,6 +88,9 @@ export function normalizeSocialResult(item = {}) {
     headline: conciseText(item.headline || item.body || 'Social conversation', 220),
     summary: conciseText(item.summary || item.body || '', 420),
     url: safeSocialUrl(item.canonical_url || item.link || item.permalink),
+    mediaUrl: safeSocialMediaUrl(item.media_url || providerMetadata.media_url),
+    profileImageUrl: safeSocialMediaUrl(item.profile_picture_url || providerMetadata.profile_picture_url),
+    mediaType: providerMetadata.media_type === 'video' ? 'video' : 'image',
     date,
     commentCount,
     replyCount,
@@ -82,6 +106,8 @@ export function normalizeSocialResult(item = {}) {
     tags: Array.isArray(item.tags) ? item.tags : [],
     externalThreadId: item.external_thread_id || null,
     visibilityStatus: item.visibility_status || 'active',
+    provider: item.provider || null,
+    providerMetadata,
   };
 }
 

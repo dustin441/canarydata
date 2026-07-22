@@ -1,8 +1,10 @@
 import assert from 'node:assert/strict';
 import {
   buildSocialResults,
+  calculateSocialEngagementRate,
   normalizeSocialResult,
   rankTopSocialResults,
+  safeSocialMediaUrl,
   summarizeSocialResults,
 } from '../src/lib/social.mjs';
 import { normalizeProviderBatch } from '../src/lib/socialIngestion.mjs';
@@ -35,6 +37,11 @@ const canonicalThread = {
   summary: 'The district shared its opening schedule.',
   canonical_url: 'https://www.facebook.com/example/posts/1',
   published_at: '2026-07-18T12:00:00Z',
+  provider_metadata: {
+    media_url: 'https://scontent-lga3-3.xx.fbcdn.net/example.jpg',
+    profile_picture_url: 'https://scontent-lga3-1.xx.fbcdn.net/avatar.jpg',
+    media_type: 'image',
+  },
   comment_count: 24,
   reply_count: 6,
   reaction_count: 120,
@@ -54,6 +61,9 @@ assert.equal(canonical.relationshipType, 'owned');
 assert.equal(canonical.commentCount, 24);
 assert.equal(canonical.engagementTotal, 159);
 assert.equal(canonical.url, canonicalThread.canonical_url);
+assert.equal(canonical.mediaUrl, 'https://scontent-lga3-3.xx.fbcdn.net/example.jpg');
+assert.equal(canonical.profileImageUrl, 'https://scontent-lga3-1.xx.fbcdn.net/avatar.jpg');
+assert.equal(canonical.mediaType, 'image');
 assert.equal(canonical.visibilityStatus, 'active');
 assert.equal(normalizeSocialResult({ ...canonicalThread, visibility_status: 'review' }).visibilityStatus, 'review');
 
@@ -68,6 +78,12 @@ assert.ok(concise.recommendation.endsWith('…'));
 
 const unsafeLink = normalizeSocialResult({ ...legacyArticle, id: 'unsafe-link', link: 'javascript:alert(1)' });
 assert.equal(unsafeLink.url, null);
+assert.equal(safeSocialMediaUrl('javascript:alert(1)'), '');
+assert.equal(safeSocialMediaUrl('https://example.com/tracker.png'), '');
+assert.equal(safeSocialMediaUrl('https://scontent-lax3-1.cdninstagram.com/example.jpg'), 'https://scontent-lax3-1.cdninstagram.com/example.jpg');
+assert.equal(calculateSocialEngagementRate({ engagementTotal: 50 }, 1000), 5);
+assert.equal(calculateSocialEngagementRate({ engagementTotal: 50 }, 0), null);
+assert.equal(calculateSocialEngagementRate({ engagementTotal: 0 }, 1000), 0);
 
 const results = buildSocialResults([legacyArticle, canonicalThread, { ...canonicalThread }]);
 assert.equal(results.length, 2, 'duplicate platform thread IDs should collapse');
