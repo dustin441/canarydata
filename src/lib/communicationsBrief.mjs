@@ -18,6 +18,16 @@ export function isRoutineRecommendation(value) {
   return Boolean(recommendation) && ROUTINE_RECOMMENDATION_PATTERNS.some((pattern) => pattern.test(recommendation));
 }
 
+export function formatCommunicationsBriefRecommendation(value) {
+  return String(value || '')
+    .replace(/\\r\\n|\\n|\\r/g, ' ')
+    .replace(/^\s*#{1,6}\s*/gm, '')
+    .replace(/\*\*|__/g, '')
+    .replace(/^\s*[-*]\s+/gm, '')
+    .replace(/\s+/g, ' ')
+    .trim();
+}
+
 export function buildCommunicationsBrief(articles, limit = 3) {
   const records = [];
   const seen = new Set();

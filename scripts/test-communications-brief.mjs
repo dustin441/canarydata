@@ -1,9 +1,13 @@
 import assert from 'node:assert/strict';
-import { buildCommunicationsBrief, isRoutineRecommendation } from '../src/lib/communicationsBrief.mjs';
+import { buildCommunicationsBrief, formatCommunicationsBriefRecommendation, isRoutineRecommendation } from '../src/lib/communicationsBrief.mjs';
 
 assert.equal(isRoutineRecommendation('No immediate communications action recommended. Continue routine monitoring.'), true);
 assert.equal(isRoutineRecommendation('Confirm the event details, then amplify the opportunity.'), false);
 assert.equal(isRoutineRecommendation(''), false);
+assert.equal(
+  formatCommunicationsBriefRecommendation('## Strategic Intent\\n**Amplify** the story and __verify__ the date.'),
+  'Strategic Intent Amplify the story and verify the date.'
+);
 
 const brief = buildCommunicationsBrief([
   { id: 'routine', date: '2026-07-20', headline: 'Routine mention', recommendation: 'No immediate communications action recommended. Continue routine monitoring.', canary_score: 9.9 },

@@ -10,7 +10,7 @@ import { compareStrategicAlignmentRows } from '@/lib/strategicAlignmentSort.mjs'
 import { CORE_TAGS, canonicalTags } from '@/lib/canonicalTags.mjs';
 import { buildSocialResults, calculateSocialEngagementRate, rankTopSocialResults, safeSocialMediaUrl, safeSocialUrl, socialActionFilterMatches, socialRelationshipFilterMatches, summarizeSocialActions, summarizeSocialResults } from '@/lib/social.mjs';
 import { formatDisplayDate } from '@/lib/date.mjs';
-import { buildCommunicationsBrief } from '@/lib/communicationsBrief.mjs';
+import { buildCommunicationsBrief, formatCommunicationsBriefRecommendation } from '@/lib/communicationsBrief.mjs';
 
 const stripePromise = process.env.NEXT_PUBLIC_STRIPE_PUBLISHABLE_KEY
   ? loadStripe(process.env.NEXT_PUBLIC_STRIPE_PUBLISHABLE_KEY)
@@ -3009,7 +3009,7 @@ export default function DashboardClient({ articles, districts, queries: initialQ
                   : currentView === 'corrections' ? 'Add, exclude, restore, and audit district stories'
                   : currentView === 'birdseye' ? 'Strategic Alignment themes, counts, and supporting coverage'
                   : currentView === 'clients' ? 'Login credentials for beta testers'
-                  : currentView === 'howto' ? 'Platform walkthrough video'
+                  : currentView === 'howto' ? 'Media to decision to leadership proof'
                   : currentView === 'articles' ? 'Browse, filter, annotate, and export article-level coverage'
                   : currentView === 'social' ? 'District posts, tagged or mentioned posts, and public conversations'
                   : 'Media Intelligence Dashboard'}
@@ -3255,7 +3255,7 @@ export default function DashboardClient({ articles, districts, queries: initialQ
                         <span>{formatDate(article.date)} · {formatSourceLabel(article.source_type ?? 'other')} · Review-only recommendation</span>
                         <h3>{article.headline || 'Coverage recommendation'}</h3>
                       </div>
-                      <p>{normalizeEscapedRecommendationText(article.recommendation)}</p>
+                      <p>{formatCommunicationsBriefRecommendation(article.recommendation)}</p>
                       {articleUrl && <a href={articleUrl} target="_blank" rel="noopener noreferrer">View story ↗</a>}
                     </article>
                   );
