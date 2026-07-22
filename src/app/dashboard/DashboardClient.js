@@ -11,6 +11,7 @@ import { CORE_TAGS, canonicalTags } from '@/lib/canonicalTags.mjs';
 import { buildSocialResults, calculateSocialEngagementRate, rankTopSocialResults, safeSocialMediaUrl, safeSocialUrl, socialActionFilterMatches, socialRelationshipFilterMatches, summarizeSocialActions, summarizeSocialResults } from '@/lib/social.mjs';
 import { formatDisplayDate } from '@/lib/date.mjs';
 import { buildCommunicationsBrief, formatCommunicationsBriefRecommendation } from '@/lib/communicationsBrief.mjs';
+import { buildStrategicGovernance } from '@/lib/strategicGovernance.mjs';
 
 const stripePromise = process.env.NEXT_PUBLIC_STRIPE_PUBLISHABLE_KEY
   ? loadStripe(process.env.NEXT_PUBLIC_STRIPE_PUBLISHABLE_KEY)
@@ -848,7 +849,72 @@ function NotesView({ articles, getNoteText, openNoteModal }) {
   );
 }
 
-function BirdEyeView({ articles, strategicAlignmentData, selectedLabel, onSelectLabel, isEarned, dateStart, dateEnd, setDateStart, setDateEnd, onExportPdf }) {
+function StrategicGovernancePanel({ governance, hasSelectedDistrict }) {
+  if (!governance) {
+    return (
+      <section className="strategic-governance-card needs-review" aria-label="Strategic Alignment basis">
+        <div>
+          <span>Strategic Alignment basis</span>
+          <h4>{hasSelectedDistrict ? 'Source profile needs review' : 'Select a district to see its alignment basis'}</h4>
+        </div>
+        <p>{hasSelectedDistrict ? 'Canary does not have a reviewed strategic profile for this district yet.' : 'District-level mission, priorities, review dates, and sources appear here.'}</p>
+      </section>
+    );
+  }
+
+  const confidenceLabel = governance.confidence === 'high'
+    ? 'High-confidence sources'
+    : governance.confidence === 'medium'
+      ? 'Medium-confidence sources'
+      : governance.confidence === 'low'
+        ? 'Low-confidence sources'
+        : 'Needs source review';
+
+  return (
+    <details className={`strategic-governance-card confidence-${governance.confidence}`}>
+      <summary>
+        <div>
+          <span>Strategic Alignment basis</span>
+          <h4>{confidenceLabel}</h4>
+        </div>
+        <div className="strategic-governance-summary-metrics">
+          <div><strong>{governance.priorityCount}</strong><span>Active priorities</span></div>
+          <div><strong>{governance.sourceCount}</strong><span>Source documents</span></div>
+          <div><strong>{governance.lastReviewedAt ? formatDate(governance.lastReviewedAt) : 'Not recorded'}</strong><span>Last reviewed</span></div>
+        </div>
+        <span className="strategic-governance-expand">View basis</span>
+      </summary>
+      <div className="strategic-governance-details">
+        {(governance.mission || governance.vision) && (
+          <div className="strategic-governance-statements">
+            {governance.mission && <div><span>Mission</span><p>{governance.mission}</p></div>}
+            {governance.vision && <div><span>Vision</span><p>{governance.vision}</p></div>}
+          </div>
+        )}
+        <div>
+          <span className="strategic-governance-section-label">Active priorities used for alignment</span>
+          <div className="strategic-governance-priorities">
+            {governance.priorities.length > 0
+              ? governance.priorities.map((priority) => <span key={priority.id || priority.label}>{priority.label}</span>)
+              : <p>No active priorities are configured.</p>}
+          </div>
+        </div>
+        <div>
+          <span className="strategic-governance-section-label">Source documents</span>
+          <div className="strategic-governance-sources">
+            {governance.sourceUrls.length > 0
+              ? governance.sourceUrls.map((url, index) => (
+                  <a key={url} href={url} target="_blank" rel="noopener noreferrer">Source {index + 1} ↗</a>
+                ))
+              : <p>No public source links are recorded.</p>}
+          </div>
+        </div>
+      </div>
+    </details>
+  );
+}
+
+function BirdEyeView({ articles, strategicAlignmentData, strategicGovernance, hasSelectedDistrict, selectedLabel, onSelectLabel, isEarned, dateStart, dateEnd, setDateStart, setDateEnd, onExportPdf }) {
   const highlightedArticles = selectedLabel === 'All'
     ? articles.filter((article) => extractStrategicAlignmentLabels(article.innovation_reason).length > 0)
     : articles.filter((article) => extractStrategicAlignmentLabels(article.innovation_reason).includes(selectedLabel));
@@ -884,6 +950,8 @@ function BirdEyeView({ articles, strategicAlignmentData, selectedLabel, onSelect
           <button className="btn btn-secondary btn-sm" type="button" onClick={onExportPdf}>⬇ Export PDF</button>
         </div>
       </div>
+
+      <StrategicGovernancePanel governance={strategicGovernance} hasSelectedDistrict={hasSelectedDistrict} />
 
       <div className="filter-secondary-bar" style={{ marginTop: 0, marginBottom: '18px' }}>
         <div className="filter-control-group date-filter-group">
@@ -2393,7 +2461,7 @@ function SocialView({ articles, socialThreads, socialSources, districtFilter, di
   );
 }
 
-export default function DashboardClient({ articles, districts, queries: initialQueries, clients = [], userDistrictId, paymentNotice = null, billingInfo = null, excludedStories = [], correctionEvents = [], socialSources = [], socialThreads = [], demoMode = false }) {
+export default function DashboardClient({ articles, districts, queries: initialQueries, clients = [], userDistrictId, paymentNotice = null, billingInfo = null, excludedStories = [], correctionEvents = [], socialSources = [], socialThreads = [], strategicProfiles = [], strategicPriorities = [], demoMode = false }) {
   const defaultDistrictFilter = userDistrictId ?? districts[0]?.id ?? 'All';
   const [currentView, setCurrentView] = useState('dashboard');
   const [search, setSearch] = useState('');
@@ -2767,6 +2835,13 @@ export default function DashboardClient({ articles, districts, queries: initialQ
     [chartArticles]
   );
 
+  const strategicGovernance = useMemo(
+    () => districtFilter === 'All'
+      ? null
+      : buildStrategicGovernance({ districtId: districtFilter, profiles: strategicProfiles, priorities: strategicPriorities }),
+    [districtFilter, strategicProfiles, strategicPriorities]
+  );
+
   const strategicAlignedCount = chartArticles.filter((article) => extractStrategicAlignmentLabels(article.innovation_reason).length > 0).length;
 
   const avgScore = chartArticles.length
@@ -3129,6 +3204,8 @@ export default function DashboardClient({ articles, districts, queries: initialQ
             <BirdEyeView
               articles={chartArticles}
               strategicAlignmentData={strategicAlignmentData}
+              strategicGovernance={strategicGovernance}
+              hasSelectedDistrict={districtFilter !== 'All'}
               selectedLabel={strategicAlignmentFilter}
               onSelectLabel={setStrategicAlignmentFilter}
               isEarned={isEarned}

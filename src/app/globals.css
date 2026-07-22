@@ -2936,6 +2936,160 @@ a:hover {
   margin-bottom: 28px;
 }
 
+.strategic-governance-card {
+  margin-bottom: 18px;
+  border: 1px solid rgba(59, 130, 246, 0.28);
+  border-radius: var(--radius-lg);
+  background: linear-gradient(135deg, rgba(59, 130, 246, 0.1), rgba(15, 42, 68, 0.26));
+  overflow: hidden;
+}
+
+.strategic-governance-card.needs-review {
+  display: flex;
+  align-items: center;
+  justify-content: space-between;
+  gap: 18px;
+  padding: 16px 20px;
+  border-color: rgba(245, 197, 24, 0.3);
+}
+
+.strategic-governance-card summary {
+  display: grid;
+  grid-template-columns: minmax(190px, 1fr) auto auto;
+  gap: 24px;
+  align-items: center;
+  padding: 16px 20px;
+  cursor: pointer;
+  list-style: none;
+}
+
+.strategic-governance-card summary::-webkit-details-marker {
+  display: none;
+}
+
+.strategic-governance-card summary:hover {
+  background: rgba(255, 255, 255, 0.025);
+}
+
+.strategic-governance-card summary > div:first-child > span,
+.strategic-governance-card.needs-review > div > span,
+.strategic-governance-section-label,
+.strategic-governance-statements span {
+  display: block;
+  color: var(--blue-400);
+  font-size: 0.68rem;
+  font-weight: 800;
+  letter-spacing: 0.08em;
+  text-transform: uppercase;
+}
+
+.strategic-governance-card h4 {
+  margin: 4px 0 0;
+  color: var(--text-primary);
+  font-size: 1rem;
+}
+
+.strategic-governance-card.needs-review p,
+.strategic-governance-priorities p,
+.strategic-governance-sources p {
+  margin: 0;
+  color: var(--text-secondary);
+  font-size: 0.82rem;
+}
+
+.strategic-governance-summary-metrics {
+  display: flex;
+  gap: 24px;
+  align-items: center;
+}
+
+.strategic-governance-summary-metrics > div {
+  min-width: 92px;
+}
+
+.strategic-governance-summary-metrics strong,
+.strategic-governance-summary-metrics span {
+  display: block;
+}
+
+.strategic-governance-summary-metrics strong {
+  color: var(--text-primary);
+  font-size: 0.9rem;
+}
+
+.strategic-governance-summary-metrics span {
+  margin-top: 2px;
+  color: var(--text-tertiary);
+  font-size: 0.65rem;
+  text-transform: uppercase;
+  letter-spacing: 0.04em;
+}
+
+.strategic-governance-expand {
+  color: var(--blue-400);
+  font-size: 0.75rem;
+  font-weight: 700;
+  white-space: nowrap;
+}
+
+.strategic-governance-details {
+  display: grid;
+  gap: 18px;
+  padding: 18px 20px 20px;
+  border-top: 1px solid var(--border-primary);
+  background: rgba(3, 13, 25, 0.24);
+}
+
+.strategic-governance-statements {
+  display: grid;
+  grid-template-columns: repeat(2, minmax(0, 1fr));
+  gap: 12px;
+}
+
+.strategic-governance-statements > div {
+  padding: 14px;
+  border: 1px solid var(--border-primary);
+  border-radius: var(--radius-md);
+  background: var(--bg-card);
+}
+
+.strategic-governance-statements p {
+  margin: 7px 0 0;
+  color: var(--text-secondary);
+  font-size: 0.84rem;
+  line-height: 1.55;
+}
+
+.strategic-governance-priorities,
+.strategic-governance-sources {
+  display: flex;
+  flex-wrap: wrap;
+  gap: 8px;
+  margin-top: 9px;
+}
+
+.strategic-governance-priorities > span,
+.strategic-governance-sources a {
+  display: inline-flex;
+  padding: 6px 10px;
+  border: 1px solid var(--border-primary);
+  border-radius: var(--radius-full);
+  background: var(--bg-card);
+  color: var(--text-secondary);
+  font-size: 0.75rem;
+  line-height: 1.35;
+  text-decoration: none;
+}
+
+.strategic-governance-sources a {
+  color: var(--blue-400);
+}
+
+.strategic-governance-sources a:hover {
+  border-color: var(--blue-500);
+  color: var(--text-primary);
+}
+
 .strategic-performance-chart {
   grid-column: 1 / -1;
 }
@@ -3419,6 +3573,29 @@ a:hover {
     grid-template-columns: 1fr;
   }
 
+  .strategic-governance-card.needs-review,
+  .strategic-governance-card summary {
+    display: grid;
+    grid-template-columns: 1fr;
+    align-items: flex-start;
+    gap: 12px;
+  }
+
+  .strategic-governance-summary-metrics {
+    width: 100%;
+    display: grid;
+    grid-template-columns: repeat(2, minmax(0, 1fr));
+    gap: 10px;
+  }
+
+  .strategic-governance-summary-metrics > div {
+    min-width: 0;
+  }
+
+  .strategic-governance-statements {
+    grid-template-columns: 1fr;
+  }
+
   .pricing-journey-main {
     flex-direction: column;
     align-items: flex-start;
@@ -3851,6 +4028,7 @@ a:hover {
   }
 
   .main-content {
+    width: 100% !important;
     margin-left: 0 !important;
     min-height: auto !important;
   }

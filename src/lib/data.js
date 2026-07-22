@@ -68,6 +68,32 @@ export async function getDistricts() {
   return data ?? [];
 }
 
+export async function getStrategicProfiles(districtId = null) {
+  const supabase = createAdminClient();
+  let query = supabase
+    .from('strategic_profiles')
+    .select('id, district_id, source_confidence, mission, vision, values, source_urls, last_reviewed_at, updated_at')
+    .order('district_id');
+  if (districtId) query = query.eq('district_id', districtId);
+  const { data, error } = await query;
+  if (error) throw error;
+  return data ?? [];
+}
+
+export async function getStrategicPriorities(districtId = null) {
+  const supabase = createAdminClient();
+  let query = supabase
+    .from('strategic_priorities')
+    .select('id, district_id, profile_id, label, description, aliases, source_urls, confidence, active, updated_at')
+    .eq('active', true)
+    .order('district_id')
+    .order('label');
+  if (districtId) query = query.eq('district_id', districtId);
+  const { data, error } = await query;
+  if (error) throw error;
+  return data ?? [];
+}
+
 export async function getSocialSources(districtId = null) {
   const supabase = createAdminClient();
   let query = supabase

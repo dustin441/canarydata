@@ -14,6 +14,7 @@
     "test:onboarding": "node scripts/test-onboarding-discovery.mjs",
     "health:canary": "node scripts/check-canary-health.mjs",
     "test:social": "node scripts/test-social-monitoring.mjs && node scripts/test-communications-brief.mjs",
+    "test:strategic-governance": "node scripts/test-strategic-governance.mjs",
     "pilot:social": "node scripts/ingest-social-pilot.mjs"
   },
   "dependencies": {
