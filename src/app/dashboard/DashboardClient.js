@@ -120,6 +120,11 @@ function formatAvailableSocialMetric(result, metric, value) {
   return result?.metricAvailability?.[metric] ? formatSocialMetric(value) : 'N/A';
 }
 
+function proxiedSocialMediaUrl(value) {
+  const safeUrl = safeSocialMediaUrl(value);
+  return safeUrl ? `/api/social-media?url=${encodeURIComponent(safeUrl)}` : '';
+}
+
 function formatSourceLabel(source) {
   if (source === 'All') return 'All';
   if (source === 'Social') return 'Social';
@@ -1902,6 +1907,9 @@ function SocialPostPreviewCard({ result, source, rank = null, showContext = fals
   const mediaUrl = safeSocialMediaUrl(result.mediaUrl);
   const videoUrl = safeSocialMediaUrl(result.videoUrl);
   const profileImageUrl = safeSocialMediaUrl(result.profileImageUrl || source?.metadata?.profile_picture_url);
+  const renderedMediaUrl = proxiedSocialMediaUrl(mediaUrl);
+  const renderedVideoUrl = proxiedSocialMediaUrl(videoUrl);
+  const renderedProfileImageUrl = proxiedSocialMediaUrl(profileImageUrl);
   const [failedMediaUrl, setFailedMediaUrl] = useState('');
   const [failedProfileImageUrl, setFailedProfileImageUrl] = useState('');
   const [videoOpen, setVideoOpen] = useState(false);
@@ -1923,7 +1931,7 @@ function SocialPostPreviewCard({ result, source, rank = null, showContext = fals
           <div className="social-post-preview-identity">
             {profileImageUrl && !profileImageFailed ? (
               // eslint-disable-next-line @next/next/no-img-element
-              <img src={profileImageUrl} alt="" className="social-post-avatar" onError={() => setFailedProfileImageUrl(profileImageUrl)} />
+              <img src={renderedProfileImageUrl} alt="" className="social-post-avatar" onError={() => setFailedProfileImageUrl(profileImageUrl)} />
             ) : (
               <span className="social-post-avatar social-post-avatar-fallback" aria-hidden="true">{initials}</span>
             )}
@@ -1944,7 +1952,7 @@ function SocialPostPreviewCard({ result, source, rank = null, showContext = fals
         <div className={`social-post-preview-media ${mediaUrl && !imageFailed ? 'has-media' : 'media-fallback'}`}>
           {mediaUrl && !imageFailed ? (
             // eslint-disable-next-line @next/next/no-img-element
-            <img src={mediaUrl} alt={result.headline || 'District social post'} loading="lazy" onError={() => setFailedMediaUrl(mediaUrl)} />
+            <img src={renderedMediaUrl} alt={result.headline || 'District social post'} loading="lazy" onError={() => setFailedMediaUrl(mediaUrl)} />
           ) : (
             <div className="social-post-fallback-state">
               <span aria-hidden="true">{result.isTextOnly && !imageFailed ? 'Aa' : '◇'}</span>
@@ -2000,7 +2008,7 @@ function SocialPostPreviewCard({ result, source, rank = null, showContext = fals
         <div className="social-video-modal" role="dialog" aria-modal="true" aria-label={`Video player for ${result.headline}`} onClick={() => setVideoOpen(false)}>
           <div className="social-video-modal-panel" onClick={(event) => event.stopPropagation()}>
             <header><strong>{displayName}</strong><button type="button" onClick={() => setVideoOpen(false)} aria-label="Close video player">✕</button></header>
-            <video src={videoUrl} poster={mediaUrl || undefined} controls autoPlay playsInline>
+            <video src={renderedVideoUrl} poster={renderedMediaUrl || undefined} controls autoPlay playsInline>
               Your browser does not support video playback.
             </video>
             <footer><span>{result.headline}</span>{result.url && <a href={result.url} target="_blank" rel="noopener noreferrer">Open original post ↗</a>}</footer>
@@ -2213,8 +2221,8 @@ function SocialView({ articles, socialThreads, socialSources, districtFilter, di
           <label><span>Platform</span><select value={platformFilter} onChange={(event) => changeSocialFilter(setPlatformFilter, event.target.value)}><option value="all">All platforms</option>{platformOptions.map((platform) => <option key={platform} value={platform}>{formatSourceLabel(platform)}</option>)}</select></label>
           <label><span>Content</span><select value={mediaFilter} onChange={(event) => changeSocialFilter(setMediaFilter, event.target.value)}><option value="all">All content</option><option value="image">Images</option><option value="video">Videos</option><option value="text">Text-only / no media</option></select></label>
           <label><span>Performance data</span><select value={performanceFilter} onChange={(event) => changeSocialFilter(setPerformanceFilter, event.target.value)}><option value="all">Available or N/A</option><option value="available">Has performance data</option><option value="unavailable">Performance unavailable</option></select></label>
-          <label><span>Minimum engagement rate</span><div className="social-rate-input"><input type="number" min="0" step="0.1" value={minimumEngagementRate} onChange={(event) => changeSocialFilter(setMinimumEngagementRate, event.target.value)} placeholder="0.0" /><em>%</em></div></label>
-          <label><span>Maximum engagement rate</span><div className="social-rate-input"><input type="number" min="0" step="0.1" value={maximumEngagementRate} onChange={(event) => changeSocialFilter(setMaximumEngagementRate, event.target.value)} placeholder="Any" /><em>%</em></div></label>
+          <label><span>Min engagement rate</span><div className="social-rate-input"><input type="number" min="0" step="0.1" value={minimumEngagementRate} onChange={(event) => changeSocialFilter(setMinimumEngagementRate, event.target.value)} placeholder="0.0" /><em>%</em></div></label>
+          <label><span>Max engagement rate</span><div className="social-rate-input"><input type="number" min="0" step="0.1" value={maximumEngagementRate} onChange={(event) => changeSocialFilter(setMaximumEngagementRate, event.target.value)} placeholder="Any" /><em>%</em></div></label>
           <label><span>Sort by</span><select value={socialSort} onChange={(event) => changeSocialFilter(setSocialSort, event.target.value)}><option value="newest">Newest first</option><option value="engagement">Highest engagement</option><option value="engagement-rate">Highest engagement rate</option><option value="reactions">Most reactions</option><option value="comments">Most comments</option><option value="views">Most views</option></select></label>
           <button type="button" className="social-filter-reset" onClick={resetSocialFilters} disabled={!hasActiveSocialFilters}>Reset filters</button>
         </div>
