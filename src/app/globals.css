@@ -3596,27 +3596,6 @@ a:hover {
     grid-template-columns: 1fr;
   }
 
-  .date-filter-group {
-    width: 100%;
-    display: grid;
-    grid-template-columns: minmax(0, 1fr);
-    gap: 8px;
-  }
-
-  .date-filter-group .filter-group-label,
-  .date-filter-group .btn {
-    grid-column: 1 / -1;
-  }
-
-  .date-filter-group > span:not(.filter-group-label) {
-    display: none;
-  }
-
-  .date-filter-group .filter-date {
-    width: 100%;
-    min-width: 0;
-  }
-
   .pricing-journey-main {
     flex-direction: column;
     align-items: flex-start;
@@ -3778,6 +3757,29 @@ a:hover {
 
 .filter-date:focus {
   border-color: var(--canary-yellow);
+}
+
+@media (max-width: 768px) {
+  .filter-secondary-bar .date-filter-group {
+    width: 100%;
+    display: grid;
+    grid-template-columns: minmax(0, 1fr);
+    gap: 8px;
+  }
+
+  .filter-secondary-bar .date-filter-group .filter-group-label,
+  .filter-secondary-bar .date-filter-group .btn {
+    grid-column: 1;
+  }
+
+  .filter-secondary-bar .date-filter-group > span:not(.filter-group-label) {
+    display: none;
+  }
+
+  .filter-secondary-bar .date-filter-group .filter-date {
+    width: 100%;
+    min-width: 0;
+  }
 }
 
 /* Score dual-range slider */
