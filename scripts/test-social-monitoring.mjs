@@ -43,6 +43,9 @@ const canonicalThread = {
     video_url: 'https://scontent-lga3-3.xx.fbcdn.net/example.mp4',
     profile_picture_url: 'https://scontent-lga3-1.xx.fbcdn.net/avatar.jpg',
     media_type: 'video',
+    shared_post: false,
+    carousel_count: 1,
+    is_text_only: false,
     metric_availability: { reactions: true, comments: false, shares: true, views: true },
   },
   comment_count: 24,
@@ -68,6 +71,9 @@ assert.equal(canonical.mediaUrl, 'https://scontent-lga3-3.xx.fbcdn.net/example.j
 assert.equal(canonical.videoUrl, 'https://scontent-lga3-3.xx.fbcdn.net/example.mp4');
 assert.equal(canonical.profileImageUrl, 'https://scontent-lga3-1.xx.fbcdn.net/avatar.jpg');
 assert.equal(canonical.mediaType, 'video');
+assert.equal(canonical.isTextOnly, false);
+assert.equal(canonical.isSharedPost, false);
+assert.equal(canonical.carouselCount, 1);
 assert.equal(canonical.hasPerformanceData, true);
 assert.equal(canonical.metricAvailability.comments, false);
 assert.equal(legacy.hasPerformanceData, false);

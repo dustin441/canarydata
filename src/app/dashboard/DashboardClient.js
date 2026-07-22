@@ -1934,6 +1934,7 @@ function SocialPostPreviewCard({ result, source, rank = null, showContext = fals
           </div>
           <div className="social-post-preview-badges">
             {rank && <span className="social-top-rank">#{rank}</span>}
+            {result.isSharedPost && <span className="social-content-badge">Shared</span>}
             {result.visibilityStatus === 'review' && <span className="social-review-badge">Review</span>}
           </div>
         </header>
@@ -1945,8 +1946,13 @@ function SocialPostPreviewCard({ result, source, rank = null, showContext = fals
             // eslint-disable-next-line @next/next/no-img-element
             <img src={mediaUrl} alt={result.headline || 'District social post'} loading="lazy" onError={() => setFailedMediaUrl(mediaUrl)} />
           ) : (
-            <div className="social-post-preview-fallback-copy">{result.headline}</div>
+            <div className="social-post-fallback-state">
+              <span aria-hidden="true">{result.isTextOnly && !imageFailed ? 'Aa' : '◇'}</span>
+              <strong>{result.isTextOnly && !imageFailed ? 'Text-only social post' : 'Media unavailable'}</strong>
+              <small>{result.isTextOnly && !imageFailed ? 'This post was published without an image or video.' : 'Open the original post to review its media.'}</small>
+            </div>
           )}
+          {result.carouselCount > 1 && <span className="social-carousel-badge">▦ {result.carouselCount} images</span>}
           {isVideo && videoUrl ? (
             <button type="button" className="social-post-video-launch" onClick={() => setVideoOpen(true)} aria-label={`Play video: ${result.headline}`}>
               <span aria-hidden="true">▶</span><small>Play video</small>
@@ -2009,6 +2015,12 @@ function SocialView({ articles, socialThreads, socialSources, districtFilter, di
   const [relationshipFilter, setRelationshipFilter] = useState('all');
   const [socialSearch, setSocialSearch] = useState('');
   const [socialResultLimit, setSocialResultLimit] = useState(24);
+  const [platformFilter, setPlatformFilter] = useState('all');
+  const [mediaFilter, setMediaFilter] = useState('all');
+  const [performanceFilter, setPerformanceFilter] = useState('all');
+  const [minimumEngagementRate, setMinimumEngagementRate] = useState('');
+  const [maximumEngagementRate, setMaximumEngagementRate] = useState('');
+  const [socialSort, setSocialSort] = useState('newest');
   const scopedRecords = useMemo(() => {
     const legacyRecords = articles.filter((article) => {
       const platform = String(article.source_type || '').toLowerCase();
@@ -2033,17 +2045,64 @@ function SocialView({ articles, socialThreads, socialSources, districtFilter, di
       .map((platform) => ({ platform, posts: rankTopSocialResults(results.filter((result) => result.platform === platform), 3) }))
       .filter((group) => group.posts.length > 0);
   }, [results]);
+  const scopedSources = useMemo(
+    () => socialSources.filter((source) => districtFilter === 'All' || source.district_id === districtFilter),
+    [socialSources, districtFilter],
+  );
+  const sourceByDistrictPlatform = useMemo(() => new Map(
+    scopedSources.map((source) => [`${source.district_id}:${source.platform}`, source]),
+  ), [scopedSources]);
+  const platformOptions = useMemo(() => [...new Set(results.map((result) => result.platform))].sort(), [results]);
   const visibleResults = useMemo(() => {
     const query = socialSearch.trim().toLowerCase();
-    return results.filter((result) => {
-      const relationshipMatches = relationshipFilter === 'all' || result.relationshipType === relationshipFilter;
+    const minRate = minimumEngagementRate === '' ? null : Number(minimumEngagementRate);
+    const maxRate = maximumEngagementRate === '' ? null : Number(maximumEngagementRate);
+    const rateFor = (result) => {
+      const source = sourceByDistrictPlatform.get(`${result.districtId}:${result.platform}`);
+      return result.hasPerformanceData ? calculateSocialEngagementRate(result, Number(source?.metadata?.followers_count) || 0) : null;
+    };
+    const filtered = results.filter((result) => {
+      const relationshipMatches = relationshipFilter === 'all'
+        || (relationshipFilter === 'direct' ? ['direct_tag', 'direct_mention'].includes(result.relationshipType) : result.relationshipType === relationshipFilter);
+      const platformMatches = platformFilter === 'all' || result.platform === platformFilter;
+      const mediaCategory = result.mediaType === 'video' ? 'video' : (result.mediaUrl ? 'image' : 'text');
+      const mediaMatches = mediaFilter === 'all' || mediaCategory === mediaFilter;
+      const performanceMatches = performanceFilter === 'all'
+        || (performanceFilter === 'available' ? result.hasPerformanceData : !result.hasPerformanceData);
+      const rate = rateFor(result);
+      const minimumMatches = minRate === null || (rate !== null && Number.isFinite(minRate) && rate >= minRate);
+      const maximumMatches = maxRate === null || (rate !== null && Number.isFinite(maxRate) && rate <= maxRate);
       const searchMatches = !query || [result.headline, result.summary, result.authorName, result.platform, result.matchReason]
         .some((value) => String(value || '').toLowerCase().includes(query));
-      return relationshipMatches && searchMatches;
+      return relationshipMatches && platformMatches && mediaMatches && performanceMatches && minimumMatches && maximumMatches && searchMatches;
     });
-  }, [results, relationshipFilter, socialSearch]);
+    return filtered.sort((a, b) => {
+      if (socialSort === 'engagement') return b.engagementTotal - a.engagementTotal;
+      if (socialSort === 'engagement-rate') return (rateFor(b) ?? -1) - (rateFor(a) ?? -1);
+      if (socialSort === 'reactions') return b.reactionCount - a.reactionCount;
+      if (socialSort === 'comments') return b.commentCount - a.commentCount;
+      if (socialSort === 'views') return b.viewCount - a.viewCount;
+      return new Date(b.date).getTime() - new Date(a.date).getTime();
+    });
+  }, [results, relationshipFilter, platformFilter, mediaFilter, performanceFilter, minimumEngagementRate, maximumEngagementRate, socialSearch, socialSort, sourceByDistrictPlatform]);
   const pagedResults = visibleResults.slice(0, socialResultLimit);
-  const scopedSources = socialSources.filter((source) => districtFilter === 'All' || source.district_id === districtFilter);
+  const changeSocialFilter = (setter, value) => {
+    setter(value);
+    setSocialResultLimit(24);
+  };
+  const resetSocialFilters = () => {
+    setRelationshipFilter('all');
+    setPlatformFilter('all');
+    setMediaFilter('all');
+    setPerformanceFilter('all');
+    setMinimumEngagementRate('');
+    setMaximumEngagementRate('');
+    setSocialSearch('');
+    setSocialSort('newest');
+    setSocialResultLimit(24);
+  };
+  const hasActiveSocialFilters = relationshipFilter !== 'all' || platformFilter !== 'all' || mediaFilter !== 'all'
+    || performanceFilter !== 'all' || minimumEngagementRate !== '' || maximumEngagementRate !== '' || socialSearch !== '' || socialSort !== 'newest';
 
   return (
     <div className="social-monitor-view">
@@ -2060,16 +2119,16 @@ function SocialView({ articles, socialThreads, socialSources, districtFilter, di
       </section>
 
       <div className="social-summary-grid" aria-label="Social result summary">
-        <button type="button" className={relationshipFilter === 'all' ? 'active' : ''} onClick={() => setRelationshipFilter('all')}>
+        <button type="button" className={relationshipFilter === 'all' ? 'active' : ''} onClick={() => changeSocialFilter(setRelationshipFilter, 'all')}>
           <span>All results</span><strong>{summary.total}</strong>
         </button>
-        <button type="button" className={relationshipFilter === 'owned' ? 'active' : ''} onClick={() => setRelationshipFilter('owned')}>
+        <button type="button" className={relationshipFilter === 'owned' ? 'active' : ''} onClick={() => changeSocialFilter(setRelationshipFilter, 'owned')}>
           <span>District posts</span><strong>{summary.owned}</strong>
         </button>
-        <button type="button" className={relationshipFilter === 'direct' ? 'active' : ''} onClick={() => setRelationshipFilter('direct')}>
+        <button type="button" className={relationshipFilter === 'direct' ? 'active' : ''} onClick={() => changeSocialFilter(setRelationshipFilter, 'direct')}>
           <span>Direct engagement</span><strong>{summary.direct}</strong>
         </button>
-        <button type="button" className={relationshipFilter === 'ambient' ? 'active' : ''} onClick={() => setRelationshipFilter('ambient')}>
+        <button type="button" className={relationshipFilter === 'ambient' ? 'active' : ''} onClick={() => changeSocialFilter(setRelationshipFilter, 'ambient')}>
           <span>Public mentions</span><strong>{summary.ambient}</strong>
         </button>
       </div>
@@ -2146,8 +2205,18 @@ function SocialView({ articles, socialThreads, socialSources, districtFilter, di
           </div>
           <div className="social-results-heading-controls">
             <span>{visibleResults.length} result{visibleResults.length === 1 ? '' : 's'}</span>
-            <input className="filter-input" value={socialSearch} onChange={(event) => setSocialSearch(event.target.value)} placeholder="Search social results…" />
+            <input className="filter-input" value={socialSearch} onChange={(event) => changeSocialFilter(setSocialSearch, event.target.value)} placeholder="Search social results…" />
           </div>
+        </div>
+
+        <div className="social-filter-panel" aria-label="Social result filters">
+          <label><span>Platform</span><select value={platformFilter} onChange={(event) => changeSocialFilter(setPlatformFilter, event.target.value)}><option value="all">All platforms</option>{platformOptions.map((platform) => <option key={platform} value={platform}>{formatSourceLabel(platform)}</option>)}</select></label>
+          <label><span>Content</span><select value={mediaFilter} onChange={(event) => changeSocialFilter(setMediaFilter, event.target.value)}><option value="all">All content</option><option value="image">Images</option><option value="video">Videos</option><option value="text">Text-only / no media</option></select></label>
+          <label><span>Performance data</span><select value={performanceFilter} onChange={(event) => changeSocialFilter(setPerformanceFilter, event.target.value)}><option value="all">Available or N/A</option><option value="available">Has performance data</option><option value="unavailable">Performance unavailable</option></select></label>
+          <label><span>Minimum engagement rate</span><div className="social-rate-input"><input type="number" min="0" step="0.1" value={minimumEngagementRate} onChange={(event) => changeSocialFilter(setMinimumEngagementRate, event.target.value)} placeholder="0.0" /><em>%</em></div></label>
+          <label><span>Maximum engagement rate</span><div className="social-rate-input"><input type="number" min="0" step="0.1" value={maximumEngagementRate} onChange={(event) => changeSocialFilter(setMaximumEngagementRate, event.target.value)} placeholder="Any" /><em>%</em></div></label>
+          <label><span>Sort by</span><select value={socialSort} onChange={(event) => changeSocialFilter(setSocialSort, event.target.value)}><option value="newest">Newest first</option><option value="engagement">Highest engagement</option><option value="engagement-rate">Highest engagement rate</option><option value="reactions">Most reactions</option><option value="comments">Most comments</option><option value="views">Most views</option></select></label>
+          <button type="button" className="social-filter-reset" onClick={resetSocialFilters} disabled={!hasActiveSocialFilters}>Reset filters</button>
         </div>
 
         {visibleResults.length === 0 ? (
