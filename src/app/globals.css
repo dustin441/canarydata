@@ -1066,6 +1066,7 @@ a:hover {
 }
 
 .social-monitor-hero,
+.social-top-section,
 .social-account-section,
 .social-results-section {
   background: var(--bg-card);
@@ -1161,9 +1162,110 @@ a:hover {
   font-size: 1.45rem;
 }
 
+.social-top-section,
 .social-account-section,
 .social-results-section {
   overflow: hidden;
+}
+
+.social-top-groups {
+  display: grid;
+}
+
+.social-top-group + .social-top-group {
+  border-top: 1px solid var(--border-primary);
+}
+
+.social-top-group > h4 {
+  display: flex;
+  align-items: center;
+  gap: 8px;
+  margin: 0;
+  padding: 18px 20px 0;
+  font-size: 0.88rem;
+}
+
+.social-top-grid {
+  display: grid;
+  grid-template-columns: repeat(auto-fit, minmax(250px, 1fr));
+  gap: 12px;
+  padding: 12px 20px 20px;
+}
+
+.social-top-card {
+  position: relative;
+  display: grid;
+  gap: 12px;
+  min-width: 0;
+  padding: 18px;
+  border: 1px solid var(--border-primary);
+  border-radius: var(--radius-md);
+  background: linear-gradient(145deg, rgba(245, 197, 24, 0.07), var(--bg-elevated) 44%);
+}
+
+.social-top-rank {
+  position: absolute;
+  top: 14px;
+  right: 14px;
+  color: var(--canary-yellow);
+  font-size: 0.8rem;
+  font-weight: 800;
+}
+
+.social-top-card .social-result-meta {
+  padding-right: 34px;
+  margin-bottom: 0;
+}
+
+.social-top-card h5 {
+  margin: 0;
+  font-size: 0.92rem;
+  line-height: 1.45;
+}
+
+.social-top-metrics {
+  display: grid;
+  grid-template-columns: repeat(2, minmax(0, 1fr));
+  gap: 7px;
+}
+
+.social-top-metrics span {
+  display: grid;
+  gap: 2px;
+  padding: 9px;
+  color: var(--text-tertiary);
+  border-radius: var(--radius-sm);
+  background: var(--bg-card);
+  font-size: 0.66rem;
+}
+
+.social-top-metrics strong {
+  color: var(--text-primary);
+  font-size: 0.92rem;
+}
+
+.social-top-total {
+  display: flex;
+  align-items: center;
+  justify-content: space-between;
+  gap: 12px;
+  color: var(--text-secondary);
+  font-size: 0.74rem;
+}
+
+.social-top-total strong {
+  color: var(--canary-yellow);
+  font-size: 1.1rem;
+}
+
+.social-top-card > a {
+  color: var(--blue-400);
+  font-size: 0.74rem;
+  font-weight: 700;
+}
+
+.social-top-section > .social-empty-inline {
+  padding: 18px 20px 20px;
 }
 
 .social-section-heading {
@@ -1346,8 +1448,12 @@ a:hover {
 
 .social-engagement-grid {
   display: grid;
-  grid-template-columns: repeat(3, minmax(0, 1fr));
+  grid-template-columns: repeat(2, minmax(0, 1fr));
   gap: 6px;
+}
+
+.social-engagement-grid span:last-child {
+  grid-column: 1 / -1;
 }
 
 .social-engagement-grid span {
@@ -1385,10 +1491,18 @@ a:hover {
   .social-summary-grid {
     grid-template-columns: repeat(2, minmax(0, 1fr));
   }
+
+  .social-top-grid {
+    grid-template-columns: repeat(2, minmax(0, 1fr));
+  }
 }
 
 @media (max-width: 560px) {
   .social-summary-grid {
+    grid-template-columns: 1fr;
+  }
+
+  .social-top-grid {
     grid-template-columns: 1fr;
   }
 

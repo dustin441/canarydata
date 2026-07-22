@@ -8,7 +8,7 @@ import { setEarnedMedia, saveNote, addQuery, deleteQuery, submitFeedback, addMan
 import { createEmbeddedCanaryCheckout, confirmEmbeddedCanaryCheckout, saveBillingPurchaseOrder } from '@/app/payment/actions';
 import { compareStrategicAlignmentRows } from '@/lib/strategicAlignmentSort.mjs';
 import { CORE_TAGS, canonicalTags } from '@/lib/canonicalTags.mjs';
-import { buildSocialResults, safeSocialUrl, summarizeSocialResults } from '@/lib/social.mjs';
+import { buildSocialResults, rankTopSocialResults, safeSocialUrl, summarizeSocialResults } from '@/lib/social.mjs';
 import { formatDisplayDate } from '@/lib/date.mjs';
 
 const stripePromise = process.env.NEXT_PUBLIC_STRIPE_PUBLISHABLE_KEY
@@ -110,6 +110,11 @@ const DEMO_TESTIMONIALS = [
 ];
 
 const SOCIAL_SOURCE_TYPES = new Set(['facebook', 'instagram', 'tiktok', 'twitter', 'x', 'youtube', 'threads', 'linkedin']);
+
+function formatSocialMetric(value) {
+  const number = Number(value);
+  return Number.isFinite(number) && number > 0 ? Math.round(number).toLocaleString('en-US') : '0';
+}
 
 function formatSourceLabel(source) {
   if (source === 'All') return 'All';
@@ -1897,6 +1902,19 @@ function SocialView({ articles, socialThreads, socialSources, districtFilter, di
   }, [articles, socialThreads, districtFilter]);
   const results = useMemo(() => buildSocialResults(scopedRecords), [scopedRecords]);
   const summary = useMemo(() => summarizeSocialResults(results), [results]);
+  const topPlatformGroups = useMemo(() => {
+    const preferredOrder = ['facebook', 'instagram'];
+    const platforms = [...new Set(results.filter((result) => result.relationshipType === 'owned').map((result) => result.platform))]
+      .sort((a, b) => {
+        const aIndex = preferredOrder.indexOf(a);
+        const bIndex = preferredOrder.indexOf(b);
+        if (aIndex >= 0 || bIndex >= 0) return (aIndex < 0 ? preferredOrder.length : aIndex) - (bIndex < 0 ? preferredOrder.length : bIndex);
+        return a.localeCompare(b);
+      });
+    return platforms
+      .map((platform) => ({ platform, posts: rankTopSocialResults(results.filter((result) => result.platform === platform), 3) }))
+      .filter((group) => group.posts.length > 0);
+  }, [results]);
   const visibleResults = useMemo(() => {
     const query = socialSearch.trim().toLowerCase();
     return results.filter((result) => {
@@ -1936,6 +1954,47 @@ function SocialView({ articles, socialThreads, socialSources, districtFilter, di
           <span>Public mentions</span><strong>{summary.ambient}</strong>
         </button>
       </div>
+
+      <section className="social-top-section">
+        <div className="social-section-heading">
+          <div>
+            <h3>Top district posts by platform</h3>
+            <p>Up to three owned posts per platform, ranked by public engagement. Views are shown separately when available.</p>
+          </div>
+          <span>{topPlatformGroups.reduce((total, group) => total + group.posts.length, 0)} ranked posts</span>
+        </div>
+        {topPlatformGroups.length === 0 ? (
+          <div className="social-empty-inline">No owned posts with public metrics have been collected yet.</div>
+        ) : (
+          <div className="social-top-groups">
+            {topPlatformGroups.map((group) => (
+              <div className="social-top-group" key={group.platform}>
+                <h4><span className={`social-platform-dot ${group.platform}`} aria-hidden="true" />{formatSourceLabel(group.platform)}</h4>
+                <div className="social-top-grid">
+                  {group.posts.map((result, index) => (
+                    <article className="social-top-card" key={`top-${result.platform}-${result.id}`}>
+                      <div className="social-top-rank">#{index + 1}</div>
+                      <div className="social-result-meta">
+                        {result.visibilityStatus === 'review' && <span className="social-review-badge">Review</span>}
+                        <time>{formatDate(result.date)}</time>
+                      </div>
+                      <h5>{result.headline}</h5>
+                      <div className="social-top-metrics" aria-label="Post engagement metrics">
+                        <span><strong>{formatSocialMetric(result.reactionCount)}</strong> reactions</span>
+                        <span><strong>{formatSocialMetric(result.commentCount)}</strong> comments</span>
+                        <span><strong>{formatSocialMetric(result.shareCount)}</strong> shares</span>
+                        <span><strong>{formatSocialMetric(result.viewCount)}</strong> views</span>
+                      </div>
+                      <div className="social-top-total"><span>Total engagement</span><strong>{formatSocialMetric(result.engagementTotal)}</strong></div>
+                      {result.url && <a href={result.url} target="_blank" rel="noopener noreferrer">View original post ↗</a>}
+                    </article>
+                  ))}
+                </div>
+              </div>
+            ))}
+          </div>
+        )}
+      </section>
 
       <section className="social-account-section">
         <div className="social-section-heading">
@@ -1996,9 +2055,11 @@ function SocialView({ articles, socialThreads, socialSources, districtFilter, di
               </div>
               <aside className="social-result-actions">
                 <div className="social-engagement-grid">
-                  <span><strong>{result.commentCount}</strong> comments</span>
-                  <span><strong>{result.replyCount}</strong> replies</span>
-                  <span><strong>{result.engagementTotal}</strong> engagement</span>
+                  <span><strong>{formatSocialMetric(result.reactionCount)}</strong> reactions</span>
+                  <span><strong>{formatSocialMetric(result.commentCount)}</strong> comments</span>
+                  <span><strong>{formatSocialMetric(result.shareCount)}</strong> shares</span>
+                  <span><strong>{formatSocialMetric(result.viewCount)}</strong> views</span>
+                  <span><strong>{formatSocialMetric(result.engagementTotal)}</strong> engagement</span>
                 </div>
                 {result.url ? (
                   <a className="btn btn-primary btn-sm" href={result.url} target="_blank" rel="noopener noreferrer">View post & engagement ↗</a>

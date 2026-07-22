@@ -2,6 +2,7 @@ import assert from 'node:assert/strict';
 import {
   buildSocialResults,
   normalizeSocialResult,
+  rankTopSocialResults,
   summarizeSocialResults,
 } from '../src/lib/social.mjs';
 import { normalizeProviderBatch } from '../src/lib/socialIngestion.mjs';
@@ -97,6 +98,17 @@ assert.deepEqual(summary, {
   ambient: 1,
   totalEngagement: 159,
 });
+
+const ranked = rankTopSocialResults([
+  { ...canonical, id: 'lower-engagement', engagementTotal: 10, viewCount: 900, date: '2026-07-20' },
+  { ...canonical, id: 'highest-engagement', engagementTotal: 50, viewCount: 100, date: '2026-07-18' },
+  { ...canonical, id: 'tie-newer', engagementTotal: 25, viewCount: 200, date: '2026-07-21' },
+  { ...canonical, id: 'tie-older', engagementTotal: 25, viewCount: 200, date: '2026-07-19' },
+  { ...canonical, id: 'ambient', relationshipType: 'ambient', engagementTotal: 999, viewCount: 9999 },
+], 3);
+assert.deepEqual(ranked.map((item) => item.id), ['highest-engagement', 'tie-newer', 'tie-older']);
+assert.deepEqual(rankTopSocialResults([], 5), []);
+assert.deepEqual(rankTopSocialResults([canonical], 0), []);
 
 const batch = normalizeProviderBatch({
   provider: 'meta',

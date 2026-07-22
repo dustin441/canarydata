@@ -113,6 +113,22 @@ export function buildSocialResults(items = []) {
     .sort((a, b) => String(b.date || '').localeCompare(String(a.date || '')));
 }
 
+export function rankTopSocialResults(items = [], limit = 5) {
+  const safeLimit = Math.max(0, Math.trunc(Number(limit) || 0));
+  if (!safeLimit) return [];
+  return items
+    .filter((item) => item?.relationshipType === 'owned')
+    .slice()
+    .sort((a, b) => {
+      const engagementDifference = numberOrZero(b.engagementTotal) - numberOrZero(a.engagementTotal);
+      if (engagementDifference) return engagementDifference;
+      const viewDifference = numberOrZero(b.viewCount) - numberOrZero(a.viewCount);
+      if (viewDifference) return viewDifference;
+      return String(b.date || '').localeCompare(String(a.date || ''));
+    })
+    .slice(0, safeLimit);
+}
+
 export function summarizeSocialResults(items = []) {
   return items.reduce((summary, item) => {
     summary.total += 1;
