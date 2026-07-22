@@ -5,6 +5,7 @@ import {
   normalizeSocialResult,
   rankTopSocialResults,
   safeSocialMediaUrl,
+  socialRelationshipFilterMatches,
   summarizeSocialResults,
 } from '../src/lib/social.mjs';
 import { normalizeProviderBatch } from '../src/lib/socialIngestion.mjs';
@@ -98,6 +99,12 @@ assert.equal(canonical.representativeComments[0].reactionCount, 2);
 assert.equal(legacy.hasPerformanceData, false);
 assert.equal(canonical.visibilityStatus, 'active');
 assert.equal(normalizeSocialResult({ ...canonicalThread, visibility_status: 'review' }).visibilityStatus, 'review');
+const directTag = normalizeSocialResult({ ...canonicalThread, id: 'tagged', relationship_type: 'direct_tag' });
+assert.equal(directTag.relationshipType, 'direct');
+assert.equal(directTag.relationshipLabel, 'Tagged post');
+assert.equal(socialRelationshipFilterMatches(directTag, 'direct'), true);
+assert.equal(socialRelationshipFilterMatches(directTag, 'owned'), false);
+assert.equal(socialRelationshipFilterMatches(canonical, 'owned'), true);
 
 const concise = normalizeSocialResult({
   ...canonicalThread,

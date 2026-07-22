@@ -8,7 +8,7 @@ import { setEarnedMedia, saveNote, addQuery, deleteQuery, submitFeedback, addMan
 import { createEmbeddedCanaryCheckout, confirmEmbeddedCanaryCheckout, saveBillingPurchaseOrder } from '@/app/payment/actions';
 import { compareStrategicAlignmentRows } from '@/lib/strategicAlignmentSort.mjs';
 import { CORE_TAGS, canonicalTags } from '@/lib/canonicalTags.mjs';
-import { buildSocialResults, calculateSocialEngagementRate, rankTopSocialResults, safeSocialMediaUrl, safeSocialUrl, summarizeSocialResults } from '@/lib/social.mjs';
+import { buildSocialResults, calculateSocialEngagementRate, rankTopSocialResults, safeSocialMediaUrl, safeSocialUrl, socialRelationshipFilterMatches, summarizeSocialResults } from '@/lib/social.mjs';
 import { formatDisplayDate } from '@/lib/date.mjs';
 
 const stripePromise = process.env.NEXT_PUBLIC_STRIPE_PUBLISHABLE_KEY
@@ -1942,6 +1942,7 @@ function SocialPostPreviewCard({ result, source, rank = null, showContext = fals
           </div>
           <div className="social-post-preview-badges">
             {rank && <span className="social-top-rank">#{rank}</span>}
+            {result.relationshipType !== 'owned' && <span className="social-content-badge">{result.relationshipLabel}</span>}
             {result.isSharedPost && <span className="social-content-badge">Shared</span>}
             {result.visibilityStatus === 'review' && <span className="social-review-badge">Review</span>}
           </div>
@@ -2088,8 +2089,7 @@ function SocialView({ articles, socialThreads, socialSources, districtFilter, di
       return result.hasPerformanceData ? calculateSocialEngagementRate(result, Number(source?.metadata?.followers_count) || 0) : null;
     };
     const filtered = results.filter((result) => {
-      const relationshipMatches = relationshipFilter === 'all'
-        || (relationshipFilter === 'direct' ? ['direct_tag', 'direct_mention'].includes(result.relationshipType) : result.relationshipType === relationshipFilter);
+      const relationshipMatches = socialRelationshipFilterMatches(result, relationshipFilter);
       const platformMatches = platformFilter === 'all' || result.platform === platformFilter;
       const mediaCategory = result.mediaType === 'video' ? 'video' : (result.mediaUrl ? 'image' : 'text');
       const mediaMatches = mediaFilter === 'all' || mediaCategory === mediaFilter;
@@ -2152,13 +2152,14 @@ function SocialView({ articles, socialThreads, socialSources, districtFilter, di
           <span>District posts</span><strong>{summary.owned}</strong>
         </button>
         <button type="button" className={relationshipFilter === 'direct' ? 'active' : ''} onClick={() => changeSocialFilter(setRelationshipFilter, 'direct')}>
-          <span>Direct engagement</span><strong>{summary.direct}</strong>
+          <span>Tagged / mentioned</span><strong>{summary.direct}</strong>
         </button>
         <button type="button" className={relationshipFilter === 'ambient' ? 'active' : ''} onClick={() => changeSocialFilter(setRelationshipFilter, 'ambient')}>
           <span>Public mentions</span><strong>{summary.ambient}</strong>
         </button>
       </div>
 
+      {(relationshipFilter === 'all' || relationshipFilter === 'owned') && (
       <section className="social-top-section">
         <div className="social-section-heading">
           <div>
@@ -2189,7 +2190,9 @@ function SocialView({ articles, socialThreads, socialSources, districtFilter, di
           </div>
         )}
       </section>
+      )}
 
+      {(relationshipFilter === 'all' || relationshipFilter === 'owned') && (
       <section className="social-account-section">
         <div className="social-section-heading">
           <div>
@@ -2222,6 +2225,7 @@ function SocialView({ articles, socialThreads, socialSources, districtFilter, di
           })}
         </div>
       </section>
+      )}
 
       <section className="social-results-section">
         <div className="social-section-heading">

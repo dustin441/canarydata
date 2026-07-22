@@ -56,16 +56,27 @@ function normalizeRelationship(value) {
 }
 
 export function socialRelationshipLabel(value) {
-  const relationship = normalizeRelationship(value);
+  const rawRelationship = String(value || '').toLowerCase();
+  const relationship = normalizeRelationship(rawRelationship);
   if (relationship === 'owned') return 'Published by district';
-  if (relationship === 'direct') return 'Direct engagement';
+  if (rawRelationship === 'direct_tag' || rawRelationship === 'tagged') return 'Tagged post';
+  if (rawRelationship === 'direct_mention' || rawRelationship === 'mentioned') return 'Mentioned district';
+  if (rawRelationship === 'comment') return 'Public comment';
+  if (relationship === 'direct') return 'Tagged / mentioned';
   return 'Public mention';
+}
+
+export function socialRelationshipFilterMatches(item = {}, filter = 'all') {
+  const selected = String(filter || 'all').toLowerCase();
+  if (selected === 'all') return true;
+  return normalizeRelationship(item.relationshipType || item.relationship_type) === selected;
 }
 
 export function normalizeSocialResult(item = {}) {
   const rawPlatform = String(item.platform || item.source_type || 'social').toLowerCase();
   const platform = rawPlatform === 'twitter' ? 'x' : rawPlatform;
-  const relationshipType = normalizeRelationship(item.relationship_type);
+  const rawRelationshipType = String(item.relationship_type || '').toLowerCase();
+  const relationshipType = normalizeRelationship(rawRelationshipType);
   const commentCount = numberOrZero(item.comment_count);
   const replyCount = numberOrZero(item.reply_count);
   const reactionCount = numberOrZero(item.reaction_count);
@@ -102,7 +113,8 @@ export function normalizeSocialResult(item = {}) {
     districtId: item.district_id || null,
     platform: SOCIAL_PLATFORMS.has(platform) ? platform : rawPlatform,
     relationshipType,
-    relationshipLabel: socialRelationshipLabel(relationshipType),
+    relationshipLabel: socialRelationshipLabel(rawRelationshipType || relationshipType),
+    rawRelationshipType,
     authorName: item.author_name || item.author_handle || item.source || null,
     authorHandle: item.author_handle || null,
     headline: conciseText(item.headline || item.body || 'Social conversation', 220),
