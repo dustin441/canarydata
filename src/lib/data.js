@@ -98,7 +98,35 @@ export async function getSocialThreads(districtId = null, includeReview = false)
   if (districtId) query = query.eq('district_id', districtId);
   const { data, error } = await query;
   if (error) throw error;
-  return data ?? [];
+
+  const threads = data ?? [];
+  if (threads.length === 0) return threads;
+
+  const comments = [];
+  for (let start = 0; start < threads.length; start += 100) {
+    const threadIds = threads.slice(start, start + 100).map((thread) => thread.id);
+    const { data: commentPage, error: commentError } = await supabase
+      .from('social_comments')
+      .select('id, social_thread_id, author_name, body, published_at, reaction_count, is_representative')
+      .in('social_thread_id', threadIds)
+      .eq('is_representative', true)
+      .order('published_at', { ascending: false })
+      .limit(1000);
+    if (commentError) throw commentError;
+    comments.push(...(commentPage ?? []));
+  }
+
+  const commentsByThread = new Map();
+  comments.forEach((comment) => {
+    const current = commentsByThread.get(comment.social_thread_id) ?? [];
+    if (current.length < 3) current.push(comment);
+    commentsByThread.set(comment.social_thread_id, current);
+  });
+
+  return threads.map((thread) => ({
+    ...thread,
+    social_comments: commentsByThread.get(thread.id) ?? [],
+  }));
 }
 
 export async function updateArticleNote(id, notes) {

@@ -54,6 +54,21 @@ const canonicalThread = {
   share_count: 9,
   engagement_total: 159,
   match_reason: 'Published by a connected district account.',
+  social_comments: [
+    {
+      id: 'comment-1',
+      author_name: 'Community Member',
+      body: '**Will transportation details be posted soon?**',
+      published_at: '2026-07-18T13:00:00Z',
+      reaction_count: 2,
+      is_representative: true,
+    },
+    {
+      id: 'comment-hidden',
+      body: '',
+      is_representative: true,
+    },
+  ],
 };
 
 const legacy = normalizeSocialResult(legacyArticle);
@@ -76,6 +91,10 @@ assert.equal(canonical.isSharedPost, false);
 assert.equal(canonical.carouselCount, 1);
 assert.equal(canonical.hasPerformanceData, true);
 assert.equal(canonical.metricAvailability.comments, false);
+assert.equal(canonical.representativeComments.length, 1);
+assert.equal(canonical.representativeComments[0].authorName, 'Community Member');
+assert.equal(canonical.representativeComments[0].body, 'Will transportation details be posted soon?');
+assert.equal(canonical.representativeComments[0].reactionCount, 2);
 assert.equal(legacy.hasPerformanceData, false);
 assert.equal(canonical.visibilityStatus, 'active');
 assert.equal(normalizeSocialResult({ ...canonicalThread, visibility_status: 'review' }).visibilityStatus, 'review');

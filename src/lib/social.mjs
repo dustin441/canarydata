@@ -86,6 +86,16 @@ export function normalizeSocialResult(item = {}) {
     shares: Object.hasOwn(suppliedAvailability, 'shares') ? Boolean(suppliedAvailability.shares) : providerHasPerformance,
     views: Object.hasOwn(suppliedAvailability, 'views') ? Boolean(suppliedAvailability.views) : providerHasPerformance,
   };
+  const representativeComments = (Array.isArray(item.social_comments) ? item.social_comments : [])
+    .filter((comment) => comment?.is_representative !== false && String(comment?.body || '').trim())
+    .slice(0, 3)
+    .map((comment) => ({
+      id: comment.id || null,
+      authorName: conciseText(comment.author_name || 'Public commenter', 80),
+      body: conciseText(comment.body, 280),
+      date: comment.published_at || null,
+      reactionCount: numberOrZero(comment.reaction_count),
+    }));
 
   return {
     id: item.id || item.external_thread_id || item.canonical_url || item.link,
@@ -124,6 +134,7 @@ export function normalizeSocialResult(item = {}) {
     providerMetadata,
     metricAvailability,
     hasPerformanceData: Object.values(metricAvailability).some(Boolean),
+    representativeComments,
   };
 }
 

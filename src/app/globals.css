@@ -1477,6 +1477,50 @@ a:hover {
   white-space: nowrap;
 }
 
+.social-post-conversation {
+  display: grid;
+  gap: 8px;
+  padding: 12px 15px;
+  border-bottom: 1px solid var(--border-primary);
+  background: rgba(24, 119, 242, 0.035);
+}
+
+.social-post-conversation > header,
+.social-post-conversation blockquote footer {
+  display: flex;
+  align-items: center;
+  justify-content: space-between;
+  gap: 10px;
+}
+
+.social-post-conversation > header strong {
+  color: var(--text-secondary);
+  font-size: 0.72rem;
+}
+
+.social-post-conversation > header span,
+.social-post-conversation blockquote footer {
+  color: var(--text-tertiary);
+  font-size: 0.6rem;
+}
+
+.social-post-conversation blockquote {
+  display: grid;
+  gap: 5px;
+  margin: 0;
+  padding: 9px 10px;
+  border: 1px solid var(--border-primary);
+  border-radius: var(--radius-sm);
+  background: var(--bg-secondary);
+}
+
+.social-post-conversation blockquote p {
+  margin: 0;
+  color: var(--text-secondary);
+  font-size: 0.68rem;
+  line-height: 1.45;
+}
+
 .social-post-preview-footer > div {
   display: grid;
   grid-template-columns: auto auto;

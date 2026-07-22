@@ -1987,6 +1987,24 @@ function SocialPostPreviewCard({ result, source, rank = null, showContext = fals
           <div><strong>{formatAvailableSocialMetric(result, 'views', result.viewCount)}</strong><span>Views</span></div>
         </div>
 
+        {result.representativeComments?.length > 0 && (
+          <section className="social-post-conversation" aria-label="Representative public comments">
+            <header>
+              <strong>Public conversation</strong>
+              <span>{result.representativeComments.length} representative {result.representativeComments.length === 1 ? 'comment' : 'comments'}</span>
+            </header>
+            {result.representativeComments.map((comment, index) => (
+              <blockquote key={comment.id || `${result.id}-comment-${index}`}>
+                <p>{comment.body}</p>
+                <footer>
+                  <span>{comment.authorName}{comment.date ? ` · ${formatDate(comment.date)}` : ''}</span>
+                  {comment.reactionCount > 0 && <span>👍 {formatSocialMetric(comment.reactionCount)}</span>}
+                </footer>
+              </blockquote>
+            ))}
+          </section>
+        )}
+
         <footer className="social-post-preview-footer">
           <div>
             <span>Total engagement</span>
