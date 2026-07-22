@@ -1,4 +1,5 @@
 const SOCIAL_PLATFORMS = new Set(['facebook', 'instagram', 'tiktok', 'twitter', 'x', 'youtube', 'threads', 'linkedin']);
+const SOCIAL_ACTION_TYPES = new Set(['respond', 'amplify', 'strategy', 'monitor', 'elevate']);
 
 function numberOrZero(value) {
   const parsed = Number(value);
@@ -72,6 +73,67 @@ export function socialRelationshipFilterMatches(item = {}, filter = 'all') {
   return normalizeRelationship(item.relationshipType || item.relationship_type) === selected;
 }
 
+export function socialActionLabel(value) {
+  const labels = {
+    respond: 'Respond',
+    amplify: 'Amplify',
+    strategy: 'Strategy',
+    monitor: 'Monitor',
+    elevate: 'Elevate',
+  };
+  return labels[String(value || '').toLowerCase()] || null;
+}
+
+function conciseArray(value, maxItems = 6, maxLength = 180) {
+  return (Array.isArray(value) ? value : [])
+    .map((item) => conciseText(item, maxLength))
+    .filter(Boolean)
+    .slice(0, maxItems);
+}
+
+function normalizeActionIntelligence(value, fallbackRecommendation = '') {
+  if (!value || typeof value !== 'object') return null;
+  const actionType = String(value.action_type || value.actionType || '').toLowerCase();
+  if (!SOCIAL_ACTION_TYPES.has(actionType)) return null;
+  const confidence = Number(value.confidence);
+  return {
+    actionType,
+    actionLabel: socialActionLabel(actionType),
+    urgency: conciseText(value.urgency || 'routine', 30),
+    audiences: conciseArray(value.audiences, 6, 60),
+    situationSummary: conciseText(value.situation_summary || value.situationSummary, 360),
+    actionRationale: conciseText(value.action_rationale || value.actionRationale, 420),
+    recommendedAction: conciseText(value.recommended_action || value.recommendedAction || fallbackRecommendation, 420),
+    draftResponse: conciseText(value.draft_response || value.draftResponse, 700),
+    contentOpportunity: conciseText(value.content_opportunity || value.contentOpportunity, 420),
+    strategicPriorityIds: conciseArray(value.strategic_priority_ids || value.strategicPriorityIds, 6, 80),
+    strategicPriorityLabels: conciseArray(value.strategic_priority_labels || value.strategicPriorityLabels, 6, 240),
+    strategicAlignmentReason: conciseText(value.strategic_alignment_reason || value.strategicAlignmentReason, 500),
+    missionOrValueEvidence: conciseArray(value.mission_or_value_evidence || value.missionOrValueEvidence, 6, 360),
+    factsToVerify: conciseArray(value.facts_to_verify || value.factsToVerify, 8, 280),
+    confidence: Number.isFinite(confidence) ? Math.max(0, Math.min(1, confidence)) : null,
+    reviewStatus: value.review_status === 'approved' ? 'approved' : 'review',
+    modelVersion: conciseText(value.model_version || value.modelVersion, 80),
+    generatedAt: value.generated_at || value.generatedAt || null,
+  };
+}
+
+export function socialActionFilterMatches(item = {}, filter = 'all') {
+  const selected = String(filter || 'all').toLowerCase();
+  if (selected === 'all') return true;
+  return (item.actionType || item.actionIntelligence?.actionType || null) === selected;
+}
+
+export function summarizeSocialActions(items = []) {
+  return items.reduce((summary, item) => {
+    const actionType = item?.actionType || item?.actionIntelligence?.actionType;
+    if (!SOCIAL_ACTION_TYPES.has(actionType)) return summary;
+    summary.total += 1;
+    summary[actionType] += 1;
+    return summary;
+  }, { total: 0, respond: 0, amplify: 0, strategy: 0, monitor: 0, elevate: 0 });
+}
+
 export function normalizeSocialResult(item = {}) {
   const rawPlatform = String(item.platform || item.source_type || 'social').toLowerCase();
   const platform = rawPlatform === 'twitter' ? 'x' : rawPlatform;
@@ -87,6 +149,7 @@ export function normalizeSocialResult(item = {}) {
   const providerMetadata = item.provider_metadata && typeof item.provider_metadata === 'object'
     ? item.provider_metadata
     : {};
+  const actionIntelligence = normalizeActionIntelligence(providerMetadata.action_intelligence, item.recommendation);
   const suppliedAvailability = providerMetadata.metric_availability && typeof providerMetadata.metric_availability === 'object'
     ? providerMetadata.metric_availability
     : {};
@@ -153,6 +216,8 @@ export function normalizeSocialResult(item = {}) {
     metricAvailability,
     hasPerformanceData: Object.values(metricAvailability).some(Boolean),
     representativeComments,
+    actionType: actionIntelligence?.actionType || null,
+    actionIntelligence,
   };
 }
 

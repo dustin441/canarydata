@@ -8,7 +8,7 @@ import { setEarnedMedia, saveNote, addQuery, deleteQuery, submitFeedback, addMan
 import { createEmbeddedCanaryCheckout, confirmEmbeddedCanaryCheckout, saveBillingPurchaseOrder } from '@/app/payment/actions';
 import { compareStrategicAlignmentRows } from '@/lib/strategicAlignmentSort.mjs';
 import { CORE_TAGS, canonicalTags } from '@/lib/canonicalTags.mjs';
-import { buildSocialResults, calculateSocialEngagementRate, rankTopSocialResults, safeSocialMediaUrl, safeSocialUrl, socialRelationshipFilterMatches, summarizeSocialResults } from '@/lib/social.mjs';
+import { buildSocialResults, calculateSocialEngagementRate, rankTopSocialResults, safeSocialMediaUrl, safeSocialUrl, socialActionFilterMatches, socialRelationshipFilterMatches, summarizeSocialActions, summarizeSocialResults } from '@/lib/social.mjs';
 import { formatDisplayDate } from '@/lib/date.mjs';
 
 const stripePromise = process.env.NEXT_PUBLIC_STRIPE_PUBLISHABLE_KEY
@@ -1903,6 +1903,11 @@ function formatSocialRate(rate) {
   return `${rate.toFixed(2)}%`;
 }
 
+function formatSocialUrgency(value) {
+  const labels = { now: 'Now', today: 'Today', this_week: 'This week', routine: 'Routine' };
+  return labels[value] || String(value || 'Routine').replaceAll('_', ' ');
+}
+
 function SocialPostPreviewCard({ result, source, rank = null, showContext = false }) {
   const mediaUrl = safeSocialMediaUrl(result.mediaUrl);
   const videoUrl = safeSocialMediaUrl(result.videoUrl);
@@ -1923,6 +1928,7 @@ function SocialPostPreviewCard({ result, source, rank = null, showContext = fals
   const profileUrl = safeSocialUrl(result.authorProfileUrl || (result.relationshipType === 'owned' ? (source?.profile_url || source?.url) : null));
   const postCopy = result.summary || result.headline;
   const isVideo = result.mediaType === 'video';
+  const action = result.actionIntelligence;
 
   return (
     <>
@@ -1943,6 +1949,7 @@ function SocialPostPreviewCard({ result, source, rank = null, showContext = fals
           <div className="social-post-preview-badges">
             {rank && <span className="social-top-rank">#{rank}</span>}
             {result.relationshipType !== 'owned' && <span className="social-content-badge">{result.relationshipLabel}</span>}
+            {action && <span className={`social-action-badge ${action.actionType}`}>{action.actionLabel}</span>}
             {result.isSharedPost && <span className="social-content-badge">Shared</span>}
             {result.visibilityStatus === 'review' && <span className="social-review-badge">Review</span>}
           </div>
@@ -2006,6 +2013,40 @@ function SocialPostPreviewCard({ result, source, rank = null, showContext = fals
           </section>
         )}
 
+        {action && (
+          <section className={`social-action-intelligence ${action.actionType}`} aria-label={`${action.actionLabel} recommendation`}>
+            <header>
+              <div><span>Suggested action</span><strong>{action.actionLabel}</strong></div>
+              <div className="social-action-meta">
+                <span>{formatSocialUrgency(action.urgency)}</span>
+                {action.confidence !== null && <span>{Math.round(action.confidence * 100)}% confidence</span>}
+              </div>
+            </header>
+            {action.situationSummary && <p className="social-action-situation">{action.situationSummary}</p>}
+            {action.recommendedAction && (
+              <div className="social-action-recommendation"><strong>Recommended next step</strong><p>{action.recommendedAction}</p></div>
+            )}
+            {action.strategicPriorityLabels.length > 0 && (
+              <div className="social-action-alignment">
+                <strong>Aligned with</strong>
+                <div>{action.strategicPriorityLabels.map((label) => <span key={label}>{label}</span>)}</div>
+              </div>
+            )}
+            {(action.strategicAlignmentReason || action.contentOpportunity || action.draftResponse || action.factsToVerify.length > 0) && (
+              <details className="social-action-details">
+                <summary>Review strategy and draft</summary>
+                {action.strategicAlignmentReason && <p><strong>Why it aligns:</strong> {action.strategicAlignmentReason}</p>}
+                {action.contentOpportunity && <p><strong>Communications opportunity:</strong> {action.contentOpportunity}</p>}
+                {action.factsToVerify.length > 0 && (
+                  <div><strong>Verify before acting:</strong><ul>{action.factsToVerify.map((fact) => <li key={fact}>{fact}</li>)}</ul></div>
+                )}
+                {action.draftResponse && <div className="social-action-draft"><strong>Review-only draft</strong><p>{action.draftResponse}</p></div>}
+              </details>
+            )}
+            <footer><span>Review-only recommendation</span><span>No response will be posted automatically.</span></footer>
+          </section>
+        )}
+
         <footer className="social-post-preview-footer">
           <div>
             <span>Total engagement</span>
@@ -2015,10 +2056,10 @@ function SocialPostPreviewCard({ result, source, rank = null, showContext = fals
           {result.url && <a href={result.url} target="_blank" rel="noopener noreferrer">View original post ↗</a>}
         </footer>
 
-        {showContext && (result.matchReason || result.recommendation) && (
+        {showContext && (result.matchReason || (!action && result.recommendation)) && (
           <div className="social-post-canary-context">
             {result.matchReason && <p><strong>Why Canary found it:</strong> {result.matchReason}</p>}
-            {result.recommendation && <p><strong>Recommended action:</strong> {result.recommendation}</p>}
+            {!action && result.recommendation && <p><strong>Recommended action:</strong> {result.recommendation}</p>}
           </div>
         )}
       </article>
@@ -2040,6 +2081,7 @@ function SocialPostPreviewCard({ result, source, rank = null, showContext = fals
 
 function SocialView({ articles, socialThreads, socialSources, districtFilter, districts }) {
   const [relationshipFilter, setRelationshipFilter] = useState('all');
+  const [actionFilter, setActionFilter] = useState('all');
   const [socialSearch, setSocialSearch] = useState('');
   const [socialResultLimit, setSocialResultLimit] = useState(24);
   const [platformFilter, setPlatformFilter] = useState('all');
@@ -2080,6 +2122,10 @@ function SocialView({ articles, socialThreads, socialSources, districtFilter, di
     scopedSources.map((source) => [`${source.district_id}:${source.platform}`, source]),
   ), [scopedSources]);
   const platformOptions = useMemo(() => [...new Set(results.map((result) => result.platform))].sort(), [results]);
+  const actionSummary = useMemo(() => summarizeSocialActions(results.filter((result) => (
+    socialRelationshipFilterMatches(result, relationshipFilter)
+    && (platformFilter === 'all' || result.platform === platformFilter)
+  ))), [results, relationshipFilter, platformFilter]);
   const visibleResults = useMemo(() => {
     const query = socialSearch.trim().toLowerCase();
     const minRate = minimumEngagementRate === '' ? null : Number(minimumEngagementRate);
@@ -2095,12 +2141,13 @@ function SocialView({ articles, socialThreads, socialSources, districtFilter, di
       const mediaMatches = mediaFilter === 'all' || mediaCategory === mediaFilter;
       const performanceMatches = performanceFilter === 'all'
         || (performanceFilter === 'available' ? result.hasPerformanceData : !result.hasPerformanceData);
+      const actionMatches = socialActionFilterMatches(result, actionFilter);
       const rate = rateFor(result);
       const minimumMatches = minRate === null || (rate !== null && Number.isFinite(minRate) && rate >= minRate);
       const maximumMatches = maxRate === null || (rate !== null && Number.isFinite(maxRate) && rate <= maxRate);
-      const searchMatches = !query || [result.headline, result.summary, result.authorName, result.platform, result.matchReason]
+      const searchMatches = !query || [result.headline, result.summary, result.authorName, result.platform, result.matchReason, result.actionIntelligence?.actionLabel, result.actionIntelligence?.recommendedAction, result.actionIntelligence?.strategicAlignmentReason, ...(result.actionIntelligence?.strategicPriorityLabels || [])]
         .some((value) => String(value || '').toLowerCase().includes(query));
-      return relationshipMatches && platformMatches && mediaMatches && performanceMatches && minimumMatches && maximumMatches && searchMatches;
+      return relationshipMatches && platformMatches && mediaMatches && performanceMatches && actionMatches && minimumMatches && maximumMatches && searchMatches;
     });
     return filtered.sort((a, b) => {
       if (socialSort === 'engagement') return b.engagementTotal - a.engagementTotal;
@@ -2110,7 +2157,7 @@ function SocialView({ articles, socialThreads, socialSources, districtFilter, di
       if (socialSort === 'views') return b.viewCount - a.viewCount;
       return new Date(b.date).getTime() - new Date(a.date).getTime();
     });
-  }, [results, relationshipFilter, platformFilter, mediaFilter, performanceFilter, minimumEngagementRate, maximumEngagementRate, socialSearch, socialSort, sourceByDistrictPlatform]);
+  }, [results, relationshipFilter, platformFilter, mediaFilter, performanceFilter, actionFilter, minimumEngagementRate, maximumEngagementRate, socialSearch, socialSort, sourceByDistrictPlatform]);
   const pagedResults = visibleResults.slice(0, socialResultLimit);
   const changeSocialFilter = (setter, value) => {
     setter(value);
@@ -2118,6 +2165,7 @@ function SocialView({ articles, socialThreads, socialSources, districtFilter, di
   };
   const resetSocialFilters = () => {
     setRelationshipFilter('all');
+    setActionFilter('all');
     setPlatformFilter('all');
     setMediaFilter('all');
     setPerformanceFilter('all');
@@ -2127,7 +2175,7 @@ function SocialView({ articles, socialThreads, socialSources, districtFilter, di
     setSocialSort('newest');
     setSocialResultLimit(24);
   };
-  const hasActiveSocialFilters = relationshipFilter !== 'all' || platformFilter !== 'all' || mediaFilter !== 'all'
+  const hasActiveSocialFilters = relationshipFilter !== 'all' || actionFilter !== 'all' || platformFilter !== 'all' || mediaFilter !== 'all'
     || performanceFilter !== 'all' || minimumEngagementRate !== '' || maximumEngagementRate !== '' || socialSearch !== '' || socialSort !== 'newest';
 
   return (
@@ -2159,7 +2207,39 @@ function SocialView({ articles, socialThreads, socialSources, districtFilter, di
         </button>
       </div>
 
-      {(relationshipFilter === 'all' || relationshipFilter === 'owned') && (
+      <section className="social-navigation-controls" aria-label="Social channel navigation">
+        <div className="social-navigation-heading"><div><strong>Channels</strong><span>Move between collected networks without losing your relationship or action filters.</span></div></div>
+        <div className="social-channel-tabs">
+          <button type="button" className={platformFilter === 'all' ? 'active' : ''} onClick={() => changeSocialFilter(setPlatformFilter, 'all')}>All channels</button>
+          {platformOptions.map((platform) => (
+            <button type="button" key={platform} className={platformFilter === platform ? 'active' : ''} onClick={() => changeSocialFilter(setPlatformFilter, platform)}>
+              <span className={`social-platform-dot ${platform}`} aria-hidden="true" />{formatSourceLabel(platform)}
+            </button>
+          ))}
+        </div>
+      </section>
+
+      <section className="social-action-queue" aria-label="Action Queue">
+        <div className="social-navigation-heading">
+          <div><strong>Action Queue</strong><span>District-grounded recommendations stay review-only until a communicator approves the next step.</span></div>
+          <em>{actionSummary.total} enriched result{actionSummary.total === 1 ? '' : 's'}</em>
+        </div>
+        <div className="social-action-tabs">
+          {[
+            ['respond', 'Respond'],
+            ['amplify', 'Amplify'],
+            ['strategy', 'Strategy'],
+            ['monitor', 'Monitor'],
+            ['elevate', 'Elevate'],
+          ].map(([value, label]) => (
+            <button type="button" key={value} className={`${value} ${actionFilter === value ? 'active' : ''}`} onClick={() => changeSocialFilter(setActionFilter, actionFilter === value ? 'all' : value)}>
+              <span>{label}</span><strong>{actionSummary[value]}</strong>
+            </button>
+          ))}
+        </div>
+      </section>
+
+      {(relationshipFilter === 'all' || relationshipFilter === 'owned') && actionFilter === 'all' && platformFilter === 'all' && (
       <section className="social-top-section">
         <div className="social-section-heading">
           <div>
@@ -2192,7 +2272,7 @@ function SocialView({ articles, socialThreads, socialSources, districtFilter, di
       </section>
       )}
 
-      {(relationshipFilter === 'all' || relationshipFilter === 'owned') && (
+      {(relationshipFilter === 'all' || relationshipFilter === 'owned') && actionFilter === 'all' && platformFilter === 'all' && (
       <section className="social-account-section">
         <div className="social-section-heading">
           <div>

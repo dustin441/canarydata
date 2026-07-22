@@ -5,7 +5,9 @@ import {
   normalizeSocialResult,
   rankTopSocialResults,
   safeSocialMediaUrl,
+  socialActionFilterMatches,
   socialRelationshipFilterMatches,
+  summarizeSocialActions,
   summarizeSocialResults,
 } from '../src/lib/social.mjs';
 import { normalizeProviderBatch } from '../src/lib/socialIngestion.mjs';
@@ -106,6 +108,46 @@ assert.equal(socialRelationshipFilterMatches(directTag, 'direct'), true);
 assert.equal(socialRelationshipFilterMatches(directTag, 'owned'), false);
 assert.equal(socialRelationshipFilterMatches(canonical, 'owned'), true);
 assert.equal(directTag.authorProfileUrl, 'https://www.instagram.com/community.partner/');
+
+const enrichedAction = normalizeSocialResult({
+  ...canonicalThread,
+  id: 'enriched-action',
+  relationship_type: 'ambient',
+  provider_metadata: {
+    ...canonicalThread.provider_metadata,
+    action_intelligence: {
+      action_type: 'amplify',
+      urgency: 'this_week',
+      audiences: ['families', 'community'],
+      situation_summary: '**A community partner shared a student opportunity.**',
+      action_rationale: 'The item supports a current district priority.',
+      recommended_action: 'Verify the details and consider resharing.',
+      draft_response: 'Thank you for supporting students.',
+      content_opportunity: 'Partner recognition post.',
+      strategic_priority_ids: ['priority-1'],
+      strategic_priority_labels: ['Engaged stakeholders'],
+      strategic_alignment_reason: 'The partner is promoting student success.',
+      mission_or_value_evidence: ['Preparing students for their future.'],
+      facts_to_verify: ['Confirm the event date.'],
+      confidence: 0.94,
+      review_status: 'review',
+    },
+  },
+});
+assert.equal(enrichedAction.actionType, 'amplify');
+assert.equal(enrichedAction.actionIntelligence.actionLabel, 'Amplify');
+assert.equal(enrichedAction.actionIntelligence.situationSummary, 'A community partner shared a student opportunity.');
+assert.deepEqual(enrichedAction.actionIntelligence.strategicPriorityLabels, ['Engaged stakeholders']);
+assert.equal(socialActionFilterMatches(enrichedAction, 'amplify'), true);
+assert.equal(socialActionFilterMatches(enrichedAction, 'respond'), false);
+assert.deepEqual(summarizeSocialActions([enrichedAction, canonical]), {
+  total: 1,
+  respond: 0,
+  amplify: 1,
+  strategy: 0,
+  monitor: 0,
+  elevate: 0,
+});
 
 const concise = normalizeSocialResult({
   ...canonicalThread,
