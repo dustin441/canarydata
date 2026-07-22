@@ -1772,6 +1772,8 @@ a:hover {
 .social-action-intelligence > footer {
   align-items: flex-start;
   padding-top: 2px;
+  color: var(--text-secondary);
+  font-size: 0.64rem;
 }
 
 .social-post-preview-footer > div {

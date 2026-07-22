@@ -2019,7 +2019,7 @@ function SocialPostPreviewCard({ result, source, rank = null, showContext = fals
               <div><span>Suggested action</span><strong>{action.actionLabel}</strong></div>
               <div className="social-action-meta">
                 <span>{formatSocialUrgency(action.urgency)}</span>
-                {action.confidence !== null && <span>{Math.round(action.confidence * 100)}% confidence</span>}
+                {action.confidence !== null && <span>{Math.round(action.confidence * 100)}% evidence confidence</span>}
               </div>
             </header>
             {action.situationSummary && <p className="social-action-situation">{action.situationSummary}</p>}
@@ -2043,7 +2043,7 @@ function SocialPostPreviewCard({ result, source, rank = null, showContext = fals
                 {action.draftResponse && <div className="social-action-draft"><strong>Review-only draft</strong><p>{action.draftResponse}</p></div>}
               </details>
             )}
-            <footer><span>Review-only recommendation</span><span>No response will be posted automatically.</span></footer>
+            <footer><span>Grounded in the approved district profile · Review-only</span><span>No response will be posted automatically.</span></footer>
           </section>
         )}
 
@@ -2126,6 +2126,7 @@ function SocialView({ articles, socialThreads, socialSources, districtFilter, di
     socialRelationshipFilterMatches(result, relationshipFilter)
     && (platformFilter === 'all' || result.platform === platformFilter)
   ))), [results, relationshipFilter, platformFilter]);
+  const selectedActionLabel = { respond: 'Respond', amplify: 'Amplify', strategy: 'Strategy', monitor: 'Monitor', elevate: 'Elevate' }[actionFilter] || null;
   const visibleResults = useMemo(() => {
     const query = socialSearch.trim().toLowerCase();
     const minRate = minimumEngagementRate === '' ? null : Number(minimumEngagementRate);
@@ -2310,8 +2311,8 @@ function SocialView({ articles, socialThreads, socialSources, districtFilter, di
       <section className="social-results-section">
         <div className="social-section-heading">
           <div>
-            <h3>All social posts and conversations</h3>
-            <p>Every result uses the same post scorecard. Metrics show N/A when the original monitoring record did not collect that field.</p>
+            <h3>{selectedActionLabel ? `${selectedActionLabel} Action Queue` : 'All social posts and conversations'}</h3>
+            <p>{selectedActionLabel ? `Showing review-only ${selectedActionLabel.toLowerCase()} recommendations that also match the selected channel and relationship.` : 'Every result uses the same post scorecard. Metrics show N/A when the original monitoring record did not collect that field.'}</p>
           </div>
           <div className="social-results-heading-controls">
             <span>{visibleResults.length} result{visibleResults.length === 1 ? '' : 's'}</span>
