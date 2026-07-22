@@ -10,6 +10,7 @@ import { compareStrategicAlignmentRows } from '@/lib/strategicAlignmentSort.mjs'
 import { CORE_TAGS, canonicalTags } from '@/lib/canonicalTags.mjs';
 import { buildSocialResults, calculateSocialEngagementRate, rankTopSocialResults, safeSocialMediaUrl, safeSocialUrl, socialActionFilterMatches, socialRelationshipFilterMatches, summarizeSocialActions, summarizeSocialResults } from '@/lib/social.mjs';
 import { formatDisplayDate } from '@/lib/date.mjs';
+import { buildCommunicationsBrief } from '@/lib/communicationsBrief.mjs';
 
 const stripePromise = process.env.NEXT_PUBLIC_STRIPE_PUBLISHABLE_KEY
   ? loadStripe(process.env.NEXT_PUBLIC_STRIPE_PUBLISHABLE_KEY)
@@ -228,6 +229,17 @@ function normalizeEscapedRecommendationText(text) {
     })
     .replace(/\n{3,}/g, '\n\n')
     .trim();
+}
+
+function safeExternalHttpUrl(value) {
+  if (!value) return null;
+  try {
+    const url = new URL(String(value));
+    if (!['http:', 'https:'].includes(url.protocol) || url.username || url.password) return null;
+    return url.href;
+  } catch {
+    return null;
+  }
 }
 
 function sanitizeRecommendationText(text) {
@@ -520,14 +532,14 @@ const CHANNEL_COLORS = {
   all:    { bg: '#22C55E20', color: '#22C55E' },
 };
 
-function QueriesView({ initialQueries, districts, userDistrictId, demoMode = false }) {
+function QueriesView({ initialQueries, districts, userDistrictId, selectedDistrictId = 'All', onDistrictChange, demoMode = false }) {
   const [queries, setQueries] = useState(initialQueries);
-  const [districtFilter, setDistrictFilter] = useState(userDistrictId ?? 'All');
+  const districtFilter = userDistrictId ?? selectedDistrictId ?? 'All';
   const [showAddForm, setShowAddForm] = useState(false);
   const [form, setForm] = useState({
     query_text: '',
     channels: 'news',
-    district_id: userDistrictId ?? '',
+    district_id: userDistrictId ?? (selectedDistrictId !== 'All' ? selectedDistrictId : ''),
     geo_city: '',
     geo_state: '',
     geo_zip: '',
@@ -565,7 +577,7 @@ function QueriesView({ initialQueries, districts, userDistrictId, demoMode = fal
       const districtName = districts.find((d) => d.id === form.district_id)?.name ?? null;
       const newQuery = await addQuery({ ...form, district_name: districtName });
       setQueries((prev) => [...prev, newQuery]);
-      setForm({ query_text: '', channels: 'news', district_id: userDistrictId ?? '', geo_city: '', geo_state: '', geo_zip: '' });
+      setForm({ query_text: '', channels: 'news', district_id: userDistrictId ?? (districtFilter !== 'All' ? districtFilter : ''), geo_city: '', geo_state: '', geo_zip: '' });
       setShowAddForm(false);
     } catch (err) {
       setAddError(err.message ?? 'Failed to add query.');
@@ -650,7 +662,7 @@ function QueriesView({ initialQueries, districts, userDistrictId, demoMode = fal
               <select
                 className="filter-select"
                 value={districtFilter}
-                onChange={(e) => setDistrictFilter(e.target.value)}
+                onChange={(e) => onDistrictChange?.(e.target.value)}
               >
                 <option value="All">All Districts</option>
                 {districts.map((d) => <option key={d.id} value={d.id}>{d.name}</option>)}
@@ -1074,35 +1086,38 @@ function StrategicAlignmentChart({ data, selectedLabel, onSelectLabel }) {
 
 function HowItWorksView() {
   return (
-    <div className="data-section" style={{ maxWidth: '860px' }}>
+    <div className="data-section" style={{ maxWidth: '960px' }}>
       <div className="data-header">
         <h3>▶ How This Works</h3>
-        <span style={{ fontSize: '0.82rem', color: 'var(--text-secondary)' }}>Platform walkthrough</span>
+        <span style={{ fontSize: '0.82rem', color: 'var(--text-secondary)' }}>Media to decision to proof</span>
       </div>
-      <div style={{ padding: '28px' }}>
-        <p style={{ color: 'var(--text-secondary)', fontSize: '0.9rem', marginBottom: '18px', lineHeight: 1.6 }}>
-          Watch this short walkthrough to see how Canary Data reviews news and publicly available social content, organizes what matters with hyper-local context, and turns daily mentions into summaries, sentiment, and strategic communication recommendations.
-        </p>
-        <div className="pricing-journey-card">
-          <div className="pricing-journey-eyebrow">Early adopter launch offer</div>
-          <div className="pricing-journey-main">
-            <span className="pricing-journey-price">$1,499</span>
-            <span className="pricing-journey-term">per year</span>
-          </div>
-          <p>
-            Built to feel approachable before signup: comprehensive annual access with unlimited users, daily monitoring, strategic recommendations, and PDF exports.
-          </p>
+      <div className="how-it-works-content">
+        <div className="how-it-works-intro">
+          <span>Recommended workflow</span>
+          <h2>Find the signal, decide locally, and show the impact</h2>
+          <p>Canary reviews news and publicly available social content, organizes the evidence with district context, and offers review-only next steps. Your communications team remains responsible for verification and approval.</p>
         </div>
-        {/* Responsive 16:9 Google Drive video embed */}
-        <div style={{ position: 'relative', paddingBottom: '56.25%', height: 0, borderRadius: 'var(--radius-lg)', overflow: 'hidden', background: '#0B1120' }}>
-          <iframe
-            src="https://drive.google.com/file/d/1zqrSxZdsa8wXRg8wSZ6G4R-qYyf0oFfX/preview"
-            frameBorder="0"
-            webkitallowfullscreen="true"
-            mozallowfullscreen="true"
-            allowFullScreen
-            style={{ position: 'absolute', top: 0, left: 0, width: '100%', height: '100%' }}
-          />
+        <div className="how-it-works-flow">
+          <article>
+            <span>1</span>
+            <div><strong>See the media</strong><p>Start with Dashboard for a filtered media brief. Open Social to separate district posts, tagged posts, and public conversation.</p></div>
+          </article>
+          <article>
+            <span>2</span>
+            <div><strong>Decide what matters</strong><p>Review Strategic Alignment, the original source, public comments, evidence confidence, and facts that still need verification.</p></div>
+          </article>
+          <article>
+            <span>3</span>
+            <div><strong>Choose the next step</strong><p>Use the recommendation as a starting point. Respond, amplify, plan, monitor, or elevate only after a communicator approves the action.</p></div>
+          </article>
+          <article>
+            <span>4</span>
+            <div><strong>Show the value</strong><p>Use Bird’s Eye View to package strategic hits, earned media, supporting stories, and date-filtered evidence for leadership.</p></div>
+          </article>
+        </div>
+        <div className="how-it-works-boundary">
+          <strong>Public coverage boundary</strong>
+          <p>Canary can review public posts and configured official accounts. Private profiles, direct messages, closed groups, and content unavailable to the public are not included.</p>
         </div>
       </div>
     </div>
@@ -1768,6 +1783,7 @@ function CorrectionsView({ districts, userDistrictId, districtFilter, excludedSt
   const [districtId, setDistrictId] = useState(initialDistrict);
   const [saving, setSaving] = useState(false);
   const [message, setMessage] = useState('');
+
   const scopedExcluded = districtId ? excludedStories.filter((story) => story.district_id === districtId) : excludedStories;
   const scopedEvents = districtId ? correctionEvents.filter((event) => event.district_id === districtId) : correctionEvents;
 
@@ -1957,7 +1973,18 @@ function SocialPostPreviewCard({ result, source, rank = null, showContext = fals
 
         {postCopy && <p className="social-post-preview-copy">{postCopy}</p>}
 
-        <div className={`social-post-preview-media ${mediaUrl && !imageFailed ? 'has-media' : 'media-fallback'}`}>
+        {action && (action.recommendedAction || action.situationSummary) && (
+          <section className={`social-decision-cue ${action.actionType}`} aria-label={`${action.actionLabel} decision cue`}>
+            <div>
+              <span>What to do</span>
+              <strong>{action.actionLabel} · {formatSocialUrgency(action.urgency)}</strong>
+            </div>
+            <p>{action.recommendedAction || action.situationSummary}</p>
+            <small>Review-only recommendation</small>
+          </section>
+        )}
+
+        <div className={`social-post-preview-media ${mediaUrl && !imageFailed ? 'has-media' : 'media-fallback'} ${result.isTextOnly && !imageFailed ? 'text-only-fallback' : ''}`}>
           {mediaUrl && !imageFailed ? (
             // eslint-disable-next-line @next/next/no-img-element
             <img src={renderedMediaUrl} alt={result.headline || 'District social post'} loading="lazy" onError={() => setFailedMediaUrl(mediaUrl)} />
@@ -2587,12 +2614,21 @@ export default function DashboardClient({ articles, districts, queries: initialQ
       : article.is_earned_media;
   }
 
-  const notesCount = articles.filter((a) => a.notes).length;
-  const socialResultCount = articles.filter((article) => {
-    const platform = String(article.source_type || '').toLowerCase();
-    const districtMatches = districtFilter === 'All' || article.district_id === districtFilter;
-    return districtMatches && SOCIAL_SOURCE_TYPES.has(platform);
-  }).length;
+  const scopedArticlesForCounts = useMemo(
+    () => articles.filter((article) => districtFilter === 'All' || article.district_id === districtFilter),
+    [articles, districtFilter]
+  );
+  const articleCount = scopedArticlesForCounts.length;
+  const notesCount = scopedArticlesForCounts.filter((article) => getNoteText(article)).length;
+  const queryCount = initialQueries.filter((query) => districtFilter === 'All' || query.district_id === districtFilter).length;
+  const correctionCount = excludedStories.filter((story) => districtFilter === 'All' || story.district_id === districtFilter).length;
+  const scopedSocialResultsForCounts = useMemo(() => {
+    const legacyRecords = scopedArticlesForCounts.filter((article) => SOCIAL_SOURCE_TYPES.has(String(article.source_type || '').toLowerCase()));
+    const stagedRecords = socialThreads.filter((thread) => districtFilter === 'All' || thread.district_id === districtFilter);
+    return buildSocialResults([...stagedRecords, ...legacyRecords]);
+  }, [scopedArticlesForCounts, socialThreads, districtFilter]);
+  const socialResultCount = scopedSocialResultsForCounts.length;
+  const socialActionSummary = useMemo(() => summarizeSocialActions(scopedSocialResultsForCounts), [scopedSocialResultsForCounts]);
 
   const allTags = useMemo(() => ['All', ...CORE_TAGS], []);
 
@@ -2718,6 +2754,8 @@ export default function DashboardClient({ articles, districts, queries: initialQ
   // reflects the broader district/all-article set.
   const chartArticles = filtered;
   const earnedMediaCount = chartArticles.filter((article) => isEarned(article)).length;
+  const filteredNotesCount = chartArticles.filter((article) => getNoteText(article)).length;
+  const communicationsBrief = useMemo(() => buildCommunicationsBrief(chartArticles, 3), [chartArticles]);
 
   const { mentionTrend, sentimentTrend, sourceBreakdown } = useMemo(
     () => buildChartData(chartArticles),
@@ -2803,7 +2841,7 @@ export default function DashboardClient({ articles, districts, queries: initialQ
             >
               <span className="sidebar-link-icon">📰</span>
               Articles
-              <span className="sidebar-link-badge">{articles.length}</span>
+              <span className="sidebar-link-badge">{articleCount}</span>
             </button>
             <button
               className={`sidebar-link ${currentView === 'social' ? 'active' : ''}`}
@@ -2821,7 +2859,7 @@ export default function DashboardClient({ articles, districts, queries: initialQ
             >
               <span className="sidebar-link-icon">🔍</span>
               Queries
-              <span className="sidebar-link-badge">{initialQueries.length}</span>
+              <span className="sidebar-link-badge">{queryCount}</span>
             </button>
             <button
               className={`sidebar-link ${currentView === 'notes' ? 'active' : ''}`}
@@ -2840,7 +2878,7 @@ export default function DashboardClient({ articles, districts, queries: initialQ
               >
                 <span className="sidebar-link-icon">🛠️</span>
                 Add / Correct Stories
-                <span className="sidebar-link-badge">{excludedStories.length}</span>
+                <span className="sidebar-link-badge">{correctionCount}</span>
               </button>
             )}
           </div>
@@ -3061,21 +3099,25 @@ export default function DashboardClient({ articles, districts, queries: initialQ
           )}
           {currentView === 'queries' && (
             <QueriesView
+              key={districtFilter}
               initialQueries={initialQueries}
               districts={districts}
               userDistrictId={userDistrictId}
+              selectedDistrictId={districtFilter}
+              onDistrictChange={handleDistrictSelect}
               demoMode={demoMode}
             />
           )}
           {currentView === 'notes' && (
             <NotesView
-              articles={articles}
+              articles={scopedArticlesForCounts}
               getNoteText={getNoteText}
               openNoteModal={openNoteModal}
             />
           )}
           {currentView === 'corrections' && (
             <CorrectionsView
+              key={districtFilter}
               districts={districts}
               userDistrictId={userDistrictId}
               districtFilter={districtFilter}
@@ -3166,9 +3208,9 @@ export default function DashboardClient({ articles, districts, queries: initialQ
                 <div className="kpi-label">Notes Added</div>
                 <div className="kpi-icon yellow">📝</div>
               </div>
-              <div className="kpi-value">{notesCount}</div>
+              <div className="kpi-value">{filteredNotesCount}</div>
               <span className="kpi-change positive">
-                Across {articles.length} articles
+                Across {chartArticles.length} mentions
               </span>
             </div>
 
@@ -3183,6 +3225,46 @@ export default function DashboardClient({ articles, districts, queries: initialQ
               </span>
             </div>
           </div>
+
+          <section className="communications-brief" aria-label="Communications brief">
+            <header className="communications-brief-header">
+              <div>
+                <span>Communications brief</span>
+                <h2>Here is what matters and what to do</h2>
+                <p>Media values follow the active filters. Social action cues include all enriched results for the selected district. Recommendations are review-only and require source verification.</p>
+              </div>
+              <button type="button" className="btn btn-secondary btn-sm" onClick={() => setCurrentView('social')}>
+                Open Social Action Queue{socialActionSummary.total ? ` (${socialActionSummary.total})` : ''}
+              </button>
+            </header>
+
+            <div className="communications-brief-metrics">
+              <div><span>Newest media mention</span><strong>{communicationsBrief.latestDate ? formatDate(communicationsBrief.latestDate) : 'No coverage'}</strong></div>
+              <div><span>Recommended next steps</span><strong>{communicationsBrief.recommendedCount}</strong></div>
+              <div><span>Social action cues</span><strong>{socialActionSummary.total}</strong></div>
+              <div><span>Strategic hits</span><strong>{strategicAlignedCount}</strong></div>
+            </div>
+
+            {communicationsBrief.items.length > 0 ? (
+              <div className="communications-brief-list">
+                {communicationsBrief.items.map((article) => {
+                  const articleUrl = safeExternalHttpUrl(article.link);
+                  return (
+                    <article key={article.id || articleUrl || `${article.date}:${article.headline}`}>
+                      <div>
+                        <span>{formatDate(article.date)} · {formatSourceLabel(article.source_type ?? 'other')} · Review-only recommendation</span>
+                        <h3>{article.headline || 'Coverage recommendation'}</h3>
+                      </div>
+                      <p>{normalizeEscapedRecommendationText(article.recommendation)}</p>
+                      {articleUrl && <a href={articleUrl} target="_blank" rel="noopener noreferrer">View story ↗</a>}
+                    </article>
+                  );
+                })}
+              </div>
+            ) : (
+              <p className="communications-brief-empty">No specific next steps appear in this filtered coverage. Continue routine monitoring or adjust the filters.</p>
+            )}
+          </section>
 
           {/* Charts */}
           <div className="charts-grid">
