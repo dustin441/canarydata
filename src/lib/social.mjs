@@ -91,6 +91,11 @@ export function normalizeSocialResult(item = {}) {
     ? providerMetadata.metric_availability
     : {};
   const providerHasPerformance = Boolean(item.provider && item.provider !== 'legacy_canary_replay');
+  const authorHandle = String(item.author_handle || '').replace(/^@/, '').trim();
+  const suppliedAuthorProfileUrl = safeSocialUrl(item.author_profile_url || providerMetadata.author_profile_url);
+  const derivedInstagramProfileUrl = platform === 'instagram' && /^[a-z0-9._]+$/i.test(authorHandle)
+    ? `https://www.instagram.com/${authorHandle}/`
+    : null;
   const metricAvailability = {
     reactions: Object.hasOwn(suppliedAvailability, 'reactions') ? Boolean(suppliedAvailability.reactions) : providerHasPerformance,
     comments: Object.hasOwn(suppliedAvailability, 'comments') ? Boolean(suppliedAvailability.comments) : providerHasPerformance,
@@ -117,6 +122,7 @@ export function normalizeSocialResult(item = {}) {
     rawRelationshipType,
     authorName: item.author_name || item.author_handle || item.source || null,
     authorHandle: item.author_handle || null,
+    authorProfileUrl: suppliedAuthorProfileUrl || derivedInstagramProfileUrl,
     headline: conciseText(item.headline || item.body || 'Social conversation', 220),
     summary: conciseText(item.summary || item.body || '', 420),
     url: safeSocialUrl(item.canonical_url || item.link || item.permalink),

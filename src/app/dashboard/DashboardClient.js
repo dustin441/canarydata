@@ -1906,7 +1906,7 @@ function formatSocialRate(rate) {
 function SocialPostPreviewCard({ result, source, rank = null, showContext = false }) {
   const mediaUrl = safeSocialMediaUrl(result.mediaUrl);
   const videoUrl = safeSocialMediaUrl(result.videoUrl);
-  const profileImageUrl = safeSocialMediaUrl(result.profileImageUrl || source?.metadata?.profile_picture_url);
+  const profileImageUrl = safeSocialMediaUrl(result.profileImageUrl || (result.relationshipType === 'owned' ? source?.metadata?.profile_picture_url : ''));
   const renderedMediaUrl = proxiedSocialMediaUrl(mediaUrl);
   const renderedVideoUrl = proxiedSocialMediaUrl(videoUrl);
   const renderedProfileImageUrl = proxiedSocialMediaUrl(profileImageUrl);
@@ -1920,7 +1920,7 @@ function SocialPostPreviewCard({ result, source, rank = null, showContext = fals
   const engagementRate = result.hasPerformanceData ? calculateSocialEngagementRate(result, followers) : null;
   const displayName = result.authorName || source?.display_name || source?.handle || 'Public social account';
   const initials = displayName.split(/\s+/).map((part) => part[0]).join('').slice(0, 3).toUpperCase();
-  const profileUrl = safeSocialUrl(source?.profile_url || source?.url);
+  const profileUrl = safeSocialUrl(result.authorProfileUrl || (result.relationshipType === 'owned' ? (source?.profile_url || source?.url) : null));
   const postCopy = result.summary || result.headline;
   const isVideo = result.mediaType === 'video';
 
@@ -2885,7 +2885,7 @@ export default function DashboardClient({ articles, districts, queries: initialQ
                   : currentView === 'clients' ? 'Login credentials for beta testers'
                   : currentView === 'howto' ? 'Platform walkthrough video'
                   : currentView === 'articles' ? 'Browse, filter, annotate, and export article-level coverage'
-                  : currentView === 'social' ? 'District posts, direct engagement, and public mentions'
+                  : currentView === 'social' ? 'District posts, tagged or mentioned posts, and public conversations'
                   : 'Media Intelligence Dashboard'}
               </div>
             </div>
