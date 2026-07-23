@@ -127,6 +127,9 @@ export async function POST(request) {
     const metadata = userRecord.user.app_metadata || {};
     const isAdmin = metadata.role === 'admin';
     const assignedDistrictId = metadata.district_id || null;
+    if (process.env.MELODI_QA_MODE === 'true' && !isAdmin) {
+      return NextResponse.json({ error: 'MELODI is currently available to Canary reviewers only.' }, { status: 403 });
+    }
     if (!isAdmin && !assignedDistrictId) return NextResponse.json({ error: 'Canary district access is not configured.' }, { status: 403 });
     let body;
     try {
