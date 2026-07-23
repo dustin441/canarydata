@@ -1160,6 +1160,138 @@ function StrategicAlignmentChart({ data, selectedLabel, onSelectLabel }) {
   );
 }
 
+const MELODI_STARTERS = [
+  'What should I pay attention to today?',
+  'Which stories align with our strategic priorities?',
+  'What public social conversations may need review?',
+  'Summarize our top social posts from the last 30 days.',
+];
+
+function MelodiAnswer({ content }) {
+  const lines = String(content || '')
+    .replace(/\*\*/g, '')
+    .split(/\n+/)
+    .map((line) => line.replace(/^#{1,4}\s*/, '').trim())
+    .filter(Boolean);
+  return <div className="melodi-answer-text">{lines.map((line, index) => <p key={`${index}-${line.slice(0, 24)}`}>{line}</p>)}</div>;
+}
+
+function MelodiChatView({ districtId, districtName }) {
+  const [messages, setMessages] = useState([]);
+  const [draft, setDraft] = useState('');
+  const [loading, setLoading] = useState(false);
+  const [error, setError] = useState('');
+  const endRef = useRef(null);
+  const hasDistrict = Boolean(districtId && districtId !== 'All');
+
+  useEffect(() => {
+    endRef.current?.scrollIntoView({ behavior: 'smooth', block: 'nearest' });
+  }, [messages, loading]);
+
+  async function askMelodi(question) {
+    const cleanQuestion = String(question || '').trim();
+    if (!cleanQuestion || !hasDistrict || loading) return;
+    const priorMessages = messages.map(({ role, content }) => ({ role, content }));
+    setMessages((current) => [...current, { role: 'user', content: cleanQuestion }]);
+    setDraft('');
+    setError('');
+    setLoading(true);
+    try {
+      const response = await fetch('/api/melodi', {
+        method: 'POST',
+        headers: { 'Content-Type': 'application/json' },
+        body: JSON.stringify({ message: cleanQuestion, districtId, history: priorMessages }),
+      });
+      const payload = await response.json();
+      if (!response.ok) throw new Error(payload?.error || 'MELODI could not answer right now.');
+      setMessages((current) => [...current, { role: 'assistant', content: payload.answer, sources: payload.sources || [], scope: payload.scope || null }]);
+    } catch (requestError) {
+      setError(requestError instanceof Error ? requestError.message : 'MELODI could not answer right now.');
+    } finally {
+      setLoading(false);
+    }
+  }
+
+  return (
+    <section className="melodi-shell" aria-label="Ask MELODI">
+      <header className="melodi-hero">
+        <div className="melodi-mark" aria-hidden="true">M</div>
+        <div>
+          <span>Canary conversational intelligence</span>
+          <h2>Ask MELODI</h2>
+          <p>Ask questions about {hasDistrict ? districtName : 'a selected district'} using Canary’s current news, public-social intelligence, and approved strategic profile.</p>
+        </div>
+      </header>
+
+      {!hasDistrict ? (
+        <div className="melodi-empty-state">
+          <strong>Select one district to begin.</strong>
+          <p>MELODI never combines client data across districts.</p>
+        </div>
+      ) : (
+        <>
+          <div className="melodi-starters" aria-label="Suggested questions">
+            {MELODI_STARTERS.map((starter) => (
+              <button type="button" key={starter} onClick={() => askMelodi(starter)} disabled={loading}>{starter}</button>
+            ))}
+          </div>
+
+          <div className="melodi-conversation" aria-live="polite">
+            {messages.length === 0 && (
+              <div className="melodi-welcome">
+                <strong>Start with a question, not another report.</strong>
+                <p>MELODI will answer from the selected district’s accessible Canary records and cite the evidence it used.</p>
+              </div>
+            )}
+            {messages.map((message, index) => (
+              <article className={`melodi-message ${message.role}`} key={`${message.role}-${index}`}>
+                <div className="melodi-message-label">{message.role === 'assistant' ? 'MELODI' : 'You'}</div>
+                {message.role === 'assistant' ? <MelodiAnswer content={message.content} /> : <p>{message.content}</p>}
+                {message.sources?.length > 0 && (
+                  <div className="melodi-sources">
+                    <span>Evidence used</span>
+                    <div>
+                      {message.sources.map((source) => source.url ? (
+                        <a key={source.id} href={source.url} target="_blank" rel="noopener noreferrer">
+                          <strong>{source.id}</strong><span>{source.title}</span><small>{source.type} ↗</small>
+                        </a>
+                      ) : (
+                        <div key={source.id}>
+                          <strong>{source.id}</strong><span>{source.title}</span><small>{source.type}</small>
+                        </div>
+                      ))}
+                    </div>
+                  </div>
+                )}
+                {message.scope && (
+                  <small className="melodi-scope-note">Grounded in {message.scope.newsRecords} news records, {message.scope.socialRecords} public-social records, and {message.scope.strategicPriorities} strategic priorities for {message.scope.districtName}.</small>
+                )}
+              </article>
+            ))}
+            {loading && <div className="melodi-thinking"><span aria-hidden="true" />MELODI is reviewing the evidence…</div>}
+            <div ref={endRef} />
+          </div>
+
+          {error && <div className="melodi-error" role="alert">{error}</div>}
+          <form className="melodi-composer" onSubmit={(event) => { event.preventDefault(); askMelodi(draft); }}>
+            <label htmlFor="melodi-question">Ask about media coverage, public social conversation, strategic alignment, or reporting</label>
+            <div>
+              <textarea id="melodi-question" value={draft} onChange={(event) => setDraft(event.target.value.slice(0, 1200))} onKeyDown={(event) => {
+                if (event.key === 'Enter' && !event.shiftKey) {
+                  event.preventDefault();
+                  askMelodi(draft);
+                }
+              }} rows={3} maxLength={1200} placeholder="What should our communications team review today?" disabled={loading} />
+              <button className="btn btn-primary" type="submit" disabled={loading || !draft.trim()}>Ask MELODI</button>
+            </div>
+          </form>
+          <p className="melodi-boundary">MELODI is advisory and may be wrong. Verify facts and original sources before acting. Public-social discovery is incomplete and does not replace native platform notifications or inboxes. MELODI cannot publish, reply, assign, approve, or complete actions.</p>
+        </>
+      )}
+    </section>
+  );
+}
+
 function HowItWorksView() {
   return (
     <div className="data-section" style={{ maxWidth: '960px' }}>
@@ -2935,6 +3067,17 @@ export default function DashboardClient({ articles, districts, queries: initialQ
               Social
               <span className="sidebar-link-badge">{socialResultCount}</span>
             </button>
+            {!demoMode && (
+              <button
+                className={`sidebar-link melodi-sidebar-link ${currentView === 'melodi' ? 'active' : ''}`}
+                onClick={() => handleNavSelect('melodi')}
+                style={{ width: '100%', background: 'none', border: 'none', textAlign: 'left', cursor: 'pointer' }}
+              >
+                <span className="sidebar-link-icon">✦</span>
+                Ask MELODI
+                <span className="sidebar-link-badge">AI</span>
+              </button>
+            )}
             <button
               className={`sidebar-link ${currentView === 'queries' ? 'active' : ''}`}
               onClick={() => handleNavSelect('queries')}
@@ -3083,7 +3226,9 @@ export default function DashboardClient({ articles, districts, queries: initialQ
                             ? 'Media Articles'
                             : currentView === 'social'
                               ? 'Social Intelligence'
-                              : selectedDistrictName}
+                              : currentView === 'melodi'
+                                ? 'Ask MELODI'
+                                : selectedDistrictName}
               </div>
               <div className="topbar-breadcrumb">
                 {currentView === 'queries' ? 'Manage monitored search terms'
@@ -3095,6 +3240,7 @@ export default function DashboardClient({ articles, districts, queries: initialQ
                   : currentView === 'howto' ? 'Media to decision to leadership proof'
                   : currentView === 'articles' ? 'Browse, filter, annotate, and export article-level coverage'
                   : currentView === 'social' ? 'District posts, tagged or mentioned posts, and public conversations'
+                  : currentView === 'melodi' ? 'District-scoped conversational media intelligence with cited evidence'
                   : 'Media Intelligence Dashboard'}
               </div>
             </div>
@@ -3179,6 +3325,9 @@ export default function DashboardClient({ articles, districts, queries: initialQ
               districtFilter={districtFilter}
               districts={districts}
             />
+          )}
+          {currentView === 'melodi' && (
+            <MelodiChatView key={districtFilter} districtId={districtFilter} districtName={selectedDistrictName} />
           )}
           {currentView === 'queries' && (
             <QueriesView
