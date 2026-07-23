@@ -2132,7 +2132,7 @@ function formatSocialUrgency(value) {
   return labels[value] || String(value || 'Routine').replaceAll('_', ' ');
 }
 
-function SocialPostPreviewCard({ result, source, rank = null, showContext = false, compact = false, reviewEnabled = false, selected = false, onToggleSelected = null }) {
+function SocialPostPreviewCard({ result, source, rank = null, showContext = false, compact = false, listCompact = false, reviewEnabled = false, selected = false, onToggleSelected = null }) {
   const mediaUrl = safeSocialMediaUrl(result.mediaUrl);
   const videoUrl = safeSocialMediaUrl(result.videoUrl);
   const profileImageUrl = safeSocialMediaUrl(result.profileImageUrl || (result.relationshipType === 'owned' ? source?.metadata?.profile_picture_url : ''));
@@ -2208,7 +2208,7 @@ function SocialPostPreviewCard({ result, source, rank = null, showContext = fals
 
         {postCopy && <p className="social-post-preview-copy">{postCopy}</p>}
 
-        {action && (action.recommendedAction || action.situationSummary) && (
+        {!listCompact && action && (action.recommendedAction || action.situationSummary) && (
           <section className={`social-decision-cue ${action.actionType}`} aria-label={`${action.actionLabel} decision cue`}>
             <div>
               <span>What to do</span>
@@ -2219,28 +2219,30 @@ function SocialPostPreviewCard({ result, source, rank = null, showContext = fals
           </section>
         )}
 
-        <div className={`social-post-preview-media ${mediaUrl && !imageFailed ? 'has-media' : 'media-fallback'} ${result.isTextOnly && !imageFailed ? 'text-only-fallback' : ''}`}>
-          {mediaUrl && !imageFailed ? (
-            // eslint-disable-next-line @next/next/no-img-element
-            <img src={renderedMediaUrl} alt={result.headline || 'District social post'} loading="lazy" onError={() => setFailedMediaUrl(mediaUrl)} />
-          ) : (
-            <div className="social-post-fallback-state">
-              <span aria-hidden="true">{result.isTextOnly && !imageFailed ? 'Aa' : '◇'}</span>
-              <strong>{result.isTextOnly && !imageFailed ? 'Text-only social post' : 'Media unavailable'}</strong>
-              <small>{result.isTextOnly && !imageFailed ? 'This post was published without an image or video.' : 'Open the original post to review its media.'}</small>
-            </div>
-          )}
-          {result.carouselCount > 1 && <span className="social-carousel-badge">▦ {result.carouselCount} images</span>}
-          {isVideo && videoUrl ? (
-            <button type="button" className="social-post-video-launch" onClick={() => setVideoOpen(true)} aria-label={`Play video: ${result.headline}`}>
-              <span aria-hidden="true">▶</span><small>Play video</small>
-            </button>
-          ) : isVideo && result.url ? (
-            <a className="social-post-video-launch" href={result.url} target="_blank" rel="noopener noreferrer">
-              <span aria-hidden="true">▶</span><small>Watch on platform</small>
-            </a>
-          ) : null}
-        </div>
+        {!listCompact && (
+          <div className={`social-post-preview-media ${mediaUrl && !imageFailed ? 'has-media' : 'media-fallback'} ${result.isTextOnly && !imageFailed ? 'text-only-fallback' : ''}`}>
+            {mediaUrl && !imageFailed ? (
+              // eslint-disable-next-line @next/next/no-img-element
+              <img src={renderedMediaUrl} alt={result.headline || 'District social post'} loading="lazy" onError={() => setFailedMediaUrl(mediaUrl)} />
+            ) : (
+              <div className="social-post-fallback-state">
+                <span aria-hidden="true">{result.isTextOnly && !imageFailed ? 'Aa' : '◇'}</span>
+                <strong>{result.isTextOnly && !imageFailed ? 'Text-only social post' : 'Media unavailable'}</strong>
+                <small>{result.isTextOnly && !imageFailed ? 'This post was published without an image or video.' : 'Open the original post to review its media.'}</small>
+              </div>
+            )}
+            {result.carouselCount > 1 && <span className="social-carousel-badge">▦ {result.carouselCount} images</span>}
+            {isVideo && videoUrl ? (
+              <button type="button" className="social-post-video-launch" onClick={() => setVideoOpen(true)} aria-label={`Play video: ${result.headline}`}>
+                <span aria-hidden="true">▶</span><small>Play video</small>
+              </button>
+            ) : isVideo && result.url ? (
+              <a className="social-post-video-launch" href={result.url} target="_blank" rel="noopener noreferrer">
+                <span aria-hidden="true">▶</span><small>Watch on platform</small>
+              </a>
+            ) : null}
+          </div>
+        )}
 
         {!compact && (
           <div className="social-post-engagement-bar" aria-label="Public engagement counts">
@@ -2250,14 +2252,16 @@ function SocialPostPreviewCard({ result, source, rank = null, showContext = fals
           </div>
         )}
 
-        <div className="social-post-performance-grid">
-          <div><strong>{formatAvailableSocialMetric(result, 'reactions', result.reactionCount)}</strong><span>Reactions</span></div>
-          <div><strong>{formatAvailableSocialMetric(result, 'comments', result.commentCount)}</strong><span>Comments</span></div>
-          <div title={result.hasPerformanceData && followers ? `${formatSocialMetric(result.engagementTotal)} available public interactions divided by ${formatSocialMetric(followers)} followers` : 'Performance or follower data unavailable'}>
-            <strong>{formatSocialRate(engagementRate)}</strong><span>Engagement rate</span>
+        {!listCompact && (
+          <div className="social-post-performance-grid">
+            <div><strong>{formatAvailableSocialMetric(result, 'reactions', result.reactionCount)}</strong><span>Reactions</span></div>
+            <div><strong>{formatAvailableSocialMetric(result, 'comments', result.commentCount)}</strong><span>Comments</span></div>
+            <div title={result.hasPerformanceData && followers ? `${formatSocialMetric(result.engagementTotal)} available public interactions divided by ${formatSocialMetric(followers)} followers` : 'Performance or follower data unavailable'}>
+              <strong>{formatSocialRate(engagementRate)}</strong><span>Engagement rate</span>
+            </div>
+            <div><strong>{formatAvailableSocialMetric(result, 'views', result.viewCount)}</strong><span>Views</span></div>
           </div>
-          <div><strong>{formatAvailableSocialMetric(result, 'views', result.viewCount)}</strong><span>Views</span></div>
-        </div>
+        )}
 
         {!compact && result.representativeComments?.length > 0 && (
           <section className="social-post-conversation" aria-label="Representative public comments">
@@ -2500,8 +2504,9 @@ function SocialView({ articles, socialThreads, socialSources, socialReviewEvents
     || performanceFilter !== 'all' || minimumEngagementRate !== '' || maximumEngagementRate !== '' || socialDateStart !== '' || socialDateEnd !== '' || reviewStatusFilter !== 'all' || socialSearch !== '' || socialSort !== 'newest';
   const reviewableVisibleResults = visibleResults.filter((result) => Boolean(result.provider && result.externalThreadId));
   const selectedResults = reviewableVisibleResults.filter((result) => selectedSocialIds.has(result.id));
-  const safeOfficialResults = reviewableVisibleResults.filter((result) => result.rawRelationshipType === 'owned' && result.visibilityStatus === 'review');
-  const canBulkApprove = selectedResults.length > 0 && selectedResults.every((result) => result.rawRelationshipType === 'owned' && result.visibilityStatus === 'review');
+  const hasVerifiedOfficialSource = (result) => scopedSources.some((source) => source.id === result.socialAccountId && source.district_id === result.districtId && source.platform === result.platform && (source.handle || source.profile_url));
+  const safeOfficialResults = reviewableVisibleResults.filter((result) => result.rawRelationshipType === 'owned' && result.visibilityStatus === 'review' && hasVerifiedOfficialSource(result));
+  const canBulkApprove = selectedResults.length > 0 && selectedResults.every((result) => result.rawRelationshipType === 'owned' && result.visibilityStatus === 'review' && hasVerifiedOfficialSource(result));
   const canPromoteBatch = selectedResults.length > 0 && selectedResults.every((result) => result.visibilityStatus === 'approved');
   const scopedReviewEvents = socialReviewEvents.filter((event) => districtFilter === 'All' || event.district_id === districtFilter);
 
@@ -2693,6 +2698,7 @@ function SocialView({ articles, socialThreads, socialSources, socialReviewEvents
                   source={scopedSources.find((source) => source.platform === result.platform && source.district_id === result.districtId)}
                   showContext
                   compact={compactListMode}
+                  listCompact={compactListMode}
                   reviewEnabled={isAdmin && Boolean(result.provider && result.externalThreadId)}
                   selected={selectedSocialIds.has(result.id)}
                   onToggleSelected={isAdmin && result.provider && result.externalThreadId ? toggleSocialSelection : null}

@@ -748,14 +748,23 @@ export async function bulkReviewSocialThreads({ districtId, socialThreadIds, act
 
   const { data: rows, error: rowsError } = await supabase
     .from('social_threads')
-    .select('id, district_id, relationship_type, visibility_status')
+    .select('id, district_id, social_account_id, platform, relationship_type, visibility_status')
     .in('id', ids);
   if (rowsError) throw rowsError;
   if ((rows ?? []).length !== ids.length || rows.some((row) => row.district_id !== districtId)) {
     throw new Error('Selection contains missing or cross-district social results.');
   }
+  const accountIds = [...new Set(rows.map((row) => row.social_account_id).filter(Boolean))];
+  const { data: officialAccounts, error: accountError } = accountIds.length > 0
+    ? await supabase.from('social_accounts').select('id, district_id, platform, handle, profile_url, active').in('id', accountIds)
+    : { data: [], error: null };
+  if (accountError) throw accountError;
+  const officialAccountKeys = new Set((officialAccounts ?? [])
+    .filter((account) => account.active && (String(account.handle || '').trim() || String(account.profile_url || '').trim()))
+    .map((account) => `${account.id}:${account.district_id}:${account.platform}`));
   const allEligible = action === 'approve_official'
-    ? rows.every((row) => row.relationship_type === 'owned' && row.visibility_status === 'review')
+    ? rows.every((row) => row.relationship_type === 'owned' && row.visibility_status === 'review'
+      && officialAccountKeys.has(`${row.social_account_id}:${row.district_id}:${row.platform}`))
     : rows.every((row) => row.visibility_status === 'approved');
   if (!allEligible) throw new Error(action === 'approve_official'
     ? 'Bulk approval is limited to official district posts awaiting review.'

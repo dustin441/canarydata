@@ -2857,7 +2857,13 @@ a:hover {
   .social-bulk-review-actions .btn,
   .social-view-mode {
     width: 100%;
+    min-height: 44px;
     justify-content: center;
+  }
+
+  .social-review-select {
+    width: 44px;
+    height: 44px;
   }
 
   .social-post-preview-header {

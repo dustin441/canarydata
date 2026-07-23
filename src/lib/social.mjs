@@ -239,6 +239,7 @@ export function normalizeSocialResult(item = {}) {
     matchReason: conciseText(item.match_reason || (relationshipType === 'ambient' ? 'Matched a configured district social query.' : ''), 220),
     recommendation: conciseText(item.recommendation || '', 320),
     tags: Array.isArray(item.tags) ? item.tags : [],
+    socialAccountId: item.social_account_id || null,
     externalThreadId: item.external_thread_id || null,
     visibilityStatus: item.visibility_status || 'active',
     reviewerNote: conciseText(item.reviewer_note || '', 2000),

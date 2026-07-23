@@ -23,7 +23,7 @@ alter table public.social_threads validate constraint social_threads_reviewer_no
 
 create table if not exists public.social_review_batches (
   id uuid primary key default gen_random_uuid(),
-  district_id text not null references public.districts(id) on delete cascade,
+  district_id text not null references public.districts(id) on delete restrict,
   action text not null check (action in ('approve', 'exclude', 'restore', 'classification', 'note', 'bulk_approve_official', 'promote')),
   actor_user_id uuid not null,
   item_count integer not null check (item_count > 0),
@@ -34,7 +34,7 @@ create table if not exists public.social_review_batches (
 create table if not exists public.social_review_events (
   id uuid primary key default gen_random_uuid(),
   batch_id uuid not null references public.social_review_batches(id) on delete restrict,
-  district_id text not null references public.districts(id) on delete cascade,
+  district_id text not null references public.districts(id) on delete restrict,
   social_thread_id uuid not null references public.social_threads(id) on delete restrict,
   actor_user_id uuid not null,
   action text not null check (action in ('approve', 'exclude', 'restore', 'classification', 'note', 'promote')),
@@ -73,6 +73,25 @@ create trigger social_review_events_immutable
 before update or delete on public.social_review_events
 for each row execute function public.prevent_social_review_audit_mutation();
 
+create or replace function public.canary_assert_social_reviewer(p_actor_user_id uuid)
+returns void
+language plpgsql
+security definer
+set search_path = public, auth
+as $$
+declare
+  actor_role text;
+begin
+  select raw_app_meta_data ->> 'role'
+    into actor_role
+  from auth.users
+  where id = p_actor_user_id;
+  if actor_role is distinct from 'admin' then
+    raise exception 'Canary reviewer access is required';
+  end if;
+end;
+$$;
+
 create or replace function public.canary_review_social_thread(
   p_actor_user_id uuid,
   p_social_thread_id uuid,
@@ -92,6 +111,7 @@ declare
   new_batch_id uuid;
 begin
   if p_actor_user_id is null then raise exception 'Actor is required'; end if;
+  perform public.canary_assert_social_reviewer(p_actor_user_id);
   if p_action not in ('approve', 'exclude', 'restore', 'classification', 'note', 'promote') then
     raise exception 'Unsupported social review action';
   end if;
@@ -180,6 +200,7 @@ declare
   row_after public.social_threads%rowtype;
 begin
   if p_actor_user_id is null then raise exception 'Actor is required'; end if;
+  perform public.canary_assert_social_reviewer(p_actor_user_id);
   if p_district_id is null then raise exception 'District is required'; end if;
   if p_action not in ('approve_official', 'promote') then raise exception 'Unsupported bulk social review action'; end if;
 
@@ -198,7 +219,16 @@ begin
     where id = any(p_social_thread_ids)
       and district_id = p_district_id
       and relationship_type = 'owned'
-      and visibility_status = 'review';
+      and visibility_status = 'review'
+      and exists (
+        select 1
+        from public.social_accounts account
+        where account.id = social_threads.social_account_id
+          and account.district_id = social_threads.district_id
+          and account.platform = social_threads.platform
+          and account.active = true
+          and (nullif(btrim(account.handle), '') is not null or nullif(btrim(account.profile_url), '') is not null)
+      );
   else
     select count(*)::integer into eligible_count
     from public.social_threads
@@ -251,7 +281,9 @@ $$;
 
 revoke all on function public.canary_review_social_thread(uuid, uuid, text, integer, text, text) from public, anon, authenticated;
 revoke all on function public.canary_bulk_review_social_threads(uuid, text, uuid[], text) from public, anon, authenticated;
+revoke all on function public.canary_assert_social_reviewer(uuid) from public, anon, authenticated;
 grant execute on function public.canary_review_social_thread(uuid, uuid, text, integer, text, text) to service_role;
 grant execute on function public.canary_bulk_review_social_threads(uuid, text, uuid[], text) to service_role;
+grant execute on function public.canary_assert_social_reviewer(uuid) to service_role;
 
 commit;

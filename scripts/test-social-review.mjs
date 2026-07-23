@@ -6,6 +6,7 @@ const reviewed = normalizeSocialResult({
   id: 'thread-review-1',
   provider: 'apify',
   platform: 'facebook',
+  social_account_id: '22222222-2222-2222-2222-222222222222',
   external_thread_id: 'official-1',
   relationship_type: 'owned',
   visibility_status: 'approved',
@@ -18,6 +19,7 @@ assert.equal(reviewed.visibilityStatus, 'approved');
 assert.equal(reviewed.reviewerNote, 'Safe official post.');
 assert.equal(reviewed.reviewVersion, 4);
 assert.equal(reviewed.reviewedAt, '2026-07-23T12:00:00Z');
+assert.equal(reviewed.socialAccountId, '22222222-2222-2222-2222-222222222222');
 
 const [sql, actions, dashboard, data, melodi] = await Promise.all([
   readFile(new URL('../supabase/social_review_workflow.sql', import.meta.url), 'utf8'),
@@ -33,6 +35,10 @@ assert.match(sql, /before_state jsonb not null/);
 assert.match(sql, /after_state jsonb not null/);
 assert.match(sql, /relationship_type = 'owned'[\s\S]*visibility_status = 'review'/);
 assert.match(sql, /visibility_status = 'approved'/);
+assert.match(sql, /canary_assert_social_reviewer/);
+assert.match(sql, /raw_app_meta_data ->> 'role'/);
+assert.match(sql, /account\.id = social_threads\.social_account_id/);
+assert.match(sql, /account\.active = true/);
 assert.match(sql, /revoke all on function public\.canary_review_social_thread[\s\S]*from public, anon, authenticated/);
 assert.match(sql, /revoke all on function public\.canary_bulk_review_social_threads[\s\S]*from public, anon, authenticated/);
 
@@ -54,6 +60,7 @@ for (const marker of [
 ]) {
   assert.ok(dashboard.includes(marker), `Dashboard must include ${marker}`);
 }
+assert.match(dashboard, /!listCompact && \(/);
 assert.match(data, /includeReview \? \['active', 'approved', 'review', 'excluded'\] : \['active'\]/);
 assert.match(data, /export async function getSocialReviewEvents/);
 assert.match(melodi, /isAdmin \? \['active', 'approved', 'review'\] : \['active'\]/);
