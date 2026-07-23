@@ -45,6 +45,7 @@ MELODI is not a generic replacement label for Canary recommendations. Canary rem
 
 ## Current limitations
 
+- Customer visibility and model requests are gated by `MELODI_ENABLED=true`; keep the gate off until AI Gateway billing is active and authenticated production QA passes.
 - Chats are session-local and are not yet persisted.
 - Retrieval is deterministic lexical ranking with special handling for 30-day and top-social questions. It is not vector search.
 - MELODI does not search the live web.

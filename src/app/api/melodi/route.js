@@ -95,6 +95,7 @@ function sourceMap({ priorities, news, social }) {
 
 export async function POST(request) {
   try {
+    if (process.env.MELODI_ENABLED !== 'true') return NextResponse.json({ error: 'MELODI is not enabled yet.' }, { status: 503 });
     const contentLength = Number(request.headers.get('content-length') || 0);
     if (contentLength > 25000) return NextResponse.json({ error: 'MELODI request is too large.' }, { status: 413 });
     const sessionClient = await createSessionClient();

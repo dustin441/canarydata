@@ -2601,7 +2601,7 @@ function SocialView({ articles, socialThreads, socialSources, districtFilter, di
   );
 }
 
-export default function DashboardClient({ articles, districts, queries: initialQueries, clients = [], userDistrictId, paymentNotice = null, billingInfo = null, excludedStories = [], correctionEvents = [], socialSources = [], socialThreads = [], strategicProfiles = [], strategicPriorities = [], demoMode = false }) {
+export default function DashboardClient({ articles, districts, queries: initialQueries, clients = [], userDistrictId, paymentNotice = null, billingInfo = null, excludedStories = [], correctionEvents = [], socialSources = [], socialThreads = [], strategicProfiles = [], strategicPriorities = [], melodiEnabled = false, demoMode = false }) {
   const defaultDistrictFilter = userDistrictId ?? districts[0]?.id ?? 'All';
   const [currentView, setCurrentView] = useState('dashboard');
   const [search, setSearch] = useState('');
@@ -3067,7 +3067,7 @@ export default function DashboardClient({ articles, districts, queries: initialQ
               Social
               <span className="sidebar-link-badge">{socialResultCount}</span>
             </button>
-            {!demoMode && (
+            {!demoMode && melodiEnabled && (
               <button
                 className={`sidebar-link melodi-sidebar-link ${currentView === 'melodi' ? 'active' : ''}`}
                 onClick={() => handleNavSelect('melodi')}
@@ -3326,7 +3326,7 @@ export default function DashboardClient({ articles, districts, queries: initialQ
               districts={districts}
             />
           )}
-          {currentView === 'melodi' && (
+          {melodiEnabled && currentView === 'melodi' && (
             <MelodiChatView key={districtFilter} districtId={districtFilter} districtName={selectedDistrictName} />
           )}
           {currentView === 'queries' && (

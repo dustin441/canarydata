@@ -78,6 +78,7 @@ export default async function DashboardPage() {
       socialThreads={socialThreads}
       strategicProfiles={strategicProfiles}
       strategicPriorities={strategicPriorities}
+      melodiEnabled={process.env.MELODI_ENABLED === 'true'}
     />
   );
 }
