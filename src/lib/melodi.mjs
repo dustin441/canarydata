@@ -1,5 +1,5 @@
 const STOP_WORDS = new Set([
-  'about', 'after', 'again', 'also', 'and', 'are', 'can', 'could', 'district', 'for', 'from', 'have', 'how', 'into', 'last', 'most', 'our', 'past', 'please', 'should', 'that', 'the', 'their', 'there', 'these', 'they', 'this', 'what', 'when', 'where', 'which', 'who', 'with', 'would', 'your',
+  'about', 'after', 'again', 'also', 'and', 'are', 'attention', 'can', 'could', 'district', 'for', 'from', 'have', 'how', 'into', 'last', 'media', 'most', 'need', 'needs', 'news', 'our', 'past', 'pay', 'please', 'post', 'posts', 'report', 'reporting', 'should', 'social', 'stories', 'story', 'summarize', 'summary', 'that', 'the', 'their', 'there', 'these', 'they', 'this', 'today', 'top', 'what', 'when', 'where', 'which', 'who', 'with', 'would', 'your',
 ]);
 
 function questionTokens(question) {
@@ -28,9 +28,9 @@ function itemDate(item, fields) {
 function relevanceScore(item, tokens, weightedFields) {
   let score = 0;
   weightedFields.forEach(([field, weight]) => {
-    const value = textValue(item, [field]);
+    const words = new Set(textValue(item, [field]).replace(/[^a-z0-9@]+/g, ' ').split(/\s+/).filter(Boolean));
     tokens.forEach((token) => {
-      if (value.includes(token)) score += weight;
+      if (words.has(token) || (token.length >= 5 && [...words].some((word) => word.length >= 5 && (word.startsWith(token) || token.startsWith(word))))) score += weight;
     });
   });
   return score;
@@ -39,14 +39,19 @@ function relevanceScore(item, tokens, weightedFields) {
 function withinDays(item, dateFields, now, days) {
   const date = itemDate(item, dateFields);
   if (!date) return false;
-  return date.getTime() >= now.getTime() - days * 24 * 60 * 60 * 1000;
+  return date.getTime() <= now.getTime() && date.getTime() >= now.getTime() - days * 24 * 60 * 60 * 1000;
+}
+
+function isNotFuture(item, dateFields, now) {
+  const date = itemDate(item, dateFields);
+  return !date || date.getTime() <= now.getTime();
 }
 
 function rankByRelevance(items, tokens, weightedFields, dateFields) {
-  return [...items]
+  const ranked = [...items]
     .map((item) => ({ item, score: relevanceScore(item, tokens, weightedFields), date: itemDate(item, dateFields)?.getTime() || 0 }))
-    .sort((a, b) => b.score - a.score || b.date - a.date)
-    .map(({ item }) => item);
+    .sort((a, b) => b.score - a.score || b.date - a.date);
+  return (tokens.length > 0 ? ranked.filter((entry) => entry.score > 0) : ranked).map(({ item }) => item);
 }
 
 export function selectMelodiContext({ question, news = [], social = [], now = new Date(), newsLimit = 24, socialLimit = 16 }) {
@@ -54,8 +59,8 @@ export function selectMelodiContext({ question, news = [], social = [], now = ne
   const asksForThirtyDays = /(?:last|past)\s+30\s+days?|30[- ]day/i.test(String(question || ''));
   const asksForTopSocial = /\b(top|highest|best|most\s+engag(?:ed|ing))\b/i.test(String(question || '')) && /\b(social|post|facebook|instagram)\b/i.test(String(question || ''));
 
-  const availableNews = (Array.isArray(news) ? news : []).filter((item) => !asksForThirtyDays || withinDays(item, ['date', 'created_at'], now, 30));
-  const availableSocial = (Array.isArray(social) ? social : []).filter((item) => !asksForThirtyDays || withinDays(item, ['published_at', 'created_at'], now, 30));
+  const availableNews = (Array.isArray(news) ? news : []).filter((item) => isNotFuture(item, ['date', 'created_at'], now) && (!asksForThirtyDays || withinDays(item, ['date', 'created_at'], now, 30)));
+  const availableSocial = (Array.isArray(social) ? social : []).filter((item) => isNotFuture(item, ['published_at', 'created_at'], now) && (!asksForThirtyDays || withinDays(item, ['published_at', 'created_at'], now, 30)));
 
   const rankedNews = rankByRelevance(
     availableNews,

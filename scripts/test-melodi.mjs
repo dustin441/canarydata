@@ -7,8 +7,9 @@ const news = [
   { id: 'n-board', date: '2026-07-18', headline: 'Board celebrates literacy gains', summary: 'Reading outcomes improved', canary_score: 88, link: 'https://news.example/literacy' },
 ];
 const social = [
-  { id: 's-high', published_at: '2026-07-21', headline: 'Health fair photos', body: 'Community health fair', engagement_total: 120, canonical_url: 'https://social.example/high' },
-  { id: 's-low', published_at: '2026-07-22', headline: 'Bus question', body: 'Is the bus schedule changing?', engagement_total: 4, canonical_url: 'https://social.example/low' },
+  { id: 's-low', published_at: '2026-07-10', headline: 'School bus update', body: 'Bus route changed', engagement_total: 12, canonical_url: 'https://social.example/low' },
+  { id: 's-high', published_at: '2026-07-20', headline: 'Health fair', body: 'Community health fair', engagement_total: 900, canonical_url: 'https://social.example/high' },
+  { id: 's-future', published_at: '2026-07-24', headline: 'Future post', body: 'Not published yet', engagement_total: 9999, canonical_url: 'https://social.example/future' },
 ];
 
 const busContext = selectMelodiContext({ question: 'What is happening with bus transportation?', news, social, now: new Date('2026-07-23T12:00:00Z') });
@@ -17,7 +18,14 @@ assert.equal(busContext.social[0].id, 's-low');
 
 const topContext = selectMelodiContext({ question: 'What are our top social posts in the last 30 days?', news, social, now: new Date('2026-07-23T12:00:00Z') });
 assert.equal(topContext.social[0].id, 's-high');
+assert.equal(topContext.social.some((item) => item.id === 's-future'), false);
 assert.equal(topContext.news.some((item) => item.id === 'n-old'), false);
+
+const missingContext = selectMelodiContext({ question: 'quantum cafeteria zanzibar', news, social, now: new Date('2026-07-23T12:00:00Z') });
+assert.equal(missingContext.news.length, 0);
+assert.equal(missingContext.social.length, 0);
+const genericContext = selectMelodiContext({ question: 'What should I pay attention to today?', news, social, now: new Date('2026-07-23T12:00:00Z') });
+assert.ok(genericContext.news.length > 0 || genericContext.social.length > 0);
 
 const stableNewsId = stableMelodiCitationId('N', { id: '6f0bb1da-d8ca-4989-9171-337c057aafe7' });
 assert.equal(stableNewsId, 'N-6F0BB1DAD8CA');

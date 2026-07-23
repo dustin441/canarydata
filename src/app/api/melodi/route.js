@@ -10,26 +10,8 @@ export const dynamic = 'force-dynamic';
 
 const MAX_MESSAGE_LENGTH = 1200;
 const MAX_HISTORY_MESSAGES = 4;
-const RATE_LIMIT_WINDOW_MS = 10 * 60 * 1000;
 const RATE_LIMIT_REQUESTS = 8;
-
-function getRateStore() {
-  if (!globalThis.__melodiRateStore) globalThis.__melodiRateStore = new Map();
-  return globalThis.__melodiRateStore;
-}
-
-function rateLimitAllows(userId) {
-  const now = Date.now();
-  const store = getRateStore();
-  const current = (store.get(userId) || []).filter((timestamp) => now - timestamp < RATE_LIMIT_WINDOW_MS);
-  if (current.length >= RATE_LIMIT_REQUESTS) {
-    store.set(userId, current);
-    return false;
-  }
-  current.push(now);
-  store.set(userId, current);
-  return true;
-}
+const MAX_REQUEST_BYTES = 25000;
 
 function cleanMessage(value, maxLength = MAX_MESSAGE_LENGTH) {
   return String(value || '').replace(/[\u0000-\u0008\u000B\u000C\u000E-\u001F\u007F]/g, '').trim().slice(0, maxLength);
@@ -38,9 +20,38 @@ function cleanMessage(value, maxLength = MAX_MESSAGE_LENGTH) {
 function cleanHistory(value) {
   if (!Array.isArray(value)) return [];
   return value
+    .filter((item) => item?.role === 'user')
     .slice(-MAX_HISTORY_MESSAGES)
-    .map((item) => ({ role: item?.role === 'assistant' ? 'assistant' : 'user', content: cleanMessage(item?.content, 1000) }))
+    .map((item) => ({ role: 'user', content: cleanMessage(item?.content, 1000) }))
     .filter((item) => item.content);
+}
+
+async function readBoundedJson(request) {
+  if (!request.body) return {};
+  const reader = request.body.getReader();
+  const decoder = new TextDecoder();
+  let bytes = 0;
+  let text = '';
+  while (true) {
+    const { done, value } = await reader.read();
+    if (done) break;
+    bytes += value.byteLength;
+    if (bytes > MAX_REQUEST_BYTES) {
+      await reader.cancel();
+      const error = new Error('request-too-large');
+      error.code = 'REQUEST_TOO_LARGE';
+      throw error;
+    }
+    text += decoder.decode(value, { stream: true });
+  }
+  text += decoder.decode();
+  try {
+    return JSON.parse(text || '{}');
+  } catch {
+    const error = new Error('invalid-json');
+    error.code = 'INVALID_JSON';
+    throw error;
+  }
 }
 
 function compact(value, maxLength = 500) {
@@ -105,7 +116,7 @@ export async function POST(request) {
   try {
     if (process.env.MELODI_ENABLED !== 'true') return NextResponse.json({ error: 'MELODI is not enabled yet.' }, { status: 503 });
     const contentLength = Number(request.headers.get('content-length') || 0);
-    if (contentLength > 25000) return NextResponse.json({ error: 'MELODI request is too large.' }, { status: 413 });
+    if (contentLength > MAX_REQUEST_BYTES) return NextResponse.json({ error: 'MELODI request is too large.' }, { status: 413 });
     const sessionClient = await createSessionClient();
     const { data: { user: sessionUser } } = await sessionClient.auth.getUser();
     if (!sessionUser) return NextResponse.json({ error: 'Authentication required.' }, { status: 401 });
@@ -117,15 +128,33 @@ export async function POST(request) {
     const isAdmin = metadata.role === 'admin';
     const assignedDistrictId = metadata.district_id || null;
     if (!isAdmin && !assignedDistrictId) return NextResponse.json({ error: 'Canary district access is not configured.' }, { status: 403 });
-    if (!rateLimitAllows(sessionUser.id)) return NextResponse.json({ error: 'MELODI has reached the short-term question limit. Please try again in a few minutes.' }, { status: 429 });
-
-    const body = await request.json();
+    let body;
+    try {
+      body = await readBoundedJson(request);
+    } catch (error) {
+      if (error?.code === 'REQUEST_TOO_LARGE') return NextResponse.json({ error: 'MELODI request is too large.' }, { status: 413 });
+      return NextResponse.json({ error: 'MELODI request must be valid JSON.' }, { status: 400 });
+    }
     const message = cleanMessage(body?.message);
     const requestedDistrictId = cleanMessage(body?.districtId, 80);
     const districtId = isAdmin ? requestedDistrictId : assignedDistrictId;
     if (!message) return NextResponse.json({ error: 'Ask MELODI a question first.' }, { status: 400 });
     if (!districtId) return NextResponse.json({ error: 'Select a district before asking MELODI.' }, { status: 400 });
     if (!isAdmin && districtId !== assignedDistrictId) return NextResponse.json({ error: 'You do not have access to that district.' }, { status: 403 });
+
+    const { data: rateRows, error: rateError } = await admin.rpc('canary_check_melodi_rate_limit', {
+      p_user_id: sessionUser.id,
+      p_limit: RATE_LIMIT_REQUESTS,
+      p_window_seconds: 600,
+    });
+    if (rateError) return NextResponse.json({ error: 'MELODI cost controls are not available, so the request was not sent.' }, { status: 503 });
+    const rate = Array.isArray(rateRows) ? rateRows[0] : rateRows;
+    if (!rate?.allowed) {
+      return NextResponse.json(
+        { error: 'MELODI has reached the short-term question limit. Please try again in a few minutes.' },
+        { status: 429, headers: { 'Retry-After': String(Math.max(1, Number(rate?.retry_after_seconds) || 60)) } },
+      );
+    }
 
     const socialVisibility = isAdmin ? ['active', 'review'] : ['active'];
     const [districtResult, profileResult, prioritiesResult, newsResult, socialResult] = await Promise.all([
