@@ -1,4 +1,5 @@
 import assert from 'node:assert/strict';
+import { readFile } from 'node:fs/promises';
 import {
   buildSocialResults,
   calculateSocialEngagementRate,
@@ -274,5 +275,18 @@ const emptyBatch = normalizeProviderBatch({
   items: [],
 });
 assert.equal(emptyBatch.status, 'empty');
+
+const dashboardSource = await readFile(new URL('../src/app/dashboard/DashboardClient.js', import.meta.url), 'utf8');
+for (const period of ['last-30-days', 'this-month', 'previous-month', 'school-year', 'calendar-year', 'custom']) {
+  assert.match(dashboardSource, new RegExp(`value="${period}"`), `Top Posts period ${period} must remain available`);
+}
+assert.match(dashboardSource, /SOCIAL_CSV_HEADERS/);
+assert.match(dashboardSource, /function exportSocialCsv\(\)/);
+assert.match(dashboardSource, /function exportSocialPdf\(\)/);
+assert.match(dashboardSource, /function BoardReportView\(/);
+assert.match(dashboardSource, /thread\.visibility_status === 'active'/, 'Board Report must exclude review-only canonical Social records');
+assert.match(dashboardSource, /Board Report PDF/);
+assert.match(dashboardSource, /current === label \? 'All' : label/, 'Strategic Alignment chart clicks must toggle the active filter off');
+assert.match(dashboardSource, /className="active-filter-chip"/);
 
 console.log('Social monitoring unit tests passed.');

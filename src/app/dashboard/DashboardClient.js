@@ -377,6 +377,71 @@ const BIRD_EYE_CSV_COLUMNS = ALL_COLUMNS.filter((column) =>
   ['date', 'headline', 'summary', 'link', 'source', 'tags', 'score', 'innovation_reason', 'earned_media'].includes(column.id)
 );
 
+const SOCIAL_CSV_HEADERS = [
+  'Date', 'Platform', 'Relationship', 'Author', 'Post', 'Source URL', 'Media type',
+  'Reactions', 'Comments', 'Shares', 'Views', 'Total engagement', 'Engagement rate',
+  'Review state', 'Strategic priorities', 'Recommended action',
+];
+
+function socialCsvRow(result, source) {
+  const followerCount = resolveSocialFollowerCount(result, source);
+  const engagementRate = result.hasPerformanceData
+    ? calculateSocialEngagementRate(result, followerCount)
+    : null;
+  return [
+    result.date || '',
+    formatSourceLabel(result.platform),
+    result.relationshipLabel || result.relationshipType || '',
+    result.authorName || result.authorHandle || '',
+    result.headline || result.summary || '',
+    result.url || '',
+    result.mediaType || (result.mediaUrl ? 'image' : 'text'),
+    result.reactionCount ?? '',
+    result.commentCount ?? '',
+    result.shareCount ?? '',
+    result.viewCount ?? '',
+    result.engagementTotal ?? '',
+    engagementRate === null || engagementRate === undefined ? 'N/A' : `${engagementRate.toFixed(2)}%`,
+    result.visibilityStatus || '',
+    (result.actionIntelligence?.strategicPriorityLabels || []).join('; '),
+    result.actionIntelligence?.recommendedAction || '',
+  ];
+}
+
+function dateInputValue(date) {
+  return date.toISOString().slice(0, 10);
+}
+
+function resolveTopPostsWindow(period, asOf, customStart = '', customEnd = '') {
+  const end = new Date(asOf);
+  const year = end.getUTCFullYear();
+  const month = end.getUTCMonth();
+  let start;
+  let rangeEnd = end;
+  let label = 'Last 30 days';
+  if (period === 'this-month') {
+    start = new Date(Date.UTC(year, month, 1));
+    label = 'This month';
+  } else if (period === 'previous-month') {
+    start = new Date(Date.UTC(year, month - 1, 1));
+    rangeEnd = new Date(Date.UTC(year, month, 1) - 1);
+    label = 'Previous month';
+  } else if (period === 'school-year') {
+    start = new Date(Date.UTC(month >= 6 ? year : year - 1, 6, 1));
+    label = `School year ${start.getUTCFullYear()}–${String(start.getUTCFullYear() + 1).slice(-2)}`;
+  } else if (period === 'calendar-year') {
+    start = new Date(Date.UTC(year, 0, 1));
+    label = `Calendar year ${year}`;
+  } else if (period === 'custom') {
+    start = customStart ? new Date(`${customStart}T00:00:00.000Z`) : new Date(0);
+    rangeEnd = customEnd ? new Date(`${customEnd}T23:59:59.999Z`) : end;
+    label = customStart || customEnd ? `Custom ${customStart || 'beginning'} to ${customEnd || 'today'}` : 'Custom range';
+  } else {
+    start = new Date(end.getTime() - (30 * 24 * 60 * 60 * 1000));
+  }
+  return { start, end: rangeEnd, label, startInput: dateInputValue(start), endInput: dateInputValue(rangeEnd) };
+}
+
 function StrategicAlignmentPills({ labels, selectedLabel, onSelect, max = 3 }) {
   const visible = labels.slice(0, max);
   if (!visible.length) return <span style={{ color: 'var(--text-tertiary)', fontStyle: 'italic' }}>—</span>;
@@ -2381,7 +2446,51 @@ function SocialPostPreviewCard({ result, source, rank = null, showContext = fals
   );
 }
 
-function SocialView({ articles, socialThreads, socialSources, socialReviewEvents = [], districtFilter, districts, isAdmin = false }) {
+function BoardReportView({ districtId, districtName, articles, socialThreads, socialSources, isEarned }) {
+  const districtArticles = articles.filter((article) => article.district_id === districtId);
+  const newsArticles = districtArticles.filter((article) => !SOCIAL_SOURCE_TYPES.has(String(article.source_type || '').toLowerCase()));
+  const activeCanonical = socialThreads.filter((thread) => thread.district_id === districtId && thread.visibility_status === 'active');
+  const configuredPlatforms = new Set(socialSources.filter((source) => source.district_id === districtId).map((source) => String(source.platform || '').toLowerCase()));
+  const legacySocial = districtArticles.filter((article) => {
+    const platform = String(article.source_type || '').toLowerCase();
+    return SOCIAL_SOURCE_TYPES.has(platform) && !configuredPlatforms.has(platform);
+  });
+  const socialResults = buildSocialResults([...activeCanonical, ...legacySocial]).filter((result) => result.visibilityStatus !== 'excluded');
+  const topSocial = rankTopSocialResults(socialResults.filter((result) => result.relationshipType === 'owned'), 6);
+  const alignment = buildStrategicAlignmentData(newsArticles);
+  const strategicHits = newsArticles.filter((article) => extractStrategicAlignmentLabels(article.innovation_reason).length > 0);
+  const earnedCount = newsArticles.filter((article) => isEarned(article)).length;
+  const scored = newsArticles.map((article) => Number(article.canary_score)).filter(Number.isFinite);
+  const averageScore = scored.length ? (scored.reduce((sum, score) => sum + score, 0) / scored.length).toFixed(1) : 'N/A';
+  const evidence = [...newsArticles].sort((a, b) => String(b.date || '').localeCompare(String(a.date || ''))).slice(0, 12);
+  return (
+    <section className="board-report" aria-label={`${districtName} Board Report`}>
+      <header className="board-report-header">
+        <div><span>Canary Data</span><h1>{districtName} Board Report</h1><p>Media Intelligence, Strategic Alignment, and approved Social evidence · {new Date().toLocaleDateString()}</p></div>
+      </header>
+      <div className="board-report-kpis">
+        <article><span>News mentions</span><strong>{newsArticles.length}</strong></article>
+        <article><span>Average Canary score</span><strong>{averageScore}</strong></article>
+        <article><span>Strategic hits</span><strong>{strategicHits.length}</strong></article>
+        <article><span>Earned media</span><strong>{earnedCount}</strong></article>
+      </div>
+      <section className="board-report-section">
+        <h2>Strategic Alignment</h2>
+        {alignment.length ? <div className="board-report-alignment">{alignment.slice(0, 9).map((item) => <article key={item.label}><span>{item.label}</span><strong>{item.count}</strong></article>)}</div> : <p>No strategically aligned coverage is available for this report period.</p>}
+      </section>
+      <section className="board-report-section">
+        <h2>Top approved district social posts</h2>
+        {topSocial.length ? <div className="board-report-social">{topSocial.map((result, index) => <article key={result.id}><span>#{index + 1} · {formatSourceLabel(result.platform)} · {formatDisplayDate(result.date)}</span><strong>{result.headline || result.summary}</strong><p>{formatSocialMetric(result.engagementTotal)} public interactions</p><a href={result.url}>View source</a></article>)}</div> : <p>No approved owned social posts are available yet. Review-only records are intentionally excluded.</p>}
+      </section>
+      <section className="board-report-section board-report-evidence">
+        <h2>Evidence appendix</h2>
+        <table><thead><tr><th>Date</th><th>Headline</th><th>Source</th><th>Score</th><th>Strategic Alignment</th></tr></thead><tbody>{evidence.map((article) => <tr key={article.id}><td>{formatDisplayDate(article.date)}</td><td><a href={article.link}>{article.headline}</a></td><td>{article.source || formatSourceLabel(article.source_type)}</td><td>{Number(article.canary_score).toFixed(1)}</td><td>{extractStrategicAlignmentLabels(article.innovation_reason).join('; ') || '—'}</td></tr>)}</tbody></table>
+      </section>
+    </section>
+  );
+}
+
+function SocialView({ articles, socialThreads, socialSources, socialReviewEvents = [], districtFilter, districts, isAdmin = false, onExportPdf }) {
   const [relationshipFilter, setRelationshipFilter] = useState('all');
   const [actionFilter, setActionFilter] = useState('all');
   const [socialSearch, setSocialSearch] = useState('');
@@ -2401,6 +2510,9 @@ function SocialView({ articles, socialThreads, socialSources, socialReviewEvents
   const [bulkReviewMessage, setBulkReviewMessage] = useState('');
   const [sourcesOpen, setSourcesOpen] = useState(false);
   const [topPostsAsOf] = useState(() => Date.now());
+  const [topPostsPeriod, setTopPostsPeriod] = useState('last-30-days');
+  const [topPostsCustomStart, setTopPostsCustomStart] = useState('');
+  const [topPostsCustomEnd, setTopPostsCustomEnd] = useState('');
   const scopedRecords = useMemo(() => {
     const configuredPlatformKeys = new Set(socialSources.map((source) => `${source.district_id}:${String(source.platform || '').toLowerCase()}`));
     const legacyRecords = articles.filter((article) => {
@@ -2413,10 +2525,19 @@ function SocialView({ articles, socialThreads, socialSources, socialReviewEvents
   }, [articles, socialThreads, socialSources, districtFilter]);
   const results = useMemo(() => buildSocialResults(scopedRecords), [scopedRecords]);
   const summary = useMemo(() => summarizeSocialResults(results), [results]);
+  const topPostsWindow = useMemo(
+    () => resolveTopPostsWindow(topPostsPeriod, topPostsAsOf, topPostsCustomStart, topPostsCustomEnd),
+    [topPostsPeriod, topPostsAsOf, topPostsCustomStart, topPostsCustomEnd],
+  );
   const topPlatformGroups = useMemo(() => {
     const preferredOrder = ['facebook', 'instagram'];
-    const cutoff = topPostsAsOf - (30 * 24 * 60 * 60 * 1000);
-    const recentOwnedResults = results.filter((result) => result.relationshipType === 'owned' && result.visibilityStatus !== 'excluded' && new Date(result.date).getTime() >= cutoff);
+    const recentOwnedResults = results.filter((result) => {
+      const timestamp = new Date(result.date).getTime();
+      return result.relationshipType === 'owned'
+        && result.visibilityStatus !== 'excluded'
+        && timestamp >= topPostsWindow.start.getTime()
+        && timestamp <= topPostsWindow.end.getTime();
+    });
     const platforms = [...new Set(recentOwnedResults.map((result) => result.platform))]
       .sort((a, b) => {
         const aIndex = preferredOrder.indexOf(a);
@@ -2427,7 +2548,7 @@ function SocialView({ articles, socialThreads, socialSources, socialReviewEvents
     return platforms
       .map((platform) => ({ platform, posts: rankTopSocialResults(recentOwnedResults.filter((result) => result.platform === platform), 3) }))
       .filter((group) => group.posts.length > 0);
-  }, [results, topPostsAsOf]);
+  }, [results, topPostsWindow]);
   const scopedSources = useMemo(
     () => socialSources.filter((source) => districtFilter === 'All' || source.district_id === districtFilter),
     [socialSources, districtFilter],
@@ -2510,6 +2631,22 @@ function SocialView({ articles, socialThreads, socialSources, socialReviewEvents
   const canPromoteBatch = selectedResults.length > 0 && selectedResults.every((result) => result.visibilityStatus === 'approved');
   const scopedReviewEvents = socialReviewEvents.filter((event) => districtFilter === 'All' || event.district_id === districtFilter);
 
+  function exportSocialCsv() {
+    downloadCsv(
+      `canary-social-${districtFilter === 'All' ? 'all-districts' : districtFilter}-${new Date().toISOString().slice(0, 10)}.csv`,
+      SOCIAL_CSV_HEADERS,
+      visibleResults.map((result) => socialCsvRow(
+        result,
+        scopedSources.find((source) => source.platform === result.platform && source.district_id === result.districtId),
+      )),
+    );
+  }
+
+  function exportSocialPdf() {
+    setSocialResultLimit(Math.max(12, visibleResults.length));
+    window.setTimeout(() => onExportPdf?.(), 200);
+  }
+
   const toggleSocialSelection = (id) => {
     setSelectedSocialIds((current) => {
       const next = new Set(current);
@@ -2541,10 +2678,10 @@ function SocialView({ articles, socialThreads, socialSources, socialReviewEvents
         <div>
           <span className="social-eyebrow">Social review workspace</span>
           <h2>Review what matters, then decide what to do</h2>
-          <p>Start with recent mentions or the 30-day top posts. Canary keeps recommendations review-only and links every result to the original public post.</p>
+          <p>Start with recent mentions or period-based top posts. Canary keeps recommendations review-only and links every result to the original public post.</p>
           <nav className="social-workflow-links" aria-label="Social review shortcuts">
             <a href="#social-results">Review recent results</a>
-            <a href="#social-top-posts">See 30-day top posts</a>
+            <a href="#social-top-posts">See top posts</a>
             <a href="#social-sources" onClick={() => setSourcesOpen(true)}>Check monitored sources</a>
           </nav>
         </div>
@@ -2610,12 +2747,31 @@ function SocialView({ articles, socialThreads, socialSources, socialReviewEvents
         <div className="social-section-heading">
           <div>
             <h3>Top district posts by platform</h3>
-            <p>Up to three owned posts per platform from the last 30 days, ranked by public engagement. This reference stays fixed while you filter the review feed below. Engagement rate uses public interactions divided by public followers.</p>
+            <p>Up to three owned posts per platform for {topPostsWindow.label.toLowerCase()}, ranked by public engagement. This reference stays fixed while you filter the review feed below. Engagement rate uses public interactions divided by public followers.</p>
           </div>
-          <span>{topPlatformGroups.reduce((total, group) => total + group.posts.length, 0)} ranked posts</span>
+          <div className="social-top-period-controls">
+            <label>
+              <span>Top posts period</span>
+              <select value={topPostsPeriod} onChange={(event) => setTopPostsPeriod(event.target.value)}>
+                <option value="last-30-days">Last 30 days</option>
+                <option value="this-month">This month</option>
+                <option value="previous-month">Previous month</option>
+                <option value="school-year">Current school year</option>
+                <option value="calendar-year">Current calendar year</option>
+                <option value="custom">Custom range</option>
+              </select>
+            </label>
+            <span>{topPlatformGroups.reduce((total, group) => total + group.posts.length, 0)} ranked posts</span>
+          </div>
         </div>
+        {topPostsPeriod === 'custom' && (
+          <div className="social-top-custom-range" aria-label="Custom top posts date range">
+            <label><span>From</span><input type="date" value={topPostsCustomStart} max={topPostsCustomEnd || topPostsWindow.endInput} onChange={(event) => setTopPostsCustomStart(event.target.value)} /></label>
+            <label><span>To</span><input type="date" value={topPostsCustomEnd} min={topPostsCustomStart || undefined} max={dateInputValue(new Date(topPostsAsOf))} onChange={(event) => setTopPostsCustomEnd(event.target.value)} /></label>
+          </div>
+        )}
         {topPlatformGroups.length === 0 ? (
-          <div className="social-empty-inline">No reviewed owned posts are available for this 30-day window yet.</div>
+          <div className="social-empty-inline">No reviewed owned posts are available for {topPostsWindow.label.toLowerCase()} yet.</div>
         ) : (
           <div className="social-top-groups">
             {topPlatformGroups.map((group) => (
@@ -2646,6 +2802,8 @@ function SocialView({ articles, socialThreads, socialSources, socialReviewEvents
           </div>
           <div className="social-results-heading-controls">
             <span>{visibleResults.length} result{visibleResults.length === 1 ? '' : 's'}</span>
+            <button type="button" className="social-view-mode" onClick={exportSocialCsv}>Export CSV</button>
+            <button type="button" className="social-view-mode export-pdf-btn" onClick={exportSocialPdf}>Export PDF</button>
             <button type="button" className="social-view-mode" aria-pressed={compactListMode} onClick={() => setCompactListMode((current) => !current)}>{compactListMode ? 'Scorecard mode' : 'Compact list'}</button>
             <input className="filter-input" value={socialSearch} onChange={(event) => changeSocialFilter(setSocialSearch, event.target.value)} placeholder="Search social results…" />
           </div>
@@ -2788,6 +2946,7 @@ export default function DashboardClient({ articles, districts, queries: initialQ
   const [releaseSignupOpen, setReleaseSignupOpen] = useState(false);
   const [releaseAutoPromptShown, setReleaseAutoPromptShown] = useState(false);
   const [sidebarOpen, setSidebarOpen] = useState(false);
+  const [boardReportMode, setBoardReportMode] = useState(false);
   const [visibleColumns, setVisibleColumns] = useState(DEFAULT_VISIBLE);
   const [colMenuOpen, setColMenuOpen] = useState(false);
   const [paymentModalOpen, setPaymentModalOpen] = useState(false);
@@ -3040,6 +3199,10 @@ export default function DashboardClient({ articles, districts, queries: initialQ
     setStrategicAlignmentFilter('All');
   }
 
+  const toggleStrategicAlignmentFilter = useCallback((label) => {
+    setStrategicAlignmentFilter((current) => current === label ? 'All' : label);
+  }, []);
+
   function handleExportPdf() {
     setCurrentView('dashboard');
     setColMenuOpen(false);
@@ -3068,6 +3231,18 @@ export default function DashboardClient({ articles, districts, queries: initialQ
     setFeedbackOpen(false);
     setSidebarOpen(false);
     window.setTimeout(() => window.print(), 250);
+  }
+
+  function handleBoardReportPdf() {
+    if (districtFilter === 'All') return;
+    setColMenuOpen(false);
+    setFeedbackOpen(false);
+    setSidebarOpen(false);
+    setBoardReportMode(true);
+    const restore = () => setBoardReportMode(false);
+    window.addEventListener('afterprint', restore, { once: true });
+    window.setTimeout(() => window.print(), 300);
+    window.setTimeout(restore, 15000);
   }
 
   function handleNavSelect(view) {
@@ -3435,6 +3610,17 @@ export default function DashboardClient({ articles, districts, queries: initialQ
                 </button>
               </>
             )}
+            {['dashboard', 'birdseye', 'social'].includes(currentView) && (
+              <button
+                className="btn btn-secondary btn-sm export-pdf-btn"
+                type="button"
+                onClick={handleBoardReportPdf}
+                disabled={districtFilter === 'All'}
+                title={districtFilter === 'All' ? 'Choose one district to create a Board Report.' : 'Combines Media Intelligence, Strategic Alignment, approved Social, and an evidence appendix.'}
+              >
+                ⬇ Board Report PDF
+              </button>
+            )}
             {demoMode && (
               <a className="privacy-topbar-link" href="/privacy" target="_blank" rel="noreferrer">
                 🔒 Privacy Policy
@@ -3446,7 +3632,17 @@ export default function DashboardClient({ articles, districts, queries: initialQ
           </div>
         </header>
 
-        <main className="page-content">
+        <main className={`page-content${boardReportMode ? ' board-report-mode' : ''}`}>
+          {boardReportMode && districtFilter !== 'All' && (
+            <BoardReportView
+              districtId={districtFilter}
+              districtName={selectedDistrictName}
+              articles={articles}
+              socialThreads={socialThreads}
+              socialSources={socialSources}
+              isEarned={isEarned}
+            />
+          )}
           {demoMode && (
             <div className="demo-mode-banner">
               <strong>Interactive demo:</strong> sample public-media intelligence for Canary Falls Unified School District. Filters, Social aggregation, columns, notes, feedback, and PDF export are enabled; changes stay in this browser session.
@@ -3496,6 +3692,7 @@ export default function DashboardClient({ articles, districts, queries: initialQ
               districtFilter={districtFilter}
               districts={districts}
               isAdmin={isAdmin}
+              onExportPdf={handleBirdEyePdf}
             />
           )}
           {melodiEnabled && currentView === 'melodi' && (
@@ -3536,7 +3733,7 @@ export default function DashboardClient({ articles, districts, queries: initialQ
               strategicGovernance={strategicGovernance}
               hasSelectedDistrict={districtFilter !== 'All'}
               selectedLabel={strategicAlignmentFilter}
-              onSelectLabel={setStrategicAlignmentFilter}
+              onSelectLabel={toggleStrategicAlignmentFilter}
               isEarned={isEarned}
               dateStart={dateStart}
               dateEnd={dateEnd}
@@ -3729,7 +3926,7 @@ export default function DashboardClient({ articles, districts, queries: initialQ
             <StrategicAlignmentChart
               data={strategicAlignmentData}
               selectedLabel={strategicAlignmentFilter}
-              onSelectLabel={setStrategicAlignmentFilter}
+              onSelectLabel={toggleStrategicAlignmentFilter}
             />
 
           </div>
@@ -3848,6 +4045,11 @@ export default function DashboardClient({ articles, districts, queries: initialQ
                   <option value="All">All focus areas</option>
                   {allStrategicLabels.map((label) => <option key={label} value={label}>{label}</option>)}
                 </select>
+                {strategicAlignmentFilter !== 'All' && (
+                  <button type="button" className="active-filter-chip" onClick={() => setStrategicAlignmentFilter('All')} title="Remove Strategic Alignment filter">
+                    {strategicAlignmentFilter} <span aria-hidden="true">×</span>
+                  </button>
+                )}
               </div>
 
               {/* Clear all secondary filters */}
