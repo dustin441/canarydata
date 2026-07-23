@@ -2132,7 +2132,7 @@ function formatSocialUrgency(value) {
   return labels[value] || String(value || 'Routine').replaceAll('_', ' ');
 }
 
-function SocialPostPreviewCard({ result, source, rank = null, showContext = false }) {
+function SocialPostPreviewCard({ result, source, rank = null, showContext = false, compact = false }) {
   const mediaUrl = safeSocialMediaUrl(result.mediaUrl);
   const videoUrl = safeSocialMediaUrl(result.videoUrl);
   const profileImageUrl = safeSocialMediaUrl(result.profileImageUrl || (result.relationshipType === 'owned' ? source?.metadata?.profile_picture_url : ''));
@@ -2156,7 +2156,7 @@ function SocialPostPreviewCard({ result, source, rank = null, showContext = fals
 
   return (
     <>
-      <article className="social-post-preview-card">
+      <article className={`social-post-preview-card${compact ? ' compact' : ''}`}>
         <header className="social-post-preview-header">
           <div className="social-post-preview-identity">
             {profileImageUrl && !profileImageFailed ? (
@@ -2215,11 +2215,13 @@ function SocialPostPreviewCard({ result, source, rank = null, showContext = fals
           ) : null}
         </div>
 
-        <div className="social-post-engagement-bar" aria-label="Public engagement counts">
-          <span>👍 <strong>{formatAvailableSocialMetric(result, 'reactions', result.reactionCount)}</strong> reactions</span>
-          <span>💬 <strong>{formatAvailableSocialMetric(result, 'comments', result.commentCount)}</strong> comments</span>
-          <span>↗ <strong>{formatAvailableSocialMetric(result, 'shares', result.shareCount)}</strong> shares</span>
-        </div>
+        {!compact && (
+          <div className="social-post-engagement-bar" aria-label="Public engagement counts">
+            <span>👍 <strong>{formatAvailableSocialMetric(result, 'reactions', result.reactionCount)}</strong> reactions</span>
+            <span>💬 <strong>{formatAvailableSocialMetric(result, 'comments', result.commentCount)}</strong> comments</span>
+            <span>↗ <strong>{formatAvailableSocialMetric(result, 'shares', result.shareCount)}</strong> shares</span>
+          </div>
+        )}
 
         <div className="social-post-performance-grid">
           <div><strong>{formatAvailableSocialMetric(result, 'reactions', result.reactionCount)}</strong><span>Reactions</span></div>
@@ -2230,7 +2232,7 @@ function SocialPostPreviewCard({ result, source, rank = null, showContext = fals
           <div><strong>{formatAvailableSocialMetric(result, 'views', result.viewCount)}</strong><span>Views</span></div>
         </div>
 
-        {result.representativeComments?.length > 0 && (
+        {!compact && result.representativeComments?.length > 0 && (
           <section className="social-post-conversation" aria-label="Representative public comments">
             <header>
               <strong>Public conversation</strong>
@@ -2248,7 +2250,7 @@ function SocialPostPreviewCard({ result, source, rank = null, showContext = fals
           </section>
         )}
 
-        {action && (
+        {!compact && action && (
           <section className={`social-action-intelligence ${action.actionType}`} aria-label={`${action.actionLabel} recommendation`}>
             <header>
               <div><span>Suggested action</span><strong>{action.actionLabel}</strong></div>
@@ -2322,7 +2324,7 @@ function SocialView({ articles, socialThreads, socialSources, districtFilter, di
   const [relationshipFilter, setRelationshipFilter] = useState('all');
   const [actionFilter, setActionFilter] = useState('all');
   const [socialSearch, setSocialSearch] = useState('');
-  const [socialResultLimit, setSocialResultLimit] = useState(24);
+  const [socialResultLimit, setSocialResultLimit] = useState(12);
   const [platformFilter, setPlatformFilter] = useState('all');
   const [mediaFilter, setMediaFilter] = useState('all');
   const [performanceFilter, setPerformanceFilter] = useState('all');
@@ -2331,6 +2333,7 @@ function SocialView({ articles, socialThreads, socialSources, districtFilter, di
   const [socialDateStart, setSocialDateStart] = useState('');
   const [socialDateEnd, setSocialDateEnd] = useState('');
   const [socialSort, setSocialSort] = useState('newest');
+  const [sourcesOpen, setSourcesOpen] = useState(false);
   const [topPostsAsOf] = useState(() => Date.now());
   const scopedRecords = useMemo(() => {
     const configuredPlatformKeys = new Set(socialSources.map((source) => `${source.district_id}:${String(source.platform || '').toLowerCase()}`));
@@ -2413,7 +2416,7 @@ function SocialView({ articles, socialThreads, socialSources, districtFilter, di
   const pagedResults = visibleResults.slice(0, socialResultLimit);
   const changeSocialFilter = (setter, value) => {
     setter(value);
-    setSocialResultLimit(24);
+    setSocialResultLimit(12);
   };
   const resetSocialFilters = () => {
     setRelationshipFilter('all');
@@ -2427,7 +2430,7 @@ function SocialView({ articles, socialThreads, socialSources, districtFilter, di
     setSocialDateEnd('');
     setSocialSearch('');
     setSocialSort('newest');
-    setSocialResultLimit(24);
+    setSocialResultLimit(12);
   };
   const hasActiveSocialFilters = relationshipFilter !== 'all' || actionFilter !== 'all' || platformFilter !== 'all' || mediaFilter !== 'all'
     || performanceFilter !== 'all' || minimumEngagementRate !== '' || maximumEngagementRate !== '' || socialDateStart !== '' || socialDateEnd !== '' || socialSearch !== '' || socialSort !== 'newest';
@@ -2436,9 +2439,14 @@ function SocialView({ articles, socialThreads, socialSources, districtFilter, di
     <div className="social-monitor-view">
       <section className="social-monitor-hero">
         <div>
-          <span className="social-eyebrow">Public social intelligence</span>
-          <h2>Where your district is showing up</h2>
-          <p>Canary summarizes public posts and conversations without reproducing the full comment stream. Open the original post to review every available reaction, reply, and comment on the source platform.</p>
+          <span className="social-eyebrow">Social review workspace</span>
+          <h2>Review what matters, then decide what to do</h2>
+          <p>Start with recent mentions or the 30-day top posts. Canary keeps recommendations review-only and links every result to the original public post.</p>
+          <nav className="social-workflow-links" aria-label="Social review shortcuts">
+            <a href="#social-results">Review recent results</a>
+            <a href="#social-top-posts">See 30-day top posts</a>
+            <a href="#social-sources" onClick={() => setSourcesOpen(true)}>Check monitored sources</a>
+          </nav>
         </div>
         <div className="social-coverage-note">
           <strong>Coverage boundary</strong>
@@ -2446,34 +2454,39 @@ function SocialView({ articles, socialThreads, socialSources, districtFilter, di
         </div>
       </section>
 
-      <div className="social-summary-grid" aria-label="Social result summary">
-        <button type="button" className={relationshipFilter === 'all' ? 'active' : ''} onClick={() => changeSocialFilter(setRelationshipFilter, 'all')}>
-          <span>All results</span><strong>{summary.total}</strong>
-        </button>
-        <button type="button" className={relationshipFilter === 'owned' ? 'active' : ''} onClick={() => changeSocialFilter(setRelationshipFilter, 'owned')}>
-          <span>District posts</span><strong>{summary.owned}</strong>
-        </button>
-        <button type="button" className={relationshipFilter === 'direct' ? 'active' : ''} onClick={() => changeSocialFilter(setRelationshipFilter, 'direct')}>
-          <span>Tagged / mentioned</span><strong>{summary.direct}</strong>
-        </button>
-        <button type="button" className={relationshipFilter === 'ambient' ? 'active' : ''} onClick={() => changeSocialFilter(setRelationshipFilter, 'ambient')}>
-          <span>Public mentions</span><strong>{summary.ambient}</strong>
-        </button>
-      </div>
+      <section className="social-review-scope" aria-label="Social review scope">
+        <div className="social-navigation-heading">
+          <div><strong>Choose what to review</strong><span>Relationship and channel filters work together.</span></div>
+          <em>{summary.total} collected results</em>
+        </div>
+        <div className="social-summary-grid" aria-label="Social result summary">
+          <button type="button" aria-pressed={relationshipFilter === 'all'} className={relationshipFilter === 'all' ? 'active' : ''} onClick={() => changeSocialFilter(setRelationshipFilter, 'all')}>
+            <span>All results</span><strong>{summary.total}</strong>
+          </button>
+          <button type="button" aria-pressed={relationshipFilter === 'owned'} className={relationshipFilter === 'owned' ? 'active' : ''} onClick={() => changeSocialFilter(setRelationshipFilter, 'owned')}>
+            <span>District posts</span><strong>{summary.owned}</strong>
+          </button>
+          <button type="button" aria-pressed={relationshipFilter === 'direct'} className={relationshipFilter === 'direct' ? 'active' : ''} onClick={() => changeSocialFilter(setRelationshipFilter, 'direct')}>
+            <span>Tagged / mentioned</span><strong>{summary.direct}</strong>
+          </button>
+          <button type="button" aria-pressed={relationshipFilter === 'ambient'} className={relationshipFilter === 'ambient' ? 'active' : ''} onClick={() => changeSocialFilter(setRelationshipFilter, 'ambient')}>
+            <span>Public mentions</span><strong>{summary.ambient}</strong>
+          </button>
+        </div>
 
-      <section className="social-navigation-controls" aria-label="Social channel navigation">
-        <div className="social-navigation-heading"><div><strong>Channels</strong><span>Move between collected networks without losing your relationship or action filters.</span></div></div>
-        <div className="social-channel-tabs">
-          <button type="button" className={platformFilter === 'all' ? 'active' : ''} onClick={() => changeSocialFilter(setPlatformFilter, 'all')}>All channels</button>
-          {platformOptions.map((platform) => (
-            <button type="button" key={platform} className={platformFilter === platform ? 'active' : ''} onClick={() => changeSocialFilter(setPlatformFilter, platform)}>
-              <span className={`social-platform-dot ${platform}`} aria-hidden="true" />{formatSourceLabel(platform)}
-            </button>
-          ))}
+        <div className="social-navigation-controls" aria-label="Social channel navigation">
+          <div className="social-channel-tabs">
+            <button type="button" aria-pressed={platformFilter === 'all'} className={platformFilter === 'all' ? 'active' : ''} onClick={() => changeSocialFilter(setPlatformFilter, 'all')}>All channels</button>
+            {platformOptions.map((platform) => (
+              <button type="button" key={platform} aria-pressed={platformFilter === platform} className={platformFilter === platform ? 'active' : ''} onClick={() => changeSocialFilter(setPlatformFilter, platform)}>
+                <span className={`social-platform-dot ${platform}`} aria-hidden="true" />{formatSourceLabel(platform)}
+              </button>
+            ))}
+          </div>
         </div>
       </section>
 
-      <section className="social-action-queue" aria-label="Action Queue">
+      {actionSummary.total > 0 && <section className="social-action-queue" aria-label="Action Queue">
         <div className="social-navigation-heading">
           <div><strong>Action Queue</strong><span>District-grounded recommendations stay review-only until a communicator approves the next step.</span></div>
           <em>{actionSummary.total} enriched result{actionSummary.total === 1 ? '' : 's'}</em>
@@ -2486,19 +2499,18 @@ function SocialView({ articles, socialThreads, socialSources, districtFilter, di
             ['monitor', 'Monitor'],
             ['elevate', 'Elevate'],
           ].map(([value, label]) => (
-            <button type="button" key={value} className={`${value} ${actionFilter === value ? 'active' : ''}`} onClick={() => changeSocialFilter(setActionFilter, actionFilter === value ? 'all' : value)}>
+            <button type="button" key={value} aria-pressed={actionFilter === value} className={`${value} ${actionFilter === value ? 'active' : ''}`} onClick={() => changeSocialFilter(setActionFilter, actionFilter === value ? 'all' : value)}>
               <span>{label}</span><strong>{actionSummary[value]}</strong>
             </button>
           ))}
         </div>
-      </section>
+      </section>}
 
-      {(relationshipFilter === 'all' || relationshipFilter === 'owned') && actionFilter === 'all' && platformFilter === 'all' && (
-      <section className="social-top-section">
+      <section className="social-top-section" id="social-top-posts">
         <div className="social-section-heading">
           <div>
             <h3>Top district posts by platform</h3>
-            <p>Up to three owned posts per platform from the last 30 days, ranked by public engagement. Engagement rate uses public interactions divided by the account’s public follower count.</p>
+            <p>Up to three owned posts per platform from the last 30 days, ranked by public engagement. This reference stays fixed while you filter the review feed below. Engagement rate uses public interactions divided by public followers.</p>
           </div>
           <span>{topPlatformGroups.reduce((total, group) => total + group.posts.length, 0)} ranked posts</span>
         </div>
@@ -2516,6 +2528,7 @@ function SocialView({ articles, socialThreads, socialSources, districtFilter, di
                       result={result}
                       source={scopedSources.find((source) => source.platform === result.platform && source.district_id === result.districtId)}
                       rank={index + 1}
+                      compact
                     />
                   ))}
                 </div>
@@ -2524,17 +2537,68 @@ function SocialView({ articles, socialThreads, socialSources, districtFilter, di
           </div>
         )}
       </section>
-      )}
 
-      {(relationshipFilter === 'all' || relationshipFilter === 'owned') && actionFilter === 'all' && platformFilter === 'all' && (
-      <section className="social-account-section">
+      <section className="social-results-section" id="social-results">
         <div className="social-section-heading">
           <div>
-            <h3>Monitored source registry</h3>
-            <p>Official handles and public-discovery lanes configured for monitoring. “Configured” does not yet mean the district has authorized Canary through platform OAuth.</p>
+            <h3>{selectedActionLabel ? `${selectedActionLabel} Action Queue` : 'All social posts and conversations'}</h3>
+            <p>{selectedActionLabel ? `Showing review-only ${selectedActionLabel.toLowerCase()} recommendations that also match the selected channel and relationship.` : 'Every result uses the same post scorecard. Metrics show N/A when the original monitoring record did not collect that field.'}</p>
           </div>
-          <span>{scopedSources.length} configured source{scopedSources.length === 1 ? '' : 's'}</span>
+          <div className="social-results-heading-controls">
+            <span>{visibleResults.length} result{visibleResults.length === 1 ? '' : 's'}</span>
+            <input className="filter-input" value={socialSearch} onChange={(event) => changeSocialFilter(setSocialSearch, event.target.value)} placeholder="Search social results…" />
+          </div>
         </div>
+
+        <div className="social-filter-panel" aria-label="Social result filters">
+          <label><span>Platform</span><select value={platformFilter} onChange={(event) => changeSocialFilter(setPlatformFilter, event.target.value)}><option value="all">All platforms</option>{platformOptions.map((platform) => <option key={platform} value={platform}>{formatSourceLabel(platform)}</option>)}</select></label>
+          <label><span>Content</span><select value={mediaFilter} onChange={(event) => changeSocialFilter(setMediaFilter, event.target.value)}><option value="all">All content</option><option value="image">Images</option><option value="video">Videos</option><option value="text">Text-only / no media</option></select></label>
+          <label><span>From date</span><input type="date" value={socialDateStart} max={socialDateEnd || undefined} onChange={(event) => changeSocialFilter(setSocialDateStart, event.target.value)} /></label>
+          <label><span>To date</span><input type="date" value={socialDateEnd} min={socialDateStart || undefined} onChange={(event) => changeSocialFilter(setSocialDateEnd, event.target.value)} /></label>
+          <label><span>Sort by</span><select value={socialSort} onChange={(event) => changeSocialFilter(setSocialSort, event.target.value)}><option value="newest">Newest first</option><option value="oldest">Oldest first</option><option value="engagement">Highest engagement</option><option value="engagement-rate">Highest engagement rate</option><option value="reactions">Most reactions</option><option value="comments">Most comments</option><option value="shares">Most shares</option><option value="views">Most views</option></select></label>
+          <button type="button" className="social-filter-reset" onClick={resetSocialFilters} disabled={!hasActiveSocialFilters}>Reset filters</button>
+        </div>
+        <details className="social-advanced-filters">
+          <summary>Advanced performance filters</summary>
+          <div>
+            <label><span>Performance data</span><select value={performanceFilter} onChange={(event) => changeSocialFilter(setPerformanceFilter, event.target.value)}><option value="all">Available or N/A</option><option value="available">Has performance data</option><option value="unavailable">Performance unavailable</option></select></label>
+            <label><span>Min engagement rate</span><div className="social-rate-input"><input type="number" min="0" step="0.1" value={minimumEngagementRate} onChange={(event) => changeSocialFilter(setMinimumEngagementRate, event.target.value)} placeholder="0.0" /><em>%</em></div></label>
+            <label><span>Max engagement rate</span><div className="social-rate-input"><input type="number" min="0" step="0.1" value={maximumEngagementRate} onChange={(event) => changeSocialFilter(setMaximumEngagementRate, event.target.value)} placeholder="Any" /><em>%</em></div></label>
+          </div>
+        </details>
+
+        {visibleResults.length === 0 ? (
+          <div className="empty-state"><div className="empty-state-icon">💬</div><h3>No reviewed social results found</h3><p>Try another filter, or check back after collected posts complete review.</p></div>
+        ) : (
+          <>
+            <div className="social-scorecard-grid">
+              {pagedResults.map((result) => (
+                <SocialPostPreviewCard
+                  key={`${result.platform}-${result.id}`}
+                  result={result}
+                  source={scopedSources.find((source) => source.platform === result.platform && source.district_id === result.districtId)}
+                  showContext
+                />
+              ))}
+            </div>
+            {pagedResults.length < visibleResults.length && (
+              <div className="social-load-more">
+                <button type="button" className="btn btn-secondary" onClick={() => setSocialResultLimit((current) => current + 12)}>
+                  Load 12 more scorecards
+                </button>
+                <span>Showing {pagedResults.length} of {visibleResults.length}</span>
+              </div>
+            )}
+          </>
+        )}
+      </section>
+
+      <details className="social-account-section social-account-details" id="social-sources" open={sourcesOpen} onToggle={(event) => setSourcesOpen(event.currentTarget.open)}>
+        <summary>
+          <span><strong>Monitored sources</strong><small>Check official handles and public-discovery coverage.</small></span>
+          <em>{scopedSources.length} configured source{scopedSources.length === 1 ? '' : 's'}</em>
+        </summary>
+        <p className="social-source-boundary">“Configured” does not mean the district has authorized Canary through platform OAuth.</p>
         <div className="social-account-list">
           {scopedSources.length === 0 ? (
             <div className="social-empty-inline">No official social sources are configured for this district yet.</div>
@@ -2558,58 +2622,7 @@ function SocialView({ articles, socialThreads, socialSources, districtFilter, di
             );
           })}
         </div>
-      </section>
-      )}
-
-      <section className="social-results-section">
-        <div className="social-section-heading">
-          <div>
-            <h3>{selectedActionLabel ? `${selectedActionLabel} Action Queue` : 'All social posts and conversations'}</h3>
-            <p>{selectedActionLabel ? `Showing review-only ${selectedActionLabel.toLowerCase()} recommendations that also match the selected channel and relationship.` : 'Every result uses the same post scorecard. Metrics show N/A when the original monitoring record did not collect that field.'}</p>
-          </div>
-          <div className="social-results-heading-controls">
-            <span>{visibleResults.length} result{visibleResults.length === 1 ? '' : 's'}</span>
-            <input className="filter-input" value={socialSearch} onChange={(event) => changeSocialFilter(setSocialSearch, event.target.value)} placeholder="Search social results…" />
-          </div>
-        </div>
-
-        <div className="social-filter-panel" aria-label="Social result filters">
-          <label><span>Platform</span><select value={platformFilter} onChange={(event) => changeSocialFilter(setPlatformFilter, event.target.value)}><option value="all">All platforms</option>{platformOptions.map((platform) => <option key={platform} value={platform}>{formatSourceLabel(platform)}</option>)}</select></label>
-          <label><span>Content</span><select value={mediaFilter} onChange={(event) => changeSocialFilter(setMediaFilter, event.target.value)}><option value="all">All content</option><option value="image">Images</option><option value="video">Videos</option><option value="text">Text-only / no media</option></select></label>
-          <label><span>From date</span><input type="date" value={socialDateStart} max={socialDateEnd || undefined} onChange={(event) => changeSocialFilter(setSocialDateStart, event.target.value)} /></label>
-          <label><span>To date</span><input type="date" value={socialDateEnd} min={socialDateStart || undefined} onChange={(event) => changeSocialFilter(setSocialDateEnd, event.target.value)} /></label>
-          <label><span>Performance data</span><select value={performanceFilter} onChange={(event) => changeSocialFilter(setPerformanceFilter, event.target.value)}><option value="all">Available or N/A</option><option value="available">Has performance data</option><option value="unavailable">Performance unavailable</option></select></label>
-          <label><span>Min engagement rate</span><div className="social-rate-input"><input type="number" min="0" step="0.1" value={minimumEngagementRate} onChange={(event) => changeSocialFilter(setMinimumEngagementRate, event.target.value)} placeholder="0.0" /><em>%</em></div></label>
-          <label><span>Max engagement rate</span><div className="social-rate-input"><input type="number" min="0" step="0.1" value={maximumEngagementRate} onChange={(event) => changeSocialFilter(setMaximumEngagementRate, event.target.value)} placeholder="Any" /><em>%</em></div></label>
-          <label><span>Sort by</span><select value={socialSort} onChange={(event) => changeSocialFilter(setSocialSort, event.target.value)}><option value="newest">Newest first</option><option value="oldest">Oldest first</option><option value="engagement">Highest engagement</option><option value="engagement-rate">Highest engagement rate</option><option value="reactions">Most reactions</option><option value="comments">Most comments</option><option value="shares">Most shares</option><option value="views">Most views</option></select></label>
-          <button type="button" className="social-filter-reset" onClick={resetSocialFilters} disabled={!hasActiveSocialFilters}>Reset filters</button>
-        </div>
-
-        {visibleResults.length === 0 ? (
-          <div className="empty-state"><div className="empty-state-icon">💬</div><h3>No reviewed social results found</h3><p>Try another filter, or check back after collected posts complete review.</p></div>
-        ) : (
-          <>
-            <div className="social-scorecard-grid">
-              {pagedResults.map((result) => (
-                <SocialPostPreviewCard
-                  key={`${result.platform}-${result.id}`}
-                  result={result}
-                  source={scopedSources.find((source) => source.platform === result.platform && source.district_id === result.districtId)}
-                  showContext
-                />
-              ))}
-            </div>
-            {pagedResults.length < visibleResults.length && (
-              <div className="social-load-more">
-                <button type="button" className="btn btn-secondary" onClick={() => setSocialResultLimit((current) => current + 24)}>
-                  Load 24 more scorecards
-                </button>
-                <span>Showing {pagedResults.length} of {visibleResults.length}</span>
-              </div>
-            )}
-          </>
-        )}
-      </section>
+      </details>
     </div>
   );
 }
