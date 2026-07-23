@@ -1,5 +1,5 @@
 import assert from 'node:assert/strict';
-import { extractMelodiCitationIds, selectMelodiContext, safeMelodiSourceUrl } from '../src/lib/melodi.mjs';
+import { extractMelodiCitationIds, selectMelodiContext, safeMelodiSourceUrl, stableMelodiCitationId, validateMelodiAnswer } from '../src/lib/melodi.mjs';
 
 const news = [
   { id: 'n-old', date: '2026-05-01', headline: 'Graduation ceremony', summary: 'Students graduate', canary_score: 90, link: 'https://news.example/old' },
@@ -19,7 +19,13 @@ const topContext = selectMelodiContext({ question: 'What are our top social post
 assert.equal(topContext.social[0].id, 's-high');
 assert.equal(topContext.news.some((item) => item.id === 'n-old'), false);
 
-assert.deepEqual(extractMelodiCitationIds('Review [N2], [S1], and [N2]. Ignore [X9].'), ['N2', 'S1']);
+const stableNewsId = stableMelodiCitationId('N', { id: '6f0bb1da-d8ca-4989-9171-337c057aafe7' });
+assert.equal(stableNewsId, 'N-6F0BB1DAD8CA');
+assert.equal(stableMelodiCitationId('N', { id: '6f0bb1da-d8ca-4989-9171-337c057aafe7' }), stableNewsId);
+assert.deepEqual(extractMelodiCitationIds(`Review [${stableNewsId}], [S-ABC12345], and [${stableNewsId}]. Ignore [X-9999].`), [stableNewsId, 'S-ABC12345']);
+assert.equal(validateMelodiAnswer(`## Finding\nThe bus schedule changed [${stableNewsId}].`, new Set([stableNewsId])).valid, true);
+assert.equal(validateMelodiAnswer('The bus schedule changed without evidence.', new Set([stableNewsId])).valid, false);
+assert.equal(validateMelodiAnswer('The bus schedule changed [N-UNKNOWN123].', new Set([stableNewsId])).valid, false);
 assert.equal(safeMelodiSourceUrl('https://example.com/story'), 'https://example.com/story');
 assert.equal(safeMelodiSourceUrl('javascript:alert(1)'), null);
 assert.equal(safeMelodiSourceUrl('https://user:pass@example.com/private'), null);

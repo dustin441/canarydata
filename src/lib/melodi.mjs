@@ -90,10 +90,45 @@ export function safeMelodiSourceUrl(value) {
   }
 }
 
+export function stableMelodiCitationId(prefix, item) {
+  const normalizedPrefix = ['N', 'S', 'P'].includes(String(prefix || '').toUpperCase()) ? String(prefix).toUpperCase() : 'N';
+  const raw = String(item?.id || item?.canonical_url || item?.link || item?.label || item?.headline || 'record');
+  let token = raw.replace(/[^a-z0-9]/gi, '').toUpperCase().slice(0, 12);
+  if (token.length < 8) {
+    let hash = 2166136261;
+    for (const character of raw) {
+      hash ^= character.charCodeAt(0);
+      hash = Math.imul(hash, 16777619);
+    }
+    token = `${token}${(hash >>> 0).toString(36).toUpperCase()}`.slice(0, 12);
+  }
+  return `${normalizedPrefix}-${token}`;
+}
+
 export function extractMelodiCitationIds(text) {
   const allowed = new Set();
-  for (const match of String(text || '').matchAll(/\[((?:N|S|P)\d+)\]/gi)) {
+  for (const match of String(text || '').matchAll(/\[((?:N|S|P)-[A-Z0-9]{4,16})\]/gi)) {
     allowed.add(match[1].toUpperCase());
   }
   return [...allowed];
+}
+
+export function validateMelodiAnswer(text, knownIds) {
+  const answer = String(text || '').trim();
+  const known = knownIds instanceof Set ? knownIds : new Set(knownIds || []);
+  const citations = extractMelodiCitationIds(answer);
+  const unknownCitations = citations.filter((id) => !known.has(id));
+  if (!answer) return { valid: false, reason: 'empty', citations, unknownCitations };
+  if (known.size === 0) return { valid: true, reason: null, citations, unknownCitations: [] };
+  if (citations.length === 0) return { valid: false, reason: 'missing-citations', citations, unknownCitations };
+  if (unknownCitations.length > 0) return { valid: false, reason: 'unknown-citations', citations, unknownCitations };
+
+  const uncitedLines = answer.split(/\n+/).map((line) => line.trim()).filter((line) => {
+    if (!line || /^#{1,6}\s+/.test(line)) return false;
+    const withoutMarkers = line.replace(/\[(?:N|S|P)-[A-Z0-9]{4,16}\]/gi, '').replace(/^[-*\d.)\s]+/, '').trim();
+    if (withoutMarkers.length < 32 || withoutMarkers.split(/\s+/).length < 6) return false;
+    if (/^(the available records|no matching records|public-social discovery|canary's public-social coverage|i cannot determine)/i.test(withoutMarkers)) return false;
+    return extractMelodiCitationIds(line).length === 0;
+  });
+  return { valid: uncitedLines.length === 0, reason: uncitedLines.length ? 'uncited-lines' : null, citations, unknownCitations, uncitedLines };
 }
