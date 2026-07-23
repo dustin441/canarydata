@@ -2404,6 +2404,7 @@ function SocialView({ articles, socialThreads, socialSources, districtFilter, di
       if (socialSort === 'engagement-rate') return (rateFor(b) ?? -1) - (rateFor(a) ?? -1);
       if (socialSort === 'reactions') return b.reactionCount - a.reactionCount;
       if (socialSort === 'comments') return b.commentCount - a.commentCount;
+      if (socialSort === 'shares') return b.shareCount - a.shareCount;
       if (socialSort === 'views') return b.viewCount - a.viewCount;
       if (socialSort === 'oldest') return new Date(a.date).getTime() - new Date(b.date).getTime();
       return new Date(b.date).getTime() - new Date(a.date).getTime();
@@ -2580,7 +2581,7 @@ function SocialView({ articles, socialThreads, socialSources, districtFilter, di
           <label><span>Performance data</span><select value={performanceFilter} onChange={(event) => changeSocialFilter(setPerformanceFilter, event.target.value)}><option value="all">Available or N/A</option><option value="available">Has performance data</option><option value="unavailable">Performance unavailable</option></select></label>
           <label><span>Min engagement rate</span><div className="social-rate-input"><input type="number" min="0" step="0.1" value={minimumEngagementRate} onChange={(event) => changeSocialFilter(setMinimumEngagementRate, event.target.value)} placeholder="0.0" /><em>%</em></div></label>
           <label><span>Max engagement rate</span><div className="social-rate-input"><input type="number" min="0" step="0.1" value={maximumEngagementRate} onChange={(event) => changeSocialFilter(setMaximumEngagementRate, event.target.value)} placeholder="Any" /><em>%</em></div></label>
-          <label><span>Sort by</span><select value={socialSort} onChange={(event) => changeSocialFilter(setSocialSort, event.target.value)}><option value="newest">Newest first</option><option value="oldest">Oldest first</option><option value="engagement">Highest engagement</option><option value="engagement-rate">Highest engagement rate</option><option value="reactions">Most reactions</option><option value="comments">Most comments</option><option value="views">Most views</option></select></label>
+          <label><span>Sort by</span><select value={socialSort} onChange={(event) => changeSocialFilter(setSocialSort, event.target.value)}><option value="newest">Newest first</option><option value="oldest">Oldest first</option><option value="engagement">Highest engagement</option><option value="engagement-rate">Highest engagement rate</option><option value="reactions">Most reactions</option><option value="comments">Most comments</option><option value="shares">Most shares</option><option value="views">Most views</option></select></label>
           <button type="button" className="social-filter-reset" onClick={resetSocialFilters} disabled={!hasActiveSocialFilters}>Reset filters</button>
         </div>
 
