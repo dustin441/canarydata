@@ -36,7 +36,14 @@ export function safeSocialMediaUrl(value) {
     const url = new URL(String(value || ''));
     if (url.protocol !== 'https:') return '';
     const host = url.hostname.toLowerCase();
-    if (!['fbcdn.net', 'cdninstagram.com'].some((suffix) => host === suffix || host.endsWith(`.${suffix}`))) return '';
+    if (![
+      'fbcdn.net',
+      'cdninstagram.com',
+      'tiktokcdn-us.com',
+      'tiktokcdn.com',
+      'tiktokv.us',
+      'tiktokv.com',
+    ].some((suffix) => host === suffix || host.endsWith(`.${suffix}`))) return '';
     return url.toString();
   } catch {
     return '';
