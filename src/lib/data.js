@@ -112,20 +112,27 @@ export async function getSocialSources(districtId = null) {
 }
 
 const SOCIAL_THREAD_COLUMNS = 'id, district_id, social_account_id, provider, platform, external_thread_id, canonical_url, relationship_type, author_name, author_handle, headline, body, summary, recommendation, published_at, comment_count, reply_count, reaction_count, share_count, view_count, engagement_total, sentiment, risk_level, canary_score, tags, strategic_alignment, matched_terms, match_reason, identity_confidence, visibility_status, provider_metadata, created_at, updated_at';
+const SOCIAL_THREAD_PAGE_SIZE = 1000;
 
 export async function getSocialThreads(districtId = null, includeReview = false) {
   const supabase = createAdminClient();
-  let query = supabase
-    .from('social_threads')
-    .select(SOCIAL_THREAD_COLUMNS)
-    .in('visibility_status', includeReview ? ['active', 'review'] : ['active'])
-    .order('published_at', { ascending: false })
-    .limit(500);
-  if (districtId) query = query.eq('district_id', districtId);
-  const { data, error } = await query;
-  if (error) throw error;
+  const threads = [];
+  for (let from = 0; ; from += SOCIAL_THREAD_PAGE_SIZE) {
+    let query = supabase
+      .from('social_threads')
+      .select(SOCIAL_THREAD_COLUMNS)
+      .in('visibility_status', includeReview ? ['active', 'review'] : ['active'])
+      .order('published_at', { ascending: false })
+      .order('id', { ascending: true })
+      .range(from, from + SOCIAL_THREAD_PAGE_SIZE - 1);
+    if (districtId) query = query.eq('district_id', districtId);
+    const { data, error } = await query;
+    if (error) throw error;
+    const page = data ?? [];
+    threads.push(...page);
+    if (page.length < SOCIAL_THREAD_PAGE_SIZE) break;
+  }
 
-  const threads = data ?? [];
   if (threads.length === 0) return threads;
 
   const comments = [];

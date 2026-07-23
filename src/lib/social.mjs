@@ -56,6 +56,30 @@ export function calculateSocialEngagementRate(item = {}, followerCount = 0) {
   return (numberOrZero(item.engagementTotal) / followers) * 100;
 }
 
+export function resolveSocialFollowerCount(item = {}, officialAccount = {}) {
+  const metadata = item.providerMetadata && typeof item.providerMetadata === 'object'
+    ? item.providerMetadata
+    : {};
+  const authorFollowers = numberOrZero(
+    metadata.followers
+      ?? metadata.follower_count
+      ?? metadata.followers_count
+      ?? metadata.author_followers
+      ?? metadata.author_follower_count,
+  );
+  if (authorFollowers > 0) return authorFollowers;
+  if (item.relationshipType !== 'owned') return 0;
+  return numberOrZero(officialAccount?.metadata?.followers_count);
+}
+
+export function socialDateFilterMatches(item = {}, startDate = '', endDate = '') {
+  const publishedAt = new Date(item.date).getTime();
+  if (!Number.isFinite(publishedAt)) return !startDate && !endDate;
+  const startAt = startDate ? new Date(`${startDate}T00:00:00`).getTime() : null;
+  const endAt = endDate ? new Date(`${endDate}T23:59:59.999`).getTime() : null;
+  return (startAt === null || publishedAt >= startAt) && (endAt === null || publishedAt <= endAt);
+}
+
 function normalizeRelationship(value) {
   const relationship = String(value || '').toLowerCase();
   if (relationship === 'owned') return 'owned';

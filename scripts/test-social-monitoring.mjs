@@ -4,8 +4,10 @@ import {
   calculateSocialEngagementRate,
   normalizeSocialResult,
   rankTopSocialResults,
+  resolveSocialFollowerCount,
   safeSocialMediaUrl,
   socialActionFilterMatches,
+  socialDateFilterMatches,
   socialRelationshipFilterMatches,
   summarizeSocialActions,
   summarizeSocialResults,
@@ -182,6 +184,12 @@ assert.equal(safeSocialMediaUrl('https://evil-tiktokcdn-us.com/example.mp4'), ''
 assert.equal(calculateSocialEngagementRate({ engagementTotal: 50 }, 1000), 5);
 assert.equal(calculateSocialEngagementRate({ engagementTotal: 50 }, 0), null);
 assert.equal(calculateSocialEngagementRate({ engagementTotal: 0 }, 1000), 0);
+assert.equal(resolveSocialFollowerCount(canonical, { metadata: { followers_count: 4327 } }), 4327);
+assert.equal(resolveSocialFollowerCount({ ...canonical, relationshipType: 'ambient' }, { metadata: { followers_count: 4327 } }), 0, 'district followers must not be used for outside authors');
+assert.equal(resolveSocialFollowerCount({ ...canonical, relationshipType: 'ambient', providerMetadata: { followers: 2500 } }, { metadata: { followers_count: 4327 } }), 2500);
+assert.equal(socialDateFilterMatches({ date: '2026-07-15T12:00:00Z' }, '2026-07-01', '2026-07-31'), true);
+assert.equal(socialDateFilterMatches({ date: '2026-06-30T23:59:59Z' }, '2026-07-01', ''), false);
+assert.equal(socialDateFilterMatches({ date: '2026-08-01T00:00:00Z' }, '', '2026-07-31'), false);
 
 const results = buildSocialResults([legacyArticle, canonicalThread, { ...canonicalThread }]);
 assert.equal(results.length, 2, 'duplicate platform thread IDs should collapse');

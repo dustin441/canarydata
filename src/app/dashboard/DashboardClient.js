@@ -8,7 +8,7 @@ import { setEarnedMedia, saveNote, addQuery, deleteQuery, submitFeedback, addMan
 import { createEmbeddedCanaryCheckout, confirmEmbeddedCanaryCheckout, saveBillingPurchaseOrder } from '@/app/payment/actions';
 import { compareStrategicAlignmentRows } from '@/lib/strategicAlignmentSort.mjs';
 import { CORE_TAGS, canonicalTags } from '@/lib/canonicalTags.mjs';
-import { buildSocialResults, calculateSocialEngagementRate, rankTopSocialResults, safeSocialMediaUrl, safeSocialUrl, socialActionFilterMatches, socialRelationshipFilterMatches, summarizeSocialActions, summarizeSocialResults } from '@/lib/social.mjs';
+import { buildSocialResults, calculateSocialEngagementRate, rankTopSocialResults, resolveSocialFollowerCount, safeSocialMediaUrl, safeSocialUrl, socialActionFilterMatches, socialDateFilterMatches, socialRelationshipFilterMatches, summarizeSocialActions, summarizeSocialResults } from '@/lib/social.mjs';
 import { formatDisplayDate } from '@/lib/date.mjs';
 import { buildCommunicationsBrief, formatCommunicationsBriefRecommendation } from '@/lib/communicationsBrief.mjs';
 import { buildStrategicGovernance } from '@/lib/strategicGovernance.mjs';
@@ -2145,7 +2145,7 @@ function SocialPostPreviewCard({ result, source, rank = null, showContext = fals
   const imageFailed = Boolean(mediaUrl && failedMediaUrl === mediaUrl);
   const profileImageFailed = Boolean(profileImageUrl && failedProfileImageUrl === profileImageUrl);
 
-  const followers = Number(source?.metadata?.followers_count) || 0;
+  const followers = resolveSocialFollowerCount(result, source);
   const engagementRate = result.hasPerformanceData ? calculateSocialEngagementRate(result, followers) : null;
   const displayName = result.authorName || source?.display_name || source?.handle || 'Public social account';
   const initials = displayName.split(/\s+/).map((part) => part[0]).join('').slice(0, 3).toUpperCase();
@@ -2328,7 +2328,10 @@ function SocialView({ articles, socialThreads, socialSources, districtFilter, di
   const [performanceFilter, setPerformanceFilter] = useState('all');
   const [minimumEngagementRate, setMinimumEngagementRate] = useState('');
   const [maximumEngagementRate, setMaximumEngagementRate] = useState('');
+  const [socialDateStart, setSocialDateStart] = useState('');
+  const [socialDateEnd, setSocialDateEnd] = useState('');
   const [socialSort, setSocialSort] = useState('newest');
+  const [topPostsAsOf] = useState(() => Date.now());
   const scopedRecords = useMemo(() => {
     const legacyRecords = articles.filter((article) => {
       const platform = String(article.source_type || '').toLowerCase();
@@ -2342,7 +2345,9 @@ function SocialView({ articles, socialThreads, socialSources, districtFilter, di
   const summary = useMemo(() => summarizeSocialResults(results), [results]);
   const topPlatformGroups = useMemo(() => {
     const preferredOrder = ['facebook', 'instagram'];
-    const platforms = [...new Set(results.filter((result) => result.relationshipType === 'owned').map((result) => result.platform))]
+    const cutoff = topPostsAsOf - (30 * 24 * 60 * 60 * 1000);
+    const recentOwnedResults = results.filter((result) => result.relationshipType === 'owned' && new Date(result.date).getTime() >= cutoff);
+    const platforms = [...new Set(recentOwnedResults.map((result) => result.platform))]
       .sort((a, b) => {
         const aIndex = preferredOrder.indexOf(a);
         const bIndex = preferredOrder.indexOf(b);
@@ -2350,9 +2355,9 @@ function SocialView({ articles, socialThreads, socialSources, districtFilter, di
         return a.localeCompare(b);
       });
     return platforms
-      .map((platform) => ({ platform, posts: rankTopSocialResults(results.filter((result) => result.platform === platform), 3) }))
+      .map((platform) => ({ platform, posts: rankTopSocialResults(recentOwnedResults.filter((result) => result.platform === platform), 3) }))
       .filter((group) => group.posts.length > 0);
-  }, [results]);
+  }, [results, topPostsAsOf]);
   const scopedSources = useMemo(
     () => socialSources.filter((source) => districtFilter === 'All' || source.district_id === districtFilter),
     [socialSources, districtFilter],
@@ -2367,7 +2372,7 @@ function SocialView({ articles, socialThreads, socialSources, districtFilter, di
     const maxRate = maximumEngagementRate === '' ? null : Number(maximumEngagementRate);
     const rateFor = (result) => {
       const source = sourceByDistrictPlatform.get(`${result.districtId}:${result.platform}`);
-      return result.hasPerformanceData ? calculateSocialEngagementRate(result, Number(source?.metadata?.followers_count) || 0) : null;
+      return result.hasPerformanceData ? calculateSocialEngagementRate(result, resolveSocialFollowerCount(result, source)) : null;
     };
     return results.filter((result) => {
       const relationshipMatches = socialRelationshipFilterMatches(result, relationshipFilter);
@@ -2379,17 +2384,18 @@ function SocialView({ articles, socialThreads, socialSources, districtFilter, di
       const rate = rateFor(result);
       const minimumMatches = minRate === null || (rate !== null && Number.isFinite(minRate) && rate >= minRate);
       const maximumMatches = maxRate === null || (rate !== null && Number.isFinite(maxRate) && rate <= maxRate);
+      const dateMatches = socialDateFilterMatches(result, socialDateStart, socialDateEnd);
       const searchMatches = !query || [result.headline, result.summary, result.authorName, result.platform, result.matchReason, result.actionIntelligence?.actionLabel, result.actionIntelligence?.recommendedAction, result.actionIntelligence?.strategicAlignmentReason, ...(result.actionIntelligence?.strategicPriorityLabels || [])]
         .some((value) => String(value || '').toLowerCase().includes(query));
-      return relationshipMatches && platformMatches && mediaMatches && performanceMatches && minimumMatches && maximumMatches && searchMatches;
+      return relationshipMatches && platformMatches && mediaMatches && performanceMatches && minimumMatches && maximumMatches && dateMatches && searchMatches;
     });
-  }, [results, relationshipFilter, platformFilter, mediaFilter, performanceFilter, minimumEngagementRate, maximumEngagementRate, socialSearch, sourceByDistrictPlatform]);
+  }, [results, relationshipFilter, platformFilter, mediaFilter, performanceFilter, minimumEngagementRate, maximumEngagementRate, socialDateStart, socialDateEnd, socialSearch, sourceByDistrictPlatform]);
   const actionSummary = useMemo(() => summarizeSocialActions(facetedResults), [facetedResults]);
   const selectedActionLabel = { respond: 'Respond', amplify: 'Amplify', strategy: 'Strategy', monitor: 'Monitor', elevate: 'Elevate' }[actionFilter] || null;
   const visibleResults = useMemo(() => {
     const rateFor = (result) => {
       const source = sourceByDistrictPlatform.get(`${result.districtId}:${result.platform}`);
-      return result.hasPerformanceData ? calculateSocialEngagementRate(result, Number(source?.metadata?.followers_count) || 0) : null;
+      return result.hasPerformanceData ? calculateSocialEngagementRate(result, resolveSocialFollowerCount(result, source)) : null;
     };
     const filtered = facetedResults.filter((result) => socialActionFilterMatches(result, actionFilter));
     return filtered.sort((a, b) => {
@@ -2398,6 +2404,7 @@ function SocialView({ articles, socialThreads, socialSources, districtFilter, di
       if (socialSort === 'reactions') return b.reactionCount - a.reactionCount;
       if (socialSort === 'comments') return b.commentCount - a.commentCount;
       if (socialSort === 'views') return b.viewCount - a.viewCount;
+      if (socialSort === 'oldest') return new Date(a.date).getTime() - new Date(b.date).getTime();
       return new Date(b.date).getTime() - new Date(a.date).getTime();
     });
   }, [facetedResults, actionFilter, socialSort, sourceByDistrictPlatform]);
@@ -2414,12 +2421,14 @@ function SocialView({ articles, socialThreads, socialSources, districtFilter, di
     setPerformanceFilter('all');
     setMinimumEngagementRate('');
     setMaximumEngagementRate('');
+    setSocialDateStart('');
+    setSocialDateEnd('');
     setSocialSearch('');
     setSocialSort('newest');
     setSocialResultLimit(24);
   };
   const hasActiveSocialFilters = relationshipFilter !== 'all' || actionFilter !== 'all' || platformFilter !== 'all' || mediaFilter !== 'all'
-    || performanceFilter !== 'all' || minimumEngagementRate !== '' || maximumEngagementRate !== '' || socialSearch !== '' || socialSort !== 'newest';
+    || performanceFilter !== 'all' || minimumEngagementRate !== '' || maximumEngagementRate !== '' || socialDateStart !== '' || socialDateEnd !== '' || socialSearch !== '' || socialSort !== 'newest';
 
   return (
     <div className="social-monitor-view">
@@ -2487,7 +2496,7 @@ function SocialView({ articles, socialThreads, socialSources, districtFilter, di
         <div className="social-section-heading">
           <div>
             <h3>Top district posts by platform</h3>
-            <p>Up to three owned posts per platform, ranked by public engagement. Engagement rate uses public interactions divided by the account’s public follower count.</p>
+            <p>Up to three owned posts per platform from the last 30 days, ranked by public engagement. Engagement rate uses public interactions divided by the account’s public follower count.</p>
           </div>
           <span>{topPlatformGroups.reduce((total, group) => total + group.posts.length, 0)} ranked posts</span>
         </div>
@@ -2565,10 +2574,12 @@ function SocialView({ articles, socialThreads, socialSources, districtFilter, di
         <div className="social-filter-panel" aria-label="Social result filters">
           <label><span>Platform</span><select value={platformFilter} onChange={(event) => changeSocialFilter(setPlatformFilter, event.target.value)}><option value="all">All platforms</option>{platformOptions.map((platform) => <option key={platform} value={platform}>{formatSourceLabel(platform)}</option>)}</select></label>
           <label><span>Content</span><select value={mediaFilter} onChange={(event) => changeSocialFilter(setMediaFilter, event.target.value)}><option value="all">All content</option><option value="image">Images</option><option value="video">Videos</option><option value="text">Text-only / no media</option></select></label>
+          <label><span>From date</span><input type="date" value={socialDateStart} max={socialDateEnd || undefined} onChange={(event) => changeSocialFilter(setSocialDateStart, event.target.value)} /></label>
+          <label><span>To date</span><input type="date" value={socialDateEnd} min={socialDateStart || undefined} onChange={(event) => changeSocialFilter(setSocialDateEnd, event.target.value)} /></label>
           <label><span>Performance data</span><select value={performanceFilter} onChange={(event) => changeSocialFilter(setPerformanceFilter, event.target.value)}><option value="all">Available or N/A</option><option value="available">Has performance data</option><option value="unavailable">Performance unavailable</option></select></label>
           <label><span>Min engagement rate</span><div className="social-rate-input"><input type="number" min="0" step="0.1" value={minimumEngagementRate} onChange={(event) => changeSocialFilter(setMinimumEngagementRate, event.target.value)} placeholder="0.0" /><em>%</em></div></label>
           <label><span>Max engagement rate</span><div className="social-rate-input"><input type="number" min="0" step="0.1" value={maximumEngagementRate} onChange={(event) => changeSocialFilter(setMaximumEngagementRate, event.target.value)} placeholder="Any" /><em>%</em></div></label>
-          <label><span>Sort by</span><select value={socialSort} onChange={(event) => changeSocialFilter(setSocialSort, event.target.value)}><option value="newest">Newest first</option><option value="engagement">Highest engagement</option><option value="engagement-rate">Highest engagement rate</option><option value="reactions">Most reactions</option><option value="comments">Most comments</option><option value="views">Most views</option></select></label>
+          <label><span>Sort by</span><select value={socialSort} onChange={(event) => changeSocialFilter(setSocialSort, event.target.value)}><option value="newest">Newest first</option><option value="oldest">Oldest first</option><option value="engagement">Highest engagement</option><option value="engagement-rate">Highest engagement rate</option><option value="reactions">Most reactions</option><option value="comments">Most comments</option><option value="views">Most views</option></select></label>
           <button type="button" className="social-filter-reset" onClick={resetSocialFilters} disabled={!hasActiveSocialFilters}>Reset filters</button>
         </div>
 
