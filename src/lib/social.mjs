@@ -261,6 +261,11 @@ function socialResultKey(item) {
       const url = new URL(item.url);
       const host = url.hostname.replace(/^www\./, '').toLowerCase();
       const path = url.pathname.replace(/\/+$/, '') || '/';
+      if (host.endsWith('facebook.com') && ['/permalink.php', '/story.php'].includes(path)) {
+        const storyId = url.searchParams.get('story_fbid') || url.searchParams.get('fbid');
+        const ownerId = url.searchParams.get('id');
+        if (storyId) return `${item.platform}:${host}${path}?story_fbid=${storyId}${ownerId ? `&id=${ownerId}` : ''}`;
+      }
       return `${item.platform}:${host}${path}`;
     } catch {
       // safeSocialUrl already filters malformed links; fall through to provider identity.

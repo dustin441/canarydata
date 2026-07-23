@@ -212,6 +212,12 @@ const transitionalResults = buildSocialResults([stagedInstagram, legacyDuplicate
 assert.equal(transitionalResults.length, 1, 'canonical permalink variants should deduplicate across staged and legacy records');
 assert.equal(transitionalResults[0].visibilityStatus, 'review', 'staged record should win transitional deduplication');
 
+const facebookPermalinks = buildSocialResults([
+  { ...canonicalThread, id: 'facebook-permalink-1', external_thread_id: 'fb-1', canonical_url: 'https://www.facebook.com/permalink.php?story_fbid=post-1&id=page-1' },
+  { ...canonicalThread, id: 'facebook-permalink-2', external_thread_id: 'fb-2', canonical_url: 'https://www.facebook.com/permalink.php?id=page-1&story_fbid=post-2' },
+]);
+assert.equal(facebookPermalinks.length, 2, 'distinct Facebook permalink query identities must not collapse');
+
 const summary = summarizeSocialResults(results);
 assert.deepEqual(summary, {
   total: 2,

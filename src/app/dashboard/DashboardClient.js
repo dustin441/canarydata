@@ -2333,14 +2333,15 @@ function SocialView({ articles, socialThreads, socialSources, districtFilter, di
   const [socialSort, setSocialSort] = useState('newest');
   const [topPostsAsOf] = useState(() => Date.now());
   const scopedRecords = useMemo(() => {
+    const configuredPlatformKeys = new Set(socialSources.map((source) => `${source.district_id}:${String(source.platform || '').toLowerCase()}`));
     const legacyRecords = articles.filter((article) => {
       const platform = String(article.source_type || '').toLowerCase();
       const districtMatches = districtFilter === 'All' || article.district_id === districtFilter;
-      return districtMatches && SOCIAL_SOURCE_TYPES.has(platform);
+      return districtMatches && SOCIAL_SOURCE_TYPES.has(platform) && !configuredPlatformKeys.has(`${article.district_id}:${platform}`);
     });
     const stagedRecords = socialThreads.filter((thread) => districtFilter === 'All' || thread.district_id === districtFilter);
     return [...stagedRecords, ...legacyRecords];
-  }, [articles, socialThreads, districtFilter]);
+  }, [articles, socialThreads, socialSources, districtFilter]);
   const results = useMemo(() => buildSocialResults(scopedRecords), [scopedRecords]);
   const summary = useMemo(() => summarizeSocialResults(results), [results]);
   const topPlatformGroups = useMemo(() => {
@@ -2842,10 +2843,14 @@ export default function DashboardClient({ articles, districts, queries: initialQ
   const queryCount = initialQueries.filter((query) => districtFilter === 'All' || query.district_id === districtFilter).length;
   const correctionCount = excludedStories.filter((story) => districtFilter === 'All' || story.district_id === districtFilter).length;
   const scopedSocialResultsForCounts = useMemo(() => {
-    const legacyRecords = scopedArticlesForCounts.filter((article) => SOCIAL_SOURCE_TYPES.has(String(article.source_type || '').toLowerCase()));
+    const configuredPlatformKeys = new Set(socialSources.map((source) => `${source.district_id}:${String(source.platform || '').toLowerCase()}`));
+    const legacyRecords = scopedArticlesForCounts.filter((article) => {
+      const platform = String(article.source_type || '').toLowerCase();
+      return SOCIAL_SOURCE_TYPES.has(platform) && !configuredPlatformKeys.has(`${article.district_id}:${platform}`);
+    });
     const stagedRecords = socialThreads.filter((thread) => districtFilter === 'All' || thread.district_id === districtFilter);
     return buildSocialResults([...stagedRecords, ...legacyRecords]);
-  }, [scopedArticlesForCounts, socialThreads, districtFilter]);
+  }, [scopedArticlesForCounts, socialThreads, socialSources, districtFilter]);
   const socialResultCount = scopedSocialResultsForCounts.length;
   const socialActionSummary = useMemo(() => summarizeSocialActions(scopedSocialResultsForCounts), [scopedSocialResultsForCounts]);
 
