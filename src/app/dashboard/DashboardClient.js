@@ -4,7 +4,7 @@ import { useState, useMemo, useEffect, useRef, useTransition, useCallback } from
 import Image from 'next/image';
 import Link from 'next/link';
 import { loadStripe } from '@stripe/stripe-js';
-import { setEarnedMedia, saveNote, addQuery, deleteQuery, submitFeedback, addManualStory, excludeStory, restoreStory } from '@/app/actions';
+import { setEarnedMedia, saveNote, addQuery, deleteQuery, submitFeedback, addManualStory, excludeStory, restoreStory, reviewSocialThread, bulkReviewSocialThreads } from '@/app/actions';
 import { createEmbeddedCanaryCheckout, confirmEmbeddedCanaryCheckout, saveBillingPurchaseOrder } from '@/app/payment/actions';
 import { compareStrategicAlignmentRows } from '@/lib/strategicAlignmentSort.mjs';
 import { CORE_TAGS, canonicalTags } from '@/lib/canonicalTags.mjs';
@@ -2132,7 +2132,7 @@ function formatSocialUrgency(value) {
   return labels[value] || String(value || 'Routine').replaceAll('_', ' ');
 }
 
-function SocialPostPreviewCard({ result, source, rank = null, showContext = false, compact = false }) {
+function SocialPostPreviewCard({ result, source, rank = null, showContext = false, compact = false, reviewEnabled = false, selected = false, onToggleSelected = null }) {
   const mediaUrl = safeSocialMediaUrl(result.mediaUrl);
   const videoUrl = safeSocialMediaUrl(result.videoUrl);
   const profileImageUrl = safeSocialMediaUrl(result.profileImageUrl || (result.relationshipType === 'owned' ? source?.metadata?.profile_picture_url : ''));
@@ -2142,6 +2142,10 @@ function SocialPostPreviewCard({ result, source, rank = null, showContext = fals
   const [failedMediaUrl, setFailedMediaUrl] = useState('');
   const [failedProfileImageUrl, setFailedProfileImageUrl] = useState('');
   const [videoOpen, setVideoOpen] = useState(false);
+  const [reviewSaving, setReviewSaving] = useState(false);
+  const [reviewMessage, setReviewMessage] = useState('');
+  const [classification, setClassification] = useState(result.rawRelationshipType || 'ambient');
+  const [reviewerNote, setReviewerNote] = useState(result.reviewerNote || '');
   const imageFailed = Boolean(mediaUrl && failedMediaUrl === mediaUrl);
   const profileImageFailed = Boolean(profileImageUrl && failedProfileImageUrl === profileImageUrl);
 
@@ -2153,6 +2157,24 @@ function SocialPostPreviewCard({ result, source, rank = null, showContext = fals
   const postCopy = result.summary || result.headline;
   const isVideo = result.mediaType === 'video';
   const action = result.actionIntelligence;
+  const statusLabel = { review: 'Review', approved: 'Approved', active: 'Client visible', excluded: 'Excluded' }[result.visibilityStatus] || result.visibilityStatus;
+
+  async function applyReviewAction(reviewAction, values = {}) {
+    setReviewSaving(true);
+    setReviewMessage('');
+    try {
+      await reviewSocialThread({
+        socialThreadId: result.id,
+        action: reviewAction,
+        expectedVersion: result.reviewVersion,
+        ...values,
+      });
+      window.location.reload();
+    } catch (error) {
+      setReviewMessage(error?.message || 'Unable to update this social result.');
+      setReviewSaving(false);
+    }
+  }
 
   return (
     <>
@@ -2175,7 +2197,12 @@ function SocialPostPreviewCard({ result, source, rank = null, showContext = fals
             {result.relationshipType !== 'owned' && <span className="social-content-badge">{result.relationshipLabel}</span>}
             {action && <span className={`social-action-badge ${action.actionType}`}>{action.actionLabel}</span>}
             {result.isSharedPost && <span className="social-content-badge">Shared</span>}
-            {result.visibilityStatus === 'review' && <span className="social-review-badge">Review</span>}
+            {reviewEnabled && <span className={`social-review-badge ${result.visibilityStatus}`}>{statusLabel}</span>}
+            {reviewEnabled && onToggleSelected && (
+              <label className="social-review-select" title="Select for a bulk review action">
+                <input type="checkbox" checked={selected} onChange={() => onToggleSelected(result.id)} aria-label={`Select ${result.headline} for bulk review`} />
+              </label>
+            )}
           </div>
         </header>
 
@@ -2303,6 +2330,36 @@ function SocialPostPreviewCard({ result, source, rank = null, showContext = fals
             {!action && result.recommendation && <p><strong>Recommended action:</strong> {result.recommendation}</p>}
           </div>
         )}
+
+        {reviewEnabled && (
+          <section className="social-review-controls" aria-label="Reviewer controls">
+            <header><strong>Review decision</strong><span>Saved changes are added to the immutable audit history.</span></header>
+            <div className="social-review-fields">
+              <label>
+                <span>Classification</span>
+                <select value={classification} onChange={(event) => setClassification(event.target.value)} disabled={reviewSaving}>
+                  <option value="owned">Official district post</option>
+                  <option value="direct_tag">Tagged district</option>
+                  <option value="direct_mention">Mentioned district</option>
+                  <option value="ambient">Public mention</option>
+                </select>
+              </label>
+              <button type="button" className="btn btn-secondary btn-sm" disabled={reviewSaving || classification === result.rawRelationshipType} onClick={() => applyReviewAction('classification', { classification })}>Save classification</button>
+            </div>
+            <label className="social-review-note">
+              <span>Reviewer note</span>
+              <textarea value={reviewerNote} maxLength={2000} rows={2} onChange={(event) => setReviewerNote(event.target.value)} placeholder="Add context for the next reviewer…" disabled={reviewSaving} />
+            </label>
+            <div className="social-review-actions">
+              <button type="button" className="btn btn-secondary btn-sm" disabled={reviewSaving || reviewerNote.trim() === (result.reviewerNote || '')} onClick={() => applyReviewAction('note', { reviewerNote })}>Save note</button>
+              {result.visibilityStatus === 'review' && <button type="button" className="btn btn-primary btn-sm" disabled={reviewSaving} onClick={() => applyReviewAction('approve')}>Approve</button>}
+              {result.visibilityStatus === 'approved' && <button type="button" className="btn btn-primary btn-sm" disabled={reviewSaving} onClick={() => applyReviewAction('promote')}>Promote to client</button>}
+              {result.visibilityStatus !== 'excluded' && <button type="button" className="btn btn-secondary btn-sm social-exclude-button" disabled={reviewSaving} onClick={() => applyReviewAction('exclude')}>Exclude</button>}
+              {result.visibilityStatus === 'excluded' && <button type="button" className="btn btn-secondary btn-sm" disabled={reviewSaving} onClick={() => applyReviewAction('restore')}>Restore to review</button>}
+            </div>
+            {reviewMessage && <p className="social-review-error" role="alert">{reviewMessage}</p>}
+          </section>
+        )}
       </article>
 
       {videoOpen && videoUrl && (
@@ -2320,7 +2377,7 @@ function SocialPostPreviewCard({ result, source, rank = null, showContext = fals
   );
 }
 
-function SocialView({ articles, socialThreads, socialSources, districtFilter, districts }) {
+function SocialView({ articles, socialThreads, socialSources, socialReviewEvents = [], districtFilter, districts, isAdmin = false }) {
   const [relationshipFilter, setRelationshipFilter] = useState('all');
   const [actionFilter, setActionFilter] = useState('all');
   const [socialSearch, setSocialSearch] = useState('');
@@ -2333,6 +2390,11 @@ function SocialView({ articles, socialThreads, socialSources, districtFilter, di
   const [socialDateStart, setSocialDateStart] = useState('');
   const [socialDateEnd, setSocialDateEnd] = useState('');
   const [socialSort, setSocialSort] = useState('newest');
+  const [reviewStatusFilter, setReviewStatusFilter] = useState('all');
+  const [compactListMode, setCompactListMode] = useState(false);
+  const [selectedSocialIds, setSelectedSocialIds] = useState(new Set());
+  const [bulkReviewSaving, setBulkReviewSaving] = useState(false);
+  const [bulkReviewMessage, setBulkReviewMessage] = useState('');
   const [sourcesOpen, setSourcesOpen] = useState(false);
   const [topPostsAsOf] = useState(() => Date.now());
   const scopedRecords = useMemo(() => {
@@ -2350,7 +2412,7 @@ function SocialView({ articles, socialThreads, socialSources, districtFilter, di
   const topPlatformGroups = useMemo(() => {
     const preferredOrder = ['facebook', 'instagram'];
     const cutoff = topPostsAsOf - (30 * 24 * 60 * 60 * 1000);
-    const recentOwnedResults = results.filter((result) => result.relationshipType === 'owned' && new Date(result.date).getTime() >= cutoff);
+    const recentOwnedResults = results.filter((result) => result.relationshipType === 'owned' && result.visibilityStatus !== 'excluded' && new Date(result.date).getTime() >= cutoff);
     const platforms = [...new Set(recentOwnedResults.map((result) => result.platform))]
       .sort((a, b) => {
         const aIndex = preferredOrder.indexOf(a);
@@ -2389,11 +2451,12 @@ function SocialView({ articles, socialThreads, socialSources, districtFilter, di
       const minimumMatches = minRate === null || (rate !== null && Number.isFinite(minRate) && rate >= minRate);
       const maximumMatches = maxRate === null || (rate !== null && Number.isFinite(maxRate) && rate <= maxRate);
       const dateMatches = socialDateFilterMatches(result, socialDateStart, socialDateEnd);
+      const reviewStatusMatches = !isAdmin || reviewStatusFilter === 'all' || result.visibilityStatus === reviewStatusFilter;
       const searchMatches = !query || [result.headline, result.summary, result.authorName, result.platform, result.matchReason, result.actionIntelligence?.actionLabel, result.actionIntelligence?.recommendedAction, result.actionIntelligence?.strategicAlignmentReason, ...(result.actionIntelligence?.strategicPriorityLabels || [])]
         .some((value) => String(value || '').toLowerCase().includes(query));
-      return relationshipMatches && platformMatches && mediaMatches && performanceMatches && minimumMatches && maximumMatches && dateMatches && searchMatches;
+      return relationshipMatches && platformMatches && mediaMatches && performanceMatches && minimumMatches && maximumMatches && dateMatches && reviewStatusMatches && searchMatches;
     });
-  }, [results, relationshipFilter, platformFilter, mediaFilter, performanceFilter, minimumEngagementRate, maximumEngagementRate, socialDateStart, socialDateEnd, socialSearch, sourceByDistrictPlatform]);
+  }, [results, relationshipFilter, platformFilter, mediaFilter, performanceFilter, minimumEngagementRate, maximumEngagementRate, socialDateStart, socialDateEnd, reviewStatusFilter, socialSearch, sourceByDistrictPlatform, isAdmin]);
   const actionSummary = useMemo(() => summarizeSocialActions(facetedResults), [facetedResults]);
   const selectedActionLabel = { respond: 'Respond', amplify: 'Amplify', strategy: 'Strategy', monitor: 'Monitor', elevate: 'Elevate' }[actionFilter] || null;
   const visibleResults = useMemo(() => {
@@ -2430,10 +2493,42 @@ function SocialView({ articles, socialThreads, socialSources, districtFilter, di
     setSocialDateEnd('');
     setSocialSearch('');
     setSocialSort('newest');
+    setReviewStatusFilter('all');
     setSocialResultLimit(12);
   };
   const hasActiveSocialFilters = relationshipFilter !== 'all' || actionFilter !== 'all' || platformFilter !== 'all' || mediaFilter !== 'all'
-    || performanceFilter !== 'all' || minimumEngagementRate !== '' || maximumEngagementRate !== '' || socialDateStart !== '' || socialDateEnd !== '' || socialSearch !== '' || socialSort !== 'newest';
+    || performanceFilter !== 'all' || minimumEngagementRate !== '' || maximumEngagementRate !== '' || socialDateStart !== '' || socialDateEnd !== '' || reviewStatusFilter !== 'all' || socialSearch !== '' || socialSort !== 'newest';
+  const reviewableVisibleResults = visibleResults.filter((result) => Boolean(result.provider && result.externalThreadId));
+  const selectedResults = reviewableVisibleResults.filter((result) => selectedSocialIds.has(result.id));
+  const safeOfficialResults = reviewableVisibleResults.filter((result) => result.rawRelationshipType === 'owned' && result.visibilityStatus === 'review');
+  const canBulkApprove = selectedResults.length > 0 && selectedResults.every((result) => result.rawRelationshipType === 'owned' && result.visibilityStatus === 'review');
+  const canPromoteBatch = selectedResults.length > 0 && selectedResults.every((result) => result.visibilityStatus === 'approved');
+  const scopedReviewEvents = socialReviewEvents.filter((event) => districtFilter === 'All' || event.district_id === districtFilter);
+
+  const toggleSocialSelection = (id) => {
+    setSelectedSocialIds((current) => {
+      const next = new Set(current);
+      if (next.has(id)) next.delete(id);
+      else next.add(id);
+      return next;
+    });
+  };
+
+  async function handleBulkSocialReview(action) {
+    if (districtFilter === 'All') {
+      setBulkReviewMessage('Choose one district before running a bulk review action.');
+      return;
+    }
+    setBulkReviewSaving(true);
+    setBulkReviewMessage('');
+    try {
+      await bulkReviewSocialThreads({ districtId: districtFilter, socialThreadIds: [...selectedSocialIds], action });
+      window.location.reload();
+    } catch (error) {
+      setBulkReviewMessage(error?.message || 'Unable to complete the bulk review action.');
+      setBulkReviewSaving(false);
+    }
+  }
 
   return (
     <div className="social-monitor-view">
@@ -2546,6 +2641,7 @@ function SocialView({ articles, socialThreads, socialSources, districtFilter, di
           </div>
           <div className="social-results-heading-controls">
             <span>{visibleResults.length} result{visibleResults.length === 1 ? '' : 's'}</span>
+            <button type="button" className="social-view-mode" aria-pressed={compactListMode} onClick={() => setCompactListMode((current) => !current)}>{compactListMode ? 'Scorecard mode' : 'Compact list'}</button>
             <input className="filter-input" value={socialSearch} onChange={(event) => changeSocialFilter(setSocialSearch, event.target.value)} placeholder="Search social results…" />
           </div>
         </div>
@@ -2553,6 +2649,7 @@ function SocialView({ articles, socialThreads, socialSources, districtFilter, di
         <div className="social-filter-panel" aria-label="Social result filters">
           <label><span>Platform</span><select value={platformFilter} onChange={(event) => changeSocialFilter(setPlatformFilter, event.target.value)}><option value="all">All platforms</option>{platformOptions.map((platform) => <option key={platform} value={platform}>{formatSourceLabel(platform)}</option>)}</select></label>
           <label><span>Content</span><select value={mediaFilter} onChange={(event) => changeSocialFilter(setMediaFilter, event.target.value)}><option value="all">All content</option><option value="image">Images</option><option value="video">Videos</option><option value="text">Text-only / no media</option></select></label>
+          {isAdmin && <label><span>Review state</span><select value={reviewStatusFilter} onChange={(event) => changeSocialFilter(setReviewStatusFilter, event.target.value)}><option value="all">All review states</option><option value="review">Needs review</option><option value="approved">Approved internally</option><option value="active">Client visible</option><option value="excluded">Excluded</option></select></label>}
           <label><span>From date</span><input type="date" value={socialDateStart} max={socialDateEnd || undefined} onChange={(event) => changeSocialFilter(setSocialDateStart, event.target.value)} /></label>
           <label><span>To date</span><input type="date" value={socialDateEnd} min={socialDateStart || undefined} onChange={(event) => changeSocialFilter(setSocialDateEnd, event.target.value)} /></label>
           <label><span>Sort by</span><select value={socialSort} onChange={(event) => changeSocialFilter(setSocialSort, event.target.value)}><option value="newest">Newest first</option><option value="oldest">Oldest first</option><option value="engagement">Highest engagement</option><option value="engagement-rate">Highest engagement rate</option><option value="reactions">Most reactions</option><option value="comments">Most comments</option><option value="shares">Most shares</option><option value="views">Most views</option></select></label>
@@ -2567,17 +2664,38 @@ function SocialView({ articles, socialThreads, socialSources, districtFilter, di
           </div>
         </details>
 
+        {isAdmin && (
+          <section className="social-bulk-review" aria-label="Bulk social review actions">
+            <div>
+              <strong>{selectedResults.length} selected</strong>
+              <span>Bulk approval is restricted to official district posts. Promotion only makes already-approved results client-visible.</span>
+            </div>
+            <div className="social-bulk-review-actions">
+              <button type="button" className="btn btn-secondary btn-sm" disabled={bulkReviewSaving || districtFilter === 'All' || safeOfficialResults.length === 0} onClick={() => setSelectedSocialIds(new Set(safeOfficialResults.slice(0, 250).map((result) => result.id)))}>Select safe official posts ({Math.min(safeOfficialResults.length, 250)})</button>
+              <button type="button" className="btn btn-secondary btn-sm" disabled={bulkReviewSaving || selectedResults.length === 0} onClick={() => setSelectedSocialIds(new Set())}>Clear</button>
+              <button type="button" className="btn btn-primary btn-sm" disabled={bulkReviewSaving || districtFilter === 'All' || !canBulkApprove} onClick={() => handleBulkSocialReview('approve_official')}>Approve official batch</button>
+              <button type="button" className="btn btn-primary btn-sm" disabled={bulkReviewSaving || districtFilter === 'All' || !canPromoteBatch} onClick={() => handleBulkSocialReview('promote')}>Promote approved batch</button>
+            </div>
+            {districtFilter === 'All' && <p>Choose one district in the sidebar to use bulk review.</p>}
+            {bulkReviewMessage && <p role="alert">{bulkReviewMessage}</p>}
+          </section>
+        )}
+
         {visibleResults.length === 0 ? (
           <div className="empty-state"><div className="empty-state-icon">💬</div><h3>No reviewed social results found</h3><p>Try another filter, or check back after collected posts complete review.</p></div>
         ) : (
           <>
-            <div className="social-scorecard-grid">
+            <div className={`social-scorecard-grid${compactListMode ? ' compact-list' : ''}`}>
               {pagedResults.map((result) => (
                 <SocialPostPreviewCard
                   key={`${result.platform}-${result.id}`}
                   result={result}
                   source={scopedSources.find((source) => source.platform === result.platform && source.district_id === result.districtId)}
                   showContext
+                  compact={compactListMode}
+                  reviewEnabled={isAdmin && Boolean(result.provider && result.externalThreadId)}
+                  selected={selectedSocialIds.has(result.id)}
+                  onToggleSelected={isAdmin && result.provider && result.externalThreadId ? toggleSocialSelection : null}
                 />
               ))}
             </div>
@@ -2592,6 +2710,21 @@ function SocialView({ articles, socialThreads, socialSources, districtFilter, di
           </>
         )}
       </section>
+
+      {isAdmin && (
+        <details className="social-audit-history">
+          <summary><span><strong>Review audit history</strong><small>Immutable approvals, exclusions, classifications, notes, restorations, and promotions.</small></span><em>{scopedReviewEvents.length} event{scopedReviewEvents.length === 1 ? '' : 's'}</em></summary>
+          <div className="social-audit-list">
+            {scopedReviewEvents.length === 0 ? <p>No social review events yet.</p> : scopedReviewEvents.slice(0, 100).map((event) => (
+              <article key={event.id}>
+                <div><strong>{String(event.action || '').replaceAll('_', ' ')}</strong><time>{new Date(event.created_at).toLocaleString()}</time></div>
+                <p>{event.after_state?.headline || event.before_state?.headline || event.social_thread_id}</p>
+                <span>{formatDistrictName(event.district_id)} · version {event.resulting_version}</span>
+              </article>
+            ))}
+          </div>
+        </details>
+      )}
 
       <details className="social-account-section social-account-details" id="social-sources" open={sourcesOpen} onToggle={(event) => setSourcesOpen(event.currentTarget.open)}>
         <summary>
@@ -2627,7 +2760,7 @@ function SocialView({ articles, socialThreads, socialSources, districtFilter, di
   );
 }
 
-export default function DashboardClient({ articles, districts, queries: initialQueries, clients = [], userDistrictId, paymentNotice = null, billingInfo = null, excludedStories = [], correctionEvents = [], socialSources = [], socialThreads = [], strategicProfiles = [], strategicPriorities = [], melodiEnabled = false, demoMode = false }) {
+export default function DashboardClient({ articles, districts, queries: initialQueries, clients = [], userDistrictId, paymentNotice = null, billingInfo = null, excludedStories = [], correctionEvents = [], socialSources = [], socialThreads = [], socialReviewEvents = [], strategicProfiles = [], strategicPriorities = [], isAdmin = false, melodiEnabled = false, demoMode = false }) {
   const defaultDistrictFilter = userDistrictId ?? districts[0]?.id ?? 'All';
   const [currentView, setCurrentView] = useState('dashboard');
   const [search, setSearch] = useState('');
@@ -3349,11 +3482,14 @@ export default function DashboardClient({ articles, districts, queries: initialQ
           {currentView === 'howto' && <HowItWorksView />}
           {currentView === 'social' && (
             <SocialView
+              key={districtFilter}
               articles={articles}
               socialThreads={socialThreads}
               socialSources={socialSources}
+              socialReviewEvents={socialReviewEvents}
               districtFilter={districtFilter}
               districts={districts}
+              isAdmin={isAdmin}
             />
           )}
           {melodiEnabled && currentView === 'melodi' && (

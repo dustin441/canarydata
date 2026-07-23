@@ -111,7 +111,7 @@ export async function getSocialSources(districtId = null) {
   }));
 }
 
-const SOCIAL_THREAD_COLUMNS = 'id, district_id, social_account_id, provider, platform, external_thread_id, canonical_url, relationship_type, author_name, author_handle, headline, body, summary, recommendation, published_at, comment_count, reply_count, reaction_count, share_count, view_count, engagement_total, sentiment, risk_level, canary_score, tags, strategic_alignment, matched_terms, match_reason, identity_confidence, visibility_status, provider_metadata, created_at, updated_at';
+const SOCIAL_THREAD_COLUMNS = 'id, district_id, social_account_id, provider, platform, external_thread_id, canonical_url, relationship_type, author_name, author_handle, headline, body, summary, recommendation, published_at, comment_count, reply_count, reaction_count, share_count, view_count, engagement_total, sentiment, risk_level, canary_score, tags, strategic_alignment, matched_terms, match_reason, identity_confidence, visibility_status, reviewer_note, review_version, reviewed_at, reviewed_by, provider_metadata, created_at, updated_at';
 const SOCIAL_THREAD_PAGE_SIZE = 1000;
 
 export async function getSocialThreads(districtId = null, includeReview = false) {
@@ -121,7 +121,7 @@ export async function getSocialThreads(districtId = null, includeReview = false)
     let query = supabase
       .from('social_threads')
       .select(SOCIAL_THREAD_COLUMNS)
-      .in('visibility_status', includeReview ? ['active', 'review'] : ['active'])
+      .in('visibility_status', includeReview ? ['active', 'approved', 'review', 'excluded'] : ['active'])
       .order('published_at', { ascending: false })
       .order('id', { ascending: true })
       .range(from, from + SOCIAL_THREAD_PAGE_SIZE - 1);
@@ -160,6 +160,19 @@ export async function getSocialThreads(districtId = null, includeReview = false)
     ...thread,
     social_comments: commentsByThread.get(thread.id) ?? [],
   }));
+}
+
+export async function getSocialReviewEvents(districtId = null) {
+  const supabase = createAdminClient();
+  let query = supabase
+    .from('social_review_events')
+    .select('id, batch_id, district_id, social_thread_id, actor_user_id, action, before_state, after_state, resulting_version, created_at')
+    .order('created_at', { ascending: false })
+    .limit(500);
+  if (districtId) query = query.eq('district_id', districtId);
+  const { data, error } = await query;
+  if (error) throw error;
+  return data ?? [];
 }
 
 export async function updateArticleNote(id, notes) {

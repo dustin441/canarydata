@@ -159,7 +159,7 @@ export async function POST(request) {
       );
     }
 
-    const socialVisibility = isAdmin ? ['active', 'review'] : ['active'];
+    const socialVisibility = isAdmin ? ['active', 'approved', 'review'] : ['active'];
     const [districtResult, profileResult, prioritiesResult, newsResult, socialResult] = await Promise.all([
       admin.from('districts').select('id, name').eq('id', districtId).maybeSingle(),
       admin.from('strategic_profiles').select('district_id, source_confidence, mission, vision, values, source_urls, last_reviewed_at').eq('district_id', districtId).maybeSingle(),

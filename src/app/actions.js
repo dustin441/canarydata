@@ -30,6 +30,31 @@ function assertDistrictAccess(actor, districtId) {
   }
 }
 
+function assertCanaryReviewer(actor) {
+  if (!actor.isAdmin) throw new Error('Canary reviewer access is required.');
+}
+
+const SOCIAL_REVIEW_ACTIONS = new Set(['approve', 'exclude', 'restore', 'classification', 'note', 'promote']);
+const SOCIAL_CLASSIFICATIONS = new Set(['owned', 'direct_tag', 'direct_mention', 'ambient']);
+
+function cleanSocialReviewerNote(value) {
+  const note = String(value || '').trim();
+  if (note.length > 2000) throw new Error('Reviewer note must be 2000 characters or fewer.');
+  return note;
+}
+
+async function requireSocialThreadForReview(supabase, actor, socialThreadId) {
+  const { data: thread, error } = await supabase
+    .from('social_threads')
+    .select('id, district_id, relationship_type, visibility_status, review_version')
+    .eq('id', socialThreadId)
+    .maybeSingle();
+  if (error) throw error;
+  if (!thread) throw new Error('Social result not found.');
+  assertDistrictAccess(actor, thread.district_id);
+  return thread;
+}
+
 function cleanFormValue(formData, key) {
   return String(formData.get(key) || '').trim();
 }
@@ -689,6 +714,62 @@ export async function restoreStory({ storyId, exclusionEventId, reason, expected
   if (error) throw error;
   revalidatePath('/dashboard');
   return data;
+}
+
+export async function reviewSocialThread({ socialThreadId, action, expectedVersion, classification = null, reviewerNote = null }) {
+  const { actor, admin: supabase } = await requireCanaryActor();
+  assertCanaryReviewer(actor);
+  if (!SOCIAL_REVIEW_ACTIONS.has(action)) throw new Error('Unsupported social review action.');
+  if (action === 'classification' && !SOCIAL_CLASSIFICATIONS.has(classification)) {
+    throw new Error('Choose a valid social classification.');
+  }
+  const thread = await requireSocialThreadForReview(supabase, actor, socialThreadId);
+  const version = Number.isInteger(expectedVersion) ? expectedVersion : thread.review_version;
+  const { data, error } = await supabase.rpc('canary_review_social_thread', {
+    p_actor_user_id: actor.id,
+    p_social_thread_id: thread.id,
+    p_action: action,
+    p_expected_version: version,
+    p_classification: action === 'classification' ? classification : null,
+    p_reviewer_note: action === 'note' ? cleanSocialReviewerNote(reviewerNote) : null,
+  });
+  if (error) throw error;
+  revalidatePath('/dashboard');
+  return data;
+}
+
+export async function bulkReviewSocialThreads({ districtId, socialThreadIds, action }) {
+  const { actor, admin: supabase } = await requireCanaryActor();
+  assertCanaryReviewer(actor);
+  assertDistrictAccess(actor, districtId);
+  if (!['approve_official', 'promote'].includes(action)) throw new Error('Unsupported bulk social review action.');
+  const ids = [...new Set((Array.isArray(socialThreadIds) ? socialThreadIds : []).map(String).filter(Boolean))];
+  if (ids.length < 1 || ids.length > 250) throw new Error('Select between 1 and 250 social results.');
+
+  const { data: rows, error: rowsError } = await supabase
+    .from('social_threads')
+    .select('id, district_id, relationship_type, visibility_status')
+    .in('id', ids);
+  if (rowsError) throw rowsError;
+  if ((rows ?? []).length !== ids.length || rows.some((row) => row.district_id !== districtId)) {
+    throw new Error('Selection contains missing or cross-district social results.');
+  }
+  const allEligible = action === 'approve_official'
+    ? rows.every((row) => row.relationship_type === 'owned' && row.visibility_status === 'review')
+    : rows.every((row) => row.visibility_status === 'approved');
+  if (!allEligible) throw new Error(action === 'approve_official'
+    ? 'Bulk approval is limited to official district posts awaiting review.'
+    : 'Only approved results can be promoted.');
+
+  const { data, error } = await supabase.rpc('canary_bulk_review_social_threads', {
+    p_actor_user_id: actor.id,
+    p_district_id: districtId,
+    p_social_thread_ids: ids,
+    p_action: action,
+  });
+  if (error) throw error;
+  revalidatePath('/dashboard');
+  return Array.isArray(data) ? data[0] : data;
 }
 
 export async function addQuery({ query_text, district_id, district_name, geo_city, geo_state, geo_zip, channels }) {
