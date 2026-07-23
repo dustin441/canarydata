@@ -2502,7 +2502,7 @@ function SocialView({ articles, socialThreads, socialSources, districtFilter, di
           <span>{topPlatformGroups.reduce((total, group) => total + group.posts.length, 0)} ranked posts</span>
         </div>
         {topPlatformGroups.length === 0 ? (
-          <div className="social-empty-inline">No owned posts with public metrics have been collected yet.</div>
+          <div className="social-empty-inline">No reviewed owned posts are available for this 30-day window yet.</div>
         ) : (
           <div className="social-top-groups">
             {topPlatformGroups.map((group) => (
@@ -2529,8 +2529,8 @@ function SocialView({ articles, socialThreads, socialSources, districtFilter, di
       <section className="social-account-section">
         <div className="social-section-heading">
           <div>
-            <h3>Official account registry</h3>
-            <p>These handles are configured for monitoring. “Configured” does not yet mean the district has authorized Canary through platform OAuth.</p>
+            <h3>Monitored source registry</h3>
+            <p>Official handles and public-discovery lanes configured for monitoring. “Configured” does not yet mean the district has authorized Canary through platform OAuth.</p>
           </div>
           <span>{scopedSources.length} configured source{scopedSources.length === 1 ? '' : 's'}</span>
         </div>
@@ -2549,10 +2549,10 @@ function SocialView({ articles, socialThreads, socialSources, districtFilter, di
               >
                 <span className={`social-platform-dot ${source.platform}`} aria-hidden="true" />
                 <span>
-                  <strong>{source.handle ? `@${source.handle.replace(/^@/, '')}` : formatSourceLabel(source.platform)}</strong>
+                  <strong>{source.handle ? `@${source.handle.replace(/^@/, '')}` : `${formatSourceLabel(source.platform)} public discovery`}</strong>
                   <small>{district?.name || formatDistrictName(source.district_id)} · {formatSourceLabel(source.platform)}{Number(source.metadata?.followers_count) > 0 ? ` · ${formatSocialMetric(source.metadata.followers_count)} followers` : ''}</small>
                 </span>
-                <em>{sourceUrl ? 'Public feed live ↗' : 'Public feed live'}</em>
+                <em>{source.handle ? (sourceUrl ? 'Public feed live ↗' : 'Public feed live') : 'Keyword monitoring live'}</em>
               </AccountElement>
             );
           })}
@@ -2585,7 +2585,7 @@ function SocialView({ articles, socialThreads, socialSources, districtFilter, di
         </div>
 
         {visibleResults.length === 0 ? (
-          <div className="empty-state"><div className="empty-state-icon">💬</div><h3>No social results found</h3><p>Try another filter, or connect and collect an official account.</p></div>
+          <div className="empty-state"><div className="empty-state-icon">💬</div><h3>No reviewed social results found</h3><p>Try another filter, or check back after collected posts complete review.</p></div>
         ) : (
           <>
             <div className="social-scorecard-grid">
