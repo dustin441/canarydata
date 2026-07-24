@@ -67,6 +67,9 @@ assert.match(actions, /Bulk approval is limited to verified official district po
 assert.match(actions, /runReviewAction\('promote', current\.review_version\)/);
 assert.match(actions, /runBulkAction\('promote', promotionIds\)/);
 assert.match(actions, /\.select\('visibility_status, review_version'\)/);
+assert.match(actions, /expectedCurrentVersion/);
+assert.match(sql, /p_action not in \('approve', 'promote'/);
+assert.match(sql, /p_action not in \('approve_official', 'promote'\)/);
 assert.doesNotMatch(actions, /Only approved results can be promoted/);
 
 for (const marker of [
@@ -88,6 +91,9 @@ assert.doesNotMatch(dashboard, /Promote to client|Promote approved batch|Approve
 assert.match(dashboard, /function SocialReportView/);
 assert.match(dashboard, /groupTopReportPostsByPlatform\(visibleResults\.filter/);
 assert.match(dashboard, /reportPeriod = `\$\{topPostsWindow\.label\}/);
+assert.match(dashboard, /Choose one district before exporting a Social Report/);
+assert.match(dashboard, /Minimum engagement rate:/);
+assert.match(dashboard, /Feed dates:/);
 assert.match(dashboard, /setSocialReportMode\(true\)/);
 assert.doesNotMatch(dashboard, /function exportSocialPdf\(\)[\s\S]{0,250}setCurrentView\('dashboard'\)/);
 assert.match(dashboard, /source\.id === result\.socialAccountId/);

@@ -769,6 +769,8 @@ export async function reviewSocialThread({ socialThreadId, action, expectedVersi
       .eq('id', thread.id)
       .single();
     if (currentError) throw currentError;
+    const expectedCurrentVersion = thread.visibility_status === 'review' ? version + 1 : version;
+    if (current.review_version !== expectedCurrentVersion) throw new Error('Social result changed; refresh and try again.');
     if (current.visibility_status !== 'active') {
       if (current.visibility_status !== 'approved') throw new Error('Official post could not be made client-visible.');
       const promotion = await runReviewAction('promote', current.review_version);
@@ -794,7 +796,7 @@ export async function bulkReviewSocialThreads({ districtId, socialThreadIds, act
 
   const { data: rows, error: rowsError } = await supabase
     .from('social_threads')
-    .select('id, district_id, social_account_id, platform, relationship_type, visibility_status')
+    .select('id, district_id, social_account_id, platform, relationship_type, visibility_status, review_version')
     .in('id', ids);
   if (rowsError) throw rowsError;
   if ((rows ?? []).length !== ids.length || rows.some((row) => row.district_id !== districtId)) {
@@ -828,9 +830,15 @@ export async function bulkReviewSocialThreads({ districtId, socialThreadIds, act
   }
   const { data: currentRows, error: currentRowsError } = await supabase
     .from('social_threads')
-    .select('id, visibility_status')
+    .select('id, visibility_status, review_version')
     .in('id', ids);
   if (currentRowsError) throw currentRowsError;
+  const originalById = new Map(rows.map((row) => [row.id, row]));
+  if ((currentRows ?? []).some((row) => {
+    const original = originalById.get(row.id);
+    const expectedVersion = original.visibility_status === 'review' ? original.review_version + 1 : original.review_version;
+    return row.review_version !== expectedVersion;
+  })) throw new Error('Social results changed; refresh and try again.');
   const promotionIds = (currentRows ?? []).filter((row) => row.visibility_status !== 'active').map((row) => row.id);
   if (promotionIds.length > 0) {
     if ((currentRows ?? []).some((row) => promotionIds.includes(row.id) && row.visibility_status !== 'approved')) {

@@ -112,7 +112,7 @@ declare
 begin
   if p_actor_user_id is null then raise exception 'Actor is required'; end if;
   perform public.canary_assert_social_reviewer(p_actor_user_id);
-  if p_action not in ('approve', 'exclude', 'restore', 'classification', 'note') then
+  if p_action not in ('approve', 'promote', 'exclude', 'restore', 'classification', 'note') then
     raise exception 'Unsupported social review action';
   end if;
   if p_action = 'classification' and p_classification not in ('owned', 'direct_tag', 'direct_mention', 'ambient') then
@@ -131,7 +131,7 @@ begin
     raise exception 'Social result changed; refresh and try again';
   end if;
 
-  if p_action = 'approve' then
+  if p_action in ('approve', 'promote') then
     if before_row.visibility_status not in ('review', 'approved') then raise exception 'Only results awaiting client approval can be approved'; end if;
     if before_row.relationship_type <> 'owned' or not exists (
       select 1
@@ -205,7 +205,7 @@ begin
   if p_actor_user_id is null then raise exception 'Actor is required'; end if;
   perform public.canary_assert_social_reviewer(p_actor_user_id);
   if p_district_id is null then raise exception 'District is required'; end if;
-  if p_action <> 'approve_official' then raise exception 'Unsupported bulk social review action'; end if;
+  if p_action not in ('approve_official', 'promote') then raise exception 'Unsupported bulk social review action'; end if;
 
   select count(distinct selected.id)::integer into expected_count
   from unnest(coalesce(p_social_thread_ids, '{}'::uuid[])) as selected(id);
@@ -239,7 +239,7 @@ begin
   insert into public.social_review_batches (district_id, action, actor_user_id, item_count, criteria)
   values (
     p_district_id,
-    'bulk_approve_official',
+    case when p_action = 'promote' then 'promote' else 'bulk_approve_official' end,
     p_actor_user_id,
     expected_count,
     jsonb_build_object('social_thread_ids', p_social_thread_ids)

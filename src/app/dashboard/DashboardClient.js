@@ -2670,8 +2670,14 @@ function SocialView({ articles, socialThreads, socialSources, socialReviewEvents
   const reportFilterContext = [
     platformFilter !== 'all' ? `Platform: ${formatSourceLabel(platformFilter)}` : 'All platforms',
     relationshipFilter !== 'all' ? `Relationship: ${relationshipFilter}` : 'Owned official posts for reporting',
+    actionFilter !== 'all' ? `Action: ${actionFilter}` : null,
     mediaFilter !== 'all' ? `Content: ${mediaFilter}` : null,
     performanceFilter !== 'all' ? `Performance: ${performanceFilter}` : null,
+    minimumEngagementRate !== '' ? `Minimum engagement rate: ${minimumEngagementRate}%` : null,
+    maximumEngagementRate !== '' ? `Maximum engagement rate: ${maximumEngagementRate}%` : null,
+    socialDateStart || socialDateEnd ? `Feed dates: ${socialDateStart || 'Any start'} to ${socialDateEnd || 'Today'}` : null,
+    reviewStatusFilter !== 'all' ? `Review state: ${reviewStatusFilter}` : null,
+    socialSort !== 'newest' ? `Feed sort: ${socialSort}` : null,
     socialSearch ? `Search: “${socialSearch}”` : null,
   ].filter(Boolean).join(' · ');
   const pagedResults = visibleResults.slice(0, socialResultLimit);
@@ -2715,6 +2721,10 @@ function SocialView({ articles, socialThreads, socialSources, socialReviewEvents
   }
 
   function exportSocialPdf() {
+    if (districtFilter === 'All') {
+      setBulkReviewMessage('Choose one district before exporting a Social Report.');
+      return;
+    }
     setSocialReportMode(true);
     const restore = () => setSocialReportMode(false);
     window.addEventListener('afterprint', restore, { once: true });
