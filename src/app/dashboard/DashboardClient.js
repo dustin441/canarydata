@@ -2504,15 +2504,20 @@ function SocialPostPreviewCard({ result, source, rank = null, showContext = fals
 
 function SocialReportCard({ result, rank }) {
   const thumbnailUrl = safeSocialMediaUrl(result.mediaUrl);
+  const renderedThumbnailUrl = proxiedSocialMediaUrl(thumbnailUrl);
   const sourceUrl = safeSocialUrl(result.url);
   const [failedThumbnailUrl, setFailedThumbnailUrl] = useState('');
   const thumbnailAvailable = Boolean(thumbnailUrl && failedThumbnailUrl !== thumbnailUrl);
   return (
     <article className="social-report-card">
-      <div className="social-report-media">
+      <div className={`social-report-media${thumbnailAvailable ? ' has-thumbnail' : ''}`}>
         {thumbnailAvailable ? (
-          // eslint-disable-next-line @next/next/no-img-element -- remote social thumbnails are validated and proxied for print.
-          <img src={proxiedSocialMediaUrl(thumbnailUrl)} alt={result.headline || 'Official district social post'} onError={() => setFailedThumbnailUrl(thumbnailUrl)} />
+          <>
+            {/* eslint-disable-next-line @next/next/no-img-element -- decorative backdrop reuses the validated, proxied thumbnail. */}
+            <img className="social-report-media-backdrop" src={renderedThumbnailUrl} alt="" aria-hidden="true" />
+            {/* eslint-disable-next-line @next/next/no-img-element -- remote social thumbnails are validated and proxied for print. */}
+            <img className="social-report-media-image" src={renderedThumbnailUrl} alt={result.headline || 'Official district social post'} onError={() => setFailedThumbnailUrl(thumbnailUrl)} />
+          </>
         ) : (
           <div className="social-report-media-fallback"><strong>{thumbnailUrl ? 'Thumbnail unavailable' : 'Text-only post'}</strong><span>No safe thumbnail available</span></div>
         )}

@@ -250,6 +250,15 @@ for (const marker of ['Monthly Social Performance', 'Latest completed month', 'C
 }
 assert.match(dashboard, /const \[postTableSort, setPostTableSort\] = useState\('newest'\)/);
 assert.match(dashboard, /sortedPosts\.map/);
+assert.match(dashboard, /function SocialReportCard/);
+assert.match(dashboard, /social-report-media-backdrop/);
+assert.match(dashboard, /social-report-media-image/);
+assert.match(styles, /\.social-monthly-top-posts \.board-report-social \{ grid-template-columns: repeat\(2, minmax\(0, 1fr\)\); \}/);
+assert.match(styles, /\.social-monthly-top-posts \.social-report-card \{ grid-template-columns: minmax\(150px, 0\.42fr\) minmax\(0, 1fr\); \}/);
+assert.match(styles, /\.social-report-media-backdrop[\s\S]*object-fit: cover/);
+assert.match(styles, /\.social-report-media-image[\s\S]*object-fit: contain/);
+assert.match(styles, /@media print[\s\S]*\.social-monthly-top-posts \.social-report-card \{ grid-template-columns: minmax\(0, 1fr\); \}/);
+assert.match(styles, /@media print[\s\S]*\.social-report-media-backdrop \{ display: none; \}/);
 assert.match(dashboard, /Legacy approval\/card workspace intentionally removed from the rendered Social experience/);
 assert.match(dashboard, /function formatSocialComparison\(change\)[\s\S]*Intl\.NumberFormat\('en-US'/);
 assert.doesNotMatch(dashboard, /formatSocialComparison\(change\)[\s\S]{0,500}formatSocialMetric\(change\.absolute\)/);
@@ -306,7 +315,7 @@ assert.match(styles, /\.birdseye-report-controls[\s\S]*display: none !important/
 assert.match(styles, /\.birdseye-evidence-page[\s\S]*break-before: page/);
 assert.match(styles, /\.birdseye-evidence-table thead[\s\S]*display: table-header-group/);
 assert.match(styles, /\.birdseye-evidence-table \.headline-text,[\s\S]*-webkit-line-clamp: unset !important/);
-assert.match(styles, /\.board-report-social \.social-report-media img[\s\S]*object-fit: contain/);
+assert.match(styles, /\.board-report-social \.social-report-media-image[\s\S]*object-fit: contain/);
 assert.match(dashboard, /!listCompact && \(/);
 assert.match(data, /includeReview \? \['active', 'approved', 'review', 'excluded'\] : \['active'\]/);
 assert.match(data, /export async function getSocialReviewEvents/);

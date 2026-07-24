@@ -1284,7 +1284,9 @@ a:hover {
 .social-monthly-post-copy small { margin-top: 4px; color: var(--text-tertiary); font-weight: 500; }
 .social-monthly-post-table-wrap a { color: var(--brand-primary); font-weight: 800; text-decoration: none; }
 .social-platform-label { display: inline-flex; align-items: center; padding: 4px 8px; border-radius: 999px; background: var(--bg-card); color: var(--text-primary); font-size: 0.7rem; font-weight: 800; }
-.social-monthly-top-posts .board-report-social { grid-template-columns: repeat(3, minmax(0, 1fr)); }
+.social-monthly-top-posts .board-report-social { grid-template-columns: repeat(2, minmax(0, 1fr)); }
+.social-monthly-top-posts .social-report-card { grid-template-columns: minmax(150px, 0.42fr) minmax(0, 1fr); }
+.social-monthly-top-posts .social-report-media { min-height: 210px; height: auto; }
 
 .social-monthly-analyst-note { display: grid; gap: 10px; }
 .social-monthly-analyst-note textarea {
@@ -5119,8 +5121,19 @@ input[type="date"]::-webkit-calendar-picker-indicator {
 .birdseye-social-section { margin: 18px 0; }
 .board-report-social { display: grid; grid-template-columns: repeat(3, minmax(0, 1fr)); gap: 12px; margin-top: 12px; }
 .board-report-social .social-report-card { display: grid; min-width: 0; overflow: hidden; border: 1px solid var(--border-primary); border-radius: var(--radius-lg); background: var(--bg-card); }
-.board-report-social .social-report-media { height: 150px; overflow: hidden; background: var(--bg-elevated); }
-.board-report-social .social-report-media img { display: block; width: 100%; height: 100%; object-fit: contain; }
+.board-report-social .social-report-media { position: relative; isolation: isolate; height: 150px; overflow: hidden; background: var(--bg-elevated); }
+.board-report-social .social-report-media-backdrop {
+  position: absolute;
+  inset: -12px;
+  z-index: -1;
+  width: calc(100% + 24px);
+  height: calc(100% + 24px);
+  object-fit: cover;
+  filter: blur(10px) saturate(0.82);
+  transform: scale(1.08);
+  opacity: 0.72;
+}
+.board-report-social .social-report-media-image { position: relative; display: block; width: 100%; height: 100%; object-fit: contain; }
 .board-report-social .social-report-media-fallback { display: flex; height: 100%; align-items: center; justify-content: center; flex-direction: column; color: var(--text-secondary); }
 .board-report-social .social-report-card-copy { display: grid; gap: 7px; padding: 12px; }
 .board-report-social .social-report-card-copy p { margin: 0; color: var(--text-secondary); font-size: 0.76rem; line-height: 1.45; }
@@ -5129,6 +5142,12 @@ input[type="date"]::-webkit-calendar-picker-indicator {
 @media (max-width: 900px) {
   .birdseye-report-header { grid-template-columns: 1fr; }
   .board-report-social { grid-template-columns: 1fr; }
+  .social-monthly-top-posts .social-report-card { grid-template-columns: minmax(140px, 0.4fr) minmax(0, 1fr); }
+}
+
+@media (max-width: 560px) {
+  .social-monthly-top-posts .social-report-card { grid-template-columns: minmax(0, 1fr); }
+  .social-monthly-top-posts .social-report-media { min-height: 170px; height: 170px; }
 }
 
 @media print {
@@ -5654,8 +5673,11 @@ input[type="date"]::-webkit-calendar-picker-indicator {
   .board-report-section { margin-top: 14px; }
   .board-report-section h2 { margin: 0 0 10px; font-size: 17px; }
   .board-report-social article { display: grid; gap: 0; padding: 0; overflow: hidden; }
+  .social-monthly-top-posts .social-report-card { grid-template-columns: minmax(0, 1fr); }
+  .social-monthly-top-posts .social-report-media { min-height: 0; }
   .board-report-social .social-report-media { height: 90px; overflow: hidden; background: #f1f5f9 !important; }
-  .board-report-social .social-report-media img { display: block; width: 100%; height: 100%; object-fit: contain; }
+  .board-report-social .social-report-media-backdrop { display: none; }
+  .board-report-social .social-report-media-image { display: block; width: 100%; height: 100%; object-fit: contain; }
   .board-report-social .social-report-media-fallback { display: flex; height: 100%; align-items: center; justify-content: center; flex-direction: column; color: #475569 !important; }
   .board-report-social .social-report-card-copy { display: grid; gap: 6px; padding: 10px; }
   .board-report-social strong { font-size: 11px; }
