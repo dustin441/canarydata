@@ -2,8 +2,8 @@
 -- Review this migration in Supabase SQL Editor before applying.
 begin;
 
-alter table public.social_threads
-  alter column visibility_status set default 'active';
+-- The database default remains review-safe for unclassified/public records.
+-- Application ingestion explicitly sets verified owned posts active.
 
 -- Existing verified official posts become report eligible automatically.
 update public.social_threads thread

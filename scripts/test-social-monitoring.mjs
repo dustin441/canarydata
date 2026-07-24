@@ -259,6 +259,20 @@ assert.equal(batch.threads.length, 1);
 assert.equal(batch.rejected.length, 1);
 assert.equal(batch.threads[0].provider, 'meta');
 assert.equal(batch.threads[0].district_id, 'alabaster-city-schools');
+assert.equal(batch.threads[0].visibility_status, 'review', 'non-owned public content must remain review-only by default');
+const ownedBatch = normalizeProviderBatch({
+  provider: 'meta',
+  districtId: 'alabaster-city-schools',
+  items: [{
+    platform: 'facebook',
+    external_thread_id: 'owned-123',
+    canonical_url: 'https://www.facebook.com/example/posts/owned-123',
+    relationship_type: 'owned',
+    published_at: '2026-07-18T12:00:00Z',
+    body: 'Official district post.',
+  }],
+});
+assert.equal(ownedBatch.threads[0].visibility_status, 'review', 'normalization alone cannot verify an official account');
 assert.deepEqual(batch.threads[0].provider_metadata.metric_availability, {
   reactions: false, comments: false, shares: false, views: false,
 });

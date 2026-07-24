@@ -62,9 +62,11 @@ async function run() {
   const accounts = await supabaseRequest(
     env,
     'GET',
-    `social_accounts?district_id=eq.${encodeURIComponent(args.district)}&active=eq.true&select=id,platform`,
+    `social_accounts?district_id=eq.${encodeURIComponent(args.district)}&active=eq.true&select=id,platform,handle,profile_url`,
   );
-  const accountByPlatform = new Map(accounts.map((account) => [account.platform, account.id]));
+  const accountByPlatform = new Map(accounts
+    .filter((account) => String(account.handle || '').trim() || String(account.profile_url || '').trim())
+    .map((account) => [account.platform, account.id]));
   const [runRecord] = await supabaseRequest(env, 'POST', 'social_collection_runs', {
     district_id: args.district,
     provider: batch.provider,
@@ -91,7 +93,9 @@ async function run() {
         {
           ...thread,
           social_account_id: accountByPlatform.get(thread.platform) || null,
-          visibility_status: 'active',
+          visibility_status: thread.relationship_type === 'owned' && accountByPlatform.has(thread.platform)
+            ? 'active'
+            : (thread.visibility_status === 'excluded' ? 'excluded' : 'review'),
           last_seen_at: completedAt(),
           provider_metadata: { ...thread.provider_metadata, pilot_ingestion: true },
         },
@@ -100,9 +104,13 @@ async function run() {
       stored.push(record);
     }
 
+    const activeThreads = stored.filter((thread) => thread.visibility_status === 'active').length;
+    const reviewThreads = stored.filter((thread) => thread.visibility_status === 'review').length;
     const diagnostics = {
       pilot: true,
-      review_only: true,
+      visibility_policy: 'verified owned posts auto-active; non-owned public records remain review-only',
+      active_threads: activeThreads,
+      review_threads: reviewThreads,
       rejected: batch.rejected,
       stored_thread_ids: stored.map((thread) => thread.id),
     };
@@ -125,7 +133,7 @@ async function run() {
       acceptedThreads: stored.length,
       duplicateItems: duplicates,
       rejectedItems: batch.rejected.length,
-      visibilityStatus: 'active',
+      visibilityStatuses: stored.reduce((counts, thread) => ({ ...counts, [thread.visibility_status]: (counts[thread.visibility_status] || 0) + 1 }), {}),
       threadIds: stored.map((thread) => thread.id),
     }, null, 2));
   } catch (error) {
@@ -138,7 +146,7 @@ async function run() {
       provider_errors: Math.max(1, batch.providerErrors),
       error_code: error.code || 'STORAGE_ERROR',
       error_message: error.message,
-      diagnostics: { pilot: true, review_only: true, rejected: batch.rejected },
+      diagnostics: { pilot: true, visibility_policy: 'verified owned posts auto-active; non-owned public records remain review-only', rejected: batch.rejected },
     }, 'return=minimal');
     throw error;
   }
