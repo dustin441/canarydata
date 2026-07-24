@@ -26,6 +26,11 @@ assert.match(actions, /canary_restore_story/);
 
 const data = await readFile(new URL('../src/lib/data.js', import.meta.url), 'utf8');
 assert.match(data, /\.eq\('visibility_status', 'active'\)/);
+assert.match(
+  data,
+  /\.order\('date', \{ ascending: false \}\)\s*\.order\('id', \{ ascending: true \}\)\s*\.range\(/,
+  'Paginated article reads need a stable id tie-breaker so admin and client district counts stay identical',
+);
 
 const dashboard = await readFile(new URL('../src/app/dashboard/DashboardClient.js', import.meta.url), 'utf8');
 assert.match(dashboard, /canary_columns_v3/);

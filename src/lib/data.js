@@ -13,6 +13,7 @@ export async function getArticles(districtId = null) {
       .select(ARTICLE_COLUMNS)
       .eq('visibility_status', 'active')
       .order('date', { ascending: false })
+      .order('id', { ascending: true })
       .range(from, from + ARTICLE_PAGE_SIZE - 1);
 
     if (districtId) {
