@@ -9,7 +9,7 @@ import { createEmbeddedCanaryCheckout, confirmEmbeddedCanaryCheckout, saveBillin
 import { compareStrategicAlignmentRows } from '@/lib/strategicAlignmentSort.mjs';
 import { CORE_TAGS, canonicalTags } from '@/lib/canonicalTags.mjs';
 import { buildSocialResults, calculateSocialEngagementRate, rankTopSocialResults, resolveSocialFollowerCount, safeSocialMediaUrl, safeSocialUrl, socialActionFilterMatches, socialDateFilterMatches, socialRelationshipFilterMatches, summarizeSocialActions, summarizeSocialResults } from '@/lib/social.mjs';
-import { dateInputValue, groupTopReportPostsByPlatform, isEligibleSocialReportPost, neutralizeSpreadsheetFormula, resolveSocialReportWindow, selectOfficialSocialReportPosts, socialReportInteractionTotal, socialReportMetricValue, sortSocialReportDetails, summarizeSocialReport } from '@/lib/socialReport.mjs';
+import { calculateSocialMetricChange, dateInputValue, groupTopReportPostsByPlatform, isEligibleSocialReportPost, neutralizeSpreadsheetFormula, rankSocialReportTopPerformers, resolveSocialReportComparisonWindow, resolveSocialReportWindow, selectOfficialSocialReportPosts, socialReportInteractionTotal, socialReportMetricValue, summarizeSocialContentFormats, summarizeSocialReport } from '@/lib/socialReport.mjs';
 import { formatDisplayDate } from '@/lib/date.mjs';
 import { CUSTOMER_SEARCH_QUERY_LIMIT, activeNewsQueryCount } from '@/lib/queryPolicy.mjs';
 import { buildCommunicationsBrief, formatCommunicationsBriefRecommendation } from '@/lib/communicationsBrief.mjs';
@@ -2590,10 +2590,9 @@ function SocialReportTable({ results, ranked = false }) {
   );
 }
 
-function SocialReportView({ districtName, reportWindow, filterContext, posts }) {
+function SocialReportView({ districtName, reportWindow, filterContext, posts, analystNote }) {
   const summary = summarizeSocialReport(posts);
   const topPerformerGroups = groupTopReportPostsByPlatform(posts, 3);
-  const detailPosts = sortSocialReportDetails(posts);
   const platformBreakdown = summary.platformBreakdown.map(({ platform, count }) => `${formatSourceLabel(platform)} ${count}`).join(' · ');
   const interactionCoverage = `Any interaction metric available for ${summary.interactionsAvailable} of ${summary.officialPosts} posts`;
   const interactionMetricCoverage = `Reactions ${summary.reactionsCoverage.available}/${summary.reactionsCoverage.total} · Comments ${summary.commentsCoverage.available}/${summary.commentsCoverage.total} · Shares ${summary.sharesCoverage.available}/${summary.sharesCoverage.total}`;
@@ -2614,6 +2613,7 @@ function SocialReportView({ districtName, reportWindow, filterContext, posts }) 
         <article><span>Reported views</span><strong>{summary.reportedViews === null ? 'Not available' : formatSocialMetric(summary.reportedViews)}</strong><small>{viewCoverage}</small></article>
         <article><span>Platforms</span><strong>{summary.platformCount || 'Not available'}</strong><small>{platformBreakdown || 'No platform data available'}</small></article>
       </section>
+      {analystNote?.trim() && <section className="social-report-section social-report-analyst-note"><div className="social-report-section-heading"><h2>Social Media Brief</h2><p>Human-reviewed context for leadership and board discussion.</p></div><p>{analystNote.trim()}</p></section>}
       {posts.length ? (
         <>
           <section className="social-report-section social-report-top-performers">
@@ -2625,14 +2625,10 @@ function SocialReportView({ districtName, reportWindow, filterContext, posts }) 
               </section>
             ))}
           </section>
-          <section className={`social-report-section social-report-detail${posts.length > 5 ? ' social-report-detail-new-page' : ''}`}>
-            <div className="social-report-section-heading"><h2>Official Post Detail</h2><p>Complete detail for every eligible post in this report period.</p></div>
-            <SocialReportTable results={detailPosts} />
-            <aside className="social-report-data-notes">
-              <strong>Data notes</strong>
-              <span>“Not available” means the source did not supply that metric. Reported views are platform-provided views, not unique reach. Public interactions include available reactions, comments, replies, and shares.</span>
-            </aside>
-          </section>
+          <aside className="social-report-data-notes">
+            <strong>Data notes</strong>
+            <span>This concise report includes leadership highlights only. The CSV contains complete post-level evidence. “Not available” means the source did not supply that metric. Reported views are platform-provided views, not unique reach.</span>
+          </aside>
         </>
       ) : (
         <aside className="social-report-empty">
@@ -2688,6 +2684,112 @@ function BoardReportView({ districtId, districtName, articles, socialThreads, so
   );
 }
 
+function formatSocialComparison(change) {
+  if (!change) return 'Not available';
+  const prefix = change.absolute > 0 ? '+' : '';
+  if (change.percent === null) return `${prefix}${formatSocialMetric(change.absolute)} · no prior baseline`;
+  const percentPrefix = change.percent > 0 ? '+' : '';
+  return `${prefix}${formatSocialMetric(change.absolute)} · ${percentPrefix}${change.percent.toFixed(0)}%`;
+}
+
+function MonthlySocialPerformance({
+  districtName,
+  period,
+  setPeriod,
+  customStart,
+  setCustomStart,
+  customEnd,
+  setCustomEnd,
+  reportWindow,
+  comparisonWindow,
+  posts,
+  previousPosts,
+  analystNote,
+  setAnalystNote,
+  campaignSearch,
+  setCampaignSearch,
+  onExportPdf,
+  onExportCsv,
+}) {
+  const summary = summarizeSocialReport(posts);
+  const previousSummary = summarizeSocialReport(previousPosts);
+  const contentFormats = summarizeSocialContentFormats(posts);
+  const topPosts = rankSocialReportTopPerformers(posts, 6);
+  const platforms = [...new Set(posts.map((post) => post.platform).filter(Boolean))].map((platform) => {
+    const platformPosts = posts.filter((post) => post.platform === platform);
+    return { platform, ...summarizeSocialReport(platformPosts) };
+  }).sort((a, b) => b.officialPosts - a.officialPosts || a.platform.localeCompare(b.platform));
+  const comparisons = {
+    posts: calculateSocialMetricChange(summary.officialPosts, previousSummary.officialPosts),
+    interactions: calculateSocialMetricChange(summary.totalInteractions, previousSummary.totalInteractions),
+    views: calculateSocialMetricChange(summary.reportedViews, previousSummary.reportedViews),
+  };
+
+  return (
+    <section className="social-monthly-performance" id="social-monthly-performance" aria-label="Monthly Social Performance">
+      <header className="social-monthly-header">
+        <div>
+          <span className="social-eyebrow">Monthly reporting</span>
+          <h2>{districtName} Social Performance</h2>
+          <p>Official district posts, month-over-month context, top content, and leadership-ready reporting. Unavailable platform metrics remain explicitly unavailable.</p>
+        </div>
+        <div className="social-monthly-actions">
+          <button type="button" className="btn btn-secondary btn-sm" onClick={onExportCsv}>Export underlying CSV</button>
+          <button type="button" className="btn btn-primary btn-sm" onClick={onExportPdf}>Export monthly PDF</button>
+        </div>
+      </header>
+
+      <div className="social-monthly-controls">
+        <label><span>Reporting period</span><select value={period} onChange={(event) => setPeriod(event.target.value)}>
+          <option value="previous-month">Latest completed month</option>
+          <option value="this-month">Current month to date</option>
+          <option value="last-30-days">Last 30 days</option>
+          <option value="school-year">Current school year</option>
+          <option value="calendar-year">Current calendar year</option>
+          <option value="custom">Custom range</option>
+        </select></label>
+        <label className="social-monthly-campaign-search"><span>Campaign or topic</span><input value={campaignSearch} onChange={(event) => setCampaignSearch(event.target.value)} placeholder="Example: kindergarten registration" /></label>
+        <div className="social-monthly-period-label"><span>Current report</span><strong>{reportWindow.label}</strong><small>{reportWindow.startInput} to {reportWindow.endInput}</small></div>
+        <div className="social-monthly-period-label"><span>Comparison</span><strong>{comparisonWindow.label}</strong><small>{comparisonWindow.startInput} to {comparisonWindow.endInput}</small></div>
+      </div>
+      {period === 'custom' && <div className="social-top-custom-range"><label><span>From</span><input type="date" value={customStart} max={customEnd || reportWindow.endInput} onChange={(event) => setCustomStart(event.target.value)} /></label><label><span>To</span><input type="date" value={customEnd} min={customStart || undefined} max={dateInputValue(new Date())} onChange={(event) => setCustomEnd(event.target.value)} /></label></div>}
+
+      <div className="social-monthly-kpis" aria-label="Monthly Social scorecards">
+        <article><span>Official posts</span><strong>{summary.officialPosts}</strong><small>{formatSocialComparison(comparisons.posts)} vs. prior period</small></article>
+        <article><span>Reported interactions</span><strong>{summary.totalInteractions === null ? 'Not available' : formatSocialMetric(summary.totalInteractions)}</strong><small>{formatSocialComparison(comparisons.interactions)} vs. prior period · available for {summary.interactionsAvailable}/{summary.officialPosts}</small></article>
+        <article><span>Average interactions</span><strong>{summary.averageInteractions === null ? 'Not available' : formatSocialMetric(summary.averageInteractions)}</strong><small>Based only on posts with available interaction metrics</small></article>
+        <article><span>Reported views</span><strong>{summary.reportedViews === null ? 'Not available' : formatSocialMetric(summary.reportedViews)}</strong><small>{formatSocialComparison(comparisons.views)} vs. prior period · available for {summary.viewsCoverage.available}/{summary.viewsCoverage.total}</small></article>
+        <article className="pending-meta"><span>Impressions / reach</span><strong>Not available</strong><small>Requires an authorized Meta account connection</small></article>
+        <article className="pending-meta"><span>Net follower growth</span><strong>Not available</strong><small>Requires daily official-account snapshots</small></article>
+      </div>
+
+      <div className="social-monthly-analysis-grid">
+        <section>
+          <div className="social-monthly-section-heading"><h3>Platform performance</h3><p>Post-level metrics currently available from verified official sources.</p></div>
+          <div className="social-monthly-table-wrap"><table><thead><tr><th>Platform</th><th>Posts</th><th>Interactions</th><th>Avg. interactions</th><th>Views</th></tr></thead><tbody>{platforms.length ? platforms.map((row) => <tr key={row.platform}><td>{formatSourceLabel(row.platform)}</td><td>{row.officialPosts}</td><td>{row.totalInteractions === null ? 'N/A' : formatSocialMetric(row.totalInteractions)}</td><td>{row.averageInteractions === null ? 'N/A' : formatSocialMetric(row.averageInteractions)}</td><td>{row.reportedViews === null ? 'N/A' : formatSocialMetric(row.reportedViews)}</td></tr>) : <tr><td colSpan={5}>No official posts are available for this period.</td></tr>}</tbody></table></div>
+        </section>
+        <section>
+          <div className="social-monthly-section-heading"><h3>Content format</h3><p>Use this to compare video, imagery, and text/link publishing patterns.</p></div>
+          <div className="social-monthly-table-wrap"><table><thead><tr><th>Format</th><th>Posts</th><th>Interactions</th><th>Avg. interactions</th></tr></thead><tbody>{contentFormats.length ? contentFormats.map((row) => <tr key={row.format}><td>{row.format}</td><td>{row.posts}</td><td>{row.totalInteractions === null ? 'N/A' : formatSocialMetric(row.totalInteractions)}</td><td>{row.averageInteractions === null ? 'N/A' : formatSocialMetric(row.averageInteractions)}</td></tr>) : <tr><td colSpan={4}>No content-format rows are available.</td></tr>}</tbody></table></div>
+        </section>
+      </div>
+
+      <section className="social-monthly-top-posts">
+        <div className="social-monthly-section-heading"><h3>Leadership highlights</h3><p>Top six official posts, ranked by available public interactions. These are the posts included in the concise monthly conversation.</p></div>
+        {topPosts.length ? <div className="board-report-social">{topPosts.map((post, index) => <SocialReportCard key={post.id} result={post} rank={index + 1} />)}</div> : <div className="social-empty-inline">No report-eligible official posts match this period and campaign filter.</div>}
+      </section>
+
+      <section className="social-monthly-analyst-note">
+        <div><h3>Social Media Brief</h3><p>Add the context a superintendent or board member needs. This human-reviewed note appears in the monthly PDF.</p></div>
+        <textarea value={analystNote} onChange={(event) => setAnalystNote(event.target.value)} maxLength={2000} placeholder="Example: This month we focused on kindergarten registration and staff back-to-school preparation. The highlighted posts show how those priorities performed and what we plan to carry forward." />
+        <small>{analystNote.length}/2,000 characters · Draft is local to this browser until report archiving is added.</small>
+      </section>
+
+      <aside className="social-monthly-data-readiness"><strong>Data readiness</strong><span>Current reporting uses verified official posts and public metrics. Direct Meta connection is the next data release for impressions, reach, follower growth, and more reliable account-level reporting.</span></aside>
+    </section>
+  );
+}
+
 function SocialView({ articles, socialThreads, socialSources, socialReviewEvents = [], districtFilter, districts, isAdmin = false }) {
   const [relationshipFilter, setRelationshipFilter] = useState('all');
   const [actionFilter, setActionFilter] = useState('all');
@@ -2708,8 +2810,9 @@ function SocialView({ articles, socialThreads, socialSources, socialReviewEvents
   const [bulkReviewMessage, setBulkReviewMessage] = useState('');
   const [sourcesOpen, setSourcesOpen] = useState(false);
   const [socialReportMode, setSocialReportMode] = useState(false);
+  const [socialAnalystNote, setSocialAnalystNote] = useState('');
   const [topPostsAsOf] = useState(() => Date.now());
-  const [topPostsPeriod, setTopPostsPeriod] = useState('last-30-days');
+  const [topPostsPeriod, setTopPostsPeriod] = useState('previous-month');
   const [topPostsCustomStart, setTopPostsCustomStart] = useState('');
   const [topPostsCustomEnd, setTopPostsCustomEnd] = useState('');
   const scopedRecords = useMemo(() => {
@@ -2726,6 +2829,10 @@ function SocialView({ articles, socialThreads, socialSources, socialReviewEvents
   const summary = useMemo(() => summarizeSocialResults(results), [results]);
   const topPostsWindow = useMemo(
     () => resolveSocialReportWindow(topPostsPeriod, topPostsAsOf, topPostsCustomStart, topPostsCustomEnd),
+    [topPostsPeriod, topPostsAsOf, topPostsCustomStart, topPostsCustomEnd],
+  );
+  const comparisonPostsWindow = useMemo(
+    () => resolveSocialReportComparisonWindow(topPostsPeriod, topPostsAsOf, topPostsCustomStart, topPostsCustomEnd),
     [topPostsPeriod, topPostsAsOf, topPostsCustomStart, topPostsCustomEnd],
   );
   const topPlatformGroups = useMemo(() => {
@@ -2812,6 +2919,11 @@ function SocialView({ articles, socialThreads, socialSources, socialReviewEvents
     () => visibleResults.filter((result) => isEligibleSocialReportPost(result, topPostsWindow)
       && verifiedOfficialSourceKeys.has(`${result.socialAccountId}:${result.districtId}:${result.platform}`)),
     [visibleResults, topPostsWindow, verifiedOfficialSourceKeys],
+  );
+  const previousSocialReportPosts = useMemo(
+    () => visibleResults.filter((result) => isEligibleSocialReportPost(result, comparisonPostsWindow)
+      && verifiedOfficialSourceKeys.has(`${result.socialAccountId}:${result.districtId}:${result.platform}`)),
+    [visibleResults, comparisonPostsWindow, verifiedOfficialSourceKeys],
   );
   const reportDistrictName = districtFilter === 'All'
     ? 'All Districts'
@@ -2921,13 +3033,33 @@ function SocialView({ articles, socialThreads, socialSources, socialReviewEvents
           reportWindow={reportPeriod}
           filterContext={reportFilterContext}
           posts={socialReportPosts}
+          analystNote={socialAnalystNote}
         />
       )}
+      <MonthlySocialPerformance
+        districtName={reportDistrictName}
+        period={topPostsPeriod}
+        setPeriod={setTopPostsPeriod}
+        customStart={topPostsCustomStart}
+        setCustomStart={setTopPostsCustomStart}
+        customEnd={topPostsCustomEnd}
+        setCustomEnd={setTopPostsCustomEnd}
+        reportWindow={topPostsWindow}
+        comparisonWindow={comparisonPostsWindow}
+        posts={socialReportPosts}
+        previousPosts={previousSocialReportPosts}
+        analystNote={socialAnalystNote}
+        setAnalystNote={setSocialAnalystNote}
+        campaignSearch={socialSearch}
+        setCampaignSearch={(value) => changeSocialFilter(setSocialSearch, value)}
+        onExportPdf={exportSocialPdf}
+        onExportCsv={exportSocialCsv}
+      />
       <section className="social-monitor-hero">
         <div>
-          <span className="social-eyebrow">Social review workspace</span>
-          <h2>Review what matters, then decide what to do</h2>
-          <p>Start with recent mentions or period-based top posts. Canary keeps recommendations review-only and links every result to the original public post.</p>
+          <span className="social-eyebrow">Posts and public monitoring</span>
+          <h2>Explore the complete Social evidence</h2>
+          <p>Use the workspace below for post-level review, public mentions, and administrative corrections. Monthly Performance above is the customer-facing reporting view.</p>
           <nav className="social-workflow-links" aria-label="Social review shortcuts">
             <a href="#social-results">Review recent results</a>
             <a href="#social-top-posts">See top posts</a>

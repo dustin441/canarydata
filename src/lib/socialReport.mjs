@@ -36,6 +36,50 @@ export function resolveSocialReportWindow(period, asOf, customStart = '', custom
   return { start, end: rangeEnd, label, startInput: dateInputValue(start), endInput: dateInputValue(rangeEnd) };
 }
 
+function endOfUtcDay(year, month, day) {
+  return new Date(Date.UTC(year, month, day, 23, 59, 59, 999));
+}
+
+export function resolveSocialReportComparisonWindow(period, asOf, customStart = '', customEnd = '') {
+  const current = resolveSocialReportWindow(period, asOf, customStart, customEnd);
+  const end = new Date(asOf);
+  let start;
+  let rangeEnd;
+  let label = `Previous period before ${current.label.toLowerCase()}`;
+
+  if (period === 'this-month') {
+    const previousMonthStart = new Date(Date.UTC(end.getUTCFullYear(), end.getUTCMonth() - 1, 1));
+    const previousMonthLastDay = new Date(Date.UTC(end.getUTCFullYear(), end.getUTCMonth(), 0)).getUTCDate();
+    const comparisonDay = Math.min(end.getUTCDate(), previousMonthLastDay);
+    start = previousMonthStart;
+    rangeEnd = endOfUtcDay(previousMonthStart.getUTCFullYear(), previousMonthStart.getUTCMonth(), comparisonDay);
+    label = `Previous month through day ${comparisonDay}`;
+  } else if (period === 'previous-month') {
+    const selectedMonthStart = current.start;
+    start = new Date(Date.UTC(selectedMonthStart.getUTCFullYear(), selectedMonthStart.getUTCMonth() - 1, 1));
+    rangeEnd = new Date(Date.UTC(selectedMonthStart.getUTCFullYear(), selectedMonthStart.getUTCMonth(), 1) - 1);
+    label = start.toLocaleDateString('en-US', { month: 'long', year: 'numeric', timeZone: 'UTC' });
+  } else {
+    const duration = current.end.getTime() - current.start.getTime();
+    rangeEnd = new Date(current.start.getTime() - 1);
+    start = new Date(rangeEnd.getTime() - duration);
+  }
+
+  return { start, end: rangeEnd, label, startInput: dateInputValue(start), endInput: dateInputValue(rangeEnd) };
+}
+
+export function calculateSocialMetricChange(current, previous) {
+  if (current === null || current === undefined || previous === null || previous === undefined) return null;
+  const currentNumber = Number(current);
+  const previousNumber = Number(previous);
+  if (!Number.isFinite(currentNumber) || !Number.isFinite(previousNumber)) return null;
+  const absolute = currentNumber - previousNumber;
+  return {
+    absolute,
+    percent: previousNumber === 0 ? null : (absolute / Math.abs(previousNumber)) * 100,
+  };
+}
+
 const INTERACTION_METRICS = [
   ['reactions', 'reactionCount'],
   ['comments', 'commentCount'],
@@ -159,6 +203,32 @@ export function summarizeSocialReport(results) {
     platformBreakdown,
     topPlatform: platformBreakdown[0]?.platform || null,
   };
+}
+
+export function summarizeSocialContentFormats(results) {
+  const order = ['Video / Reel', 'Image / Photo', 'Text / Link'];
+  const groups = new Map(order.map((format) => [format, []]));
+  for (const result of results || []) {
+    const format = result?.mediaType === 'video' || Number(result?.providerMetadata?.duration_seconds) > 0
+      ? 'Video / Reel'
+      : result?.mediaUrl
+        ? 'Image / Photo'
+        : 'Text / Link';
+    groups.get(format).push(result);
+  }
+  return order.map((format) => {
+    const posts = groups.get(format);
+    const interactionTotals = posts.map(socialReportInteractionTotal).filter((value) => value !== null);
+    return {
+      format,
+      posts: posts.length,
+      totalInteractions: interactionTotals.length ? interactionTotals.reduce((sum, value) => sum + value, 0) : null,
+      averageInteractions: interactionTotals.length
+        ? interactionTotals.reduce((sum, value) => sum + value, 0) / interactionTotals.length
+        : null,
+      interactionsAvailable: interactionTotals.length,
+    };
+  }).filter((row) => row.posts > 0);
 }
 
 export function groupTopReportPostsByPlatform(results, limitPerPlatform = 3) {

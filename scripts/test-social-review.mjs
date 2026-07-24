@@ -2,6 +2,8 @@ import assert from 'node:assert/strict';
 import { readFile } from 'node:fs/promises';
 import { normalizeSocialResult } from '../src/lib/social.mjs';
 import {
+  calculateSocialMetricChange,
+  resolveSocialReportComparisonWindow,
   resolveSocialReportWindow,
   groupTopReportPostsByPlatform,
   isEligibleSocialReportPost,
@@ -11,6 +13,7 @@ import {
   selectOfficialSocialReportPosts,
   socialReportMetricValue,
   sortSocialReportDetails,
+  summarizeSocialContentFormats,
   summarizeSocialReport,
 } from '../src/lib/socialReport.mjs';
 
@@ -51,6 +54,15 @@ const schoolYearAfterBoundary = resolveSocialReportWindow('school-year', Date.UT
 assert.equal(schoolYearAfterBoundary.startInput, '2026-07-15');
 const schoolYearBeforeBoundary = resolveSocialReportWindow('school-year', Date.UTC(2026, 6, 14));
 assert.equal(schoolYearBeforeBoundary.startInput, '2025-07-15');
+const completedMonth = resolveSocialReportWindow('previous-month', Date.UTC(2026, 6, 24));
+const completedMonthComparison = resolveSocialReportComparisonWindow('previous-month', Date.UTC(2026, 6, 24));
+assert.deepEqual([completedMonth.startInput, completedMonth.endInput], ['2026-06-01', '2026-06-30']);
+assert.deepEqual([completedMonthComparison.startInput, completedMonthComparison.endInput], ['2026-05-01', '2026-05-31']);
+const monthToDateComparison = resolveSocialReportComparisonWindow('this-month', Date.UTC(2026, 6, 24, 18));
+assert.deepEqual([monthToDateComparison.startInput, monthToDateComparison.endInput], ['2026-06-01', '2026-06-24']);
+assert.deepEqual(calculateSocialMetricChange(12, 10), { absolute: 2, percent: 20 });
+assert.deepEqual(calculateSocialMetricChange(3, 0), { absolute: 3, percent: null });
+assert.equal(calculateSocialMetricChange(null, 10), null);
 
 const reportWindow = {
   start: new Date('2026-07-01T00:00:00.000Z'),
@@ -133,6 +145,15 @@ assert.deepEqual(reportSummary.platformBreakdown, [
   { platform: 'instagram', count: 2 },
 ]);
 assert.equal(reportSummary.topPlatform, 'facebook');
+assert.deepEqual(summarizeSocialContentFormats([
+  { ...eligibleReportPosts[0], mediaType: 'video' },
+  { ...eligibleReportPosts[1], mediaUrl: 'https://cdninstagram.com/a.jpg' },
+  { ...eligibleReportPosts[3], mediaType: null, mediaUrl: '' },
+]).map(({ format, posts, totalInteractions }) => ({ format, posts, totalInteractions })), [
+  { format: 'Video / Reel', posts: 1, totalInteractions: 25 },
+  { format: 'Image / Photo', posts: 1, totalInteractions: 13 },
+  { format: 'Text / Link', posts: 1, totalInteractions: null },
+]);
 const unavailableSummary = summarizeSocialReport([eligibleReportPosts.find((post) => post.id === 'fb-no-metrics')]);
 assert.equal(unavailableSummary.totalInteractions, null);
 assert.equal(unavailableSummary.averageInteractions, null);
@@ -205,7 +226,8 @@ for (const marker of [
   'Reported views',
   'Available for',
   'Top Performers',
-  'Official Post Detail',
+  'Social Media Brief',
+  'leadership highlights only',
   'Not available',
 ]) {
   assert.ok(socialReportSource.includes(marker), `Social Report must include ${marker}`);
@@ -216,6 +238,15 @@ assert.match(socialReportSource, /ranked \? 'Rank' : 'Row'/);
 assert.match(socialReportSource, /topPerformerGroups\.map/);
 assert.match(socialReportSource, /<SocialReportTable results=\{group\.posts\} ranked \/>/);
 assert.doesNotMatch(socialReportSource, /news|evidence appendix|Strategic Alignment/i);
+assert.doesNotMatch(socialReportSource, /Official Post Detail|Complete detail for every eligible post/);
+for (const marker of ['Monthly Social Performance', 'Latest completed month', 'Campaign or topic', 'Platform performance', 'Content format', 'Leadership highlights', 'Social Media Brief', 'Requires an authorized Meta account connection']) {
+  assert.ok(dashboard.includes(marker), `Monthly Social Performance must include ${marker}`);
+}
+assert.match(dashboard, /useState\('previous-month'\)/);
+assert.match(dashboard, /resolveSocialReportComparisonWindow\(topPostsPeriod/);
+assert.match(dashboard, /previousSocialReportPosts/);
+assert.match(dashboard, /analystNote=\{socialAnalystNote\}/);
+assert.match(dashboard, /This concise report includes leadership highlights only\. The CSV contains complete post-level evidence/);
 assert.match(dashboard, /function SocialReportView/);
 assert.match(dashboard, /visibleResults\.filter\(\(result\) => isEligibleSocialReportPost\(result, topPostsWindow\)[\s\S]*verifiedOfficialSourceKeys\.has/);
 assert.match(dashboard, /reportPeriod = `\$\{topPostsWindow\.label\}/);
