@@ -3012,7 +3012,11 @@ input[type="date"]::-webkit-calendar-picker-indicator {
   .social-monthly-controls,
   .social-monthly-kpis,
   .social-monthly-analysis-grid,
-  .social-monthly-top-posts .board-report-social { grid-template-columns: 1fr; }
+  .social-monthly-top-posts .board-report-social { grid-template-columns: minmax(0, 1fr); }
+  .social-monthly-controls > *,
+  .social-monthly-kpis > *,
+  .social-monthly-analysis-grid > *,
+  .social-monthly-top-posts .board-report-social > * { min-width: 0; }
   .social-monthly-data-readiness { flex-direction: column; }
 
   .social-summary-grid {
