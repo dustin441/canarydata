@@ -112,7 +112,7 @@ declare
 begin
   if p_actor_user_id is null then raise exception 'Actor is required'; end if;
   perform public.canary_assert_social_reviewer(p_actor_user_id);
-  if p_action not in ('approve', 'exclude', 'restore', 'classification', 'note', 'promote') then
+  if p_action not in ('approve', 'exclude', 'restore', 'classification', 'note') then
     raise exception 'Unsupported social review action';
   end if;
   if p_action = 'classification' and p_classification not in ('owned', 'direct_tag', 'direct_mention', 'ambient') then
@@ -132,9 +132,18 @@ begin
   end if;
 
   if p_action = 'approve' then
-    if before_row.visibility_status <> 'review' then raise exception 'Only review results can be approved'; end if;
+    if before_row.visibility_status not in ('review', 'approved') then raise exception 'Only results awaiting client approval can be approved'; end if;
+    if before_row.relationship_type <> 'owned' or not exists (
+      select 1
+      from public.social_accounts account
+      where account.id = before_row.social_account_id
+        and account.district_id = before_row.district_id
+        and account.platform = before_row.platform
+        and account.active = true
+        and (nullif(btrim(account.handle), '') is not null or nullif(btrim(account.profile_url), '') is not null)
+    ) then raise exception 'Approval is limited to verified official district posts'; end if;
     update public.social_threads
-      set visibility_status = 'approved', reviewed_at = now(), reviewed_by = p_actor_user_id,
+      set visibility_status = 'active', reviewed_at = now(), reviewed_by = p_actor_user_id,
           review_version = review_version + 1
       where id = before_row.id returning * into after_row;
   elsif p_action = 'exclude' then
@@ -147,12 +156,6 @@ begin
     if before_row.visibility_status <> 'excluded' then raise exception 'Only excluded results can be restored'; end if;
     update public.social_threads
       set visibility_status = 'review', reviewed_at = now(), reviewed_by = p_actor_user_id,
-          review_version = review_version + 1
-      where id = before_row.id returning * into after_row;
-  elsif p_action = 'promote' then
-    if before_row.visibility_status <> 'approved' then raise exception 'Only approved results can be promoted'; end if;
-    update public.social_threads
-      set visibility_status = 'active', reviewed_at = now(), reviewed_by = p_actor_user_id,
           review_version = review_version + 1
       where id = before_row.id returning * into after_row;
   elsif p_action = 'classification' then
@@ -202,7 +205,7 @@ begin
   if p_actor_user_id is null then raise exception 'Actor is required'; end if;
   perform public.canary_assert_social_reviewer(p_actor_user_id);
   if p_district_id is null then raise exception 'District is required'; end if;
-  if p_action not in ('approve_official', 'promote') then raise exception 'Unsupported bulk social review action'; end if;
+  if p_action <> 'approve_official' then raise exception 'Unsupported bulk social review action'; end if;
 
   select count(distinct selected.id)::integer into expected_count
   from unnest(coalesce(p_social_thread_ids, '{}'::uuid[])) as selected(id);
@@ -213,29 +216,21 @@ begin
   order by id
   for update;
 
-  if p_action = 'approve_official' then
-    select count(*)::integer into eligible_count
-    from public.social_threads
-    where id = any(p_social_thread_ids)
-      and district_id = p_district_id
-      and relationship_type = 'owned'
-      and visibility_status = 'review'
-      and exists (
-        select 1
-        from public.social_accounts account
-        where account.id = social_threads.social_account_id
-          and account.district_id = social_threads.district_id
-          and account.platform = social_threads.platform
-          and account.active = true
-          and (nullif(btrim(account.handle), '') is not null or nullif(btrim(account.profile_url), '') is not null)
-      );
-  else
-    select count(*)::integer into eligible_count
-    from public.social_threads
-    where id = any(p_social_thread_ids)
-      and district_id = p_district_id
-      and visibility_status = 'approved';
-  end if;
+  select count(*)::integer into eligible_count
+  from public.social_threads
+  where id = any(p_social_thread_ids)
+    and district_id = p_district_id
+    and relationship_type = 'owned'
+    and visibility_status in ('review', 'approved')
+    and exists (
+      select 1
+      from public.social_accounts account
+      where account.id = social_threads.social_account_id
+        and account.district_id = social_threads.district_id
+        and account.platform = social_threads.platform
+        and account.active = true
+        and (nullif(btrim(account.handle), '') is not null or nullif(btrim(account.profile_url), '') is not null)
+    );
 
   if eligible_count <> expected_count then
     raise exception 'Selection contains missing, cross-district, or ineligible social results';
@@ -244,7 +239,7 @@ begin
   insert into public.social_review_batches (district_id, action, actor_user_id, item_count, criteria)
   values (
     p_district_id,
-    case when p_action = 'approve_official' then 'bulk_approve_official' else 'promote' end,
+    'bulk_approve_official',
     p_actor_user_id,
     expected_count,
     jsonb_build_object('social_thread_ids', p_social_thread_ids)
@@ -253,24 +248,17 @@ begin
   for row_before in
     select * from public.social_threads where id = any(p_social_thread_ids) order by id for update
   loop
-    if p_action = 'approve_official' then
-      update public.social_threads
-        set visibility_status = 'approved', reviewed_at = now(), reviewed_by = p_actor_user_id,
-            review_version = review_version + 1
-        where id = row_before.id returning * into row_after;
-    else
-      update public.social_threads
-        set visibility_status = 'active', reviewed_at = now(), reviewed_by = p_actor_user_id,
-            review_version = review_version + 1
-        where id = row_before.id returning * into row_after;
-    end if;
+    update public.social_threads
+      set visibility_status = 'active', reviewed_at = now(), reviewed_by = p_actor_user_id,
+          review_version = review_version + 1
+      where id = row_before.id returning * into row_after;
 
     insert into public.social_review_events (
       batch_id, district_id, social_thread_id, actor_user_id, action,
       before_state, after_state, resulting_version
     ) values (
       new_batch_id, row_before.district_id, row_before.id, p_actor_user_id,
-      case when p_action = 'approve_official' then 'approve' else 'promote' end,
+      'approve',
       to_jsonb(row_before), to_jsonb(row_after), row_after.review_version
     );
   end loop;
