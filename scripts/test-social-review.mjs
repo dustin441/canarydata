@@ -1,7 +1,15 @@
 import assert from 'node:assert/strict';
 import { readFile } from 'node:fs/promises';
 import { normalizeSocialResult } from '../src/lib/social.mjs';
-import { resolveSocialReportWindow, groupTopReportPostsByPlatform } from '../src/lib/socialReport.mjs';
+import {
+  resolveSocialReportWindow,
+  groupTopReportPostsByPlatform,
+  isEligibleSocialReportPost,
+  metricAvailabilityCoverage,
+  rankSocialReportTopPerformers,
+  sortSocialReportDetails,
+  summarizeSocialReport,
+} from '../src/lib/socialReport.mjs';
 
 const reviewed = normalizeSocialResult({
   id: 'thread-review-1',
@@ -27,16 +35,91 @@ assert.equal(schoolYearAfterBoundary.startInput, '2026-07-15');
 const schoolYearBeforeBoundary = resolveSocialReportWindow('school-year', Date.UTC(2026, 6, 14));
 assert.equal(schoolYearBeforeBoundary.startInput, '2025-07-15');
 
-const reportGroups = groupTopReportPostsByPlatform([
-  ...Array.from({ length: 4 }, (_, index) => ({ id: `fb-${index}`, platform: 'facebook', engagementTotal: 10 - index, visibilityStatus: 'active', relationshipType: 'owned' })),
-  { id: 'ig-active', platform: 'instagram', engagementTotal: 8, visibilityStatus: 'active', relationshipType: 'owned' },
-  { id: 'ig-review', platform: 'instagram', engagementTotal: 99, visibilityStatus: 'review', relationshipType: 'owned' },
-  { id: 'fb-mention', platform: 'facebook', engagementTotal: 100, visibilityStatus: 'active', relationshipType: 'direct' },
+const reportWindow = {
+  start: new Date('2026-07-01T00:00:00.000Z'),
+  end: new Date('2026-07-31T23:59:59.999Z'),
+};
+const reportPosts = [
+  {
+    id: 'fb-high', platform: 'facebook', date: '2026-07-20T12:00:00Z', visibilityStatus: 'active', relationshipType: 'owned',
+    reactionCount: 22, commentCount: 2, shareCount: 1, viewCount: 100,
+    metricAvailability: { reactions: true, comments: true, shares: true, views: true },
+  },
+  {
+    id: 'ig-tie-b', platform: 'instagram', date: '2026-07-21T12:00:00Z', visibilityStatus: 'active', relationshipType: 'owned',
+    reactionCount: 8, commentCount: 4, shareCount: 1, viewCount: 0,
+    metricAvailability: { reactions: true, comments: true, shares: true, views: false },
+  },
+  {
+    id: 'ig-tie-a', platform: 'instagram', date: '2026-07-21T12:00:00Z', visibilityStatus: 'active', relationshipType: 'owned',
+    reactionCount: 12, commentCount: 1, shareCount: 0, viewCount: 50,
+    metricAvailability: { reactions: true, comments: true, shares: false, views: true },
+  },
+  {
+    id: 'fb-no-metrics', platform: 'facebook', date: '2026-07-22T12:00:00Z', visibilityStatus: 'active', relationshipType: 'owned',
+    reactionCount: 0, commentCount: 0, shareCount: 0, viewCount: 0,
+    metricAvailability: { reactions: false, comments: false, shares: false, views: false },
+  },
+  { id: 'review', platform: 'facebook', date: '2026-07-23T12:00:00Z', visibilityStatus: 'review', relationshipType: 'owned', metricAvailability: {} },
+  { id: 'mention', platform: 'facebook', date: '2026-07-23T12:00:00Z', visibilityStatus: 'active', relationshipType: 'direct', metricAvailability: {} },
+  { id: 'outside', platform: 'facebook', date: '2026-06-30T23:59:59Z', visibilityStatus: 'active', relationshipType: 'owned', metricAvailability: {} },
+];
+
+assert.equal(isEligibleSocialReportPost(reportPosts[0], reportWindow), true);
+assert.equal(isEligibleSocialReportPost(reportPosts[4], reportWindow), false);
+assert.equal(isEligibleSocialReportPost(reportPosts[5], reportWindow), false);
+assert.equal(isEligibleSocialReportPost(reportPosts[6], reportWindow), false);
+
+const eligibleReportPosts = reportPosts.filter((post) => isEligibleSocialReportPost(post, reportWindow));
+assert.deepEqual(metricAvailabilityCoverage(eligibleReportPosts, 'views'), { available: 2, total: 4 });
+assert.deepEqual(metricAvailabilityCoverage(eligibleReportPosts, 'shares'), { available: 2, total: 4 });
+assert.deepEqual(rankSocialReportTopPerformers(eligibleReportPosts, 3).map((post) => post.id), ['fb-high', 'ig-tie-a', 'ig-tie-b']);
+assert.deepEqual(sortSocialReportDetails(eligibleReportPosts).map((post) => post.id), ['fb-no-metrics', 'ig-tie-a', 'ig-tie-b', 'fb-high']);
+
+const platformTopPerformers = groupTopReportPostsByPlatform([
+  ...Array.from({ length: 5 }, (_, index) => ({
+    id: `fb-${index}`,
+    platform: 'facebook',
+    date: `2026-07-${String(16 + index).padStart(2, '0')}T12:00:00Z`,
+    visibilityStatus: 'active',
+    relationshipType: 'owned',
+    reactionCount: 100 - index,
+    metricAvailability: { reactions: true },
+  })),
+  ...Array.from({ length: 4 }, (_, index) => ({
+    id: `ig-${index}`,
+    platform: 'instagram',
+    date: `2026-07-${String(16 + index).padStart(2, '0')}T12:00:00Z`,
+    visibilityStatus: 'active',
+    relationshipType: 'owned',
+    reactionCount: 20 - index,
+    metricAvailability: { reactions: true },
+  })),
 ]);
-assert.deepEqual(reportGroups.map((group) => [group.platform, group.posts.map((post) => post.id)]), [
+assert.deepEqual(platformTopPerformers.map(({ platform, posts }) => [platform, posts.map((post) => post.id)]), [
   ['facebook', ['fb-0', 'fb-1', 'fb-2']],
-  ['instagram', ['ig-active']],
+  ['instagram', ['ig-0', 'ig-1', 'ig-2']],
 ]);
+
+const reportSummary = summarizeSocialReport(eligibleReportPosts);
+assert.equal(reportSummary.officialPosts, 4);
+assert.equal(reportSummary.totalInteractions, 51);
+assert.equal(reportSummary.interactionsAvailable, 3);
+assert.equal(reportSummary.averageInteractions, 17);
+assert.equal(reportSummary.reportedViews, 150);
+assert.deepEqual(reportSummary.viewsCoverage, { available: 2, total: 4 });
+assert.deepEqual(reportSummary.reactionsCoverage, { available: 3, total: 4 });
+assert.deepEqual(reportSummary.commentsCoverage, { available: 3, total: 4 });
+assert.deepEqual(reportSummary.sharesCoverage, { available: 2, total: 4 });
+assert.deepEqual(reportSummary.platformBreakdown, [
+  { platform: 'facebook', count: 2 },
+  { platform: 'instagram', count: 2 },
+]);
+assert.equal(reportSummary.topPlatform, 'facebook');
+const unavailableSummary = summarizeSocialReport([eligibleReportPosts.find((post) => post.id === 'fb-no-metrics')]);
+assert.equal(unavailableSummary.totalInteractions, null);
+assert.equal(unavailableSummary.averageInteractions, null);
+assert.equal(unavailableSummary.reportedViews, null);
 
 const [sql, actions, dashboard, styles, data, melodi] = await Promise.all([
   readFile(new URL('../supabase/social_review_workflow.sql', import.meta.url), 'utf8'),
@@ -71,25 +154,34 @@ assert.match(actions, /expectedCurrentVersion/);
 assert.match(sql, /p_action not in \('approve', 'promote'/);
 assert.match(sql, /p_action not in \('approve_official', 'promote'\)/);
 assert.doesNotMatch(actions, /Only approved results can be promoted/);
-
-for (const marker of [
-  'Approve for client and reports',
-  'not yet client-visible or included in reports',
-  'Select eligible official posts',
-  'Review audit history',
-  'Compact list',
-  'social-report-mode',
-  'Social Report',
-  'Report period',
-  'Filter context',
-  'No safe thumbnail available',
-  'View source',
-]) {
+for (const marker of ['Approve for client and reports', 'not yet client-visible or included in reports', 'Select eligible official posts', 'Review audit history', 'Compact list']) {
   assert.ok(dashboard.includes(marker), `Dashboard must include ${marker}`);
 }
 assert.doesNotMatch(dashboard, /Promote to client|Promote approved batch|Approved internally/);
+
+const socialReportSource = dashboard.slice(dashboard.indexOf('function SocialReportThumbnail'), dashboard.indexOf('function BoardReportView'));
+for (const marker of [
+  'Social Media Performance Report',
+  'Executive scorecards',
+  'Official posts published',
+  'Total public interactions',
+  'Average interactions per post',
+  'Reported views',
+  'Available for',
+  'Top Performers',
+  'Official Post Detail',
+  'Not available',
+]) {
+  assert.ok(socialReportSource.includes(marker), `Social Report must include ${marker}`);
+}
+assert.match(socialReportSource, /safeSocialUrl\(result\.url\)/);
+assert.match(socialReportSource, /socialReportInteractionTotal\(result\)/);
+assert.match(socialReportSource, /ranked \? 'Rank' : 'Row'/);
+assert.match(socialReportSource, /topPerformerGroups\.map/);
+assert.match(socialReportSource, /<SocialReportTable results=\{group\.posts\} ranked \/>/);
+assert.doesNotMatch(socialReportSource, /news|evidence appendix|Strategic Alignment/i);
 assert.match(dashboard, /function SocialReportView/);
-assert.match(dashboard, /groupTopReportPostsByPlatform\(visibleResults\.filter/);
+assert.match(dashboard, /visibleResults\.filter\(\(result\) => isEligibleSocialReportPost\(result, topPostsWindow\)\)/);
 assert.match(dashboard, /reportPeriod = `\$\{topPostsWindow\.label\}/);
 assert.match(dashboard, /Choose one district before exporting a Social Report/);
 assert.match(dashboard, /Minimum engagement rate:/);
@@ -98,9 +190,15 @@ assert.match(dashboard, /setSocialReportMode\(true\)/);
 assert.doesNotMatch(dashboard, /function exportSocialPdf\(\)[\s\S]{0,250}setCurrentView\('dashboard'\)/);
 assert.match(dashboard, /source\.id === result\.socialAccountId/);
 assert.match(dashboard, /source\.active === true/);
+assert.match(dashboard, /const SHOW_GLOBAL_BOARD_REPORT_EXPORT = false/);
+assert.match(dashboard, /SHOW_GLOBAL_BOARD_REPORT_EXPORT && \['dashboard', 'birdseye', 'social'\]/);
+assert.match(dashboard, /Export Leadership \/ Board PDF/);
 assert.match(styles, /\.social-report-mode > \*:not\(\.social-report\)/);
 assert.match(styles, /\.social-report-mode \.social-report/);
-assert.match(styles, /\.social-report-media img/);
+assert.match(styles, /\.social-report-table thead \{ display: table-header-group; \}/);
+assert.match(styles, /\.social-report-thumbnail img[\s\S]*object-fit: contain/);
+assert.match(styles, /\.social-report-table th,[\s\S]*overflow-wrap: anywhere/);
+assert.doesNotMatch(styles, /\.social-report-grid/);
 assert.match(styles, /input\[type="date"\][\s\S]*color-scheme: dark/);
 assert.match(dashboard, /!listCompact && \(/);
 assert.match(data, /includeReview \? \['active', 'approved', 'review', 'excluded'\] : \['active'\]/);

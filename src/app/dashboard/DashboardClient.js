@@ -9,7 +9,7 @@ import { createEmbeddedCanaryCheckout, confirmEmbeddedCanaryCheckout, saveBillin
 import { compareStrategicAlignmentRows } from '@/lib/strategicAlignmentSort.mjs';
 import { CORE_TAGS, canonicalTags } from '@/lib/canonicalTags.mjs';
 import { buildSocialResults, calculateSocialEngagementRate, rankTopSocialResults, resolveSocialFollowerCount, safeSocialMediaUrl, safeSocialUrl, socialActionFilterMatches, socialDateFilterMatches, socialRelationshipFilterMatches, summarizeSocialActions, summarizeSocialResults } from '@/lib/social.mjs';
-import { dateInputValue, groupTopReportPostsByPlatform, resolveSocialReportWindow } from '@/lib/socialReport.mjs';
+import { dateInputValue, groupTopReportPostsByPlatform, isEligibleSocialReportPost, resolveSocialReportWindow, socialReportInteractionTotal, sortSocialReportDetails, summarizeSocialReport } from '@/lib/socialReport.mjs';
 import { formatDisplayDate } from '@/lib/date.mjs';
 import { CUSTOMER_SEARCH_QUERY_LIMIT, activeNewsQueryCount } from '@/lib/queryPolicy.mjs';
 import { buildCommunicationsBrief, formatCommunicationsBriefRecommendation } from '@/lib/communicationsBrief.mjs';
@@ -114,6 +114,7 @@ const DEMO_TESTIMONIALS = [
 ];
 
 const SOCIAL_SOURCE_TYPES = new Set(['facebook', 'instagram', 'tiktok', 'twitter', 'x', 'youtube', 'threads', 'linkedin']);
+const SHOW_GLOBAL_BOARD_REPORT_EXPORT = false;
 
 function formatSocialMetric(value) {
   const number = Number(value);
@@ -1019,7 +1020,7 @@ function BirdEyeView({ articles, strategicAlignmentData, strategicGovernance, ha
             </button>
           )}
           <button className="btn btn-secondary btn-sm" type="button" onClick={exportBirdEyeCsv}>⬇ Export CSV</button>
-          <button className="btn btn-secondary btn-sm" type="button" onClick={onExportPdf}>⬇ Export PDF</button>
+          <button className="btn btn-secondary btn-sm" type="button" onClick={onExportPdf} title="Export this leadership and board Strategic Alignment artifact as PDF.">⬇ Export Leadership / Board PDF</button>
         </div>
       </div>
 
@@ -2481,22 +2482,110 @@ function SocialReportCard({ result, rank }) {
   );
 }
 
-function SocialReportView({ districtName, reportWindow, filterContext, groups }) {
+function SocialReportThumbnail({ result }) {
+  const thumbnailUrl = safeSocialMediaUrl(result.mediaUrl);
+  const [failedThumbnailUrl, setFailedThumbnailUrl] = useState('');
+  const thumbnailAvailable = Boolean(thumbnailUrl && failedThumbnailUrl !== thumbnailUrl);
+  return (
+    <div className="social-report-thumbnail">
+      {thumbnailAvailable ? (
+        // eslint-disable-next-line @next/next/no-img-element -- remote social thumbnails are validated and proxied for print.
+        <img src={proxiedSocialMediaUrl(thumbnailUrl)} alt="" onError={() => setFailedThumbnailUrl(thumbnailUrl)} />
+      ) : (
+        <span>{thumbnailUrl ? 'Thumbnail unavailable' : 'Text-only post'}</span>
+      )}
+    </div>
+  );
+}
+
+function SocialReportMetric({ result, metric, value }) {
+  return result?.metricAvailability?.[metric] === true ? formatSocialMetric(value) : 'Not available';
+}
+
+function SocialReportTable({ results, ranked = false }) {
+  return (
+    <div className="social-report-table-wrap">
+      <table className="social-report-table">
+        <colgroup>
+          <col className="social-report-col-rank" />
+          <col className="social-report-col-thumbnail" />
+          <col className="social-report-col-date" />
+          <col className="social-report-col-platform" />
+          <col className="social-report-col-post" />
+          <col className="social-report-col-metric" span="5" />
+        </colgroup>
+        <thead><tr><th>{ranked ? 'Rank' : 'Row'}</th><th>Thumbnail</th><th>Date</th><th>Platform</th><th>Post / excerpt</th><th>Reported views</th><th>Reactions</th><th>Comments</th><th>Shares</th><th>Total interactions</th></tr></thead>
+        <tbody>
+          {results.map((result, index) => {
+            const sourceUrl = safeSocialUrl(result.url);
+            const excerpt = result.headline || result.summary || 'Official district social post';
+            const interactions = socialReportInteractionTotal(result);
+            return (
+              <tr key={result.id}>
+                <td>{index + 1}</td>
+                <td><SocialReportThumbnail result={result} /></td>
+                <td>{formatDisplayDate(result.date)}</td>
+                <td>{formatSourceLabel(result.platform)}</td>
+                <td className="social-report-post-cell">
+                  {sourceUrl ? <a href={sourceUrl} target="_blank" rel="noopener noreferrer">{excerpt}</a> : <span>{excerpt}</span>}
+                  {!sourceUrl && <small>Source link unavailable in the collected record.</small>}
+                </td>
+                <td><SocialReportMetric result={result} metric="views" value={result.viewCount} /></td>
+                <td><SocialReportMetric result={result} metric="reactions" value={result.reactionCount} /></td>
+                <td><SocialReportMetric result={result} metric="comments" value={result.commentCount} /></td>
+                <td><SocialReportMetric result={result} metric="shares" value={result.shareCount} /></td>
+                <td>{interactions === null ? 'Not available' : formatSocialMetric(interactions)}</td>
+              </tr>
+            );
+          })}
+        </tbody>
+      </table>
+      {!ranked && <p className="social-report-table-note">All eligible posts are listed newest first; posts sharing a timestamp are ordered by stable record ID.</p>}
+    </div>
+  );
+}
+
+function SocialReportView({ districtName, reportWindow, filterContext, posts }) {
+  const summary = summarizeSocialReport(posts);
+  const topPerformerGroups = groupTopReportPostsByPlatform(posts, 3);
+  const detailPosts = sortSocialReportDetails(posts);
+  const platformBreakdown = summary.platformBreakdown.map(({ platform, count }) => `${formatSourceLabel(platform)} ${count}`).join(' · ');
+  const interactionCoverage = `Any interaction metric available for ${summary.interactionsAvailable} of ${summary.officialPosts} posts`;
+  const interactionMetricCoverage = `Reactions ${summary.reactionsCoverage.available}/${summary.reactionsCoverage.total} · Comments ${summary.commentsCoverage.available}/${summary.commentsCoverage.total} · Shares ${summary.sharesCoverage.available}/${summary.sharesCoverage.total}`;
+  const viewCoverage = `Available for ${summary.viewsCoverage.available} of ${summary.viewsCoverage.total} posts`;
   return (
     <section className="social-report" aria-label={`${districtName} Social Report`}>
       <header className="social-report-header">
-        <div><span>Canary Data</span><h1>{districtName} Social Report</h1><p>Approved, client-visible official social content only</p></div>
+        <div><span>Canary Data</span><h1>{districtName} Social Media Performance Report</h1><p>Active, owned official posts matching the selected reporting window and visible Social filters</p></div>
         <dl>
           <div><dt>Report period</dt><dd>{reportWindow}</dd></div>
           <div><dt>Filter context</dt><dd>{filterContext}</dd></div>
         </dl>
       </header>
-      {groups.length ? groups.map((group) => (
-        <section className="social-report-platform" key={group.platform}>
-          <h2>{formatSourceLabel(group.platform)} · Top approved posts</h2>
-          <div className="social-report-grid">{group.posts.map((result, index) => <SocialReportCard key={result.id} result={result} rank={index + 1} />)}</div>
-        </section>
-      )) : <p className="social-report-empty">No approved, client-visible official posts match this report context. Review-only and excluded records are not included.</p>}
+      <section className="social-report-scorecards" aria-label="Executive scorecards">
+        <article><span>Official posts published</span><strong>{summary.officialPosts}</strong><small>Active owned posts</small></article>
+        <article><span>Total public interactions</span><strong>{summary.totalInteractions === null ? 'Not available' : formatSocialMetric(summary.totalInteractions)}</strong><small>{interactionMetricCoverage}</small></article>
+        <article><span>Average interactions per post</span><strong>{summary.averageInteractions === null ? 'Not available' : formatSocialMetric(summary.averageInteractions)}</strong><small>{interactionCoverage}</small></article>
+        <article><span>Reported views</span><strong>{summary.reportedViews === null ? 'Not available' : formatSocialMetric(summary.reportedViews)}</strong><small>{viewCoverage}</small></article>
+        <article><span>Platforms</span><strong>{summary.platformCount || 'Not available'}</strong><small>{platformBreakdown || 'No platform data available'}</small></article>
+      </section>
+      {posts.length ? (
+        <>
+          <section className="social-report-section social-report-top-performers">
+            <div className="social-report-section-heading"><h2>Top Performers</h2><p>Top 3 per platform, ranked by reported public interactions, then newest date and stable record ID.</p></div>
+            {topPerformerGroups.map((group) => (
+              <section className="social-report-platform-table" key={group.platform}>
+                <h3>{formatSourceLabel(group.platform)}</h3>
+                <SocialReportTable results={group.posts} ranked />
+              </section>
+            ))}
+          </section>
+          <section className="social-report-section social-report-detail">
+            <div className="social-report-section-heading"><h2>Official Post Detail</h2><p>Complete detail for every eligible post in this report period.</p></div>
+            <SocialReportTable results={detailPosts} />
+          </section>
+        </>
+      ) : <p className="social-report-empty">No active, owned official posts match this reporting window and the current visible Social filters.</p>}
     </section>
   );
 }
@@ -2659,10 +2748,10 @@ function SocialView({ articles, socialThreads, socialSources, socialReviewEvents
       return new Date(b.date).getTime() - new Date(a.date).getTime();
     });
   }, [facetedResults, actionFilter, socialSort, sourceByDistrictPlatform]);
-  const socialReportGroups = useMemo(() => groupTopReportPostsByPlatform(visibleResults.filter((result) => {
-    const timestamp = new Date(result.date).getTime();
-    return timestamp >= topPostsWindow.start.getTime() && timestamp <= topPostsWindow.end.getTime();
-  })), [visibleResults, topPostsWindow]);
+  const socialReportPosts = useMemo(
+    () => visibleResults.filter((result) => isEligibleSocialReportPost(result, topPostsWindow)),
+    [visibleResults, topPostsWindow],
+  );
   const reportDistrictName = districtFilter === 'All'
     ? 'All Districts'
     : districts.find((district) => district.id === districtFilter)?.name || formatDistrictName(districtFilter);
@@ -2764,7 +2853,7 @@ function SocialView({ articles, socialThreads, socialSources, socialReviewEvents
           districtName={reportDistrictName}
           reportWindow={reportPeriod}
           filterContext={reportFilterContext}
-          groups={socialReportGroups}
+          posts={socialReportPosts}
         />
       )}
       <section className="social-monitor-hero">
@@ -3653,7 +3742,7 @@ export default function DashboardClient({ articles, districts, queries: initialQ
                       : currentView === 'corrections'
                         ? 'Add / Correct Stories'
                         : currentView === 'birdseye'
-                        ? 'Bird’s Eye View'
+                        ? 'Bird’s Eye View — Leadership & Board Report'
                         : currentView === 'clients'
                         ? 'Beta Testers'
                         : currentView === 'howto'
@@ -3702,7 +3791,7 @@ export default function DashboardClient({ articles, districts, queries: initialQ
                 </button>
               </>
             )}
-            {['dashboard', 'birdseye', 'social'].includes(currentView) && (
+            {SHOW_GLOBAL_BOARD_REPORT_EXPORT && ['dashboard', 'birdseye', 'social'].includes(currentView) && (
               <button
                 className="btn btn-secondary btn-sm export-pdf-btn"
                 type="button"

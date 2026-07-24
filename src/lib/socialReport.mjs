@@ -36,6 +36,100 @@ export function resolveSocialReportWindow(period, asOf, customStart = '', custom
   return { start, end: rangeEnd, label, startInput: dateInputValue(start), endInput: dateInputValue(rangeEnd) };
 }
 
+const INTERACTION_METRICS = [
+  ['reactions', 'reactionCount'],
+  ['comments', 'commentCount'],
+  ['shares', 'shareCount'],
+];
+
+function finiteMetric(value) {
+  const number = Number(value);
+  return Number.isFinite(number) ? number : 0;
+}
+
+function reportTimestamp(result) {
+  const timestamp = new Date(result?.date).getTime();
+  return Number.isFinite(timestamp) ? timestamp : null;
+}
+
+export function isEligibleSocialReportPost(result, window) {
+  const timestamp = reportTimestamp(result);
+  const start = window?.start instanceof Date ? window.start.getTime() : new Date(window?.start).getTime();
+  const end = window?.end instanceof Date ? window.end.getTime() : new Date(window?.end).getTime();
+  return result?.visibilityStatus === 'active'
+    && result?.relationshipType === 'owned'
+    && timestamp !== null
+    && Number.isFinite(start)
+    && Number.isFinite(end)
+    && timestamp >= start
+    && timestamp <= end;
+}
+
+export function metricAvailabilityCoverage(results, metric) {
+  return {
+    available: results.filter((result) => result?.metricAvailability?.[metric] === true).length,
+    total: results.length,
+  };
+}
+
+export function socialReportInteractionTotal(result) {
+  const availableMetrics = INTERACTION_METRICS.filter(([metric]) => result?.metricAvailability?.[metric] === true);
+  if (!availableMetrics.length) return null;
+  return availableMetrics.reduce((sum, [, field]) => sum + finiteMetric(result?.[field]), 0);
+}
+
+export function rankSocialReportTopPerformers(results, limit = 10) {
+  const safeLimit = Math.max(0, Number(limit) || 0);
+  return results.slice().sort((a, b) => {
+    const interactionDifference = (socialReportInteractionTotal(b) ?? -1) - (socialReportInteractionTotal(a) ?? -1);
+    if (interactionDifference) return interactionDifference;
+    const dateDifference = (reportTimestamp(b) ?? -1) - (reportTimestamp(a) ?? -1);
+    if (dateDifference) return dateDifference;
+    return String(a?.id || '').localeCompare(String(b?.id || ''));
+  }).slice(0, safeLimit);
+}
+
+export function sortSocialReportDetails(results) {
+  return results.slice().sort((a, b) => {
+    const dateDifference = (reportTimestamp(b) ?? -1) - (reportTimestamp(a) ?? -1);
+    if (dateDifference) return dateDifference;
+    return String(a?.id || '').localeCompare(String(b?.id || ''));
+  });
+}
+
+export function summarizeSocialReport(results) {
+  const interactionTotals = results.map(socialReportInteractionTotal).filter((value) => value !== null);
+  const totalInteractions = interactionTotals.length
+    ? interactionTotals.reduce((sum, value) => sum + value, 0)
+    : null;
+  const platformCounts = new Map();
+  for (const result of results) {
+    if (!result?.platform) continue;
+    platformCounts.set(result.platform, (platformCounts.get(result.platform) || 0) + 1);
+  }
+  const platformBreakdown = [...platformCounts.entries()]
+    .map(([platform, count]) => ({ platform, count }))
+    .sort((a, b) => b.count - a.count || a.platform.localeCompare(b.platform));
+  const reportedViews = results.reduce((sum, result) => (
+    result?.metricAvailability?.views === true ? sum + finiteMetric(result.viewCount) : sum
+  ), 0);
+
+  return {
+    officialPosts: results.length,
+    totalInteractions,
+    interactionsAvailable: interactionTotals.length,
+    averageInteractions: interactionTotals.length ? totalInteractions / interactionTotals.length : null,
+    reportedViews: metricAvailabilityCoverage(results, 'views').available ? reportedViews : null,
+    viewsCoverage: metricAvailabilityCoverage(results, 'views'),
+    reactionsCoverage: metricAvailabilityCoverage(results, 'reactions'),
+    commentsCoverage: metricAvailabilityCoverage(results, 'comments'),
+    sharesCoverage: metricAvailabilityCoverage(results, 'shares'),
+    platformCount: platformBreakdown.length,
+    platformBreakdown,
+    topPlatform: platformBreakdown[0]?.platform || null,
+  };
+}
+
 export function groupTopReportPostsByPlatform(results, limitPerPlatform = 3) {
   const preferredOrder = ['facebook', 'instagram'];
   const eligible = results.filter((result) => result.visibilityStatus === 'active' && result.relationshipType === 'owned');
@@ -48,11 +142,9 @@ export function groupTopReportPostsByPlatform(results, limitPerPlatform = 3) {
 
   return platforms.map((platform) => ({
     platform,
-    posts: eligible
-      .filter((result) => result.platform === platform)
-      .sort((a, b) => (Number(b.engagementTotal) - Number(a.engagementTotal))
-        || String(b.date || '').localeCompare(String(a.date || ''))
-        || String(a.id || '').localeCompare(String(b.id || '')))
-      .slice(0, limitPerPlatform),
+    posts: rankSocialReportTopPerformers(
+      eligible.filter((result) => result.platform === platform),
+      limitPerPlatform,
+    ),
   }));
 }
