@@ -8,6 +8,7 @@ import { canonicalizeStoryUrl, requireCorrectionReason } from '@/lib/storyCorrec
 import { CUSTOMER_SEARCH_QUERY_LIMIT, searchQueryFingerprint, validateSearchQueryText } from '@/lib/queryPolicy.mjs';
 import { lookup } from 'node:dns/promises';
 import { isIP } from 'node:net';
+import { createHash } from 'node:crypto';
 
 async function requireCanaryActor() {
   const sessionClient = await createServerClient();
@@ -37,6 +38,11 @@ function assertCanaryReviewer(actor) {
 
 const SOCIAL_REVIEW_ACTIONS = new Set(['approve', 'exclude', 'restore', 'classification', 'note', 'promote']);
 const SOCIAL_CLASSIFICATIONS = new Set(['owned', 'direct_tag', 'direct_mention', 'ambient']);
+
+function customerSearchQuerySlotId(districtId, slotIndex) {
+  const hex = createHash('sha256').update(`canary-search-query-slot:${districtId}:${slotIndex}`).digest('hex').slice(0, 32);
+  return `${hex.slice(0, 8)}-${hex.slice(8, 12)}-${hex.slice(12, 16)}-${hex.slice(16, 20)}-${hex.slice(20)}`;
+}
 
 function cleanSocialReviewerNote(value) {
   const note = String(value || '').trim();
@@ -818,13 +824,45 @@ export async function addQuery({ query_text, district_id, district_name, geo_cit
     active: true,
   };
 
-  if (matchingQuery) {
+  if (actor.isAdmin && matchingQuery) {
     const { data, error } = await supabase
       .from('search_queries')
       .update(queryValues)
       .eq('id', matchingQuery.id)
       .select('id, query_text, district_id, district_name, geo_city, geo_state, geo_zip, channels, active, created_at')
       .single();
+    if (error) throw error;
+    revalidatePath('/dashboard');
+    return data;
+  }
+
+  if (!actor.isAdmin) {
+    const activeIds = new Set((existingQueries || []).filter((query) => query.active !== false).map((query) => query.id));
+    const slotIds = Array.from({ length: CUSTOMER_SEARCH_QUERY_LIMIT }, (_, index) => customerSearchQuerySlotId(targetDistrictId, index));
+    const slotId = slotIds.find((id) => !activeIds.has(id));
+    if (!slotId) throw new Error(`Your account can monitor up to ${CUSTOMER_SEARCH_QUERY_LIMIT} active news queries. Remove one before adding another.`);
+
+    const existingSlot = (existingQueries || []).find((query) => query.id === slotId);
+    if (existingSlot) {
+      const { data, error } = await supabase
+        .from('search_queries')
+        .update(queryValues)
+        .eq('id', slotId)
+        .eq('active', false)
+        .select('id, query_text, district_id, district_name, geo_city, geo_state, geo_zip, channels, active, created_at')
+        .maybeSingle();
+      if (error) throw error;
+      if (!data) throw new Error('Queries changed while this request was saving. Please try again.');
+      revalidatePath('/dashboard');
+      return data;
+    }
+
+    const { data, error } = await supabase
+      .from('search_queries')
+      .insert({ ...queryValues, id: slotId })
+      .select('id, query_text, district_id, district_name, geo_city, geo_state, geo_zip, channels, active, created_at')
+      .single();
+    if (error?.code === '23505') throw new Error('Queries changed while this request was saving. Please try again.');
     if (error) throw error;
     revalidatePath('/dashboard');
     return data;
@@ -842,9 +880,10 @@ export async function addQuery({ query_text, district_id, district_name, geo_cit
 
 export async function deleteQuery(id) {
   const { actor, admin: supabase } = await requireCanaryActor();
-  const { data: query } = await supabase.from('search_queries').select('district_id').eq('id', id).maybeSingle();
+  const { data: query } = await supabase.from('search_queries').select('district_id, channels').eq('id', id).maybeSingle();
   if (!query) throw new Error('Search query not found.');
   assertDistrictAccess(actor, query?.district_id);
+  if (!actor.isAdmin && query.channels !== 'news') throw new Error('Only Canary administrators can change advanced monitoring queries.');
   const { error } = await supabase.from('search_queries').update({ active: false }).eq('id', id);
   if (error) throw error;
   revalidatePath('/dashboard');

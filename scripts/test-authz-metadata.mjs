@@ -32,11 +32,15 @@ for (const action of ['addQuery', 'deleteQuery']) {
 const addQueryStart = actions.indexOf('export async function addQuery');
 const deleteQueryStart = actions.indexOf('export async function deleteQuery');
 assert.match(actions.slice(addQueryStart, deleteQueryStart), /CUSTOMER_SEARCH_QUERY_LIMIT/, 'customer query additions must enforce the account limit');
+assert.match(actions.slice(addQueryStart, deleteQueryStart), /customerSearchQuerySlotId/, 'customer additions must claim deterministic query slots so concurrent writes cannot exceed the cap');
 assert.match(actions.slice(deleteQueryStart, deleteQueryStart + 700), /update\(\{ active: false \}\)/, 'removing a query must archive it instead of deleting history');
+assert.match(actions.slice(deleteQueryStart, deleteQueryStart + 700), /query\.channels !== 'news'/, 'customers must not be able to remove admin-managed advanced queries');
 
 const dashboardClient = await readFile(new URL('../src/app/dashboard/DashboardClient.js', import.meta.url), 'utf8');
 assert.match(dashboardClient, /const canManageQueries = !demoMode/);
 assert.match(dashboardClient, /News query usage/);
 assert.match(dashboardClient, /Query limit reached/);
+assert.match(dashboardClient, /Managed by Canary/);
+assert.match(dashboardClient, /role="alert"/);
 
 console.log('Authorization metadata regression tests passed.');

@@ -693,14 +693,18 @@ function QueriesView({ initialQueries, districts, userDistrictId, selectedDistri
         )}
         {canManageQueries && (
           <td style={{ textAlign: 'right' }}>
-            <button
-              className="btn btn-danger btn-sm"
-              onClick={() => handleDelete(q.id)}
-              disabled={deletingId === q.id}
-              style={{ padding: '4px 10px', fontSize: '0.75rem' }}
-            >
-              {deletingId === q.id ? '…' : 'Remove'}
-            </button>
+            {isAdmin || q.channels === 'news' ? (
+              <button
+                className="btn btn-danger btn-sm"
+                onClick={() => handleDelete(q.id)}
+                disabled={deletingId === q.id}
+                style={{ padding: '4px 10px', fontSize: '0.75rem' }}
+              >
+                {deletingId === q.id ? '…' : 'Remove'}
+              </button>
+            ) : (
+              <span style={{ color: 'var(--text-tertiary)', fontSize: '0.75rem', fontWeight: 600 }}>Managed by Canary</span>
+            )}
           </td>
         )}
       </tr>
@@ -772,6 +776,10 @@ function QueriesView({ initialQueries, districts, userDistrictId, selectedDistri
           </div>
         )}
 
+        {addError && (
+          <div role="alert" style={{ color: '#EF4444', fontSize: '0.82rem', marginBottom: '14px' }}>{addError}</div>
+        )}
+
         {/* Add Query Form */}
         {canManageQueries && showAddForm && (
           <form onSubmit={handleAdd} style={{
@@ -836,9 +844,6 @@ function QueriesView({ initialQueries, districts, userDistrictId, selectedDistri
                   {districts.map((d) => <option key={d.id} value={d.id}>{d.name}</option>)}
                 </select>
               </div>
-            )}
-            {addError && (
-              <div style={{ color: '#EF4444', fontSize: '0.82rem', marginBottom: '10px' }}>{addError}</div>
             )}
             <div style={{ display: 'flex', justifyContent: 'flex-end' }}>
               <button type="submit" className="btn btn-primary btn-sm" disabled={saving}>
