@@ -60,6 +60,11 @@ assert.deepEqual([completedMonth.startInput, completedMonth.endInput], ['2026-06
 assert.deepEqual([completedMonthComparison.startInput, completedMonthComparison.endInput], ['2026-05-01', '2026-05-31']);
 const monthToDateComparison = resolveSocialReportComparisonWindow('this-month', Date.UTC(2026, 6, 24, 18));
 assert.deepEqual([monthToDateComparison.startInput, monthToDateComparison.endInput], ['2026-06-01', '2026-06-24']);
+assert.equal(monthToDateComparison.start.toISOString(), '2026-06-01T00:00:00.000Z');
+assert.equal(monthToDateComparison.end.toISOString(), '2026-06-24T18:00:00.000Z');
+const shortPriorMonthComparison = resolveSocialReportComparisonWindow('this-month', Date.UTC(2026, 2, 31, 18));
+assert.equal(shortPriorMonthComparison.end.toISOString(), '2026-02-28T18:00:00.000Z');
+assert.equal(shortPriorMonthComparison.end.getTime() - shortPriorMonthComparison.start.getTime(), resolveSocialReportWindow('this-month', Date.UTC(2026, 2, 31, 18)).end.getTime() - resolveSocialReportWindow('this-month', Date.UTC(2026, 2, 31, 18)).start.getTime());
 assert.deepEqual(calculateSocialMetricChange(12, 10), { absolute: 2, percent: 20 });
 assert.deepEqual(calculateSocialMetricChange(3, 0), { absolute: 3, percent: null });
 assert.equal(calculateSocialMetricChange(null, 10), null);
@@ -148,9 +153,10 @@ assert.equal(reportSummary.topPlatform, 'facebook');
 assert.deepEqual(summarizeSocialContentFormats([
   { ...eligibleReportPosts[0], mediaType: 'video' },
   { ...eligibleReportPosts[1], mediaUrl: 'https://cdninstagram.com/a.jpg' },
+  { ...eligibleReportPosts[2], id: 'mixed-case-reel', mediaType: 'Reel', mediaUrl: 'https://cdninstagram.com/reel.jpg' },
   { ...eligibleReportPosts[3], mediaType: null, mediaUrl: '' },
 ]).map(({ format, posts, totalInteractions }) => ({ format, posts, totalInteractions })), [
-  { format: 'Video / Reel', posts: 1, totalInteractions: 25 },
+  { format: 'Video / Reel', posts: 2, totalInteractions: 38 },
   { format: 'Image / Photo', posts: 1, totalInteractions: 13 },
   { format: 'Text / Link', posts: 1, totalInteractions: null },
 ]);
@@ -250,11 +256,14 @@ assert.match(dashboard, /previousSocialReportPosts/);
 assert.match(dashboard, /analystNote=\{socialAnalystNote\}/);
 assert.match(dashboard, /This concise report includes leadership highlights only\. The CSV contains complete post-level evidence/);
 assert.match(dashboard, /function SocialReportView/);
-assert.match(dashboard, /visibleResults\.filter\(\(result\) => isEligibleSocialReportPost\(result, topPostsWindow\)[\s\S]*verifiedOfficialSourceKeys\.has/);
+assert.match(dashboard, /monthlyReportCandidates\.filter\(\(result\) => isEligibleSocialReportPost\(result, topPostsWindow\)[\s\S]*verifiedOfficialSourceKeys\.has/);
+assert.match(dashboard, /monthlyReportCandidates\.filter\(\(result\) => isEligibleSocialReportPost\(result, comparisonPostsWindow\)/);
+assert.doesNotMatch(dashboard, /visibleResults\.filter\(\(result\) => isEligibleSocialReportPost/);
+assert.match(dashboard, /All verified official platforms/);
+assert.match(dashboard, /Campaign\/topic:/);
+assert.match(dashboard, /analystNoteScopeKey = `\$\{districtFilter\}\|\$\{topPostsPeriod\}/);
 assert.match(dashboard, /reportPeriod = `\$\{topPostsWindow\.label\}/);
 assert.match(dashboard, /Choose one district before exporting a Social Report/);
-assert.match(dashboard, /Minimum engagement rate:/);
-assert.match(dashboard, /Feed dates:/);
 assert.match(dashboard, /setSocialReportMode\(true\)/);
 assert.doesNotMatch(dashboard, /function exportSocialPdf\(\)[\s\S]{0,250}setCurrentView\('dashboard'\)/);
 assert.match(dashboard, /source\.id === result\.socialAccountId/);

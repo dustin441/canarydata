@@ -36,10 +36,6 @@ export function resolveSocialReportWindow(period, asOf, customStart = '', custom
   return { start, end: rangeEnd, label, startInput: dateInputValue(start), endInput: dateInputValue(rangeEnd) };
 }
 
-function endOfUtcDay(year, month, day) {
-  return new Date(Date.UTC(year, month, day, 23, 59, 59, 999));
-}
-
 export function resolveSocialReportComparisonWindow(period, asOf, customStart = '', customEnd = '') {
   const current = resolveSocialReportWindow(period, asOf, customStart, customEnd);
   const end = new Date(asOf);
@@ -51,9 +47,20 @@ export function resolveSocialReportComparisonWindow(period, asOf, customStart = 
     const previousMonthStart = new Date(Date.UTC(end.getUTCFullYear(), end.getUTCMonth() - 1, 1));
     const previousMonthLastDay = new Date(Date.UTC(end.getUTCFullYear(), end.getUTCMonth(), 0)).getUTCDate();
     const comparisonDay = Math.min(end.getUTCDate(), previousMonthLastDay);
-    start = previousMonthStart;
-    rangeEnd = endOfUtcDay(previousMonthStart.getUTCFullYear(), previousMonthStart.getUTCMonth(), comparisonDay);
-    label = `Previous month through day ${comparisonDay}`;
+    rangeEnd = new Date(Date.UTC(
+      previousMonthStart.getUTCFullYear(),
+      previousMonthStart.getUTCMonth(),
+      comparisonDay,
+      end.getUTCHours(),
+      end.getUTCMinutes(),
+      end.getUTCSeconds(),
+      end.getUTCMilliseconds(),
+    ));
+    const currentDuration = current.end.getTime() - current.start.getTime();
+    start = rangeEnd.getTime() - previousMonthStart.getTime() < currentDuration
+      ? new Date(rangeEnd.getTime() - currentDuration)
+      : previousMonthStart;
+    label = `Previous equal-length period through ${rangeEnd.toLocaleDateString('en-US', { month: 'short', day: 'numeric', timeZone: 'UTC' })}`;
   } else if (period === 'previous-month') {
     const selectedMonthStart = current.start;
     start = new Date(Date.UTC(selectedMonthStart.getUTCFullYear(), selectedMonthStart.getUTCMonth() - 1, 1));
@@ -209,7 +216,8 @@ export function summarizeSocialContentFormats(results) {
   const order = ['Video / Reel', 'Image / Photo', 'Text / Link'];
   const groups = new Map(order.map((format) => [format, []]));
   for (const result of results || []) {
-    const format = result?.mediaType === 'video' || Number(result?.providerMetadata?.duration_seconds) > 0
+    const mediaType = String(result?.mediaType || result?.providerMetadata?.media_type || result?.providerMetadata?.post_type || '').toLowerCase();
+    const format = mediaType.includes('video') || mediaType.includes('reel') || Number(result?.providerMetadata?.duration_seconds) > 0
       ? 'Video / Reel'
       : result?.mediaUrl
         ? 'Image / Photo'

@@ -2811,7 +2811,7 @@ function SocialView({ articles, socialThreads, socialSources, socialReviewEvents
   const [bulkReviewMessage, setBulkReviewMessage] = useState('');
   const [sourcesOpen, setSourcesOpen] = useState(false);
   const [socialReportMode, setSocialReportMode] = useState(false);
-  const [socialAnalystNote, setSocialAnalystNote] = useState('');
+  const [socialAnalystDrafts, setSocialAnalystDrafts] = useState({});
   const [topPostsAsOf] = useState(() => Date.now());
   const [topPostsPeriod, setTopPostsPeriod] = useState('previous-month');
   const [topPostsCustomStart, setTopPostsCustomStart] = useState('');
@@ -2836,6 +2836,9 @@ function SocialView({ articles, socialThreads, socialSources, socialReviewEvents
     () => resolveSocialReportComparisonWindow(topPostsPeriod, topPostsAsOf, topPostsCustomStart, topPostsCustomEnd),
     [topPostsPeriod, topPostsAsOf, topPostsCustomStart, topPostsCustomEnd],
   );
+  const analystNoteScopeKey = `${districtFilter}|${topPostsPeriod}|${topPostsCustomStart}|${topPostsCustomEnd}|${socialSearch.trim().toLowerCase()}`;
+  const socialAnalystNote = socialAnalystDrafts[analystNoteScopeKey] || '';
+  const setSocialAnalystNote = (value) => setSocialAnalystDrafts((current) => ({ ...current, [analystNoteScopeKey]: value }));
   const topPlatformGroups = useMemo(() => {
     const preferredOrder = ['facebook', 'instagram'];
     const recentOwnedResults = results.filter((result) => {
@@ -2916,32 +2919,33 @@ function SocialView({ articles, socialThreads, socialSources, socialReviewEvents
       .map((source) => `${source.id}:${source.district_id}:${source.platform}`),
   ), [scopedSources]);
   const hasVerifiedOfficialSource = (result) => verifiedOfficialSourceKeys.has(`${result.socialAccountId}:${result.districtId}:${result.platform}`);
+  const monthlyReportCandidates = useMemo(() => {
+    const query = socialSearch.trim().toLowerCase();
+    if (!query) return results;
+    return results.filter((result) => [
+      result.headline,
+      result.summary,
+      result.authorName,
+      ...(result.actionIntelligence?.strategicPriorityLabels || []),
+    ].some((value) => String(value || '').toLowerCase().includes(query)));
+  }, [results, socialSearch]);
   const socialReportPosts = useMemo(
-    () => visibleResults.filter((result) => isEligibleSocialReportPost(result, topPostsWindow)
+    () => monthlyReportCandidates.filter((result) => isEligibleSocialReportPost(result, topPostsWindow)
       && verifiedOfficialSourceKeys.has(`${result.socialAccountId}:${result.districtId}:${result.platform}`)),
-    [visibleResults, topPostsWindow, verifiedOfficialSourceKeys],
+    [monthlyReportCandidates, topPostsWindow, verifiedOfficialSourceKeys],
   );
   const previousSocialReportPosts = useMemo(
-    () => visibleResults.filter((result) => isEligibleSocialReportPost(result, comparisonPostsWindow)
+    () => monthlyReportCandidates.filter((result) => isEligibleSocialReportPost(result, comparisonPostsWindow)
       && verifiedOfficialSourceKeys.has(`${result.socialAccountId}:${result.districtId}:${result.platform}`)),
-    [visibleResults, comparisonPostsWindow, verifiedOfficialSourceKeys],
+    [monthlyReportCandidates, comparisonPostsWindow, verifiedOfficialSourceKeys],
   );
   const reportDistrictName = districtFilter === 'All'
     ? 'All Districts'
     : districts.find((district) => district.id === districtFilter)?.name || formatDistrictName(districtFilter);
   const reportPeriod = `${topPostsWindow.label} (${topPostsWindow.startInput} to ${topPostsWindow.endInput})`;
   const reportFilterContext = [
-    platformFilter !== 'all' ? `Platform: ${formatSourceLabel(platformFilter)}` : 'All platforms',
-    relationshipFilter !== 'all' ? `Relationship: ${relationshipFilter}` : 'Owned official posts for reporting',
-    actionFilter !== 'all' ? `Action: ${actionFilter}` : null,
-    mediaFilter !== 'all' ? `Content: ${mediaFilter}` : null,
-    performanceFilter !== 'all' ? `Performance: ${performanceFilter}` : null,
-    minimumEngagementRate !== '' ? `Minimum engagement rate: ${minimumEngagementRate}%` : null,
-    maximumEngagementRate !== '' ? `Maximum engagement rate: ${maximumEngagementRate}%` : null,
-    socialDateStart || socialDateEnd ? `Feed dates: ${socialDateStart || 'Any start'} to ${socialDateEnd || 'Today'}` : null,
-    reviewStatusFilter !== 'all' ? `Review state: ${reviewStatusFilter}` : null,
-    socialSort !== 'newest' ? `Feed sort: ${socialSort}` : null,
-    socialSearch ? `Search: “${socialSearch}”` : null,
+    'All verified official platforms',
+    socialSearch ? `Campaign/topic: “${socialSearch}”` : null,
   ].filter(Boolean).join(' · ');
   const pagedResults = visibleResults.slice(0, socialResultLimit);
   const changeSocialFilter = (setter, value) => {
