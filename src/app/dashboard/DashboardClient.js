@@ -10,6 +10,7 @@ import { compareStrategicAlignmentRows } from '@/lib/strategicAlignmentSort.mjs'
 import { CORE_TAGS, canonicalTags } from '@/lib/canonicalTags.mjs';
 import { buildSocialResults, calculateSocialEngagementRate, rankTopSocialResults, resolveSocialFollowerCount, safeSocialMediaUrl, safeSocialUrl, socialActionFilterMatches, socialDateFilterMatches, socialRelationshipFilterMatches, summarizeSocialActions, summarizeSocialResults } from '@/lib/social.mjs';
 import { formatDisplayDate } from '@/lib/date.mjs';
+import { CUSTOMER_SEARCH_QUERY_LIMIT, activeNewsQueryCount } from '@/lib/queryPolicy.mjs';
 import { buildCommunicationsBrief, formatCommunicationsBriefRecommendation } from '@/lib/communicationsBrief.mjs';
 import { buildStrategicGovernance } from '@/lib/strategicGovernance.mjs';
 
@@ -609,7 +610,7 @@ const CHANNEL_COLORS = {
 function QueriesView({ initialQueries, districts, userDistrictId, selectedDistrictId = 'All', onDistrictChange, isAdmin = false, demoMode = false }) {
   const [queries, setQueries] = useState(initialQueries);
   const districtFilter = userDistrictId ?? selectedDistrictId ?? 'All';
-  const canManageQueries = isAdmin && !demoMode;
+  const canManageQueries = !demoMode;
   const [showAddForm, setShowAddForm] = useState(false);
   const [form, setForm] = useState({
     query_text: '',
@@ -626,6 +627,8 @@ function QueriesView({ initialQueries, districts, userDistrictId, selectedDistri
   const filtered = districtFilter === 'All'
     ? queries
     : queries.filter((q) => q.district_id === districtFilter);
+  const activeNewsQueries = activeNewsQueryCount(filtered);
+  const canAddQuery = isAdmin || activeNewsQueries < CUSTOMER_SEARCH_QUERY_LIMIT;
 
   // group by has-geo vs no-geo
   const geoQueries = filtered.filter((q) => q.geo_city || q.geo_state || q.geo_zip);
@@ -633,10 +636,14 @@ function QueriesView({ initialQueries, districts, userDistrictId, selectedDistri
 
   async function handleDelete(id) {
     if (!canManageQueries) return;
+    if (!window.confirm('Remove this query from future monitoring? Existing stories will stay in your dashboard.')) return;
+    setAddError('');
     setDeletingId(id);
     try {
       await deleteQuery(id);
       setQueries((prev) => prev.filter((q) => q.id !== id));
+    } catch (err) {
+      setAddError(err.message ?? 'Failed to remove query.');
     } finally {
       setDeletingId(null);
     }
@@ -692,7 +699,7 @@ function QueriesView({ initialQueries, districts, userDistrictId, selectedDistri
               disabled={deletingId === q.id}
               style={{ padding: '4px 10px', fontSize: '0.75rem' }}
             >
-              {deletingId === q.id ? '…' : 'Delete'}
+              {deletingId === q.id ? '…' : 'Remove'}
             </button>
           </td>
         )}
@@ -745,12 +752,25 @@ function QueriesView({ initialQueries, districts, userDistrictId, selectedDistri
               <button
                 className="btn btn-primary btn-sm"
                 onClick={() => setShowAddForm((o) => !o)}
+                disabled={!canAddQuery}
               >
-                {showAddForm ? '✕ Cancel' : '+ Add Query'}
+                {!canAddQuery ? 'Query limit reached' : showAddForm ? '✕ Cancel' : '+ Add Query'}
               </button>
             )}
           </div>
         </div>
+
+        {!isAdmin && !demoMode && (
+          <div style={{ background: 'var(--bg-elevated)', border: '1px solid var(--border-secondary)', borderRadius: 'var(--radius-lg)', padding: '14px 16px', marginBottom: '20px' }}>
+            <div style={{ display: 'flex', justifyContent: 'space-between', gap: '12px', flexWrap: 'wrap', marginBottom: '5px' }}>
+              <strong style={{ color: 'var(--text-primary)', fontSize: '0.88rem' }}>News query usage</strong>
+              <span style={{ color: 'var(--text-secondary)', fontSize: '0.82rem', fontWeight: 700 }}>{activeNewsQueries} of {CUSTOMER_SEARCH_QUERY_LIMIT} active</span>
+            </div>
+            <p style={{ color: 'var(--text-secondary)', fontSize: '0.82rem', lineHeight: 1.5, margin: 0 }}>
+              Queries are checked every two days. Use focused names, programs, facilities, or issues rather than broad one-word topics.
+            </p>
+          </div>
+        )}
 
         {/* Add Query Form */}
         {canManageQueries && showAddForm && (
@@ -759,27 +779,31 @@ function QueriesView({ initialQueries, districts, userDistrictId, selectedDistri
             borderRadius: 'var(--radius-lg)', padding: '20px', marginBottom: '24px',
           }}>
             <div style={{ fontSize: '0.75rem', fontWeight: 700, textTransform: 'uppercase', letterSpacing: '0.08em', color: 'var(--text-tertiary)', marginBottom: '14px' }}>
-              New Query
+              {isAdmin ? 'New Query' : 'New News Query'}
             </div>
-            <div style={{ display: 'grid', gridTemplateColumns: '1fr auto', gap: '12px', marginBottom: '12px' }}>
+            <div style={{ display: 'grid', gridTemplateColumns: isAdmin ? '1fr auto' : '1fr', gap: '12px', marginBottom: '8px' }}>
               <input
                 className="form-input"
-                placeholder="Query text (e.g. Canary Falls Unified budget)"
+                placeholder="e.g. district name + budget, program, or facility"
                 value={form.query_text}
                 onChange={(e) => setForm((f) => ({ ...f, query_text: e.target.value }))}
+                maxLength={200}
                 required
               />
-              <select
-                className="filter-select"
-                value={form.channels}
-                onChange={(e) => setForm((f) => ({ ...f, channels: e.target.value }))}
-                style={{ minWidth: '100px' }}
-              >
-                <option value="news">News</option>
-                <option value="social">Social</option>
-                <option value="all">All</option>
-              </select>
+              {isAdmin && (
+                <select
+                  className="filter-select"
+                  value={form.channels}
+                  onChange={(e) => setForm((f) => ({ ...f, channels: e.target.value }))}
+                  style={{ minWidth: '100px' }}
+                >
+                  <option value="news">News</option>
+                  <option value="social">Social</option>
+                  <option value="all">All</option>
+                </select>
+              )}
             </div>
+            {!isAdmin && <p style={{ color: 'var(--text-tertiary)', fontSize: '0.78rem', lineHeight: 1.45, margin: '0 0 12px' }}>Be specific enough to avoid unrelated results. The query is saved only to your district account.</p>}
             <div style={{ display: 'grid', gridTemplateColumns: '1fr 1fr 120px', gap: '12px', marginBottom: '12px' }}>
               <input
                 className="form-input"
@@ -822,12 +846,6 @@ function QueriesView({ initialQueries, districts, userDistrictId, selectedDistri
               </button>
             </div>
           </form>
-        )}
-
-        {!isAdmin && !demoMode && (
-          <p style={{ color: 'var(--text-secondary)', fontSize: '0.85rem', marginBottom: '24px', lineHeight: 1.5 }}>
-            Need to add or remove a monitoring query? Contact Canary Data and we’ll update it for you.
-          </p>
         )}
 
         {/* Keyword Queries */}

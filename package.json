@@ -16,6 +16,7 @@
     "test:social": "node scripts/test-social-monitoring.mjs && node scripts/test-social-review.mjs && node scripts/test-communications-brief.mjs",
     "test:strategic-governance": "node scripts/test-strategic-governance.mjs",
     "test:melodi": "node scripts/test-melodi.mjs",
+    "test:queries": "node scripts/test-query-management.mjs",
     "pilot:social": "node scripts/ingest-social-pilot.mjs"
   },
   "dependencies": {

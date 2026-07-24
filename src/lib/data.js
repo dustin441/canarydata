@@ -208,6 +208,7 @@ export async function getQueries(districtId = null) {
   let query = supabase
     .from('search_queries')
     .select('id, query_text, district_id, district_name, geo_city, geo_state, geo_zip, channels, active, created_at')
+    .eq('active', true)
     .order('district_id')
     .order('query_text');
   if (districtId) query = query.eq('district_id', districtId);

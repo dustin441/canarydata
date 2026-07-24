@@ -5,6 +5,7 @@ import { createClient as createServerClient } from '@/lib/supabase/server';
 import { createClickUpFeedbackTask, createClickUpOnboardingTask, isClickUpConfigured } from '@/lib/clickup';
 import { revalidatePath } from 'next/cache';
 import { canonicalizeStoryUrl, requireCorrectionReason } from '@/lib/storyCorrections.mjs';
+import { CUSTOMER_SEARCH_QUERY_LIMIT, searchQueryFingerprint, validateSearchQueryText } from '@/lib/queryPolicy.mjs';
 import { lookup } from 'node:dns/promises';
 import { isIP } from 'node:net';
 
@@ -32,10 +33,6 @@ function assertDistrictAccess(actor, districtId) {
 
 function assertCanaryReviewer(actor) {
   if (!actor.isAdmin) throw new Error('Canary reviewer access is required.');
-}
-
-function assertCanaryAdmin(actor) {
-  if (!actor.isAdmin) throw new Error('Canary admin access is required.');
 }
 
 const SOCIAL_REVIEW_ACTIONS = new Set(['approve', 'exclude', 'restore', 'classification', 'note', 'promote']);
@@ -787,33 +784,70 @@ export async function bulkReviewSocialThreads({ districtId, socialThreadIds, act
 
 export async function addQuery({ query_text, district_id, district_name, geo_city, geo_state, geo_zip, channels }) {
   const { actor, admin: supabase } = await requireCanaryActor();
-  assertCanaryAdmin(actor);
-  assertDistrictAccess(actor, district_id);
+  const targetDistrictId = actor.isAdmin ? String(district_id || '').trim() : actor.districtId;
+  if (!targetDistrictId) throw new Error('Choose a district before adding a query.');
+  assertDistrictAccess(actor, targetDistrictId);
+
+  const queryText = validateSearchQueryText(query_text);
+  const queryChannel = actor.isAdmin && ['news', 'social', 'all'].includes(channels) ? channels : 'news';
+  const { data: existingQueries, error: existingError } = await supabase
+    .from('search_queries')
+    .select('id, query_text, channels, active')
+    .eq('district_id', targetDistrictId);
+  if (existingError) throw existingError;
+
+  const fingerprint = searchQueryFingerprint(queryText);
+  const matchingQuery = (existingQueries || []).find((query) => query.channels === queryChannel && searchQueryFingerprint(query.query_text) === fingerprint);
+  if (matchingQuery && matchingQuery.active !== false) throw new Error('That search query is already active.');
+
+  const activeNewsQueries = (existingQueries || []).filter((query) => query.active !== false && query.channels === 'news').length;
+  if (!actor.isAdmin && queryChannel === 'news' && activeNewsQueries >= CUSTOMER_SEARCH_QUERY_LIMIT) {
+    throw new Error(`Your account can monitor up to ${CUSTOMER_SEARCH_QUERY_LIMIT} active news queries. Remove one before adding another.`);
+  }
+
+  const cleanLocation = (value, maxLength) => String(value || '').trim().slice(0, maxLength);
+  const { data: district } = await supabase.from('districts').select('name').eq('id', targetDistrictId).maybeSingle();
+  const queryValues = {
+    query_text: queryText,
+    district_id: targetDistrictId,
+    district_name: district?.name || district_name || null,
+    geo_city: cleanLocation(geo_city, 100),
+    geo_state: cleanLocation(geo_state, 50),
+    geo_zip: cleanLocation(geo_zip, 20),
+    channels: queryChannel,
+    active: true,
+  };
+
+  if (matchingQuery) {
+    const { data, error } = await supabase
+      .from('search_queries')
+      .update(queryValues)
+      .eq('id', matchingQuery.id)
+      .select('id, query_text, district_id, district_name, geo_city, geo_state, geo_zip, channels, active, created_at')
+      .single();
+    if (error) throw error;
+    revalidatePath('/dashboard');
+    return data;
+  }
+
   const { data, error } = await supabase
     .from('search_queries')
-    .insert({
-      query_text,
-      district_id: district_id || null,
-      district_name: district_name || null,
-      geo_city: geo_city || '',
-      geo_state: geo_state || '',
-      geo_zip: geo_zip || '',
-      channels: channels || 'news',
-      active: true,
-    })
+    .insert(queryValues)
     .select('id, query_text, district_id, district_name, geo_city, geo_state, geo_zip, channels, active, created_at')
     .single();
   if (error) throw error;
+  revalidatePath('/dashboard');
   return data;
 }
 
 export async function deleteQuery(id) {
   const { actor, admin: supabase } = await requireCanaryActor();
-  assertCanaryAdmin(actor);
   const { data: query } = await supabase.from('search_queries').select('district_id').eq('id', id).maybeSingle();
+  if (!query) throw new Error('Search query not found.');
   assertDistrictAccess(actor, query?.district_id);
-  const { error } = await supabase.from('search_queries').delete().eq('id', id);
+  const { error } = await supabase.from('search_queries').update({ active: false }).eq('id', id);
   if (error) throw error;
+  revalidatePath('/dashboard');
 }
 
 export async function submitFeedback(formData) {
