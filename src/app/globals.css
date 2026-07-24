@@ -5057,7 +5057,7 @@ input[type="date"]::-webkit-calendar-picker-indicator {
     display: grid;
     grid-template-columns: minmax(0, 1.55fr) minmax(260px, 1fr);
     gap: 18px;
-    padding: 12px 14px;
+    padding: 16px 18px;
     border: 1px solid #cbd5e1;
     border-left: 6px solid #334155;
     background: #ffffff !important;
@@ -5067,7 +5067,7 @@ input[type="date"]::-webkit-calendar-picker-indicator {
   .social-report-header h1 {
     margin: 3px 0;
     color: #0f172a !important;
-    font-size: 20px;
+    font-size: 24px;
   }
 
   .social-report-header p,
@@ -5077,28 +5077,30 @@ input[type="date"]::-webkit-calendar-picker-indicator {
     color: #475569 !important;
   }
 
+  .social-report-header p { font-size: 10px; line-height: 1.4; }
+
   .social-report-header dl {
     display: grid;
-    gap: 5px;
+    gap: 6px;
     margin: 0;
   }
 
   .social-report-header dl > div {
-    padding: 5px 7px;
+    padding: 7px 9px;
     border: 1px solid #e2e8f0;
     background: #f8fafc !important;
   }
 
   .social-report-header dt {
-    font-size: 7px;
+    font-size: 8px;
     font-weight: 800;
     letter-spacing: 0.05em;
     text-transform: uppercase;
   }
 
   .social-report-header dd {
-    margin: 1px 0 0;
-    font-size: 8px;
+    margin: 2px 0 0;
+    font-size: 9px;
     font-weight: 700;
     overflow-wrap: anywhere;
   }
@@ -5106,15 +5108,15 @@ input[type="date"]::-webkit-calendar-picker-indicator {
   .social-report-scorecards {
     display: grid;
     grid-template-columns: repeat(5, minmax(0, 1fr));
-    gap: 7px;
-    margin: 10px 0 12px;
+    gap: 9px;
+    margin: 12px 0 16px;
     break-inside: avoid;
     page-break-inside: avoid;
   }
 
   .social-report-scorecards article {
     min-width: 0;
-    padding: 8px 9px;
+    padding: 11px 12px;
     border: 1px solid #cbd5e1;
     border-top: 3px solid #475569;
     background: #ffffff !important;
@@ -5124,20 +5126,21 @@ input[type="date"]::-webkit-calendar-picker-indicator {
   .social-report-scorecards small {
     display: block;
     color: #64748b !important;
-    font-size: 7px;
-    line-height: 1.3;
+    font-size: 8px;
+    line-height: 1.35;
   }
 
   .social-report-scorecards span { font-weight: 800; text-transform: uppercase; letter-spacing: 0.03em; }
-  .social-report-scorecards strong { display: block; margin: 3px 0 2px; color: #0f172a !important; font-size: 17px; line-height: 1; }
+  .social-report-scorecards strong { display: block; margin: 5px 0 4px; color: #0f172a !important; font-size: 21px; line-height: 1; }
 
-  .social-report-section { margin-top: 12px; }
-  .social-report-section-heading { margin-bottom: 5px; break-after: avoid; }
-  .social-report-section-heading h2 { margin: 0; color: #0f172a !important; font-size: 13px; }
-  .social-report-section-heading p { margin: 2px 0 0; color: #64748b !important; font-size: 7.5px; }
-  .social-report-platform-table { margin-top: 7px; }
-  .social-report-platform-table h3 { margin: 0 0 3px; color: #334155 !important; font-size: 9px; }
+  .social-report-section { margin-top: 16px; }
+  .social-report-section-heading { margin-bottom: 8px; break-after: avoid; }
+  .social-report-section-heading h2 { margin: 0; color: #0f172a !important; font-size: 16px; }
+  .social-report-section-heading p { margin: 3px 0 0; color: #64748b !important; font-size: 9px; }
+  .social-report-platform-table { margin-top: 10px; }
+  .social-report-platform-table h3 { margin: 0 0 5px; color: #334155 !important; font-size: 11px; }
   .social-report-detail { break-before: auto; }
+  .social-report-detail-new-page { break-before: page; page-break-before: always; }
 
   .social-report-table-wrap {
     width: 100%;
@@ -5150,7 +5153,7 @@ input[type="date"]::-webkit-calendar-picker-indicator {
     max-width: 100%;
     border-collapse: collapse;
     table-layout: fixed;
-    font-size: 7px;
+    font-size: 8.5px;
   }
 
   .social-report-table thead { display: table-header-group; }
@@ -5158,7 +5161,7 @@ input[type="date"]::-webkit-calendar-picker-indicator {
   .social-report-table tr { break-inside: avoid; page-break-inside: avoid; }
   .social-report-table th,
   .social-report-table td {
-    padding: 4px 3px;
+    padding: 6px 5px;
     border: 1px solid #dbe3ef;
     color: #0f172a !important;
     text-align: left;
@@ -5170,7 +5173,7 @@ input[type="date"]::-webkit-calendar-picker-indicator {
 
   .social-report-table th {
     background: #e2e8f0 !important;
-    font-size: 6.5px;
+    font-size: 7.5px;
     font-weight: 800;
     line-height: 1.15;
     text-transform: uppercase;
@@ -5186,8 +5189,8 @@ input[type="date"]::-webkit-calendar-picker-indicator {
 
   .social-report-thumbnail {
     display: flex;
-    width: 42px;
-    height: 32px;
+    width: 50px;
+    height: 42px;
     max-width: 100%;
     align-items: center;
     justify-content: center;
@@ -5207,12 +5210,14 @@ input[type="date"]::-webkit-calendar-picker-indicator {
     -webkit-print-color-adjust: exact;
   }
 
-  .social-report-thumbnail span { padding: 2px; font-size: 5.5px; line-height: 1.15; }
+  .social-report-thumbnail span { padding: 3px; font-size: 6.5px; line-height: 1.15; }
   .social-report-post-cell a,
   .social-report-post-cell span { display: block; color: #0f172a !important; line-height: 1.25; overflow-wrap: anywhere; }
   .social-report-post-cell a { color: #1d4ed8 !important; text-decoration: underline; }
-  .social-report-post-cell small { display: block; margin-top: 2px; color: #64748b !important; font-size: 6px; }
-  .social-report-table-note { margin: 4px 0 0; color: #64748b !important; font-size: 6.5px; }
+  .social-report-post-cell small { display: block; margin-top: 2px; color: #64748b !important; font-size: 7px; }
+  .social-report-table-note { margin: 5px 0 0; color: #64748b !important; font-size: 7.5px; }
+  .social-report-data-notes { display: grid; gap: 3px; margin-top: 12px; padding: 9px 11px; border-left: 4px solid #475569; background: #f8fafc !important; color: #475569 !important; font-size: 8px; line-height: 1.4; break-inside: avoid; }
+  .social-report-data-notes strong { color: #0f172a !important; font-size: 9px; }
   .social-report-empty { margin-top: 14px; color: #475569 !important; font-size: 10px; }
 
   .board-report-header {

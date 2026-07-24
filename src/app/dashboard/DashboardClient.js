@@ -2580,9 +2580,13 @@ function SocialReportView({ districtName, reportWindow, filterContext, posts }) 
               </section>
             ))}
           </section>
-          <section className="social-report-section social-report-detail">
+          <section className={`social-report-section social-report-detail${posts.length > 5 ? ' social-report-detail-new-page' : ''}`}>
             <div className="social-report-section-heading"><h2>Official Post Detail</h2><p>Complete detail for every eligible post in this report period.</p></div>
             <SocialReportTable results={detailPosts} />
+            <aside className="social-report-data-notes">
+              <strong>Data notes</strong>
+              <span>“Not available” means the source did not supply that metric. Reported views are platform-provided views, not unique reach. Public interactions include available reactions, comments, replies, and shares.</span>
+            </aside>
           </section>
         </>
       ) : <p className="social-report-empty">No active, owned official posts match this reporting window and the current visible Social filters.</p>}
@@ -2823,7 +2827,14 @@ function SocialView({ articles, socialThreads, socialSources, socialReviewEvents
     setSocialReportMode(true);
     const restore = () => setSocialReportMode(false);
     window.addEventListener('afterprint', restore, { once: true });
-    window.setTimeout(() => window.print(), 300);
+    window.setTimeout(async () => {
+      const reportImages = [...document.querySelectorAll('.social-report img')];
+      await Promise.race([
+        Promise.all(reportImages.map((image) => image.decode?.().catch(() => undefined))),
+        new Promise((resolve) => window.setTimeout(resolve, 2000)),
+      ]);
+      window.print();
+    }, 100);
     window.setTimeout(restore, 15000);
   }
 
