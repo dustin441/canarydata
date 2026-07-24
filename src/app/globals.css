@@ -1141,11 +1141,14 @@ a:hover {
 /* ===== SOCIAL MONITORING ===== */
 .social-monitor-view {
   display: grid;
+  grid-template-columns: minmax(0, 1fr);
+  min-width: 0;
   gap: 22px;
 }
 
 .social-monthly-performance {
   display: grid;
+  grid-template-columns: minmax(0, 1fr);
   min-width: 0;
   gap: 20px;
   padding: 24px;
