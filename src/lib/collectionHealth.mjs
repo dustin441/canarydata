@@ -15,18 +15,18 @@ export function summarizeCollectionHealth(record = {}, nowValue = Date.now()) {
   const activityAgeHours = latestActivityAt ? Math.max(0, (now - latestActivityAt) / HOUR) : null;
   const storyAgeDays = lastStoryAt ? Math.max(0, (now - lastStoryAt) / DAY) : null;
   let status = 'healthy';
-  let label = 'Collection current';
-  let detail = latestActivityAt ? `Latest collection evidence ${new Date(latestActivityAt).toISOString()}` : 'No collection evidence is available.';
+  let label = 'Collection evidence current';
+  let detail = latestActivityAt ? 'Recent raw-result or candidate activity was recorded.' : 'No collection evidence is available.';
 
   if (!latestActivityAt || activityAgeHours > 72) {
     status = 'critical';
-    label = 'Collection stale';
+    label = 'Collection evidence stale';
     detail = latestActivityAt
       ? `No collection evidence in ${Math.floor(activityAgeHours / 24)} days.`
       : 'No collection evidence is available.';
   } else if (activityAgeHours > 36) {
     status = 'warning';
-    label = 'Collection delayed';
+    label = 'Collection evidence delayed';
     detail = `Latest collection evidence is ${Math.floor(activityAgeHours)} hours old.`;
   } else if ((record.rawResults7d || 0) > 0 && (record.acceptedStories14d || 0) === 0) {
     status = 'warning';

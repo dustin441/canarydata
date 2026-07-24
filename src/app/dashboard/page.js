@@ -35,7 +35,7 @@ export default async function DashboardPage() {
     isAdmin ? getSocialReviewEvents(userDistrictId) : Promise.resolve([]),
     getStrategicProfiles(userDistrictId),
     getStrategicPriorities(userDistrictId),
-    getCollectionHealth(districts, userDistrictId),
+    getCollectionHealth(districts, userDistrictId).catch(() => []),
   ]);
 
   const billingContext = userDistrictId ? await getAuthenticatedBillingContext() : null;
