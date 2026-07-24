@@ -791,10 +791,15 @@ export async function bulkReviewSocialThreads({ districtId, socialThreadIds, act
 export async function addQuery({ query_text, district_id, district_name, geo_city, geo_state, geo_zip, channels }) {
   const { actor, admin: supabase } = await requireCanaryActor();
   const targetDistrictId = actor.isAdmin ? String(district_id || '').trim() : actor.districtId;
-  if (!targetDistrictId) throw new Error('Choose a district before adding a query.');
+  if (!targetDistrictId) return { error: 'Choose a district before adding a query.' };
   assertDistrictAccess(actor, targetDistrictId);
 
-  const queryText = validateSearchQueryText(query_text);
+  let queryText;
+  try {
+    queryText = validateSearchQueryText(query_text);
+  } catch (error) {
+    return { error: error.message };
+  }
   const queryChannel = actor.isAdmin && ['news', 'social', 'all'].includes(channels) ? channels : 'news';
   const { data: existingQueries, error: existingError } = await supabase
     .from('search_queries')
@@ -804,11 +809,11 @@ export async function addQuery({ query_text, district_id, district_name, geo_cit
 
   const fingerprint = searchQueryFingerprint(queryText);
   const matchingQuery = (existingQueries || []).find((query) => query.channels === queryChannel && searchQueryFingerprint(query.query_text) === fingerprint);
-  if (matchingQuery && matchingQuery.active !== false) throw new Error('That search query is already active.');
+  if (matchingQuery && matchingQuery.active !== false) return { error: 'That search query is already active.' };
 
   const activeNewsQueries = (existingQueries || []).filter((query) => query.active !== false && query.channels === 'news').length;
   if (!actor.isAdmin && queryChannel === 'news' && activeNewsQueries >= CUSTOMER_SEARCH_QUERY_LIMIT) {
-    throw new Error(`Your account can monitor up to ${CUSTOMER_SEARCH_QUERY_LIMIT} active news queries. Remove one before adding another.`);
+    return { error: `Your account can monitor up to ${CUSTOMER_SEARCH_QUERY_LIMIT} active news queries. Remove one before adding another.` };
   }
 
   const cleanLocation = (value, maxLength) => String(value || '').trim().slice(0, maxLength);
@@ -840,7 +845,7 @@ export async function addQuery({ query_text, district_id, district_name, geo_cit
     const activeIds = new Set((existingQueries || []).filter((query) => query.active !== false).map((query) => query.id));
     const slotIds = Array.from({ length: CUSTOMER_SEARCH_QUERY_LIMIT }, (_, index) => customerSearchQuerySlotId(targetDistrictId, index));
     const slotId = slotIds.find((id) => !activeIds.has(id));
-    if (!slotId) throw new Error(`Your account can monitor up to ${CUSTOMER_SEARCH_QUERY_LIMIT} active news queries. Remove one before adding another.`);
+    if (!slotId) return { error: `Your account can monitor up to ${CUSTOMER_SEARCH_QUERY_LIMIT} active news queries. Remove one before adding another.` };
 
     const existingSlot = (existingQueries || []).find((query) => query.id === slotId);
     if (existingSlot) {
@@ -852,7 +857,7 @@ export async function addQuery({ query_text, district_id, district_name, geo_cit
         .select('id, query_text, district_id, district_name, geo_city, geo_state, geo_zip, channels, active, created_at')
         .maybeSingle();
       if (error) throw error;
-      if (!data) throw new Error('Queries changed while this request was saving. Please try again.');
+      if (!data) return { error: 'Queries changed while this request was saving. Please try again.' };
       revalidatePath('/dashboard');
       return data;
     }
@@ -862,7 +867,7 @@ export async function addQuery({ query_text, district_id, district_name, geo_cit
       .insert({ ...queryValues, id: slotId })
       .select('id, query_text, district_id, district_name, geo_city, geo_state, geo_zip, channels, active, created_at')
       .single();
-    if (error?.code === '23505') throw new Error('Queries changed while this request was saving. Please try again.');
+    if (error?.code === '23505') return { error: 'Queries changed while this request was saving. Please try again.' };
     if (error) throw error;
     revalidatePath('/dashboard');
     return data;

@@ -658,6 +658,10 @@ function QueriesView({ initialQueries, districts, userDistrictId, selectedDistri
     try {
       const districtName = districts.find((d) => d.id === form.district_id)?.name ?? null;
       const newQuery = await addQuery({ ...form, district_name: districtName });
+      if (newQuery?.error) {
+        setAddError(newQuery.error);
+        return;
+      }
       setQueries((prev) => [...prev, newQuery]);
       setForm({ query_text: '', channels: 'news', district_id: userDistrictId ?? (districtFilter !== 'All' ? districtFilter : ''), geo_city: '', geo_state: '', geo_zip: '' });
       setShowAddForm(false);
