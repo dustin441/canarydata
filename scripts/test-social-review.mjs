@@ -242,6 +242,8 @@ assert.doesNotMatch(socialReportSource, /Official Post Detail|Complete detail fo
 for (const marker of ['Monthly Social Performance', 'Latest completed month', 'Campaign or topic', 'Platform performance', 'Content format', 'Leadership highlights', 'Social Media Brief', 'Requires an authorized Meta account connection']) {
   assert.ok(dashboard.includes(marker), `Monthly Social Performance must include ${marker}`);
 }
+assert.match(dashboard, /function formatSocialComparison\(change\)[\s\S]*Intl\.NumberFormat\('en-US'/);
+assert.doesNotMatch(dashboard, /formatSocialComparison\(change\)[\s\S]{0,500}formatSocialMetric\(change\.absolute\)/);
 assert.match(dashboard, /useState\('previous-month'\)/);
 assert.match(dashboard, /resolveSocialReportComparisonWindow\(topPostsPeriod/);
 assert.match(dashboard, /previousSocialReportPosts/);

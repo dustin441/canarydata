@@ -2687,9 +2687,10 @@ function BoardReportView({ districtId, districtName, articles, socialThreads, so
 function formatSocialComparison(change) {
   if (!change) return 'Not available';
   const prefix = change.absolute > 0 ? '+' : '';
-  if (change.percent === null) return `${prefix}${formatSocialMetric(change.absolute)} · no prior baseline`;
+  const absolute = new Intl.NumberFormat('en-US', { maximumFractionDigits: 1 }).format(change.absolute);
+  if (change.percent === null) return `${prefix}${absolute} · no prior baseline`;
   const percentPrefix = change.percent > 0 ? '+' : '';
-  return `${prefix}${formatSocialMetric(change.absolute)} · ${percentPrefix}${change.percent.toFixed(0)}%`;
+  return `${prefix}${absolute} · ${percentPrefix}${change.percent.toFixed(0)}%`;
 }
 
 function MonthlySocialPerformance({
