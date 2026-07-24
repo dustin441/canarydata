@@ -90,6 +90,20 @@ export function rankSocialReportTopPerformers(results, limit = 10) {
   }).slice(0, safeLimit);
 }
 
+export function selectOfficialSocialReportPosts(results, sources, districtId, window, limit = Number.POSITIVE_INFINITY) {
+  const officialSourceKeys = new Set((sources || [])
+    .filter((source) => source?.active === true
+      && source?.district_id === districtId
+      && Boolean(String(source?.handle || source?.profile_url || '').trim()))
+    .map((source) => `${source.id}:${source.district_id}:${String(source.platform || '').toLowerCase()}`));
+
+  const eligible = (results || []).filter((result) => result?.districtId === districtId
+    && isEligibleSocialReportPost(result, window)
+    && officialSourceKeys.has(`${result.socialAccountId}:${result.districtId}:${String(result.platform || '').toLowerCase()}`));
+
+  return rankSocialReportTopPerformers(eligible, limit);
+}
+
 export function sortSocialReportDetails(results) {
   return results.slice().sort((a, b) => {
     const dateDifference = (reportTimestamp(b) ?? -1) - (reportTimestamp(a) ?? -1);

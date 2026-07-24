@@ -7,6 +7,7 @@ import {
   isEligibleSocialReportPost,
   metricAvailabilityCoverage,
   rankSocialReportTopPerformers,
+  selectOfficialSocialReportPosts,
   sortSocialReportDetails,
   summarizeSocialReport,
 } from '../src/lib/socialReport.mjs';
@@ -129,6 +130,25 @@ assert.equal(unavailableSummary.totalInteractions, null);
 assert.equal(unavailableSummary.averageInteractions, null);
 assert.equal(unavailableSummary.reportedViews, null);
 
+const officialSources = [
+  { id: 'official-fb', district_id: 'district-a', platform: 'facebook', active: true, handle: 'districta' },
+  { id: 'official-ig', district_id: 'district-a', platform: 'instagram', active: true, profile_url: 'https://instagram.com/districta' },
+  { id: 'inactive-ig', district_id: 'district-a', platform: 'instagram', active: false, handle: 'districta' },
+  { id: 'anonymous-ig', district_id: 'district-a', platform: 'instagram', active: true, handle: '', profile_url: '' },
+];
+const officialCandidates = [
+  ...reportPosts.slice(0, 4).map((post) => ({ ...post, districtId: 'district-a', socialAccountId: post.platform === 'instagram' ? 'official-ig' : 'official-fb' })),
+  { ...reportPosts[0], id: 'wrong-district', districtId: 'district-b', socialAccountId: 'official-fb' },
+  { ...reportPosts[0], id: 'wrong-platform', platform: 'instagram', districtId: 'district-a', socialAccountId: 'official-fb' },
+  { ...reportPosts[0], id: 'inactive-source', platform: 'instagram', districtId: 'district-a', socialAccountId: 'inactive-ig' },
+  { ...reportPosts[0], id: 'anonymous-source', platform: 'instagram', districtId: 'district-a', socialAccountId: 'anonymous-ig' },
+  { ...reportPosts[6], districtId: 'district-a', socialAccountId: 'official-fb' },
+];
+assert.deepEqual(
+  selectOfficialSocialReportPosts(officialCandidates, officialSources, 'district-a', reportWindow, 3).map((post) => post.id),
+  ['fb-high', 'ig-tie-a', 'ig-tie-b'],
+);
+
 const [sql, actions, dashboard, styles, data, melodi] = await Promise.all([
   readFile(new URL('../supabase/social_review_workflow.sql', import.meta.url), 'utf8'),
   readFile(new URL('../src/app/actions.js', import.meta.url), 'utf8'),
@@ -201,6 +221,20 @@ assert.match(dashboard, /source\.active === true/);
 assert.match(dashboard, /const SHOW_GLOBAL_BOARD_REPORT_EXPORT = false/);
 assert.match(dashboard, /SHOW_GLOBAL_BOARD_REPORT_EXPORT && \['dashboard', 'birdseye', 'social'\]/);
 assert.match(dashboard, /Export Leadership \/ Board PDF/);
+assert.doesNotMatch(dashboard, /⬇ Export PDF[\s\S]{0,180}Tabloid landscape works best/);
+assert.doesNotMatch(dashboard, /function handleExportPdf/);
+assert.match(dashboard, /function BirdEyeView\(\{[\s\S]*districtId[\s\S]*districtName[\s\S]*socialThreads[\s\S]*socialSources/);
+assert.match(dashboard, /selectOfficialSocialReportPosts\([\s\S]*socialThreads[\s\S]*socialSources[\s\S]*districtId[\s\S]*reportWindow[\s\S]*3/);
+assert.match(dashboard, /Top 3 official social posts/);
+assert.match(dashboard, /socialReportPosts\.map\(\(result, index\)/);
+assert.match(dashboard, /canary-social-performance-/);
+assert.match(dashboard, /socialReportPosts\.map\(\(result\) => socialCsvRow/);
+assert.match(dashboard, /<SocialReportMetric result=\{result\} metric="reactions"/);
+const socialReportCardSource = dashboard.slice(dashboard.indexOf('function SocialReportCard'), dashboard.indexOf('function SocialReportThumbnail'));
+for (const metric of ['reactions', 'comments', 'shares']) {
+  assert.ok(socialReportCardSource.includes(`metric="${metric}"`), `Board social cards must honor ${metric} availability`);
+}
+assert.match(socialReportCardSource, /socialReportInteractionTotal\(result\) === null \? 'Not available'/);
 assert.match(styles, /\.social-report-mode > \*:not\(\.social-report\)/);
 assert.match(styles, /\.social-report-mode \.social-report/);
 assert.match(styles, /\.social-report-table thead \{ display: table-header-group; \}/);
@@ -208,6 +242,10 @@ assert.match(styles, /\.social-report-thumbnail img[\s\S]*object-fit: contain/);
 assert.match(styles, /\.social-report-table th,[\s\S]*overflow-wrap: anywhere/);
 assert.doesNotMatch(styles, /\.social-report-grid/);
 assert.match(styles, /input\[type="date"\][\s\S]*color-scheme: dark/);
+assert.match(styles, /\.birdseye-report-controls[\s\S]*display: none !important/);
+assert.match(styles, /\.birdseye-evidence-page[\s\S]*break-before: page/);
+assert.match(styles, /\.birdseye-evidence-table thead[\s\S]*display: table-header-group/);
+assert.match(styles, /\.board-report-social \.social-report-media img[\s\S]*object-fit: contain/);
 assert.match(dashboard, /!listCompact && \(/);
 assert.match(data, /includeReview \? \['active', 'approved', 'review', 'excluded'\] : \['active'\]/);
 assert.match(data, /export async function getSocialReviewEvents/);

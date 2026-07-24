@@ -9,7 +9,7 @@ import { createEmbeddedCanaryCheckout, confirmEmbeddedCanaryCheckout, saveBillin
 import { compareStrategicAlignmentRows } from '@/lib/strategicAlignmentSort.mjs';
 import { CORE_TAGS, canonicalTags } from '@/lib/canonicalTags.mjs';
 import { buildSocialResults, calculateSocialEngagementRate, rankTopSocialResults, resolveSocialFollowerCount, safeSocialMediaUrl, safeSocialUrl, socialActionFilterMatches, socialDateFilterMatches, socialRelationshipFilterMatches, summarizeSocialActions, summarizeSocialResults } from '@/lib/social.mjs';
-import { dateInputValue, groupTopReportPostsByPlatform, isEligibleSocialReportPost, resolveSocialReportWindow, socialReportInteractionTotal, sortSocialReportDetails, summarizeSocialReport } from '@/lib/socialReport.mjs';
+import { dateInputValue, groupTopReportPostsByPlatform, isEligibleSocialReportPost, resolveSocialReportWindow, selectOfficialSocialReportPosts, socialReportInteractionTotal, sortSocialReportDetails, summarizeSocialReport } from '@/lib/socialReport.mjs';
 import { formatDisplayDate } from '@/lib/date.mjs';
 import { CUSTOMER_SEARCH_QUERY_LIMIT, activeNewsQueryCount } from '@/lib/queryPolicy.mjs';
 import { buildCommunicationsBrief, formatCommunicationsBriefRecommendation } from '@/lib/communicationsBrief.mjs';
@@ -987,14 +987,31 @@ function StrategicGovernancePanel({ governance, hasSelectedDistrict }) {
   );
 }
 
-function BirdEyeView({ articles, strategicAlignmentData, strategicGovernance, hasSelectedDistrict, selectedLabel, onSelectLabel, isEarned, dateStart, dateEnd, setDateStart, setDateEnd, onExportPdf }) {
+function BirdEyeView({ articles, strategicGovernance, hasSelectedDistrict, selectedLabel, onSelectLabel, isEarned, dateStart, dateEnd, setDateStart, setDateEnd, onExportPdf, districtId, districtName, socialThreads, socialSources, reportFilterContext }) {
+  const newsArticles = articles.filter((article) => !SOCIAL_SOURCE_TYPES.has(String(article.source_type || '').toLowerCase()));
+  const strategicAlignmentData = buildStrategicAlignmentData(newsArticles);
   const highlightedArticles = selectedLabel === 'All'
-    ? articles.filter((article) => extractStrategicAlignmentLabels(article.innovation_reason).length > 0)
-    : articles.filter((article) => extractStrategicAlignmentLabels(article.innovation_reason).includes(selectedLabel));
-  const totalMentions = articles.length;
+    ? newsArticles.filter((article) => extractStrategicAlignmentLabels(article.innovation_reason).length > 0)
+    : newsArticles.filter((article) => extractStrategicAlignmentLabels(article.innovation_reason).includes(selectedLabel));
+  const totalMentions = newsArticles.length;
   const strategicHitCount = highlightedArticles.length;
   const earnedCount = highlightedArticles.filter((article) => isEarned(article)).length;
   const percent = (count, total = totalMentions) => total ? `${Math.round((count / total) * 100)}%` : '0%';
+  const reportWindow = {
+    start: dateStart ? new Date(`${dateStart}T00:00:00.000Z`) : new Date(0),
+    end: dateEnd ? new Date(`${dateEnd}T23:59:59.999Z`) : new Date(),
+  };
+  const socialReportPosts = hasSelectedDistrict
+    ? selectOfficialSocialReportPosts(
+        buildSocialResults(socialThreads),
+        socialSources,
+        districtId,
+        reportWindow,
+        3,
+      )
+    : [];
+  const dateContext = `${dateStart || 'All available dates'} to ${dateEnd || 'Today'}`;
+  const filterContext = reportFilterContext || (selectedLabel === 'All' ? 'All Strategic Alignment focus areas' : `Focus area: ${selectedLabel}`);
 
   function exportBirdEyeCsv() {
     downloadCsv(
@@ -1005,28 +1022,35 @@ function BirdEyeView({ articles, strategicAlignmentData, strategicGovernance, ha
   }
 
   return (
-    <div className="data-section">
+    <div className="data-section birdseye-board-report">
       <div className="data-header">
         <div>
-          <h3>🦅 Bird’s Eye View <span style={{ color: 'var(--text-tertiary)', fontSize: '0.85rem', fontWeight: 400 }}>({highlightedArticles.length} aligned articles)</span></h3>
+          <h3>🦅 Bird’s Eye View{' '}<span className="birdseye-title-count" style={{ color: 'var(--text-tertiary)', fontSize: '0.85rem', fontWeight: 400 }}>({highlightedArticles.length} aligned articles)</span></h3>
           <p style={{ color: 'var(--text-secondary)', fontSize: '0.86rem', marginTop: '6px' }}>
             Executive Strategic Alignment report for superintendent, cabinet, board, district accreditation, and evaluation conversations.
           </p>
         </div>
-        <div style={{ display: 'flex', gap: '8px', flexWrap: 'wrap', alignItems: 'center', justifyContent: 'flex-end' }}>
+        <div className="birdseye-report-controls" style={{ display: 'flex', gap: '8px', flexWrap: 'wrap', alignItems: 'center', justifyContent: 'flex-end' }}>
           {selectedLabel !== 'All' && (
             <button className="btn btn-secondary btn-sm" onClick={() => onSelectLabel('All')}>
               {selectedLabel} ✕
             </button>
           )}
           <button className="btn btn-secondary btn-sm" type="button" onClick={exportBirdEyeCsv}>⬇ Export CSV</button>
-          <button className="btn btn-secondary btn-sm" type="button" onClick={onExportPdf} title="Export this leadership and board Strategic Alignment artifact as PDF.">⬇ Export Leadership / Board PDF</button>
+          <button className="btn btn-secondary btn-sm" type="button" onClick={onExportPdf} disabled={!hasSelectedDistrict} title={hasSelectedDistrict ? 'Export this leadership and board Strategic Alignment artifact as PDF.' : 'Choose one district before exporting the Leadership / Board Report.'}>⬇ Export Leadership / Board PDF</button>
         </div>
       </div>
 
-      <StrategicGovernancePanel governance={strategicGovernance} hasSelectedDistrict={hasSelectedDistrict} />
+      <header className="birdseye-report-header">
+        <div><span>Canary Data · Leadership & Board Reporting</span><h1>{districtName} Leadership / Board Report</h1><p>Executive media intelligence and official social evidence for district leadership, board, and district accreditation conversations.</p></div>
+        <dl><div><dt>Report date range</dt><dd>{dateContext}</dd></div><div><dt>Filter context</dt><dd>{filterContext}</dd></div></dl>
+      </header>
 
-      <div className="filter-secondary-bar" style={{ marginTop: 0, marginBottom: '18px' }}>
+      <div className="birdseye-report-controls">
+        <StrategicGovernancePanel governance={strategicGovernance} hasSelectedDistrict={hasSelectedDistrict} />
+      </div>
+
+      <div className="filter-secondary-bar birdseye-report-controls" style={{ marginTop: 0, marginBottom: '18px' }}>
         <div className="filter-control-group date-filter-group">
           <span className="filter-group-label">Report Date Range</span>
           <input type="date" className="filter-date" value={dateStart} onChange={(e) => setDateStart(e.target.value)} />
@@ -1040,7 +1064,7 @@ function BirdEyeView({ articles, strategicAlignmentData, strategicGovernance, ha
         </div>
       </div>
 
-      <div style={{
+      <div className="birdseye-leadership-intro" style={{
         marginBottom: '18px',
         padding: '18px 20px',
         border: '1px solid rgba(245,197,24,0.28)',
@@ -1063,7 +1087,7 @@ function BirdEyeView({ articles, strategicAlignmentData, strategicGovernance, ha
         </div>
         <div className="kpi-card">
           <div className="kpi-header"><div className="kpi-label">Canary Score</div><div className="kpi-icon green">📈</div></div>
-          <div className="kpi-value">{totalMentions ? (articles.reduce((sum, a) => sum + parseFloat(a.canary_score ?? 0), 0) / totalMentions).toFixed(1) : '—'}</div>
+          <div className="kpi-value">{totalMentions ? (newsArticles.reduce((sum, a) => sum + parseFloat(a.canary_score ?? 0), 0) / totalMentions).toFixed(1) : '—'}</div>
           <span className="kpi-change positive">Average for report set</span>
         </div>
         <div className="kpi-card">
@@ -1078,14 +1102,23 @@ function BirdEyeView({ articles, strategicAlignmentData, strategicGovernance, ha
         </div>
       </div>
 
-      <StrategicAlignmentChart
-        data={strategicAlignmentData}
-        selectedLabel={selectedLabel}
-        onSelectLabel={onSelectLabel}
-      />
+      <section className="board-report-section birdseye-social-section">
+        <div className="birdseye-section-heading"><span>Official district channels</span><h2>Top 3 official social posts</h2><p>Active, owned posts from verified official sources in the report date range, ranked by available public interactions, then newest date and stable record ID.</p></div>
+        {socialReportPosts.length
+          ? <div className="board-report-social">{socialReportPosts.map((result, index) => <SocialReportCard key={result.id} result={result} rank={index + 1} />)}</div>
+          : <p>No eligible official social posts are available for this report date range.</p>}
+      </section>
 
-      <div className="data-table-wrapper" style={{ marginTop: '18px' }}>
-        <table className="data-table">
+      <section className="birdseye-evidence-page">
+        <div className="birdseye-section-heading birdseye-evidence-heading"><span>Aligned evidence</span><h2>Strategic Alignment & complete news evidence</h2><p>{highlightedArticles.length} aligned news article{highlightedArticles.length === 1 ? '' : 's'} · {dateContext} · {filterContext}</p></div>
+        <StrategicAlignmentChart
+          data={strategicAlignmentData}
+          selectedLabel={selectedLabel}
+          onSelectLabel={onSelectLabel}
+        />
+
+        <div className="data-table-wrapper" style={{ marginTop: '18px' }}>
+        <table className="data-table birdseye-evidence-table">
           <thead>
             <tr>
               <th>Date</th>
@@ -1170,7 +1203,8 @@ function BirdEyeView({ articles, strategicAlignmentData, strategicGovernance, ha
             })}
           </tbody>
         </table>
-      </div>
+        </div>
+      </section>
     </div>
   );
 }
@@ -2475,7 +2509,7 @@ function SocialReportCard({ result, rank }) {
       <div className="social-report-card-copy">
         <span>#{rank} · {formatDisplayDate(result.date)}</span>
         <strong>{result.headline || result.summary || 'Official district social post'}</strong>
-        <p>{formatSocialMetric(result.engagementTotal)} public interactions · {formatSocialMetric(result.reactionCount)} reactions · {formatSocialMetric(result.commentCount)} comments · {formatSocialMetric(result.shareCount)} shares</p>
+        <p><span>{socialReportInteractionTotal(result) === null ? 'Not available' : `${formatSocialMetric(socialReportInteractionTotal(result))} public interactions`}</span> · <span><SocialReportMetric result={result} metric="reactions" value={result.reactionCount} /> reactions</span> · <span><SocialReportMetric result={result} metric="comments" value={result.commentCount + result.replyCount} /> comments / replies</span> · <span><SocialReportMetric result={result} metric="shares" value={result.shareCount} /> shares</span></p>
         {sourceUrl ? <a href={sourceUrl} target="_blank" rel="noopener noreferrer">View source</a> : <span>Source link unavailable in the collected record.</span>}
       </div>
     </article>
@@ -2810,9 +2844,9 @@ function SocialView({ articles, socialThreads, socialSources, socialReviewEvents
 
   function exportSocialCsv() {
     downloadCsv(
-      `canary-social-${districtFilter === 'All' ? 'all-districts' : districtFilter}-${new Date().toISOString().slice(0, 10)}.csv`,
+      `canary-social-performance-${districtFilter === 'All' ? 'all-districts' : districtFilter}-${topPostsWindow.startInput}-to-${topPostsWindow.endInput}.csv`,
       SOCIAL_CSV_HEADERS,
-      visibleResults.map((result) => socialCsvRow(
+      socialReportPosts.map((result) => socialCsvRow(
         result,
         sourceForResult(result),
       )),
@@ -3145,6 +3179,7 @@ export default function DashboardClient({ articles, districts, queries: initialQ
   const [releaseAutoPromptShown, setReleaseAutoPromptShown] = useState(false);
   const [sidebarOpen, setSidebarOpen] = useState(false);
   const [boardReportMode, setBoardReportMode] = useState(false);
+  const [birdEyeReportMode, setBirdEyeReportMode] = useState(false);
   const [visibleColumns, setVisibleColumns] = useState(DEFAULT_VISIBLE);
   const [colMenuOpen, setColMenuOpen] = useState(false);
   const [paymentModalOpen, setPaymentModalOpen] = useState(false);
@@ -3387,6 +3422,14 @@ export default function DashboardClient({ articles, districts, queries: initialQ
   }, [articles, districtFilter]);
 
   const hasSecondaryFilters = dateStart || dateEnd || scoreMin !== 1 || scoreMax !== 10 || selectedQueries.size > 0 || strategicAlignmentFilter !== 'All';
+  const birdEyeFilterContext = [
+    strategicAlignmentFilter === 'All' ? 'All Strategic Alignment focus areas' : `Focus area: ${strategicAlignmentFilter}`,
+    sourceFilter !== 'All' ? `Source: ${sourceFilter}` : 'News sources in the current district view',
+    tagFilter !== 'All' ? `Tag: ${tagFilter}` : null,
+    scoreMin !== 1 || scoreMax !== 10 ? `Score: ${scoreMin}–${scoreMax}` : null,
+    selectedQueries.size > 0 ? `${selectedQueries.size} source ${selectedQueries.size === 1 ? 'query' : 'queries'} selected` : null,
+    search ? `Search: “${search}”` : null,
+  ].filter(Boolean).join(' · ');
 
   function clearSecondaryFilters() {
     setDateStart('');
@@ -3400,17 +3443,6 @@ export default function DashboardClient({ articles, districts, queries: initialQ
   const toggleStrategicAlignmentFilter = useCallback((label) => {
     setStrategicAlignmentFilter((current) => current === label ? 'All' : label);
   }, []);
-
-  function handleExportPdf() {
-    setCurrentView('dashboard');
-    setColMenuOpen(false);
-    setFeedbackOpen(false);
-    setSidebarOpen(false);
-
-    // Let React finish switching back to the dashboard and give print-only
-    // assets a moment to paint before opening the browser print dialog.
-    window.setTimeout(() => window.print(), 250);
-  }
 
   function handleExportCsv() {
     downloadCsv(
@@ -3428,7 +3460,18 @@ export default function DashboardClient({ articles, districts, queries: initialQ
     setColMenuOpen(false);
     setFeedbackOpen(false);
     setSidebarOpen(false);
-    window.setTimeout(() => window.print(), 250);
+    setBirdEyeReportMode(true);
+    const restore = () => setBirdEyeReportMode(false);
+    window.addEventListener('afterprint', restore, { once: true });
+    window.setTimeout(async () => {
+      const reportImages = [...document.querySelectorAll('.birdseye-board-report img')];
+      await Promise.race([
+        Promise.all(reportImages.map((image) => image.decode?.().catch(() => undefined))),
+        new Promise((resolve) => window.setTimeout(resolve, 2000)),
+      ]);
+      window.print();
+    }, 100);
+    window.setTimeout(restore, 15000);
   }
 
   function handleBoardReportPdf() {
@@ -3789,24 +3832,14 @@ export default function DashboardClient({ articles, districts, queries: initialQ
           </div>
           <div className="topbar-right">
             {currentView === 'dashboard' && (
-              <>
-                <button
-                  className="btn btn-secondary btn-sm"
-                  type="button"
-                  onClick={handleExportCsv}
-                  title="Exports the currently filtered table using your visible Columns selection."
-                >
-                  ⬇ Export CSV
-                </button>
-                <button
-                  className="btn btn-secondary btn-sm export-pdf-btn"
-                  onClick={handleExportPdf}
-                  title="For the cleanest report, choose Tabloid / 11×17 and Landscape in the print dialog."
-                >
-                  ⬇ Export PDF
-                  <span className="export-pdf-hint">Tabloid landscape works best</span>
-                </button>
-              </>
+              <button
+                className="btn btn-secondary btn-sm"
+                type="button"
+                onClick={handleExportCsv}
+                title="Exports the currently filtered table using your visible Columns selection."
+              >
+                ⬇ Export CSV
+              </button>
             )}
             {SHOW_GLOBAL_BOARD_REPORT_EXPORT && ['dashboard', 'birdseye', 'social'].includes(currentView) && (
               <button
@@ -3830,7 +3863,7 @@ export default function DashboardClient({ articles, districts, queries: initialQ
           </div>
         </header>
 
-        <main className={`page-content${boardReportMode ? ' board-report-mode' : ''}`}>
+        <main className={`page-content${boardReportMode ? ' board-report-mode' : ''}${birdEyeReportMode ? ' birdseye-report-mode' : ''}`}>
           {boardReportMode && districtFilter !== 'All' && (
             <BoardReportView
               districtId={districtFilter}
@@ -3927,9 +3960,13 @@ export default function DashboardClient({ articles, districts, queries: initialQ
           {currentView === 'birdseye' && (
             <BirdEyeView
               articles={chartArticles}
-              strategicAlignmentData={strategicAlignmentData}
               strategicGovernance={strategicGovernance}
               hasSelectedDistrict={districtFilter !== 'All'}
+              districtId={districtFilter}
+              districtName={selectedDistrictName}
+              socialThreads={socialThreads}
+              socialSources={socialSources}
+              reportFilterContext={birdEyeFilterContext}
               selectedLabel={strategicAlignmentFilter}
               onSelectLabel={toggleStrategicAlignmentFilter}
               isEarned={isEarned}
