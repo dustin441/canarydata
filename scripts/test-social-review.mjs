@@ -245,9 +245,12 @@ assert.match(socialReportSource, /topPerformerGroups\.map/);
 assert.match(socialReportSource, /<SocialReportTable results=\{group\.posts\} ranked \/>/);
 assert.doesNotMatch(socialReportSource, /news|evidence appendix|Strategic Alignment/i);
 assert.doesNotMatch(socialReportSource, /Official Post Detail|Complete detail for every eligible post/);
-for (const marker of ['Monthly Social Performance', 'Latest completed month', 'Campaign or topic', 'Platform performance', 'Content format', 'Leadership highlights', 'Social Media Brief', 'Requires an authorized Meta account connection']) {
+for (const marker of ['Monthly Social Performance', 'Latest completed month', 'Campaign or topic', 'Platform performance', 'Content format', 'Leadership highlights', 'All official posts', 'Sort posts', 'Open post ↗', 'Social Media Brief', 'Requires an authorized Meta account connection']) {
   assert.ok(dashboard.includes(marker), `Monthly Social Performance must include ${marker}`);
 }
+assert.match(dashboard, /const \[postTableSort, setPostTableSort\] = useState\('newest'\)/);
+assert.match(dashboard, /sortedPosts\.map/);
+assert.match(dashboard, /Legacy approval\/card workspace intentionally removed from the rendered Social experience/);
 assert.match(dashboard, /function formatSocialComparison\(change\)[\s\S]*Intl\.NumberFormat\('en-US'/);
 assert.doesNotMatch(dashboard, /formatSocialComparison\(change\)[\s\S]{0,500}formatSocialMetric\(change\.absolute\)/);
 assert.match(dashboard, /useState\('previous-month'\)/);

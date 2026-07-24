@@ -47,7 +47,7 @@ function normalizeProviderItem({ provider, districtId, item }) {
   if (!body && !suppliedHeadline) throw new Error('missing_content');
   const headline = suppliedHeadline || body;
 
-  const visibilityStatus = String(item?.visibility_status || 'review').toLowerCase();
+  const visibilityStatus = String(item?.visibility_status || 'active').toLowerCase();
   if (!['review', 'active', 'excluded'].includes(visibilityStatus)) throw new Error('invalid_visibility_status');
 
   const commentCount = nonNegativeNumber(item?.comment_count);

@@ -2712,6 +2712,7 @@ function MonthlySocialPerformance({
   onExportPdf,
   onExportCsv,
 }) {
+  const [postTableSort, setPostTableSort] = useState('newest');
   const summary = summarizeSocialReport(posts);
   const previousSummary = summarizeSocialReport(previousPosts);
   const contentFormats = summarizeSocialContentFormats(posts);
@@ -2725,6 +2726,12 @@ function MonthlySocialPerformance({
     interactions: calculateSocialMetricChange(summary.totalInteractions, previousSummary.totalInteractions),
     views: calculateSocialMetricChange(summary.reportedViews, previousSummary.reportedViews),
   };
+  const sortedPosts = [...posts].sort((a, b) => {
+    if (postTableSort === 'interactions') return (socialReportInteractionTotal(b) ?? -1) - (socialReportInteractionTotal(a) ?? -1);
+    if (postTableSort === 'views') return (socialReportMetricValue(b, 'views') ?? -1) - (socialReportMetricValue(a, 'views') ?? -1);
+    if (postTableSort === 'oldest') return new Date(a.date).getTime() - new Date(b.date).getTime();
+    return new Date(b.date).getTime() - new Date(a.date).getTime();
+  });
 
   return (
     <section className="social-monthly-performance" id="social-monthly-performance" aria-label="Monthly Social Performance">
@@ -2778,6 +2785,31 @@ function MonthlySocialPerformance({
       <section className="social-monthly-top-posts">
         <div className="social-monthly-section-heading"><h3>Leadership highlights</h3><p>Top six official posts, ranked by available public interactions. These are the posts included in the concise monthly conversation.</p></div>
         {topPosts.length ? <div className="board-report-social">{topPosts.map((post, index) => <SocialReportCard key={post.id} result={post} rank={index + 1} />)}</div> : <div className="social-empty-inline">No report-eligible official posts match this period and campaign filter.</div>}
+      </section>
+
+      <section className="social-monthly-post-table" aria-label="All official social posts">
+        <div className="social-monthly-section-heading social-monthly-post-table-heading">
+          <div>
+            <h3>All official posts</h3>
+            <p>A searchable reporting table for every official post in the selected period. Use the campaign or topic search above to recalculate the table, scorecards, highlights, PDF, and CSV together.</p>
+          </div>
+          <label><span>Sort posts</span><select value={postTableSort} onChange={(event) => setPostTableSort(event.target.value)}><option value="newest">Newest first</option><option value="oldest">Oldest first</option><option value="interactions">Most interactions</option><option value="views">Most views</option></select></label>
+        </div>
+        <div className="social-monthly-table-wrap social-monthly-post-table-wrap">
+          <table>
+            <thead><tr><th>Date</th><th>Platform</th><th>Post</th><th>Format</th><th>Interactions</th><th>Views</th><th>Source</th></tr></thead>
+            <tbody>
+              {sortedPosts.length ? sortedPosts.map((post) => {
+                const postUrl = safeSocialUrl(post.url);
+                const mediaType = String(post.mediaType || '').toLowerCase();
+                const format = mediaType.includes('video') || mediaType.includes('reel') ? 'Video / Reel' : post.mediaUrl ? 'Image / Photo' : 'Text / Link';
+                const interactions = socialReportInteractionTotal(post);
+                const views = socialReportMetricValue(post, 'views');
+                return <tr key={`monthly-row-${post.id}`}><td>{formatDate(post.date)}</td><td><span className={`social-platform-label ${post.platform}`}>{formatSourceLabel(post.platform)}</span></td><td className="social-monthly-post-copy"><strong>{post.headline || post.summary || 'Untitled post'}</strong><small>{post.authorName || post.authorHandle || 'Official district account'}</small></td><td>{format}</td><td>{interactions === null ? 'N/A' : formatSocialMetric(interactions)}</td><td>{views === null ? 'N/A' : formatSocialMetric(views)}</td><td>{postUrl ? <a href={postUrl} target="_blank" rel="noopener noreferrer">Open post ↗</a> : 'Unavailable'}</td></tr>;
+              }) : <tr><td colSpan={7}>No report-eligible official posts match this period and campaign filter.</td></tr>}
+            </tbody>
+          </table>
+        </div>
       </section>
 
       <section className="social-monthly-analyst-note">
@@ -3060,6 +3092,8 @@ function SocialView({ articles, socialThreads, socialSources, socialReviewEvents
         onExportPdf={exportSocialPdf}
         onExportCsv={exportSocialCsv}
       />
+      {/* Legacy approval/card workspace intentionally removed from the rendered Social experience. */}
+      {false && <>
       <section className="social-monitor-hero">
         <div>
           <span className="social-eyebrow">Posts and public monitoring</span>
@@ -3274,6 +3308,7 @@ function SocialView({ articles, socialThreads, socialSources, socialReviewEvents
           </div>
         </details>
       )}
+      </>}
 
       <details className="social-account-section social-account-details" id="social-sources" open={sourcesOpen} onToggle={(event) => setSourcesOpen(event.currentTarget.open)}>
         <summary>
@@ -3970,7 +4005,7 @@ export default function DashboardClient({ articles, districts, queries: initialQ
                           : currentView === 'articles'
                             ? 'Media Articles'
                             : currentView === 'social'
-                              ? 'Social Intelligence'
+                              ? 'Social Reporting'
                               : currentView === 'melodi'
                                 ? 'Ask MELODI'
                                 : selectedDistrictName}
@@ -3984,7 +4019,7 @@ export default function DashboardClient({ articles, districts, queries: initialQ
                   : currentView === 'clients' ? 'Login credentials for beta testers'
                   : currentView === 'howto' ? 'Media to decision to leadership proof'
                   : currentView === 'articles' ? 'Browse, filter, annotate, and export article-level coverage'
-                  : currentView === 'social' ? 'District posts, tagged or mentioned posts, and public conversations'
+                  : currentView === 'social' ? 'Monthly scorecards, comparisons, highlights, and the complete official-post table'
                   : currentView === 'melodi' ? 'District-scoped conversational media intelligence with cited evidence'
                   : 'Media Intelligence Dashboard'}
               </div>

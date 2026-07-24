@@ -91,7 +91,7 @@ async function run() {
         {
           ...thread,
           social_account_id: accountByPlatform.get(thread.platform) || null,
-          visibility_status: 'review',
+          visibility_status: 'active',
           last_seen_at: completedAt(),
           provider_metadata: { ...thread.provider_metadata, pilot_ingestion: true },
         },
@@ -125,7 +125,7 @@ async function run() {
       acceptedThreads: stored.length,
       duplicateItems: duplicates,
       rejectedItems: batch.rejected.length,
-      visibilityStatus: 'review',
+      visibilityStatus: 'active',
       threadIds: stored.map((thread) => thread.id),
     }, null, 2));
   } catch (error) {

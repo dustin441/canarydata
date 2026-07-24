@@ -69,7 +69,7 @@ create table if not exists public.social_threads (
   matched_terms jsonb not null default '[]'::jsonb,
   match_reason text,
   identity_confidence numeric check (identity_confidence is null or (identity_confidence >= 0 and identity_confidence <= 1)),
-  visibility_status text not null default 'review' check (visibility_status in ('review','approved','active','excluded')),
+  visibility_status text not null default 'active' check (visibility_status in ('review','approved','active','excluded')),
   reviewer_note text check (reviewer_note is null or char_length(reviewer_note) <= 2000),
   review_version integer not null default 0,
   provider_metadata jsonb not null default '{}'::jsonb,

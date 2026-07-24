@@ -1264,6 +1264,21 @@ a:hover {
 .social-monthly-table-wrap th { color: var(--text-tertiary); font-size: 0.68rem; letter-spacing: 0.05em; text-transform: uppercase; }
 .social-monthly-table-wrap td { color: var(--text-secondary); }
 .social-monthly-table-wrap td:first-child { color: var(--text-primary); font-weight: 700; }
+.social-monthly-post-table { padding: 18px; border: 1px solid var(--border-primary); border-radius: var(--radius-lg); background: var(--bg-elevated); }
+.social-monthly-post-table-heading { display: flex; align-items: end; justify-content: space-between; gap: 18px; }
+.social-monthly-post-table-heading > div { max-width: 760px; }
+.social-monthly-post-table-heading label { display: grid; gap: 6px; min-width: 180px; }
+.social-monthly-post-table-heading label span { color: var(--text-tertiary); font-size: 0.7rem; font-weight: 800; letter-spacing: 0.04em; text-transform: uppercase; }
+.social-monthly-post-table-heading select { min-height: 38px; padding: 8px 10px; border: 1px solid var(--border-secondary); border-radius: 8px; background: var(--bg-card); color: var(--text-primary); }
+.social-monthly-post-table-wrap table { min-width: 980px; }
+.social-monthly-post-table-wrap th:nth-child(3),
+.social-monthly-post-table-wrap td:nth-child(3) { white-space: normal; min-width: 320px; }
+.social-monthly-post-copy strong,
+.social-monthly-post-copy small { display: block; }
+.social-monthly-post-copy strong { color: var(--text-primary); line-height: 1.35; }
+.social-monthly-post-copy small { margin-top: 4px; color: var(--text-tertiary); font-weight: 500; }
+.social-monthly-post-table-wrap a { color: var(--brand-primary); font-weight: 800; text-decoration: none; }
+.social-platform-label { display: inline-flex; align-items: center; padding: 4px 8px; border-radius: 999px; background: var(--bg-card); color: var(--text-primary); font-size: 0.7rem; font-weight: 800; }
 .social-monthly-top-posts .board-report-social { grid-template-columns: repeat(3, minmax(0, 1fr)); }
 
 .social-monthly-analyst-note { display: grid; gap: 10px; }
@@ -2961,6 +2976,8 @@ input[type="date"]::-webkit-calendar-picker-indicator {
 
   .social-monthly-header { flex-direction: column; }
   .social-monthly-actions { justify-content: flex-start; }
+  .social-monthly-post-table-heading { align-items: stretch; flex-direction: column; }
+  .social-monthly-post-table-heading label { min-width: 0; }
   .social-monthly-top-posts .board-report-social { grid-template-columns: repeat(2, minmax(0, 1fr)); }
 
   .social-monitor-hero,
