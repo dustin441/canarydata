@@ -1,4 +1,4 @@
-import { getArticles, getDistricts, getQueries, getClients, getExcludedStories, getStoryCorrectionEvents, getSocialSources, getSocialThreads, getSocialReviewEvents, getStrategicProfiles, getStrategicPriorities } from '@/lib/data';
+import { getArticles, getDistricts, getQueries, getClients, getExcludedStories, getStoryCorrectionEvents, getSocialSources, getSocialThreads, getSocialReviewEvents, getStrategicProfiles, getStrategicPriorities, getCollectionHealth } from '@/lib/data';
 import { createClient } from '@/lib/supabase/server';
 import { createAdminClient } from '@/lib/supabase/admin';
 import DashboardClient from './DashboardClient';
@@ -23,9 +23,9 @@ export default async function DashboardPage() {
   if (!sessionUser?.id) redirect('/login?redirect_to=/dashboard');
   if (!userDistrictId && !isAdmin) redirect('/demo?access=pending');
 
-  const [articles, districts, queries, clients, excludedStories, correctionEvents, socialSources, socialThreads, socialReviewEvents, strategicProfiles, strategicPriorities] = await Promise.all([
+  const districts = await getDistricts();
+  const [articles, queries, clients, excludedStories, correctionEvents, socialSources, socialThreads, socialReviewEvents, strategicProfiles, strategicPriorities, collectionHealth] = await Promise.all([
     getArticles(userDistrictId),
-    getDistricts(),
     getQueries(userDistrictId),
     isAdmin ? getClients() : Promise.resolve([]),
     getExcludedStories(userDistrictId),
@@ -35,6 +35,7 @@ export default async function DashboardPage() {
     isAdmin ? getSocialReviewEvents(userDistrictId) : Promise.resolve([]),
     getStrategicProfiles(userDistrictId),
     getStrategicPriorities(userDistrictId),
+    getCollectionHealth(districts, userDistrictId),
   ]);
 
   const billingContext = userDistrictId ? await getAuthenticatedBillingContext() : null;
@@ -81,6 +82,7 @@ export default async function DashboardPage() {
       isAdmin={isAdmin}
       strategicProfiles={strategicProfiles}
       strategicPriorities={strategicPriorities}
+      collectionHealth={collectionHealth}
       melodiEnabled={process.env.MELODI_ENABLED === 'true' && (process.env.MELODI_QA_MODE !== 'true' || isAdmin)}
     />
   );

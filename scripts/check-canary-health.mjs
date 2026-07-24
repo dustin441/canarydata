@@ -32,7 +32,7 @@ async function supabase(table, params) {
 }
 
 const inc = (map, key) => map.set(key, (map.get(key) || 0) + 1);
-const activeWorkflowIds = ['dVIf6KnZklHYzQvi', 'F4G5VdrDBAO56Kzr'];
+const activeWorkflowIds = ['dVIf6KnZklHYzQvi'];
 
 const [districts, generatedQueries, searchQueries, rawResults, stories, candidates, workflowExecutions] = await Promise.all([
   supabase('districts', { select: 'id,name', limit: '1000' }),
@@ -56,19 +56,32 @@ const candidateByDistrict = new Map();
 const rejectedByDistrict = new Map();
 const rawByQuery = new Map();
 const sourcesByDistrict = new Map();
+const latestRawByDistrict = new Map();
+const latestCandidateByDistrict = new Map();
+const latestStoryByDistrict = new Map();
+const setLatest = (map, key, value) => {
+  if (!value) return;
+  if (!map.has(key) || new Date(value) > new Date(map.get(key))) map.set(key, value);
+};
 for (const row of rawResults) {
   if (new Date(row.collected_at) >= new Date(isoAgo(7))) inc(rawByDistrict, row.district_id);
   if (row.generated_query_id) inc(rawByQuery, row.generated_query_id);
   if (!sourcesByDistrict.has(row.district_id)) sourcesByDistrict.set(row.district_id, new Set());
   if (row.source_name) sourcesByDistrict.get(row.district_id).add(String(row.source_name).toLowerCase());
+  setLatest(latestRawByDistrict, row.district_id, row.collected_at);
 }
-for (const row of stories) inc(storyByDistrict, row.district_id);
+for (const row of stories) {
+  inc(storyByDistrict, row.district_id);
+  setLatest(latestStoryByDistrict, row.district_id, row.created_at);
+}
 for (const row of candidates) {
   inc(candidateByDistrict, row.district_id);
+  setLatest(latestCandidateByDistrict, row.district_id, row.evaluated_at);
   if (row.decision === 'rejected') inc(rejectedByDistrict, row.district_id);
 }
 
 const alerts = [];
+const districtHealth = [];
 const add = (severity, code, message, details = {}) => alerts.push({ severity, code, message, ...details });
 for (const id of monitoredDistricts) {
   const label = districtName.get(id) || id;
@@ -76,9 +89,16 @@ for (const id of monitoredDistricts) {
   const acceptedStories = storyByDistrict.get(id) || 0;
   const evaluated = candidateByDistrict.get(id) || 0;
   const rejected = rejectedByDistrict.get(id) || 0;
+  const lastRawAt = latestRawByDistrict.get(id) || null;
+  const lastCandidateAt = latestCandidateByDistrict.get(id) || null;
+  const lastStoryAt = latestStoryByDistrict.get(id) || null;
+  const latestCollectionEvidence = [lastRawAt, lastCandidateAt].filter(Boolean).sort((a, b) => new Date(b) - new Date(a))[0] || null;
+  const staleHours = latestCollectionEvidence ? (now - new Date(latestCollectionEvidence)) / 3_600_000 : null;
+  if (staleHours === null || staleHours > 36) add('critical', 'district_collection_stale_36h', `${label} has no collection evidence in the last 36 hours.`, { district_id: id, latest_collection_evidence: latestCollectionEvidence });
   if (raw === 0) add('warning', 'district_zero_raw_results_7d', `${label} has no raw search results in the last 7 days.`, { district_id: id });
   if (raw > 0 && acceptedStories === 0) add('warning', 'district_zero_stories_14d', `${label} has raw results but no new accepted stories in the last 14 days.`, { district_id: id, raw_results_7d: raw });
   if (evaluated >= 10 && rejected / evaluated >= 0.9) add('warning', 'district_high_rejection_rate', `${label} rejected ${rejected}/${evaluated} evaluated candidates in the last 7 days.`, { district_id: id, rejection_rate: Number((rejected / evaluated).toFixed(3)) });
+  districtHealth.push({ district_id: id, district_name: label, latest_collection_evidence: latestCollectionEvidence, latest_story_at: lastStoryAt, raw_results_7d: raw, candidates_evaluated_7d: evaluated, rejected_candidates_7d: rejected, accepted_stories_14d: acceptedStories, status: staleHours === null || staleHours > 36 ? 'critical' : raw > 0 && acceptedStories === 0 ? 'warning' : 'healthy' });
 }
 const missingBaselineByDistrict = new Map();
 for (const query of generatedQueries) {
@@ -94,15 +114,15 @@ for (const [districtId, missing] of missingBaselineByDistrict) {
   }
 }
 for (const item of workflowExecutions) {
+  const successes = item.executions.filter((execution) => String(execution.status).toLowerCase() === 'success');
+  const latestSuccess = successes.map((execution) => new Date(execution.stoppedAt || execution.startedAt || 0)).sort((a, b) => b - a)[0];
   const failures = item.executions.filter((execution) => {
     const failed = ['error', 'crashed', 'failed'].includes(String(execution.status).toLowerCase());
     const finished = new Date(execution.stoppedAt || execution.startedAt || 0);
-    return failed && now - finished <= 3 * DAY;
+    return failed && now - finished <= 3 * DAY && (!latestSuccess || finished > latestSuccess);
   });
-  const successes = item.executions.filter((execution) => String(execution.status).toLowerCase() === 'success');
-  const latestSuccess = successes.map((execution) => new Date(execution.stoppedAt || execution.startedAt || 0)).sort((a, b) => b - a)[0];
-  if (failures.length) add('critical', 'workflow_recent_failure', `Canary workflow ${item.workflowId} has ${failures.length} failure(s) in its last ${item.executions.length} executions.`, { workflow_id: item.workflowId, latest_failure: failures[0]?.stoppedAt || failures[0]?.startedAt || null });
-  if (!latestSuccess || now - latestSuccess > 3 * DAY) add('critical', 'workflow_no_success_72h', `Canary workflow ${item.workflowId} has no successful execution in the last 72 hours.`, { workflow_id: item.workflowId, latest_success: latestSuccess?.toISOString() || null });
+  if (failures.length) add('critical', 'workflow_unrecovered_failure', `Canary workflow ${item.workflowId} has ${failures.length} failure(s) newer than its latest success.`, { workflow_id: item.workflowId, latest_failure: failures[0]?.stoppedAt || failures[0]?.startedAt || null, latest_success: latestSuccess?.toISOString() || null });
+  if (!latestSuccess || now - latestSuccess > 36 * 3_600_000) add('critical', 'workflow_no_success_36h', `Canary workflow ${item.workflowId} has no successful execution in the last 36 hours.`, { workflow_id: item.workflowId, latest_success: latestSuccess?.toISOString() || null });
 }
 
 const status = alerts.some((alert) => alert.severity === 'critical') ? 'critical' : alerts.length ? 'warning' : 'healthy';
@@ -119,6 +139,7 @@ const report = {
     candidates_evaluated_7d: candidates.length,
     alerts: alerts.length,
   },
+  district_health: districtHealth.sort((a, b) => a.district_name.localeCompare(b.district_name)),
   alerts,
 };
 const fingerprintInput = alerts.map(({ severity, code, district_id, workflow_id }) => ({ severity, code, district_id: district_id || null, workflow_id: workflow_id || null }));

@@ -9,7 +9,7 @@
     "lint": "eslint",
     "test:webhook": "node scripts/test-stripe-webhook.mjs",
     "test:authz": "node scripts/test-authz-metadata.mjs",
-    "test:quality": "node scripts/test-canary-quality.mjs",
+    "test:quality": "node scripts/test-canary-quality.mjs && node scripts/test-collection-health.mjs",
     "test:corrections": "node scripts/test-story-corrections.mjs",
     "test:onboarding": "node scripts/test-onboarding-discovery.mjs",
     "health:canary": "node scripts/check-canary-health.mjs",

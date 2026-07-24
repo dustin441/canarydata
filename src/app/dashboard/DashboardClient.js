@@ -2634,7 +2634,12 @@ function SocialReportView({ districtName, reportWindow, filterContext, posts }) 
             </aside>
           </section>
         </>
-      ) : <p className="social-report-empty">No active, owned official posts match this reporting window and the current visible Social filters.</p>}
+      ) : (
+        <aside className="social-report-empty">
+          <strong>No approved official posts were published in this reporting window.</strong>
+          <span>Choose Last 30 Days or expand the custom date range to generate a performance report. Canary does not treat missing posts or unavailable platform metrics as zero performance.</span>
+        </aside>
+      )}
     </section>
   );
 }
@@ -3167,7 +3172,7 @@ function SocialView({ articles, socialThreads, socialSources, socialReviewEvents
   );
 }
 
-export default function DashboardClient({ articles, districts, queries: initialQueries, clients = [], userDistrictId, paymentNotice = null, billingInfo = null, excludedStories = [], correctionEvents = [], socialSources = [], socialThreads = [], socialReviewEvents = [], strategicProfiles = [], strategicPriorities = [], isAdmin = false, melodiEnabled = false, demoMode = false }) {
+export default function DashboardClient({ articles, districts, queries: initialQueries, clients = [], userDistrictId, paymentNotice = null, billingInfo = null, excludedStories = [], correctionEvents = [], socialSources = [], socialThreads = [], socialReviewEvents = [], strategicProfiles = [], strategicPriorities = [], collectionHealth = [], isAdmin = false, melodiEnabled = false, demoMode = false }) {
   const defaultDistrictFilter = userDistrictId ?? districts[0]?.id ?? 'All';
   const [currentView, setCurrentView] = useState('dashboard');
   const [search, setSearch] = useState('');
@@ -3560,6 +3565,13 @@ export default function DashboardClient({ articles, districts, queries: initialQ
   const earnedMediaCount = chartArticles.filter((article) => isEarned(article)).length;
   const filteredNotesCount = chartArticles.filter((article) => getNoteText(article)).length;
   const communicationsBrief = useMemo(() => buildCommunicationsBrief(chartArticles, 3), [chartArticles]);
+  const selectedCollectionHealth = useMemo(
+    () => collectionHealth.find((item) => item.districtId === districtFilter) ?? null,
+    [collectionHealth, districtFilter],
+  );
+  const collectionHealthClass = selectedCollectionHealth?.status === 'critical'
+    ? 'negative'
+    : selectedCollectionHealth?.status === 'warning' ? 'warning' : 'positive';
 
   const { mentionTrend, sentimentTrend, sourceBreakdown } = useMemo(
     () => buildChartData(chartArticles),
@@ -4014,7 +4026,9 @@ export default function DashboardClient({ articles, districts, queries: initialQ
                 <div className="kpi-icon yellow">📰</div>
               </div>
               <div className="kpi-value">{chartArticles.length}</div>
-              <span className="kpi-change positive">↑ Active monitoring</span>
+              <span className={`kpi-change ${collectionHealthClass}`}>
+                {selectedCollectionHealth?.label ?? 'Collection status unavailable'}
+              </span>
             </div>
 
             <div className="kpi-card">
@@ -4086,6 +4100,19 @@ export default function DashboardClient({ articles, districts, queries: initialQ
                 Open Social Action Queue{socialActionSummary.total ? ` (${socialActionSummary.total})` : ''}
               </button>
             </header>
+
+            <div className={`collection-health-banner ${selectedCollectionHealth?.status ?? 'unknown'}`}>
+              <div>
+                <span>News collection health</span>
+                <strong>{selectedCollectionHealth?.label ?? 'Status unavailable'}</strong>
+                <p>{selectedCollectionHealth?.detail ?? 'No collection-health evidence is available for this district.'}</p>
+              </div>
+              <dl>
+                <div><dt>Latest collection evidence</dt><dd>{selectedCollectionHealth?.latestActivityAt ? formatDate(selectedCollectionHealth.latestActivityAt) : 'Not available'}</dd></div>
+                <div><dt>Raw results, 7 days</dt><dd>{selectedCollectionHealth?.rawResults7d ?? 'N/A'}</dd></div>
+                <div><dt>New stories, 14 days</dt><dd>{selectedCollectionHealth?.acceptedStories14d ?? 'N/A'}</dd></div>
+              </dl>
+            </div>
 
             <div className="communications-brief-metrics">
               <div><span>Newest media mention</span><strong>{communicationsBrief.latestDate ? formatDate(communicationsBrief.latestDate) : 'No coverage'}</strong></div>

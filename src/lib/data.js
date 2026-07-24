@@ -1,4 +1,5 @@
 import { createAdminClient } from '@/lib/supabase/admin';
+import { buildCollectionHealth } from '@/lib/collectionHealth.mjs';
 
 const ARTICLE_COLUMNS = 'id, created_at, date, headline, summary, source, source_type, canary_score, tags, notes, is_earned_media, is_perched, link, district_id, innovation_reason, recommendation, source_query, canonical_url, visibility_status, manual_override, correction_version';
 const ARTICLE_PAGE_SIZE = 1000;
@@ -202,6 +203,37 @@ export async function getClients() {
     .order('created_at');
   if (error) throw error;
   return data ?? [];
+}
+
+export async function getCollectionHealth(districts, districtId = null) {
+  const supabase = createAdminClient();
+  const cutoff = new Date(Date.now() - 90 * 86_400_000).toISOString();
+  const readRecent = async (table, columns, timestampColumn) => {
+    const rows = [];
+    for (let from = 0; ; from += 1000) {
+      let query = supabase
+        .from(table)
+        .select(columns)
+        .gte(timestampColumn, cutoff)
+        .order(timestampColumn, { ascending: false })
+        .order('district_id', { ascending: true })
+        .range(from, from + 999);
+      if (districtId) query = query.eq('district_id', districtId);
+      const { data, error } = await query;
+      if (error) throw error;
+      const page = data ?? [];
+      rows.push(...page);
+      if (page.length < 1000) break;
+    }
+    return rows;
+  };
+  const [rawResults, candidates, stories] = await Promise.all([
+    readRecent('raw_search_results', 'district_id, collected_at', 'collected_at'),
+    readRecent('story_candidates', 'district_id, evaluated_at', 'evaluated_at'),
+    readRecent('news_stories', 'district_id, created_at', 'created_at'),
+  ]);
+  const scopedDistricts = districtId ? districts.filter((district) => district.id === districtId) : districts;
+  return buildCollectionHealth({ districts: scopedDistricts, rawResults, candidates, stories });
 }
 
 export async function getQueries(districtId = null) {
