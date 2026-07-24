@@ -606,9 +606,10 @@ const CHANNEL_COLORS = {
   all:    { bg: '#22C55E20', color: '#22C55E' },
 };
 
-function QueriesView({ initialQueries, districts, userDistrictId, selectedDistrictId = 'All', onDistrictChange, demoMode = false }) {
+function QueriesView({ initialQueries, districts, userDistrictId, selectedDistrictId = 'All', onDistrictChange, isAdmin = false, demoMode = false }) {
   const [queries, setQueries] = useState(initialQueries);
   const districtFilter = userDistrictId ?? selectedDistrictId ?? 'All';
+  const canManageQueries = isAdmin && !demoMode;
   const [showAddForm, setShowAddForm] = useState(false);
   const [form, setForm] = useState({
     query_text: '',
@@ -631,7 +632,7 @@ function QueriesView({ initialQueries, districts, userDistrictId, selectedDistri
   const keywordQueries = filtered.filter((q) => !q.geo_city && !q.geo_state && !q.geo_zip);
 
   async function handleDelete(id) {
-    if (demoMode) return;
+    if (!canManageQueries) return;
     setDeletingId(id);
     try {
       await deleteQuery(id);
@@ -643,7 +644,7 @@ function QueriesView({ initialQueries, districts, userDistrictId, selectedDistri
 
   async function handleAdd(e) {
     e.preventDefault();
-    if (demoMode) return;
+    if (!canManageQueries) return;
     if (!form.query_text.trim()) { setAddError('Query text is required.'); return; }
     setAddError('');
     setSaving(true);
@@ -683,10 +684,8 @@ function QueriesView({ initialQueries, districts, userDistrictId, selectedDistri
             {q.district_name ?? <span style={{ color: 'var(--text-tertiary)', fontStyle: 'italic' }}>—</span>}
           </td>
         )}
-        <td style={{ textAlign: 'right' }}>
-          {demoMode ? (
-            <span style={{ color: 'var(--text-tertiary)', fontSize: '0.75rem', fontWeight: 600 }}>Demo</span>
-          ) : (
+        {canManageQueries && (
+          <td style={{ textAlign: 'right' }}>
             <button
               className="btn btn-danger btn-sm"
               onClick={() => handleDelete(q.id)}
@@ -695,8 +694,8 @@ function QueriesView({ initialQueries, districts, userDistrictId, selectedDistri
             >
               {deletingId === q.id ? '…' : 'Delete'}
             </button>
-          )}
-        </td>
+          </td>
+        )}
       </tr>
     );
   }
@@ -714,7 +713,7 @@ function QueriesView({ initialQueries, districts, userDistrictId, selectedDistri
               <th>Channel</th>
               <th>Location</th>
               {!userDistrictId && <th>District</th>}
-              <th style={{ textAlign: 'right' }}>Action</th>
+              {canManageQueries && <th style={{ textAlign: 'right' }}>Action</th>}
             </tr>
           </thead>
           <tbody>
@@ -742,7 +741,7 @@ function QueriesView({ initialQueries, districts, userDistrictId, selectedDistri
                 {districts.map((d) => <option key={d.id} value={d.id}>{d.name}</option>)}
               </select>
             )}
-            {!demoMode && (
+            {canManageQueries && (
               <button
                 className="btn btn-primary btn-sm"
                 onClick={() => setShowAddForm((o) => !o)}
@@ -754,7 +753,7 @@ function QueriesView({ initialQueries, districts, userDistrictId, selectedDistri
         </div>
 
         {/* Add Query Form */}
-        {!demoMode && showAddForm && (
+        {canManageQueries && showAddForm && (
           <form onSubmit={handleAdd} style={{
             background: 'var(--bg-elevated)', border: '1px solid var(--border-secondary)',
             borderRadius: 'var(--radius-lg)', padding: '20px', marginBottom: '24px',
@@ -823,6 +822,12 @@ function QueriesView({ initialQueries, districts, userDistrictId, selectedDistri
               </button>
             </div>
           </form>
+        )}
+
+        {!isAdmin && !demoMode && (
+          <p style={{ color: 'var(--text-secondary)', fontSize: '0.85rem', marginBottom: '24px', lineHeight: 1.5 }}>
+            Need to add or remove a monitoring query? Contact Canary Data and we’ll update it for you.
+          </p>
         )}
 
         {/* Keyword Queries */}
@@ -3706,6 +3711,7 @@ export default function DashboardClient({ articles, districts, queries: initialQ
               userDistrictId={userDistrictId}
               selectedDistrictId={districtFilter}
               onDistrictChange={handleDistrictSelect}
+              isAdmin={isAdmin}
               demoMode={demoMode}
             />
           )}

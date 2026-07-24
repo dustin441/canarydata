@@ -34,6 +34,10 @@ function assertCanaryReviewer(actor) {
   if (!actor.isAdmin) throw new Error('Canary reviewer access is required.');
 }
 
+function assertCanaryAdmin(actor) {
+  if (!actor.isAdmin) throw new Error('Canary admin access is required.');
+}
+
 const SOCIAL_REVIEW_ACTIONS = new Set(['approve', 'exclude', 'restore', 'classification', 'note', 'promote']);
 const SOCIAL_CLASSIFICATIONS = new Set(['owned', 'direct_tag', 'direct_mention', 'ambient']);
 
@@ -783,6 +787,7 @@ export async function bulkReviewSocialThreads({ districtId, socialThreadIds, act
 
 export async function addQuery({ query_text, district_id, district_name, geo_city, geo_state, geo_zip, channels }) {
   const { actor, admin: supabase } = await requireCanaryActor();
+  assertCanaryAdmin(actor);
   assertDistrictAccess(actor, district_id);
   const { data, error } = await supabase
     .from('search_queries')
@@ -804,6 +809,7 @@ export async function addQuery({ query_text, district_id, district_name, geo_cit
 
 export async function deleteQuery(id) {
   const { actor, admin: supabase } = await requireCanaryActor();
+  assertCanaryAdmin(actor);
   const { data: query } = await supabase.from('search_queries').select('district_id').eq('id', id).maybeSingle();
   assertDistrictAccess(actor, query?.district_id);
   const { error } = await supabase.from('search_queries').delete().eq('id', id);

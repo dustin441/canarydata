@@ -20,10 +20,19 @@ assert.match(dashboard, /if \(!userDistrictId && !isAdmin\) redirect/);
 const actions = await readFile(new URL('../src/app/actions.js', import.meta.url), 'utf8');
 assert.match(actions, /async function requireCanaryActor/);
 assert.match(actions, /function assertDistrictAccess/);
+assert.match(actions, /function assertCanaryAdmin/);
 for (const action of ['setEarnedMedia', 'saveNote', 'addQuery', 'deleteQuery', 'submitFeedback']) {
   const start = actions.indexOf(`export async function ${action}`);
   assert.notEqual(start, -1, `${action} must exist`);
   assert.match(actions.slice(start, start + 350), /requireCanaryActor/, `${action} must authenticate and authorize the caller`);
 }
+for (const action of ['addQuery', 'deleteQuery']) {
+  const start = actions.indexOf(`export async function ${action}`);
+  assert.match(actions.slice(start, start + 450), /assertCanaryAdmin\(actor\)/, `${action} must be restricted to Canary admins`);
+}
+
+const dashboardClient = await readFile(new URL('../src/app/dashboard/DashboardClient.js', import.meta.url), 'utf8');
+assert.match(dashboardClient, /const canManageQueries = isAdmin && !demoMode/);
+assert.match(dashboardClient, /Need to add or remove a monitoring query\? Contact Canary Data/);
 
 console.log('Authorization metadata regression tests passed.');
