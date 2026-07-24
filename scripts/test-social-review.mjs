@@ -285,8 +285,8 @@ assert.match(dashboard, /SHOW_GLOBAL_BOARD_REPORT_EXPORT && \['dashboard', 'bird
 assert.match(dashboard, /Export Leadership \/ Board PDF/);
 assert.doesNotMatch(dashboard, /⬇ Export PDF[\s\S]{0,180}Tabloid landscape works best/);
 assert.doesNotMatch(dashboard, /function handleExportPdf/);
-assert.match(dashboard, /function BirdEyeView\(\{[\s\S]*districtId[\s\S]*districtName[\s\S]*socialThreads[\s\S]*socialSources/);
-assert.match(dashboard, /selectOfficialSocialReportPosts\([\s\S]*socialThreads[\s\S]*socialSources[\s\S]*districtId[\s\S]*reportWindow[\s\S]*3/);
+assert.match(dashboard, /function BirdEyeView\(\{[\s\S]*districtId[\s\S]*districtName[\s\S]*socialResults[\s\S]*socialSources/);
+assert.match(dashboard, /selectOfficialSocialReportPosts\([\s\S]*socialResults[\s\S]*socialSources[\s\S]*districtId[\s\S]*reportWindow[\s\S]*3/);
 assert.match(dashboard, /Top 3 official social posts/);
 assert.match(dashboard, /socialReportPosts\.map\(\(result, index\)/);
 assert.match(dashboard, /canary-social-performance-/);
@@ -298,6 +298,44 @@ assert.match(dashboard, /hasCompleteInteractionMetrics/);
 assert.match(dashboard, /neutralizeSpreadsheetFormula\(rawText\)/);
 assert.match(dashboard, /const articleUrl = safeExternalHttpUrl\(article\.link\)/);
 assert.match(dashboard, /Available for \{reportScores\.length\} of \{totalMentions\} mentions/);
+assert.match(dashboard, /const earnedCount = newsArticles\.filter\(\(article\) => isEarned\(article\)\)\.length/);
+assert.match(dashboard, /buildReportingDataset, filterReportingDataset/);
+assert.match(dashboard, /const reportingDataset = useMemo/);
+assert.match(dashboard, /articles: reportingArticles/);
+assert.match(dashboard, /\[articles, noteOverrides\]/);
+assert.match(dashboard, /filterReportingDataset\(reportingDataset, \{ districtId: districtFilter, campaignSearch \}\)/);
+assert.match(dashboard, /return campaignArticles\.filter/);
+assert.match(dashboard, /const reportScores = chartArticles[\s\S]*\.filter\(Number\.isFinite\)/);
+assert.match(dashboard, /className="campaign-overview"/);
+assert.match(dashboard, /campaignSearch=\{campaignSearch\}/);
+assert.match(dashboard, /setCampaignSearch=\{setCampaignSearch\}/);
+assert.match(dashboard, /Campaign: \{campaignSearch\} ✕/);
+assert.match(dashboard, /socialResults=\{campaignSocialResults\}/);
+assert.match(dashboard, /Archived social evidence/);
+assert.match(dashboard, /not included in verified official performance totals/);
+assert.match(dashboard, /scoreFilterIsDefault/);
+assert.match(dashboard, /scoreCount: 0/);
+assert.match(dashboard, /w\.scoreSum \/ w\.scoreCount/);
+assert.doesNotMatch(dashboard, /w\.scoreSum \/ w\.mentions/);
+assert.match(dashboard, /function formatCanaryScore\(score\)/);
+assert.doesNotMatch(dashboard, /parseFloat\(article\.canary_score\)\.toFixed/);
+assert.doesNotMatch(dashboard, /Number\(article\.canary_score\)\.toFixed/);
+assert.match(styles, /\.score-badge\.unavailable/);
+assert.match(dashboard, /Showing \{filtered\.length\} of \{scopedArticlesForCounts\.length\} media articles/);
+assert.match(dashboard, /SOCIAL_ANALYST_DRAFTS_STORAGE_KEY/);
+assert.match(dashboard, /window\.localStorage\.setItem\(SOCIAL_ANALYST_DRAFTS_STORAGE_KEY/);
+const monthlyPerformanceSource = dashboard.slice(dashboard.indexOf('function MonthlySocialPerformance'), dashboard.indexOf('function SocialView'));
+assert.ok(
+  monthlyPerformanceSource.indexOf('social-monthly-analyst-note-top') < monthlyPerformanceSource.indexOf('social-monthly-controls'),
+  'The editable analyst insight must appear before report controls and scorecards.',
+);
+const socialReportViewSource = dashboard.slice(dashboard.indexOf('function SocialReportView'), dashboard.indexOf('function BoardReportView'));
+assert.ok(
+  socialReportViewSource.indexOf('social-report-analyst-note') < socialReportViewSource.indexOf('social-report-scorecards'),
+  'The saved analyst insight must appear before scorecards in the exported report.',
+);
+assert.match(styles, /\.campaign-overview[\s\S]*grid-template-columns/);
+assert.match(styles, /\.social-monthly-analyst-note-top/);
 assert.match(dashboard, /<SocialReportMetric result=\{result\} metric="reactions"/);
 const socialReportCardSource = dashboard.slice(dashboard.indexOf('function SocialReportCard'), dashboard.indexOf('function SocialReportThumbnail'));
 for (const metric of ['reactions', 'comments', 'shares']) {
