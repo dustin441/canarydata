@@ -187,17 +187,17 @@ export function normalizeSocialResult(item = {}) {
   const suppliedAvailability = providerMetadata.metric_availability && typeof providerMetadata.metric_availability === 'object'
     ? providerMetadata.metric_availability
     : {};
-  const providerHasPerformance = Boolean(item.provider && item.provider !== 'legacy_canary_replay');
+
   const authorHandle = String(item.author_handle || '').replace(/^@/, '').trim();
   const suppliedAuthorProfileUrl = safeSocialUrl(item.author_profile_url || providerMetadata.author_profile_url);
   const derivedInstagramProfileUrl = platform === 'instagram' && /^[a-z0-9._]+$/i.test(authorHandle)
     ? `https://www.instagram.com/${authorHandle}/`
     : null;
   const metricAvailability = {
-    reactions: Object.hasOwn(suppliedAvailability, 'reactions') ? Boolean(suppliedAvailability.reactions) : providerHasPerformance,
-    comments: Object.hasOwn(suppliedAvailability, 'comments') ? Boolean(suppliedAvailability.comments) : providerHasPerformance,
-    shares: Object.hasOwn(suppliedAvailability, 'shares') ? Boolean(suppliedAvailability.shares) : providerHasPerformance,
-    views: Object.hasOwn(suppliedAvailability, 'views') ? Boolean(suppliedAvailability.views) : providerHasPerformance,
+    reactions: Object.hasOwn(suppliedAvailability, 'reactions') ? Boolean(suppliedAvailability.reactions) : false,
+    comments: Object.hasOwn(suppliedAvailability, 'comments') ? Boolean(suppliedAvailability.comments) : false,
+    shares: Object.hasOwn(suppliedAvailability, 'shares') ? Boolean(suppliedAvailability.shares) : false,
+    views: Object.hasOwn(suppliedAvailability, 'views') ? Boolean(suppliedAvailability.views) : false,
   };
   const representativeComments = (Array.isArray(item.social_comments) ? item.social_comments : [])
     .filter((comment) => comment?.is_representative !== false && String(comment?.body || '').trim())

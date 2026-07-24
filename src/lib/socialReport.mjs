@@ -39,6 +39,7 @@ export function resolveSocialReportWindow(period, asOf, customStart = '', custom
 const INTERACTION_METRICS = [
   ['reactions', 'reactionCount'],
   ['comments', 'commentCount'],
+  ['comments', 'replyCount'],
   ['shares', 'shareCount'],
 ];
 

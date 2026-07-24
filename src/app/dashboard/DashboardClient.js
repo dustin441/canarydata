@@ -2514,7 +2514,7 @@ function SocialReportTable({ results, ranked = false }) {
           <col className="social-report-col-post" />
           <col className="social-report-col-metric" span="5" />
         </colgroup>
-        <thead><tr><th>{ranked ? 'Rank' : 'Row'}</th><th>Thumbnail</th><th>Date</th><th>Platform</th><th>Post / excerpt</th><th>Reported views</th><th>Reactions</th><th>Comments</th><th>Shares</th><th>Total interactions</th></tr></thead>
+        <thead><tr><th>{ranked ? 'Rank' : 'Row'}</th><th>Thumbnail</th><th>Date</th><th>Platform</th><th>Post / excerpt</th><th>Reported views</th><th>Reactions</th><th>Comments / replies</th><th>Shares</th><th>Total interactions</th></tr></thead>
         <tbody>
           {results.map((result, index) => {
             const sourceUrl = safeSocialUrl(result.url);
@@ -2532,7 +2532,7 @@ function SocialReportTable({ results, ranked = false }) {
                 </td>
                 <td><SocialReportMetric result={result} metric="views" value={result.viewCount} /></td>
                 <td><SocialReportMetric result={result} metric="reactions" value={result.reactionCount} /></td>
-                <td><SocialReportMetric result={result} metric="comments" value={result.commentCount} /></td>
+                <td><SocialReportMetric result={result} metric="comments" value={result.commentCount + result.replyCount} /></td>
                 <td><SocialReportMetric result={result} metric="shares" value={result.shareCount} /></td>
                 <td>{interactions === null ? 'Not available' : formatSocialMetric(interactions)}</td>
               </tr>
@@ -2565,7 +2565,7 @@ function SocialReportView({ districtName, reportWindow, filterContext, posts }) 
       <section className="social-report-scorecards" aria-label="Executive scorecards">
         <article><span>Official posts published</span><strong>{summary.officialPosts}</strong><small>Active owned posts</small></article>
         <article><span>Total public interactions</span><strong>{summary.totalInteractions === null ? 'Not available' : formatSocialMetric(summary.totalInteractions)}</strong><small>{interactionMetricCoverage}</small></article>
-        <article><span>Average interactions per post</span><strong>{summary.averageInteractions === null ? 'Not available' : formatSocialMetric(summary.averageInteractions)}</strong><small>{interactionCoverage}</small></article>
+        <article><span>Average reported interactions</span><strong>{summary.averageInteractions === null ? 'Not available' : formatSocialMetric(summary.averageInteractions)}</strong><small>{interactionCoverage}</small></article>
         <article><span>Reported views</span><strong>{summary.reportedViews === null ? 'Not available' : formatSocialMetric(summary.reportedViews)}</strong><small>{viewCoverage}</small></article>
         <article><span>Platforms</span><strong>{summary.platformCount || 'Not available'}</strong><small>{platformBreakdown || 'No platform data available'}</small></article>
       </section>
@@ -2748,9 +2748,16 @@ function SocialView({ articles, socialThreads, socialSources, socialReviewEvents
       return new Date(b.date).getTime() - new Date(a.date).getTime();
     });
   }, [facetedResults, actionFilter, socialSort, sourceByDistrictPlatform]);
+  const verifiedOfficialSourceKeys = useMemo(() => new Set(
+    scopedSources
+      .filter((source) => source.active === true && (source.handle || source.profile_url))
+      .map((source) => `${source.id}:${source.district_id}:${source.platform}`),
+  ), [scopedSources]);
+  const hasVerifiedOfficialSource = (result) => verifiedOfficialSourceKeys.has(`${result.socialAccountId}:${result.districtId}:${result.platform}`);
   const socialReportPosts = useMemo(
-    () => visibleResults.filter((result) => isEligibleSocialReportPost(result, topPostsWindow)),
-    [visibleResults, topPostsWindow],
+    () => visibleResults.filter((result) => isEligibleSocialReportPost(result, topPostsWindow)
+      && verifiedOfficialSourceKeys.has(`${result.socialAccountId}:${result.districtId}:${result.platform}`)),
+    [visibleResults, topPostsWindow, verifiedOfficialSourceKeys],
   );
   const reportDistrictName = districtFilter === 'All'
     ? 'All Districts'
@@ -2793,7 +2800,6 @@ function SocialView({ articles, socialThreads, socialSources, socialReviewEvents
     || performanceFilter !== 'all' || minimumEngagementRate !== '' || maximumEngagementRate !== '' || socialDateStart !== '' || socialDateEnd !== '' || reviewStatusFilter !== 'all' || socialSearch !== '' || socialSort !== 'newest';
   const reviewableVisibleResults = visibleResults.filter((result) => Boolean(result.provider && result.externalThreadId));
   const selectedResults = reviewableVisibleResults.filter((result) => selectedSocialIds.has(result.id));
-  const hasVerifiedOfficialSource = (result) => scopedSources.some((source) => source.id === result.socialAccountId && source.district_id === result.districtId && source.platform === result.platform && source.active === true && (source.handle || source.profile_url));
   const safeOfficialResults = reviewableVisibleResults.filter((result) => result.rawRelationshipType === 'owned' && ['review', 'approved'].includes(result.visibilityStatus) && hasVerifiedOfficialSource(result));
   const canBulkApprove = selectedResults.length > 0 && selectedResults.every((result) => result.rawRelationshipType === 'owned' && ['review', 'approved'].includes(result.visibilityStatus) && hasVerifiedOfficialSource(result));
   const scopedReviewEvents = socialReviewEvents.filter((event) => districtFilter === 'All' || event.district_id === districtFilter);

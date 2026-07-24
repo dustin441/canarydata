@@ -259,6 +259,9 @@ assert.equal(batch.threads.length, 1);
 assert.equal(batch.rejected.length, 1);
 assert.equal(batch.threads[0].provider, 'meta');
 assert.equal(batch.threads[0].district_id, 'alabaster-city-schools');
+assert.deepEqual(batch.threads[0].provider_metadata.metric_availability, {
+  reactions: false, comments: false, shares: false, views: false,
+});
 
 const failedBatch = normalizeProviderBatch({
   provider: 'apify',

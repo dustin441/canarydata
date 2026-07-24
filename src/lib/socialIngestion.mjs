@@ -22,6 +22,10 @@ function normalizePlatform(value) {
   return platform === 'twitter' ? 'x' : platform;
 }
 
+function metricWasProvided(item, ...fields) {
+  return fields.some((field) => Object.hasOwn(item || {}, field) && item[field] !== null && item[field] !== undefined);
+}
+
 function normalizeProviderItem({ provider, districtId, item }) {
   const platform = normalizePlatform(item?.platform || item?.source_type);
   if (!ALLOWED_PLATFORMS.has(platform)) throw new Error('unsupported_platform');
@@ -52,6 +56,18 @@ function normalizeProviderItem({ provider, districtId, item }) {
   const shareCount = nonNegativeNumber(item?.share_count);
   const engagementTotal = nonNegativeNumber(item?.engagement_total)
     || commentCount + replyCount + reactionCount + shareCount;
+  const providerMetadata = item?.provider_metadata && typeof item.provider_metadata === 'object'
+    ? { ...item.provider_metadata }
+    : {};
+  const suppliedAvailability = providerMetadata.metric_availability && typeof providerMetadata.metric_availability === 'object'
+    ? providerMetadata.metric_availability
+    : {};
+  providerMetadata.metric_availability = {
+    reactions: Object.hasOwn(suppliedAvailability, 'reactions') ? Boolean(suppliedAvailability.reactions) : metricWasProvided(item, 'reaction_count'),
+    comments: Object.hasOwn(suppliedAvailability, 'comments') ? Boolean(suppliedAvailability.comments) : metricWasProvided(item, 'comment_count', 'reply_count'),
+    shares: Object.hasOwn(suppliedAvailability, 'shares') ? Boolean(suppliedAvailability.shares) : metricWasProvided(item, 'share_count'),
+    views: Object.hasOwn(suppliedAvailability, 'views') ? Boolean(suppliedAvailability.views) : metricWasProvided(item, 'view_count'),
+  };
 
   return {
     district_id: districtId,
@@ -82,7 +98,7 @@ function normalizeProviderItem({ provider, districtId, item }) {
     match_reason: item?.match_reason || null,
     identity_confidence: item?.identity_confidence ?? null,
     visibility_status: visibilityStatus,
-    provider_metadata: item?.provider_metadata || {},
+    provider_metadata: providerMetadata,
   };
 }
 

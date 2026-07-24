@@ -30,6 +30,14 @@ assert.equal(reviewed.reviewVersion, 4);
 assert.equal(reviewed.reviewedAt, '2026-07-23T12:00:00Z');
 assert.equal(reviewed.socialAccountId, '22222222-2222-2222-2222-222222222222');
 
+const providerWithoutAvailability = normalizeSocialResult({
+  id: 'no-metric-contract', provider: 'apify', platform: 'facebook',
+  reaction_count: 0, comment_count: 0, share_count: 0, view_count: 0,
+});
+assert.deepEqual(providerWithoutAvailability.metricAvailability, {
+  reactions: false, comments: false, shares: false, views: false,
+});
+
 const schoolYearAfterBoundary = resolveSocialReportWindow('school-year', Date.UTC(2026, 6, 24));
 assert.equal(schoolYearAfterBoundary.startInput, '2026-07-15');
 const schoolYearBeforeBoundary = resolveSocialReportWindow('school-year', Date.UTC(2026, 6, 14));
@@ -165,7 +173,7 @@ for (const marker of [
   'Executive scorecards',
   'Official posts published',
   'Total public interactions',
-  'Average interactions per post',
+  'Average reported interactions',
   'Reported views',
   'Available for',
   'Top Performers',
@@ -181,7 +189,7 @@ assert.match(socialReportSource, /topPerformerGroups\.map/);
 assert.match(socialReportSource, /<SocialReportTable results=\{group\.posts\} ranked \/>/);
 assert.doesNotMatch(socialReportSource, /news|evidence appendix|Strategic Alignment/i);
 assert.match(dashboard, /function SocialReportView/);
-assert.match(dashboard, /visibleResults\.filter\(\(result\) => isEligibleSocialReportPost\(result, topPostsWindow\)\)/);
+assert.match(dashboard, /visibleResults\.filter\(\(result\) => isEligibleSocialReportPost\(result, topPostsWindow\)[\s\S]*verifiedOfficialSourceKeys\.has/);
 assert.match(dashboard, /reportPeriod = `\$\{topPostsWindow\.label\}/);
 assert.match(dashboard, /Choose one district before exporting a Social Report/);
 assert.match(dashboard, /Minimum engagement rate:/);
