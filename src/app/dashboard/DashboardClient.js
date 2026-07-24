@@ -9,7 +9,7 @@ import { createEmbeddedCanaryCheckout, confirmEmbeddedCanaryCheckout, saveBillin
 import { compareStrategicAlignmentRows } from '@/lib/strategicAlignmentSort.mjs';
 import { CORE_TAGS, canonicalTags } from '@/lib/canonicalTags.mjs';
 import { buildSocialResults, calculateSocialEngagementRate, rankTopSocialResults, resolveSocialFollowerCount, safeSocialMediaUrl, safeSocialUrl, socialActionFilterMatches, socialDateFilterMatches, socialRelationshipFilterMatches, summarizeSocialActions, summarizeSocialResults } from '@/lib/social.mjs';
-import { dateInputValue, groupTopReportPostsByPlatform, isEligibleSocialReportPost, resolveSocialReportWindow, selectOfficialSocialReportPosts, socialReportInteractionTotal, sortSocialReportDetails, summarizeSocialReport } from '@/lib/socialReport.mjs';
+import { dateInputValue, groupTopReportPostsByPlatform, isEligibleSocialReportPost, neutralizeSpreadsheetFormula, resolveSocialReportWindow, selectOfficialSocialReportPosts, socialReportInteractionTotal, socialReportMetricValue, sortSocialReportDetails, summarizeSocialReport } from '@/lib/socialReport.mjs';
 import { formatDisplayDate } from '@/lib/date.mjs';
 import { CUSTOMER_SEARCH_QUERY_LIMIT, activeNewsQueryCount } from '@/lib/queryPolicy.mjs';
 import { buildCommunicationsBrief, formatCommunicationsBriefRecommendation } from '@/lib/communicationsBrief.mjs';
@@ -336,7 +336,8 @@ function buildStrategicAlignmentData(articles) {
 
 function csvEscape(value) {
   if (value === null || value === undefined) return '';
-  const text = Array.isArray(value) ? value.join('; ') : String(value);
+  const rawText = Array.isArray(value) ? value.join('; ') : String(value);
+  const text = neutralizeSpreadsheetFormula(rawText);
   return `"${text.replace(/"/g, '""').replace(/\r?\n/g, ' ')}"`;
 }
 
@@ -359,7 +360,7 @@ function articleCsvValue(article, columnId, { isEarned, getNoteText } = {}) {
     case 'date': return article.date || '';
     case 'headline': return article.headline || '';
     case 'summary': return article.summary || '';
-    case 'link': return article.link || '';
+    case 'link': return safeExternalHttpUrl(article.link) || '';
     case 'source': return article.source || formatSourceLabel(article.source_type ?? 'other');
     case 'tags': return canonicalTags(article.tags).join('; ');
     case 'score': return article.canary_score ?? '';
@@ -382,28 +383,32 @@ const BIRD_EYE_CSV_COLUMNS = ALL_COLUMNS.filter((column) =>
 
 const SOCIAL_CSV_HEADERS = [
   'Date', 'Platform', 'Relationship', 'Author', 'Post', 'Source URL', 'Media type',
-  'Reactions', 'Comments', 'Shares', 'Views', 'Total engagement', 'Engagement rate',
+  'Reactions', 'Comments / Replies', 'Shares', 'Views', 'Total public interactions', 'Engagement rate (complete interaction metrics only)',
   'Review state', 'Strategic priorities', 'Recommended action',
 ];
 
 function socialCsvRow(result, source) {
   const followerCount = resolveSocialFollowerCount(result, source);
-  const engagementRate = result.hasPerformanceData
-    ? calculateSocialEngagementRate(result, followerCount)
+  const interactionTotal = socialReportInteractionTotal(result);
+  const hasCompleteInteractionMetrics = ['reactions', 'comments', 'shares']
+    .every((metric) => result?.metricAvailability?.[metric] === true);
+  const engagementRate = hasCompleteInteractionMetrics && interactionTotal !== null && Number(followerCount) > 0
+    ? (interactionTotal / Number(followerCount)) * 100
     : null;
+  const metricValue = (metric) => socialReportMetricValue(result, metric) ?? 'N/A';
   return [
     result.date || '',
     formatSourceLabel(result.platform),
     result.relationshipLabel || result.relationshipType || '',
     result.authorName || result.authorHandle || '',
     result.headline || result.summary || '',
-    result.url || '',
+    safeSocialUrl(result.url) || '',
     result.mediaType || (result.mediaUrl ? 'image' : 'text'),
-    result.reactionCount ?? '',
-    result.commentCount ?? '',
-    result.shareCount ?? '',
-    result.viewCount ?? '',
-    result.engagementTotal ?? '',
+    metricValue('reactions'),
+    metricValue('comments'),
+    metricValue('shares'),
+    metricValue('views'),
+    interactionTotal ?? 'N/A',
     engagementRate === null || engagementRate === undefined ? 'N/A' : `${engagementRate.toFixed(2)}%`,
     result.visibilityStatus || '',
     (result.actionIntelligence?.strategicPriorityLabels || []).join('; '),
@@ -996,6 +1001,11 @@ function BirdEyeView({ articles, strategicGovernance, hasSelectedDistrict, selec
   const totalMentions = newsArticles.length;
   const strategicHitCount = highlightedArticles.length;
   const earnedCount = highlightedArticles.filter((article) => isEarned(article)).length;
+  const reportScores = newsArticles
+    .map((article) => article.canary_score)
+    .filter((score) => score !== null && score !== undefined && String(score).trim() !== '')
+    .map(Number)
+    .filter(Number.isFinite);
   const percent = (count, total = totalMentions) => total ? `${Math.round((count / total) * 100)}%` : '0%';
   const reportWindow = {
     start: dateStart ? new Date(`${dateStart}T00:00:00.000Z`) : new Date(0),
@@ -1087,8 +1097,8 @@ function BirdEyeView({ articles, strategicGovernance, hasSelectedDistrict, selec
         </div>
         <div className="kpi-card">
           <div className="kpi-header"><div className="kpi-label">Canary Score</div><div className="kpi-icon green">📈</div></div>
-          <div className="kpi-value">{totalMentions ? (newsArticles.reduce((sum, a) => sum + parseFloat(a.canary_score ?? 0), 0) / totalMentions).toFixed(1) : '—'}</div>
-          <span className="kpi-change positive">Average for report set</span>
+          <div className="kpi-value">{reportScores.length ? (reportScores.reduce((sum, score) => sum + score, 0) / reportScores.length).toFixed(1) : 'Not available'}</div>
+          <span className="kpi-change positive">Available for {reportScores.length} of {totalMentions} mentions</span>
         </div>
         <div className="kpi-card">
           <div className="kpi-header"><div className="kpi-label">Strategic Hits</div><div className="kpi-icon blue">🎯</div></div>
@@ -1145,6 +1155,7 @@ function BirdEyeView({ articles, strategicGovernance, hasSelectedDistrict, selec
               </tr>
             ) : highlightedArticles.map((article) => {
               const labels = extractStrategicAlignmentLabels(article.innovation_reason);
+              const articleUrl = safeExternalHttpUrl(article.link);
               return (
                 <tr key={article.id}>
                   <td style={{ whiteSpace: 'nowrap', color: 'var(--text-tertiary)', fontSize: '0.78rem' }}>{formatDate(article.date)}</td>
@@ -1155,8 +1166,8 @@ function BirdEyeView({ articles, strategicGovernance, hasSelectedDistrict, selec
                     <ExpandableText text={article.summary} />
                   </td>
                   <td style={{ whiteSpace: 'nowrap' }}>
-                    {article.link && (
-                      <a href={article.link} target="_blank" rel="noopener noreferrer" style={{ display: 'inline-flex', alignItems: 'center', gap: '4px', fontSize: '0.78rem', color: 'var(--blue-400)' }}>
+                    {articleUrl && (
+                      <a href={articleUrl} target="_blank" rel="noopener noreferrer" style={{ display: 'inline-flex', alignItems: 'center', gap: '4px', fontSize: '0.78rem', color: 'var(--blue-400)' }}>
                         ↗ View Story
                       </a>
                     )}

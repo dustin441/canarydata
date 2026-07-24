@@ -79,6 +79,22 @@ export function socialReportInteractionTotal(result) {
   return availableMetrics.reduce((sum, [, field]) => sum + finiteMetric(result?.[field]), 0);
 }
 
+export function socialReportMetricValue(result, metric) {
+  if (result?.metricAvailability?.[metric] !== true) return null;
+  if (metric === 'comments') return finiteMetric(result?.commentCount) + finiteMetric(result?.replyCount);
+  const field = {
+    reactions: 'reactionCount',
+    shares: 'shareCount',
+    views: 'viewCount',
+  }[metric];
+  return field ? finiteMetric(result?.[field]) : null;
+}
+
+export function neutralizeSpreadsheetFormula(value) {
+  const text = String(value ?? '');
+  return /^[\s]*[=+\-@]/.test(text) ? `'${text}` : text;
+}
+
 export function rankSocialReportTopPerformers(results, limit = 10) {
   const safeLimit = Math.max(0, Number(limit) || 0);
   return results.slice().sort((a, b) => {

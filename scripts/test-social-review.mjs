@@ -6,11 +6,19 @@ import {
   groupTopReportPostsByPlatform,
   isEligibleSocialReportPost,
   metricAvailabilityCoverage,
+  neutralizeSpreadsheetFormula,
   rankSocialReportTopPerformers,
   selectOfficialSocialReportPosts,
+  socialReportMetricValue,
   sortSocialReportDetails,
   summarizeSocialReport,
 } from '../src/lib/socialReport.mjs';
+
+assert.equal(neutralizeSpreadsheetFormula('=HYPERLINK("https://bad.example")'), "'=HYPERLINK(\"https://bad.example\")");
+assert.equal(neutralizeSpreadsheetFormula('  @SUM(1,2)'), "'  @SUM(1,2)");
+assert.equal(neutralizeSpreadsheetFormula('Normal post text'), 'Normal post text');
+assert.equal(socialReportMetricValue({ commentCount: 5, replyCount: 7, metricAvailability: { comments: true } }, 'comments'), 12);
+assert.equal(socialReportMetricValue({ shareCount: 0, metricAvailability: { shares: false } }, 'shares'), null);
 
 const reviewed = normalizeSocialResult({
   id: 'thread-review-1',
@@ -229,6 +237,13 @@ assert.match(dashboard, /Top 3 official social posts/);
 assert.match(dashboard, /socialReportPosts\.map\(\(result, index\)/);
 assert.match(dashboard, /canary-social-performance-/);
 assert.match(dashboard, /socialReportPosts\.map\(\(result\) => socialCsvRow/);
+assert.match(dashboard, /metricValue\('comments'\)/);
+assert.match(dashboard, /interactionTotal \?\? 'N\/A'/);
+assert.match(dashboard, /Comments \/ Replies/);
+assert.match(dashboard, /hasCompleteInteractionMetrics/);
+assert.match(dashboard, /neutralizeSpreadsheetFormula\(rawText\)/);
+assert.match(dashboard, /const articleUrl = safeExternalHttpUrl\(article\.link\)/);
+assert.match(dashboard, /Available for \{reportScores\.length\} of \{totalMentions\} mentions/);
 assert.match(dashboard, /<SocialReportMetric result=\{result\} metric="reactions"/);
 const socialReportCardSource = dashboard.slice(dashboard.indexOf('function SocialReportCard'), dashboard.indexOf('function SocialReportThumbnail'));
 for (const metric of ['reactions', 'comments', 'shares']) {
@@ -245,6 +260,7 @@ assert.match(styles, /input\[type="date"\][\s\S]*color-scheme: dark/);
 assert.match(styles, /\.birdseye-report-controls[\s\S]*display: none !important/);
 assert.match(styles, /\.birdseye-evidence-page[\s\S]*break-before: page/);
 assert.match(styles, /\.birdseye-evidence-table thead[\s\S]*display: table-header-group/);
+assert.match(styles, /\.birdseye-evidence-table \.headline-text,[\s\S]*-webkit-line-clamp: unset !important/);
 assert.match(styles, /\.board-report-social \.social-report-media img[\s\S]*object-fit: contain/);
 assert.match(dashboard, /!listCompact && \(/);
 assert.match(data, /includeReview \? \['active', 'approved', 'review', 'excluded'\] : \['active'\]/);

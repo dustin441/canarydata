@@ -5346,6 +5346,14 @@ input[type="date"]::-webkit-calendar-picker-indicator {
   .birdseye-evidence-page .data-table-wrapper { margin-top: 10px !important; }
   .birdseye-evidence-table { table-layout: fixed; font-size: 7.5px; }
   .birdseye-evidence-table thead { display: table-header-group; }
+  .birdseye-evidence-table .headline-text,
+  .birdseye-evidence-table .summary-text {
+    display: block !important;
+    max-height: none !important;
+    overflow: visible !important;
+    -webkit-box-orient: initial !important;
+    -webkit-line-clamp: unset !important;
+  }
   .birdseye-evidence-table tr { break-inside: avoid; page-break-inside: avoid; }
   .birdseye-evidence-table th { background: #e2e8f0 !important; color: #0f172a !important; font-size: 7px; }
   .birdseye-evidence-table th,
