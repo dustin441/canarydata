@@ -3389,7 +3389,7 @@ function SocialView({ socialResults, socialSources, socialReviewEvents = [], dis
   );
 }
 
-export default function DashboardClient({ articles, districts, queries: initialQueries, clients = [], userDistrictId, paymentNotice = null, billingInfo = null, excludedStories = [], correctionEvents = [], socialSources = [], socialThreads = [], socialReviewEvents = [], strategicProfiles = [], strategicPriorities = [], collectionHealth = [], isAdmin = false, melodiEnabled = false, demoMode = false }) {
+export default function DashboardClient({ articles, districts, queries: initialQueries, clients = [], userDistrictId, paymentNotice = null, billingInfo = null, excludedStories = [], correctionEvents = [], socialSources = [], socialThreads = [], socialReviewEvents = [], strategicProfiles = [], strategicPriorities = [], collectionHealth = [], isAdmin = false, melodiEnabled = false, metaIntegrationEnabled = false, demoMode = false }) {
   const defaultDistrictFilter = userDistrictId ?? districts[0]?.id ?? 'All';
   const [currentView, setCurrentView] = useState('dashboard');
   const [search, setSearch] = useState('');
@@ -3906,6 +3906,16 @@ export default function DashboardClient({ articles, districts, queries: initialQ
               Social
               <span className="sidebar-link-badge">{socialResultCount}</span>
             </button>
+            {!demoMode && metaIntegrationEnabled && (isAdmin || districtFilter !== 'All') && (
+              <a
+                className="sidebar-link"
+                href={isAdmin ? '/dashboard/integrations' : `/dashboard/integrations?districtId=${encodeURIComponent(districtFilter)}`}
+              >
+                <span className="sidebar-link-icon">🔗</span>
+                Integrations
+                <span className="sidebar-link-badge">Meta</span>
+              </a>
+            )}
             {!demoMode && melodiEnabled && (
               <button
                 className={`sidebar-link melodi-sidebar-link ${currentView === 'melodi' ? 'active' : ''}`}

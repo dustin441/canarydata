@@ -13,11 +13,13 @@ export default async function DashboardPage() {
   // Use admin client to reliably fetch full user metadata
   let userDistrictId = null;
   let isAdmin = false;
+  let canManageIntegrations = false;
   if (sessionUser?.id) {
     const admin = createAdminClient();
     const { data: { user } } = await admin.auth.admin.getUserById(sessionUser.id);
     userDistrictId = user?.app_metadata?.district_id ?? null;
     isAdmin = user?.app_metadata?.role === 'admin';
+    canManageIntegrations = isAdmin || (Array.isArray(user?.app_metadata?.permissions) && user.app_metadata.permissions.includes('manage_integrations'));
   }
 
   if (!sessionUser?.id) redirect('/login?redirect_to=/dashboard');
@@ -84,6 +86,7 @@ export default async function DashboardPage() {
       strategicPriorities={strategicPriorities}
       collectionHealth={collectionHealth}
       melodiEnabled={process.env.MELODI_ENABLED === 'true' && (process.env.MELODI_QA_MODE !== 'true' || isAdmin)}
+      metaIntegrationEnabled={canManageIntegrations && process.env.META_INTEGRATION_ENABLED === 'true' && Boolean(process.env.META_APP_ID && process.env.META_APP_SECRET && process.env.META_TOKEN_ENCRYPTION_KEY && process.env.META_REDIRECT_URI)}
     />
   );
 }

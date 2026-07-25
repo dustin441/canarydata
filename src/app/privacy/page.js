@@ -59,7 +59,7 @@ export default function PrivacyPolicy() {
           Privacy Policy
         </h1>
         <p style={{ color: '#64748b', fontSize: '0.95rem', marginBottom: '3.5rem' }}>
-          Effective Date: June 5, 2026 &nbsp;·&nbsp; Last Updated: June 19, 2026
+          Effective Date: June 5, 2026 &nbsp;·&nbsp; Last Updated: July 25, 2026
         </p>
 
         {sections.map((section) => (
@@ -128,6 +128,7 @@ const sections = [
           <li style={itemStyle}><strong style={strongStyle}>Account information:</strong> name, email address, organization, role, and other information provided during signup or account support.</li>
           <li style={itemStyle}><strong style={strongStyle}>District configuration:</strong> district names, schools, geographic parameters, search terms, monitored public sources, and public social accounts or hashtags designated for monitoring.</li>
           <li style={itemStyle}><strong style={strongStyle}>Publicly accessible content:</strong> news articles, public websites, public posts, metadata, and links retrieved from publicly available sources on a customer&apos;s behalf.</li>
+          <li style={itemStyle}><strong style={strongStyle}>Connected Meta account data:</strong> when an authorized district user connects Meta, we receive the Facebook Pages, connected Instagram professional accounts, and ad accounts that person is permitted to access; granted permissions; account and post insights; advertising delivery metrics; and the identifiers needed to keep those assets mapped to the correct district. We do not request permission to publish posts or manage advertising campaigns.</li>
           <li style={itemStyle}><strong style={strongStyle}>Platform outputs:</strong> summaries, sentiment scores, risk levels, recommendations, tags, reports, exports, and other derivative analysis generated for the customer.</li>
           <li style={itemStyle}><strong style={strongStyle}>Usage and security data:</strong> access logs, IP address, browser type, pages visited, authentication events, and similar technical data used for security, auditing, troubleshooting, and performance.</li>
         </ul>
@@ -144,6 +145,7 @@ const sections = [
           <li style={itemStyle}>Operate, maintain, and deliver the Canary Data dashboard, reports, alerts, and support services.</li>
           <li style={itemStyle}>Authenticate users, secure accounts, enforce district-level access controls, and protect customer workspaces.</li>
           <li style={itemStyle}>Retrieve, filter, summarize, classify, and present publicly accessible media and social content selected by or relevant to the customer&apos;s configuration.</li>
+          <li style={itemStyle}>Read reporting data from customer-authorized Meta Pages, Instagram professional accounts, and ad accounts; reconcile organic and paid activity; and produce district-controlled reports. Canary does not use this connection to publish, reply, alter campaigns, or spend advertising budget.</li>
           <li style={itemStyle}>Generate communications-focused analysis, including sentiment, reputation risk, recommendations, and report exports.</li>
           <li style={itemStyle}>Communicate about account setup, service operations, invoices, security, support, and product updates.</li>
           <li style={itemStyle}>Improve platform reliability, accuracy, and safety without selling customer data or using one customer&apos;s confidential configuration or outputs to market to another customer.</li>
@@ -155,7 +157,7 @@ const sections = [
     title: '4. Public Data and Monitoring Boundaries',
     content: (
       <>
-        <p style={{ marginBottom: '1rem' }}>Canary Data is a public media and digital monitoring tool. Our intent is to surface information a district communications team could reasonably find in publicly accessible media or public social channels, not to surveil private communities.</p>
+        <p style={{ marginBottom: '1rem' }}>Canary Data is a public media and digital monitoring tool. Our intent is to surface information a district communications team could reasonably find in publicly accessible media or public social channels, not to surveil private communities. When a customer separately connects Meta, Canary also reads authorized business reporting metrics that Meta makes available to that user.</p>
         <ul style={listStyle}>
           <li style={itemStyle}>We do not intentionally access closed groups, private social media accounts, private parent or employee communities, or password-protected spaces.</li>
           <li style={itemStyle}>We monitor public social signals only when they are publicly accessible and relevant to a customer&apos;s configured district, schools, leaders, sources, or search terms.</li>
@@ -189,6 +191,7 @@ const sections = [
         <ul style={listStyle}>
           <li style={itemStyle}>Data is encrypted in transit using HTTPS/TLS and encrypted at rest by our infrastructure providers.</li>
           <li style={itemStyle}>Customer workspaces are separated by district or organization, with access limited to authorized users.</li>
+          <li style={itemStyle}>Meta access tokens are encrypted separately on the server, are never returned to browser clients, and are deleted locally when a connection is disconnected or a valid Meta deletion request is received.</li>
           <li style={itemStyle}>Production access is limited to authorized Canary Data personnel and service providers who need access to operate, secure, or support the platform.</li>
           <li style={itemStyle}>Demo environments use fake/sample data and should not contain live customer records, student records, or private district work product.</li>
           <li style={itemStyle}>We use role-based access, logging, and operational controls designed to reduce unauthorized access and support investigation if an issue occurs.</li>
@@ -209,7 +212,7 @@ const sections = [
     title: '8. Data Retention and Deletion',
     content: (
       <p>
-        We retain account information, district configuration, collected public content, reports, exports, and derivative analysis for the duration of the customer relationship unless a different retention period is agreed in writing. Upon cancellation or written request, we will delete or de-identify customer account and district data within a commercially reasonable period, unless retention is required for legal, security, billing, backup, or dispute-resolution purposes. Aggregated, non-identifiable technical logs may be retained for security and platform reliability.
+        We retain account information, district configuration, collected public content, reports, exports, and derivative analysis for the duration of the customer relationship unless a different retention period is agreed in writing. Meta credentials are retained only while the connection is active. A customer may disconnect Meta from Canary, remove Canary from Meta Business Integrations, or use Meta&apos;s data-deletion process; Canary then removes stored tokens and stops future collection. Upon cancellation or written request, we will delete or de-identify customer account and district data within a commercially reasonable period, unless retention is required for legal, security, billing, backup, or dispute-resolution purposes. Aggregated, non-identifiable technical logs may be retained for security and platform reliability.
       </p>
     ),
   },

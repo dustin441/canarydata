@@ -1,0 +1,48 @@
+.page { min-height: 100vh; padding: 42px clamp(20px, 5vw, 72px) 64px; color: var(--text-primary); background: var(--bg-primary); }
+.header { max-width: 840px; margin-bottom: 28px; }
+.header h1 { margin: 8px 0 10px; font-size: clamp(2rem, 5vw, 3.5rem); letter-spacing: -0.04em; }
+.header p, .sectionHeading p, .permissionCard p, .assetGroup > div > p { color: var(--text-secondary); line-height: 1.6; }
+.back { display: inline-block; color: var(--canary-yellow); text-decoration: none; margin-bottom: 22px; font-weight: 700; }
+.eyebrow { color: var(--canary-yellow); font-size: 0.75rem; font-weight: 800; letter-spacing: 0.12em; text-transform: uppercase; }
+.districtPicker { display: grid; gap: 7px; max-width: 420px; margin-bottom: 24px; }
+.districtPicker span { color: var(--text-secondary); font-size: 0.8rem; font-weight: 700; }
+.districtPicker select { width: 100%; padding: 11px 12px; border: 1px solid var(--border-color); border-radius: 10px; color: var(--text-primary); background: var(--bg-secondary); }
+.notice, .success, .error { max-width: 980px; padding: 14px 16px; margin-bottom: 18px; border-radius: 12px; line-height: 1.5; }
+.notice { background: rgba(245, 197, 24, 0.1); border: 1px solid rgba(245, 197, 24, 0.28); }
+.success { background: rgba(34, 197, 94, 0.1); border: 1px solid rgba(34, 197, 94, 0.28); }
+.error { background: rgba(239, 68, 68, 0.1); border: 1px solid rgba(239, 68, 68, 0.3); }
+.permissionCard, .connectionSection, .assetsSection { max-width: 1100px; border: 1px solid var(--border-color); border-radius: 18px; background: var(--bg-secondary); box-shadow: var(--shadow-sm); }
+.permissionCard { display: grid; grid-template-columns: minmax(0, 1.2fr) minmax(260px, 0.8fr); gap: 28px; padding: 26px; margin-bottom: 22px; }
+.permissionCard h2, .sectionHeading h2, .assetGroup h3 { margin: 6px 0; }
+.permissionList { display: grid; align-content: center; gap: 9px; color: var(--text-secondary); }
+.connectionSection, .assetsSection { padding: 24px; margin-bottom: 22px; }
+.sectionHeading { display: flex; justify-content: space-between; gap: 18px; align-items: center; margin-bottom: 18px; }
+.connectButton, .saveButton, .disconnectButton { border-radius: 10px; padding: 11px 16px; font-weight: 800; cursor: pointer; }
+.connectButton, .saveButton { border: 0; color: #0b1f33; background: var(--canary-yellow); text-decoration: none; white-space: nowrap; }
+.connectButton:disabled, .saveButton:disabled, .disconnectButton:disabled { opacity: 0.55; cursor: not-allowed; }
+.disconnectButton { border: 1px solid rgba(239, 68, 68, 0.45); color: #fecaca; background: transparent; }
+.connection { display: flex; justify-content: space-between; gap: 18px; align-items: center; padding: 18px; border: 1px solid var(--border-color); border-radius: 14px; }
+.connection h3 { margin: 6px 0; }
+.connection p, .connection small { color: var(--text-secondary); }
+.statusActive, .statusMuted { display: inline-block; padding: 4px 8px; border-radius: 999px; font-size: 0.7rem; font-weight: 800; text-transform: uppercase; }
+.statusActive { color: #bbf7d0; background: rgba(34, 197, 94, 0.15); }
+.statusMuted { color: var(--text-secondary); background: var(--bg-tertiary); }
+.empty, .emptySmall, .loading { color: var(--text-secondary); padding: 20px; border: 1px dashed var(--border-color); border-radius: 12px; }
+.loading { max-width: 1100px; }
+.assetGroup { padding: 20px 0; border-top: 1px solid var(--border-color); }
+.assetGroup:first-of-type { border-top: 0; }
+.asset { display: grid; grid-template-columns: minmax(220px, 1fr) minmax(280px, 1.3fr); gap: 18px; align-items: center; margin-top: 12px; padding: 16px; border: 1px solid var(--border-color); border-radius: 12px; background: var(--bg-primary); }
+.assetSelected { border-color: rgba(245, 197, 24, 0.5); }
+.assetIdentity { display: flex; gap: 12px; align-items: center; cursor: pointer; }
+.assetIdentity input { width: 18px; height: 18px; accent-color: var(--canary-yellow); }
+.assetIdentity span { display: grid; gap: 4px; min-width: 0; }
+.assetIdentity small { color: var(--text-secondary); overflow-wrap: anywhere; }
+.mappingNote { color: var(--canary-yellow); font-size: 0.78rem; font-weight: 700; text-align: right; }
+.footer { max-width: 1100px; color: var(--text-tertiary); font-size: 0.82rem; text-align: center; }
+@media (max-width: 760px) {
+  .page { padding: 26px 16px 48px; }
+  .permissionCard, .asset { grid-template-columns: minmax(0, 1fr); }
+  .mappingNote { text-align: left; }
+  .sectionHeading, .connection { align-items: stretch; flex-direction: column; }
+  .connectButton, .saveButton, .disconnectButton { width: 100%; text-align: center; }
+}
