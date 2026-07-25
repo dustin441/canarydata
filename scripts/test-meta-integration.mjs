@@ -113,6 +113,10 @@ assert.ok(!deletionRoute.includes(".from('social_provider_connections')"), 'Meta
 assert.ok(deletionRoute.includes('metaDeletionConfigured()'), 'Meta deletion must depend only on deletion-specific configuration.');
 assert.ok(sql.includes('canary_complete_meta_data_deletion'), 'Meta data deletion must have a transactional RPC.');
 
+const authMiddleware = fs.readFileSync(new URL('../src/lib/supabase/middleware.js', import.meta.url), 'utf8');
+assert.ok(authMiddleware.includes("request.nextUrl.pathname === '/api/integrations/meta/data-deletion'"), 'Meta deletion callback must be public for Meta.');
+assert.ok(authMiddleware.includes("request.nextUrl.pathname === '/api/integrations/meta/data-deletion/status'"), 'Meta deletion status URL must be public.');
+
 const statusRoute = fs.readFileSync(new URL('../src/app/api/integrations/meta/route.js', import.meta.url), 'utf8');
 assert.ok(!statusRoute.includes('encrypted_access_token'), 'Browser status route must not select encrypted connection tokens.');
 assert.ok(!statusRoute.includes('social_provider_credentials'), 'Browser status route must not query credentials.');

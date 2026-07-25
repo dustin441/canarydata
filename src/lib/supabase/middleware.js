@@ -33,9 +33,14 @@ export async function updateSession(request) {
     data: { user },
   } = await supabase.auth.getUser();
 
+  const isPublicMetaDeletionRoute =
+    request.nextUrl.pathname === '/api/integrations/meta/data-deletion'
+    || request.nextUrl.pathname === '/api/integrations/meta/data-deletion/status';
+
   // If no user and not on login/signup/auth pages, redirect to login
   if (
     !user &&
+    !isPublicMetaDeletionRoute &&
     request.nextUrl.pathname !== '/' &&
     !request.nextUrl.pathname.startsWith('/demo') &&
     !request.nextUrl.pathname.startsWith('/login') &&
