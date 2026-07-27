@@ -4,6 +4,7 @@ import { useState } from 'react';
 import Link from 'next/link';
 import Image from 'next/image';
 import { discoverOnboardingProfile, submitOnboardingRequest } from '@/app/actions';
+import { assertStrategicPlanFileSize } from '@/lib/onboarding-upload.mjs';
 
 const fieldStyle = { marginBottom: '1rem' };
 const DRAFT_FIELDS = [
@@ -43,6 +44,8 @@ export default function Onboarding() {
 
     try {
       const formData = new FormData(e.currentTarget);
+      const strategicPlanFile = formData.get('strategic_plan_file');
+      assertStrategicPlanFileSize(strategicPlanFile);
       const values = formDataToObject(formData);
       delete values.strategic_plan_file;
       const result = await discoverOnboardingProfile(formData);
@@ -182,7 +185,7 @@ export default function Onboarding() {
                 <div className="form-group" style={fieldStyle}>
                   <label htmlFor="strategic_plan_file">Strategic plan document (optional)</label>
                   <input id="strategic_plan_file" name="strategic_plan_file" type="file" className="form-input" accept=".pdf,.docx,.txt,.md,text/plain,application/pdf,application/vnd.openxmlformats-officedocument.wordprocessingml.document" />
-                  <small style={{ color: 'var(--text-tertiary)' }}>PDF, DOCX, TXT, or Markdown · 10 MB maximum</small>
+                  <small style={{ color: 'var(--text-tertiary)' }}>PDF, DOCX, TXT, or Markdown · 4 MB maximum</small>
                 </div>
 
                 <div className="form-group" style={fieldStyle}>

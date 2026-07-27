@@ -9,6 +9,7 @@ import { CUSTOMER_SEARCH_QUERY_LIMIT, searchQueryFingerprint, validateSearchQuer
 import { lookup } from 'node:dns/promises';
 import { isIP } from 'node:net';
 import { createHash } from 'node:crypto';
+import { assertStrategicPlanFileSize } from '@/lib/onboarding-upload.mjs';
 
 async function requireCanaryActor() {
   const sessionClient = await createServerClient();
@@ -346,8 +347,8 @@ export async function discoverOnboardingProfile(formData) {
   }
 
   if (strategicPlanFile && typeof strategicPlanFile.arrayBuffer === 'function' && strategicPlanFile.size > 0) {
+    assertStrategicPlanFileSize(strategicPlanFile);
     try {
-      if (strategicPlanFile.size > 10 * 1024 * 1024) throw new Error('Document is too large (10 MB maximum)');
       const bytes = new Uint8Array(await strategicPlanFile.arrayBuffer());
       const text = await extractDocumentText({
         bytes,
