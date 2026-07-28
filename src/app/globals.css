@@ -1284,6 +1284,9 @@ a:hover {
 .social-monthly-post-copy small { margin-top: 4px; color: var(--text-tertiary); font-weight: 500; }
 .social-monthly-post-table-wrap a { color: var(--brand-primary); font-weight: 800; text-decoration: none; }
 .social-platform-label { display: inline-flex; align-items: center; padding: 4px 8px; border-radius: 999px; background: var(--bg-card); color: var(--text-primary); font-size: 0.7rem; font-weight: 800; }
+.social-platform-label .social-platform-dot { width: 7px; height: 7px; margin-right: 5px; }
+.social-report-card-meta { display: flex; align-items: center; justify-content: space-between; gap: 8px; flex-wrap: wrap; }
+.social-report-card-meta > span:last-child { color: var(--text-tertiary); font-size: 0.72rem; font-weight: 700; }
 .social-monthly-top-posts .board-report-social { grid-template-columns: repeat(2, minmax(0, 1fr)); }
 .social-monthly-top-posts .social-report-card { grid-template-columns: minmax(150px, 0.42fr) minmax(0, 1fr); }
 .social-monthly-top-posts .social-report-media { min-height: 210px; height: auto; }

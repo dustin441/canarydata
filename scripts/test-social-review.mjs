@@ -232,8 +232,9 @@ for (const marker of [
   'Reported views',
   'Available for',
   'Top Performers',
+  'Complete Post Evidence',
   'Social Media Brief',
-  'leadership highlights only',
+  'complete eligible post table',
   'Not available',
 ]) {
   assert.ok(socialReportSource.includes(marker), `Social Report must include ${marker}`);
@@ -262,11 +263,12 @@ assert.match(styles, /@media print[\s\S]*\.social-report-media-backdrop \{ displ
 assert.match(dashboard, /Legacy approval\/card workspace intentionally removed from the rendered Social experience/);
 assert.match(dashboard, /function formatSocialComparison\(change\)[\s\S]*Intl\.NumberFormat\('en-US'/);
 assert.doesNotMatch(dashboard, /formatSocialComparison\(change\)[\s\S]{0,500}formatSocialMetric\(change\.absolute\)/);
-assert.match(dashboard, /useState\('previous-month'\)/);
+assert.match(dashboard, /useState\('this-month'\)/);
 assert.match(dashboard, /resolveSocialReportComparisonWindow\(topPostsPeriod/);
 assert.match(dashboard, /previousSocialReportPosts/);
 assert.match(dashboard, /analystNote=\{socialAnalystNote\}/);
-assert.match(dashboard, /This concise report includes leadership highlights only\. The CSV contains complete post-level evidence/);
+assert.match(dashboard, /This report includes leadership highlights and the complete eligible post table/);
+assert.match(dashboard, /<SocialReportTable results=\{allPosts\} \/>/);
 assert.match(dashboard, /function SocialReportView/);
 assert.match(dashboard, /monthlyReportCandidates\.filter\(\(result\) => isEligibleSocialReportPost\(result, topPostsWindow\)[\s\S]*verifiedOfficialSourceKeys\.has/);
 assert.match(dashboard, /monthlyReportCandidates\.filter\(\(result\) => isEligibleSocialReportPost\(result, comparisonPostsWindow\)/);

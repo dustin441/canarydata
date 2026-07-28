@@ -13,6 +13,7 @@ import {
   searchQuerySnapshot,
   validateSearchQueryText,
 } from '../src/lib/queryPolicy.mjs';
+import { buildQueryReviewTask } from '../src/lib/clickup.js';
 
 assert.equal(CUSTOMER_SEARCH_QUERY_LIMIT, 10);
 assert.equal(normalizeSearchQueryText('  Santa   Clara   schools  '), 'Santa Clara schools');
@@ -28,6 +29,21 @@ assert.equal(activeNewsQueryCount([
   { channels: 'news' },
 ]), 2);
 assert.equal(estimatedMonthlySearches(10), 150);
+
+const reviewTask = buildQueryReviewTask({
+  action: 'update',
+  district_id: 'district-a',
+  district_name: 'District A',
+  query_id: 'query-1',
+  request_id: 'request-1',
+  created_at: '2026-07-28T00:00:00Z',
+  before: { query_text: 'District A board', channels: 'news', active: true },
+  after: { query_text: 'District A budget', channels: 'news', active: true, geo_city: 'Canary Falls' },
+});
+assert.match(reviewTask.name, /^\[Query activation review\] District A: update/);
+assert.deepEqual(reviewTask.tags, ['query-review', 'customer-request', 'canary-data']);
+assert.match(reviewTask.markdown_content, /does not modify generated_queries or canonical ingestion automatically/);
+assert.match(reviewTask.markdown_content, /Run a controlled ingestion/);
 
 const activeNewsQuery = {
   id: 'query-1',
@@ -240,11 +256,53 @@ assert.equal(hasActiveSearchQueryDuplicate(
 const actionsSource = await readFile(new URL('../src/app/actions.js', import.meta.url), 'utf8');
 const addAction = actionsSource.slice(actionsSource.indexOf('export async function addQuery'), actionsSource.indexOf('export async function updateQuery'));
 const updateAction = actionsSource.slice(actionsSource.indexOf('export async function updateQuery'), actionsSource.indexOf('export async function deleteQuery'));
+const deleteAction = actionsSource.slice(actionsSource.indexOf('export async function deleteQuery'), actionsSource.indexOf('export async function submitFeedback'));
 assert.equal((addAction.match(/duplicateWriteError/g) || []).length, 4, 'every add/reactivation write path must reconcile duplicates');
+assert.equal((addAction.match(/finishSearchQueryMutation/g) || []).length, 4, 'every successful add/reactivation path must create a customer review request');
 assert.match(updateAction, /searchQuerySnapshot\(changes\?\.original\)/, 'edits must require the browser original snapshot');
 assert.match(updateAction, /applySearchQuerySnapshotFilters\(update, originalSnapshot\)/, 'edits must guard updates with every original mutable value');
 assert.match(updateAction, /duplicateWriteError/, 'edits must reconcile duplicates after writing');
 assert.match(updateAction, /reconcileRollback:\s*true/, 'edit rollback must receive a second duplicate reconciliation pass');
 assert.match(actionsSource, /restoredReconciliation/, 'restored fingerprints must be reconciled before returning');
+assert.match(updateAction, /finishSearchQueryMutation\(\{ actor, supabase, data, action: 'update', before: existingQuery, rollbackValues: originalSnapshot \}\)/, 'customer edits must create a canonical activation review with failure compensation');
+assert.match(deleteAction, /finishSearchQueryMutation\(\{ actor, supabase, data, action: 'remove', before: query, after: data, rollbackValues: searchQuerySnapshot\(query\) \}\)/, 'customer removals must create a canonical activation review with exact-snapshot failure compensation');
+assert.match(deleteAction, /if \(query\.active !== true\) return \{ error:/, 'already-inactive removals must not reactivate a query during compensation');
+assert.match(deleteAction, /applySearchQuerySnapshotFilters\(deactivate, searchQuerySnapshot\(query\)\)/, 'removals must use optimistic snapshot guards');
+assert.match(actionsSource, /if \(actor\.isAdmin\) return null;/, 'administrator mutations must not create customer review tickets');
+assert.match(actionsSource, /`query_review_synced:\$\{task\.id\}`/, 'successful review tasks must be linked without optional feedback schema columns');
+assert.doesNotMatch(actionsSource.slice(actionsSource.indexOf('async function queueCustomerQueryReview'), actionsSource.indexOf('async function finishSearchQueryMutation')), /clickup_task_id/, 'query review queuing must work with the production feedback schema');
+assert.match(actionsSource, /async function rollbackSearchQueryAfterReviewFailure/);
+assert.match(actionsSource, /canonicalReview\?\.status === 'queue_failed'/, 'a query mutation must be compensated when its durable review request cannot be stored');
+assert.match(actionsSource, /applySearchQuerySnapshotFilters\(rollback, searchQuerySnapshot\(data\)\)/, 'review-failure compensation must not overwrite a newer concurrent query change');
+
+const feedbackSyncSource = await readFile(new URL('./sync-feedback-to-clickup.mjs', import.meta.url), 'utf8');
+assert.match(feedbackSyncSource, /startsWith\('query_review_synced:'\)/, 'fallback sync must not duplicate linked query review tasks');
+assert.match(feedbackSyncSource, /isQueryReview\(row\) \? `query_review_synced:\$\{task\.id\}`/, 'fallback sync must preserve the query review task ID');
+assert.match(feedbackSyncSource, /Request record ID/);
+assert.match(feedbackSyncSource, /existingTasks\.get\(String\(row\.id\)\) \|\| await createClickUpTask\(row\)/, 'retry sync must reconcile an existing external task before creating another');
+assert.match(feedbackSyncSource, /\.eq\('status', row\.status\)/, 'retry workers must atomically claim a pending row');
+assert.match(feedbackSyncSource, /statusShowsDispatching/, 'rows with uncertain or active dispatch ownership must not be retried automatically');
+assert.match(feedbackSyncSource, /isLeadRequest/, 'lead rows must retain specialized ClickUp task formatting during retry');
+assert.match(feedbackSyncSource, /isOnboardingRequest/, 'onboarding fallback rows must retain specialized ClickUp task formatting during retry');
+assert.match(actionsSource, /lead_clickup_dispatching:\$\{Date\.now\(\)\}/, 'lead direct dispatches must reserve timestamped ownership');
+assert.match(actionsSource, /onboarding_clickup_dispatching:\$\{Date\.now\(\)\}/, 'onboarding fallback dispatches must reserve timestamped ownership');
+assert.match(actionsSource, /insert\(\{ \.\.\.request, status: onboardingDispatchStatus \}\)/, 'structured onboarding must also persist dispatch ownership');
+assert.match(feedbackSyncSource, /from\('onboarding_requests'\)/, 'shared worker must process structured onboarding rows');
+assert.match(feedbackSyncSource, /from\(rowTable\(row\)\)/, 'worker claims and links must target the owning source table');
+assert.match(feedbackSyncSource, /buildOnboardingTask\(feedback\)/, 'structured and fallback onboarding retries must use the complete shared task builder');
+assert.match(feedbackSyncSource, /--onboarding-id=/, 'structured onboarding rows must support targeted retry');
+assert.match(actionsSource, /const dispatchStatus = clickupConfigured \? `clickup_dispatching:\$\{Date\.now\(\)\}:\$\{randomUUID\(\)\}` : null/, 'ordinary feedback must reserve timestamped dispatch ownership before direct ClickUp creation');
+assert.match(actionsSource, /const dispatchStatus = `query_review_dispatching:\$\{Date\.now\(\)\}:\$\{randomUUID\(\)\}`/, 'query-review direct dispatches must encode reservation time');
+assert.match(feedbackSyncSource, /_dispatching:\$\{Date\.now\(\)\}:\$\{randomUUID\(\)\}/, 'worker claims must encode reservation time');
+assert.match(feedbackSyncSource, /Onboarding request ID/, 'direct onboarding tasks must be discoverable during uncertain-dispatch reconciliation');
+assert.match(feedbackSyncSource, /--reconcile-feedback-id=/, 'uncertain dispatches must have a targeted reconciliation path');
+assert.match(feedbackSyncSource, /\[reconciled\].*existingTask\.id/, 'targeted reconciliation must CAS-link an existing external task');
+assert.match(feedbackSyncSource, /--release-dispatch/, 'releasing uncertain ownership must require an explicit operator flag');
+assert.match(feedbackSyncSource, /!\[408, 425, 429\]\.includes\(syncError\.status\)/, 'ambiguous ClickUp failures must keep their dispatch claim');
+
+const dashboardSource = await readFile(new URL('../src/app/dashboard/DashboardClient.js', import.meta.url), 'utf8');
+assert.match(dashboardSource, /Canonical monitoring stays unchanged until the request passes relevance, source-quality, and clean-results checks/);
+assert.match(dashboardSource, /does not directly change canonical ingestion/);
+assert.match(dashboardSource, /Request removal of this query\?[\s\S]*canonical monitoring will remain unchanged until Canary reviews the request/);
 
 console.log('Query management policy tests passed.');

@@ -613,6 +613,7 @@ function QueriesView({ initialQueries, districts, userDistrictId, selectedDistri
   const [updatingId, setUpdatingId] = useState(null);
   const [editForm, setEditForm] = useState(null);
   const [addError, setAddError] = useState('');
+  const [reviewNotice, setReviewNotice] = useState('');
 
   const filtered = districtFilter === 'All'
     ? queries
@@ -623,6 +624,13 @@ function QueriesView({ initialQueries, districts, userDistrictId, selectedDistri
   // group by has-geo vs no-geo
   const geoQueries = filtered.filter((q) => q.geo_city || q.geo_state || q.geo_zip);
   const keywordQueries = filtered.filter((q) => !q.geo_city && !q.geo_state && !q.geo_zip);
+
+  function recordCanonicalReview(canonicalReview) {
+    if (!canonicalReview) return;
+    setReviewNotice(canonicalReview.status === 'queue_failed'
+      ? 'Your request was saved, but Canary could not create its review record. Please use Send Feedback so the monitoring team can follow up.'
+      : 'Saved for Canary review. Canonical monitoring stays unchanged until the request passes relevance, source-quality, and clean-results checks.');
+  }
 
   function startEdit(query) {
     if (!canManageQueries || (!isAdmin && query.channels !== 'news')) return;
@@ -663,7 +671,9 @@ function QueriesView({ initialQueries, districts, userDistrictId, selectedDistri
         setAddError(updatedQuery.error);
         return;
       }
-      setQueries((prev) => prev.map((query) => query.id === id ? updatedQuery : query));
+      const { canonical_review: canonicalReview, ...savedQuery } = updatedQuery;
+      setQueries((prev) => prev.map((query) => query.id === id ? savedQuery : query));
+      recordCanonicalReview(canonicalReview);
       cancelEdit();
     } catch (err) {
       setAddError(err.message ?? 'Failed to update query.');
@@ -674,12 +684,20 @@ function QueriesView({ initialQueries, districts, userDistrictId, selectedDistri
 
   async function handleDelete(id) {
     if (!canManageQueries) return;
-    if (!window.confirm('Remove this query from future monitoring? Existing stories will stay in your dashboard.')) return;
+    const confirmation = isAdmin
+      ? 'Remove this query from future monitoring? Existing stories will stay in your dashboard.'
+      : 'Request removal of this query? Existing stories will stay in your dashboard, and canonical monitoring will remain unchanged until Canary reviews the request.';
+    if (!window.confirm(confirmation)) return;
     setAddError('');
     setDeletingId(id);
     try {
-      await deleteQuery(id);
+      const result = await deleteQuery(id);
+      if (result?.error) {
+        setAddError(result.error);
+        return;
+      }
       setQueries((prev) => prev.filter((q) => q.id !== id));
+      recordCanonicalReview(result?.canonical_review);
     } catch (err) {
       setAddError(err.message ?? 'Failed to remove query.');
     } finally {
@@ -700,7 +718,9 @@ function QueriesView({ initialQueries, districts, userDistrictId, selectedDistri
         setAddError(newQuery.error);
         return;
       }
-      setQueries((prev) => [...prev, newQuery]);
+      const { canonical_review: canonicalReview, ...savedQuery } = newQuery;
+      setQueries((prev) => [...prev, savedQuery]);
+      recordCanonicalReview(canonicalReview);
       setForm({ query_text: '', channels: 'news', district_id: userDistrictId ?? (districtFilter !== 'All' ? districtFilter : ''), geo_city: '', geo_state: '', geo_zip: '' });
       setShowAddForm(false);
     } catch (err) {
@@ -875,8 +895,14 @@ function QueriesView({ initialQueries, districts, userDistrictId, selectedDistri
               <span style={{ color: 'var(--text-secondary)', fontSize: '0.82rem', fontWeight: 700 }}>{activeNewsQueries} of {CUSTOMER_SEARCH_QUERY_LIMIT} active</span>
             </div>
             <p style={{ color: 'var(--text-secondary)', fontSize: '0.82rem', lineHeight: 1.5, margin: 0 }}>
-              Queries are checked every two days. Use focused names, programs, facilities, or issues rather than broad one-word topics.
+              Changes are saved as district requests and sent to Canary for review. Canonical monitoring changes only after relevance, source-quality, and clean-results checks. Use focused names, programs, facilities, or issues rather than broad one-word topics.
             </p>
+          </div>
+        )}
+
+        {reviewNotice && (
+          <div role="status" style={{ color: '#166534', background: '#F0FDF4', border: '1px solid #BBF7D0', borderRadius: 'var(--radius-md)', padding: '10px 12px', fontSize: '0.82rem', lineHeight: 1.45, marginBottom: '14px' }}>
+            {reviewNotice}
           </div>
         )}
 
@@ -915,7 +941,7 @@ function QueriesView({ initialQueries, districts, userDistrictId, selectedDistri
                 </select>
               )}
             </div>
-            {!isAdmin && <p style={{ color: 'var(--text-tertiary)', fontSize: '0.78rem', lineHeight: 1.45, margin: '0 0 12px' }}>Be specific enough to avoid unrelated results. The query is saved only to your district account.</p>}
+            {!isAdmin && <p style={{ color: 'var(--text-tertiary)', fontSize: '0.78rem', lineHeight: 1.45, margin: '0 0 12px' }}>Be specific enough to avoid unrelated results. This saves a district request and creates a Canary activation review; it does not directly change canonical ingestion.</p>}
             <div style={{ display: 'grid', gridTemplateColumns: '1fr 1fr 120px', gap: '12px', marginBottom: '12px' }}>
               <input
                 className="form-input"
@@ -2655,7 +2681,10 @@ function SocialReportCard({ result, rank }) {
         )}
       </div>
       <div className="social-report-card-copy">
-        <span>#{rank} · {formatDisplayDate(result.date)}</span>
+        <div className="social-report-card-meta">
+          <span className={`social-platform-label ${result.platform}`}><span className={`social-platform-dot ${result.platform}`} aria-hidden="true" />{formatSourceLabel(result.platform)}</span>
+          <span>#{rank} · {formatDisplayDate(result.date)}</span>
+        </div>
         <strong>{result.headline || result.summary || 'Official district social post'}</strong>
         <p><span>{socialReportInteractionTotal(result) === null ? 'Not available' : `${formatSocialMetric(socialReportInteractionTotal(result))} public interactions`}</span> · <span><SocialReportMetric result={result} metric="reactions" value={result.reactionCount} /> reactions</span> · <span><SocialReportMetric result={result} metric="comments" value={result.commentCount + result.replyCount} /> comments / replies</span> · <span><SocialReportMetric result={result} metric="shares" value={result.shareCount} /> shares</span></p>
         {sourceUrl ? <a href={sourceUrl} target="_blank" rel="noopener noreferrer">View source</a> : <span>Source link unavailable in the collected record.</span>}
@@ -2730,6 +2759,10 @@ function SocialReportTable({ results, ranked = false }) {
 function SocialReportView({ districtName, reportWindow, filterContext, posts, analystNote }) {
   const summary = summarizeSocialReport(posts);
   const topPerformerGroups = groupTopReportPostsByPlatform(posts, 3);
+  const allPosts = [...posts].sort((a, b) => {
+    const dateDifference = new Date(b.date).getTime() - new Date(a.date).getTime();
+    return dateDifference || String(a.id).localeCompare(String(b.id));
+  });
   const platformBreakdown = summary.platformBreakdown.map(({ platform, count }) => `${formatSourceLabel(platform)} ${count}`).join(' · ');
   const interactionCoverage = `Any interaction metric available for ${summary.interactionsAvailable} of ${summary.officialPosts} posts`;
   const interactionMetricCoverage = `Reactions ${summary.reactionsCoverage.available}/${summary.reactionsCoverage.total} · Comments ${summary.commentsCoverage.available}/${summary.commentsCoverage.total} · Shares ${summary.sharesCoverage.available}/${summary.sharesCoverage.total}`;
@@ -2762,9 +2795,13 @@ function SocialReportView({ districtName, reportWindow, filterContext, posts, an
               </section>
             ))}
           </section>
+          <section className="social-report-section social-report-detail social-report-detail-new-page">
+            <div className="social-report-section-heading"><h2>Complete Post Evidence</h2><p>Every eligible official post in the selected reporting window, newest first, with source links and available public metrics.</p></div>
+            <SocialReportTable results={allPosts} />
+          </section>
           <aside className="social-report-data-notes">
             <strong>Data notes</strong>
-            <span>This concise report includes leadership highlights only. The CSV contains complete post-level evidence. “Not available” means the source did not supply that metric. Reported views are platform-provided views, not unique reach.</span>
+            <span>This report includes leadership highlights and the complete eligible post table. The CSV provides the same post-level evidence for analysis. “Not available” means the source did not supply that metric. Reported views are platform-provided views, not unique reach.</span>
           </aside>
         </>
       ) : (
@@ -2885,14 +2922,14 @@ function MonthlySocialPerformance({
 
       <section className="social-monthly-analyst-note social-monthly-analyst-note-top">
         <div><span className="social-eyebrow">Analyst insight</span><h3>Social Media Brief</h3><p>Write the leadership context first. This human-reviewed note appears near the top of the monthly PDF.</p></div>
-        <textarea value={analystNote} onChange={(event) => setAnalystNote(event.target.value)} maxLength={2000} placeholder="Example: This month we focused on kindergarten registration and staff back-to-school preparation. The highlighted posts show how those priorities performed and what we plan to carry forward." />
+        <textarea value={analystNote} onChange={(event) => setAnalystNote(event.target.value)} maxLength={2000} placeholder="Example: This month we focused on back-to-school preparation and family readiness. The highlighted posts show how those priorities performed and what we plan to carry forward." />
         <small>{analystNote.length}/2,000 characters · Draft is local to this browser until report archiving is added.</small>
       </section>
 
       <div className="social-monthly-controls">
         <label><span>Reporting period</span><select value={period} onChange={(event) => setPeriod(event.target.value)}>
-          <option value="previous-month">Latest completed month</option>
           <option value="this-month">Current month to date</option>
+          <option value="previous-month">Latest completed month</option>
           <option value="last-30-days">Last 30 days</option>
           <option value="school-year">Current school year</option>
           <option value="calendar-year">Current calendar year</option>
@@ -2992,7 +3029,7 @@ function SocialView({ socialResults, socialSources, socialReviewEvents = [], dis
     return () => window.clearTimeout(timer);
   }, []);
   const [topPostsAsOf] = useState(() => Date.now());
-  const [topPostsPeriod, setTopPostsPeriod] = useState('previous-month');
+  const [topPostsPeriod, setTopPostsPeriod] = useState('this-month');
   const [topPostsCustomStart, setTopPostsCustomStart] = useState('');
   const [topPostsCustomEnd, setTopPostsCustomEnd] = useState('');
 

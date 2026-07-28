@@ -300,6 +300,10 @@ for (const period of ['last-30-days', 'this-month', 'previous-month', 'school-ye
 assert.match(dashboardSource, /SOCIAL_CSV_HEADERS/);
 assert.match(dashboardSource, /function exportSocialCsv\(\)/);
 assert.match(dashboardSource, /function exportSocialPdf\(\)/);
+assert.match(dashboardSource, /useState\('this-month'\)/, 'Social reporting must default to the current month to date');
+assert.match(dashboardSource, /social-report-card-meta[\s\S]{0,300}social-platform-label/, 'Top Post cards must show a platform chip');
+assert.match(dashboardSource, /<h2>Complete Post Evidence<\/h2>[\s\S]{0,300}<SocialReportTable results=\{allPosts\}/, 'the Social PDF must contain the complete eligible post table');
+assert.doesNotMatch(dashboardSource, /kindergarten registration and staff back-to-school preparation/, 'seasonally incompatible briefing guidance must not return');
 assert.match(dashboardSource, /function BoardReportView\(/);
 assert.match(dashboardSource, /result\.visibilityStatus === 'active'/, 'Board Report must exclude review-only canonical Social records');
 assert.match(dashboardSource, /Board Report PDF/);

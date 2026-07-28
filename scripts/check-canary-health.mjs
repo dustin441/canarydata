@@ -1,5 +1,6 @@
 import { readFile, writeFile } from 'node:fs/promises';
 import { createHash } from 'node:crypto';
+import { feedbackDispatchAgeHours } from '../src/lib/feedbackDispatch.mjs';
 
 const required = (name) => {
   const value = process.env[name];
@@ -30,26 +31,49 @@ async function supabase(table, params) {
     Authorization: `Bearer ${SUPABASE_KEY}`,
   });
 }
-
+async function optionalSupabase(table, params) {
+  try {
+    return await supabase(table, params);
+  } catch (error) {
+    if (/\b404\b/.test(error.message || '')) return [];
+    throw error;
+  }
+}
+const latestDate = (values) => values.filter(Boolean).sort().at(-1) || null;
 const inc = (map, key) => map.set(key, (map.get(key) || 0) + 1);
 const activeWorkflowIds = ['dVIf6KnZklHYzQvi'];
 
-const [districts, generatedQueries, searchQueries, rawResults, stories, candidates, workflowExecutions] = await Promise.all([
+const [districts, generatedQueries, searchQueries, rawResults, stories, candidates, pendingQueryReviews, namedPendingFeedbackTasks, nullStatusFeedbackTasks, uncertainFeedbackDispatches, pendingOnboardingTasks, uncertainOnboardingDispatches, workflowExecutions] = await Promise.all([
   supabase('districts', { select: 'id,name', limit: '1000' }),
   supabase('generated_queries', { select: 'id,district_id,query_type,query_text,search_params,active', active: 'eq.true', limit: '1000' }),
   supabase('search_queries', { select: 'id,district_id,query_text,active', active: 'eq.true', limit: '1000' }),
   supabase('raw_search_results', { select: 'generated_query_id,district_id,source_name,collected_at', collected_at: `gte.${isoAgo(14)}`, limit: '5000' }),
   supabase('news_stories', { select: 'district_id,source,created_at', created_at: `gte.${isoAgo(14)}`, limit: '5000' }),
   supabase('story_candidates', { select: 'generated_query_id,district_id,decision,evaluated_at', evaluated_at: `gte.${isoAgo(7)}`, limit: '5000' }),
+  supabase('feedback', { select: 'id,district_id,district_name,status,created_at,message', status: 'eq.query_review_pending', limit: '1000' }),
+  supabase('feedback', { select: 'id,district_id,district_name,status,created_at,message', status: 'in.(lead_request,lead_clickup_failed,onboarding_request,onboarding_clickup_failed,clickup_failed)', limit: '1000' }),
+  supabase('feedback', { select: 'id,district_id,district_name,status,created_at,message', status: 'is.null', limit: '1000' }),
+  supabase('feedback', { select: 'id,district_id,district_name,status,created_at,message', status: 'like.*dispatching*', limit: '1000' }),
+  optionalSupabase('onboarding_requests', { select: 'id,organization_name,status,created_at,clickup_task_id', status: 'in.(submitted,clickup_failed)', limit: '1000' }),
+  optionalSupabase('onboarding_requests', { select: 'id,organization_name,status,created_at,clickup_task_id', status: 'like.*dispatching*', limit: '1000' }),
   Promise.all(activeWorkflowIds.map(async (workflowId) => ({
     workflowId,
     executions: (await getJson(`${N8N_URL}/api/v1/executions?workflowId=${workflowId}&limit=20`, { 'X-N8N-API-KEY': N8N_KEY })).data || [],
   }))),
 ]);
+const pendingFeedbackTasks = [...namedPendingFeedbackTasks, ...nullStatusFeedbackTasks];
+const pendingStructuredOnboarding = pendingOnboardingTasks.filter((request) => !request.clickup_task_id);
+const allUncertainDispatches = [
+  ...uncertainFeedbackDispatches,
+  ...uncertainOnboardingDispatches.map((request) => ({ ...request, district_name: request.organization_name })),
+];
 
 const districtName = new Map(districts.map((row) => [row.id, row.name]));
 const excludedDistricts = new Set(['canary-payment-test-district']);
-const monitoredDistricts = new Set([...generatedQueries, ...searchQueries].map((row) => row.district_id).filter((id) => id && !excludedDistricts.has(id)));
+// Canonical ingestion reads generated_queries. Customer search_queries are a
+// review/request surface and must not make a district look scheduled before
+// Canary activates its canonical profile.
+const monitoredDistricts = new Set(generatedQueries.map((row) => row.district_id).filter((id) => id && !excludedDistricts.has(id)));
 const rawByDistrict = new Map();
 const storyByDistrict = new Map();
 const candidateByDistrict = new Map();
@@ -93,12 +117,27 @@ for (const id of monitoredDistricts) {
   const lastCandidateAt = latestCandidateByDistrict.get(id) || null;
   const lastStoryAt = latestStoryByDistrict.get(id) || null;
   const latestCollectionEvidence = [lastRawAt, lastCandidateAt].filter(Boolean).sort((a, b) => new Date(b) - new Date(a))[0] || null;
-  const staleHours = latestCollectionEvidence ? (now - new Date(latestCollectionEvidence)) / 3_600_000 : null;
-  if (staleHours === null || staleHours > 36) add('critical', 'district_collection_stale_36h', `${label} has no collection evidence in the last 36 hours.`, { district_id: id, latest_collection_evidence: latestCollectionEvidence });
-  if (raw === 0) add('warning', 'district_zero_raw_results_7d', `${label} has no raw search results in the last 7 days.`, { district_id: id });
+  if (raw === 0) add('warning', 'district_zero_raw_results_7d', `${label} has no stored raw search results in the last 7 days. Zero stored results alone does not prove a scheduler failure; review query/source coverage and the workflow-level checks.`, { district_id: id, latest_collection_evidence: latestCollectionEvidence });
   if (raw > 0 && acceptedStories === 0) add('warning', 'district_zero_stories_14d', `${label} has raw results but no new accepted stories in the last 14 days.`, { district_id: id, raw_results_7d: raw });
   if (evaluated >= 10 && rejected / evaluated >= 0.9) add('warning', 'district_high_rejection_rate', `${label} rejected ${rejected}/${evaluated} evaluated candidates in the last 7 days.`, { district_id: id, rejection_rate: Number((rejected / evaluated).toFixed(3)) });
-  districtHealth.push({ district_id: id, district_name: label, latest_collection_evidence: latestCollectionEvidence, latest_story_at: lastStoryAt, raw_results_7d: raw, candidates_evaluated_7d: evaluated, rejected_candidates_7d: rejected, accepted_stories_14d: acceptedStories, status: staleHours === null || staleHours > 36 ? 'critical' : raw > 0 && acceptedStories === 0 ? 'warning' : 'healthy' });
+  districtHealth.push({ district_id: id, district_name: label, latest_collection_evidence: latestCollectionEvidence, latest_story_at: lastStoryAt, raw_results_7d: raw, candidates_evaluated_7d: evaluated, rejected_candidates_7d: rejected, accepted_stories_14d: acceptedStories, status: raw === 0 || (raw > 0 && acceptedStories === 0) ? 'warning' : 'healthy' });
+}
+
+for (const request of pendingQueryReviews) {
+  const ageHours = (now - new Date(request.created_at)) / 3_600_000;
+  if (ageHours > 24) add('warning', 'query_review_pending_over_24h', `${request.district_name || districtName.get(request.district_id) || request.district_id || 'A district'} has a customer query review pending for more than 24 hours.`, { district_id: request.district_id || null, request_id: request.id, created_at: request.created_at });
+}
+for (const request of pendingFeedbackTasks) {
+  const ageHours = (now - new Date(request.created_at)) / 3_600_000;
+  if (ageHours > 24) add('warning', 'feedback_clickup_pending_over_24h', `${request.district_name || districtName.get(request.district_id) || request.district_id || 'A Canary request'} has not reached ClickUp after more than 24 hours.`, { district_id: request.district_id || null, request_id: request.id, created_at: request.created_at });
+}
+for (const request of pendingStructuredOnboarding) {
+  const ageHours = (now - new Date(request.created_at)) / 3_600_000;
+  if (ageHours > 24) add('warning', 'onboarding_clickup_pending_over_24h', `${request.organization_name || 'An onboarding request'} has not reached ClickUp after more than 24 hours.`, { request_id: request.id, created_at: request.created_at });
+}
+for (const request of allUncertainDispatches) {
+  const ageHours = feedbackDispatchAgeHours(request, now);
+  if (ageHours > 1) add('warning', String(request.status || '').startsWith('query_review_dispatching') ? 'query_review_dispatch_uncertain_over_1h' : 'feedback_dispatch_uncertain_over_1h', `${request.district_name || districtName.get(request.district_id) || request.district_id || 'A district'} has a feedback task with uncertain ClickUp dispatch state for more than 1 hour. Reconcile by request ID before retrying.`, { district_id: request.district_id || null, request_id: request.id, created_at: request.created_at });
 }
 const missingBaselineByDistrict = new Map();
 for (const query of generatedQueries) {
@@ -137,12 +176,18 @@ const report = {
     raw_results_7d: rawResults7d,
     accepted_stories_14d: stories.length,
     candidates_evaluated_7d: candidates.length,
+    unresolved_query_reviews: pendingQueryReviews.length + allUncertainDispatches.filter((request) => String(request.status || '').startsWith('query_review_dispatching')).length,
+    pending_feedback_tasks: pendingFeedbackTasks.length,
+    pending_onboarding_tasks: pendingStructuredOnboarding.length,
+    uncertain_feedback_dispatches: allUncertainDispatches.length,
     alerts: alerts.length,
   },
   district_health: districtHealth.sort((a, b) => a.district_name.localeCompare(b.district_name)),
   alerts,
 };
-const fingerprintInput = alerts.map(({ severity, code, district_id, workflow_id }) => ({ severity, code, district_id: district_id || null, workflow_id: workflow_id || null }));
+const fingerprintInput = alerts
+  .map(({ severity, code, district_id, workflow_id, request_id }) => ({ severity, code, district_id: district_id || null, workflow_id: workflow_id || null, request_id: request_id || null }))
+  .sort((a, b) => JSON.stringify(a).localeCompare(JSON.stringify(b)));
 const fingerprint = createHash('sha256').update(JSON.stringify(fingerprintInput)).digest('hex');
 let previousFingerprint = null;
 if (STATE_FILE) {

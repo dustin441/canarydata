@@ -2,13 +2,13 @@
 
 import { createAdminClient } from '@/lib/supabase/admin';
 import { createClient as createServerClient } from '@/lib/supabase/server';
-import { createClickUpFeedbackTask, createClickUpOnboardingTask, isClickUpConfigured } from '@/lib/clickup';
+import { createClickUpFeedbackTask, createClickUpOnboardingTask, createClickUpQueryReviewTask, isClickUpConfigured } from '@/lib/clickup';
 import { revalidatePath } from 'next/cache';
 import { canonicalizeStoryUrl, requireCorrectionReason } from '@/lib/storyCorrections.mjs';
 import { CUSTOMER_SEARCH_QUERY_LIMIT, applySearchQuerySnapshotFilters, buildSearchQueryUpdate, hasActiveSearchQueryDuplicate, reconcileActiveSearchQueryWrite, searchQueryFingerprint, searchQuerySnapshot, validateSearchQueryText } from '@/lib/queryPolicy.mjs';
 import { lookup } from 'node:dns/promises';
 import { isIP } from 'node:net';
-import { createHash } from 'node:crypto';
+import { createHash, randomUUID } from 'node:crypto';
 import { assertStrategicPlanFileSize } from '@/lib/onboarding-upload.mjs';
 
 async function requireCanaryActor() {
@@ -414,6 +414,39 @@ export async function discoverOnboardingProfile(formData) {
   };
 }
 
+function feedbackTrackingColumnsUnavailable(error) {
+  return ['42703', 'PGRST204'].includes(String(error?.code || ''))
+    || /column .* does not exist|schema cache/i.test(String(error?.message || ''));
+}
+
+async function transitionFeedbackClickUpDispatch(supabase, { id, expectedStatus, status, task = null, errorMessage = null }) {
+  const payload = {
+    status,
+    clickup_task_id: task?.id || null,
+    clickup_task_url: task?.url || null,
+    clickup_synced_at: task ? new Date().toISOString() : null,
+    clickup_sync_error: errorMessage,
+  };
+  let { data: linked, error } = await supabase
+    .from('feedback')
+    .update(payload)
+    .eq('id', id)
+    .eq('status', expectedStatus)
+    .select('id')
+    .maybeSingle();
+  if (error && feedbackTrackingColumnsUnavailable(error)) {
+    ({ data: linked, error } = await supabase
+      .from('feedback')
+      .update({ status })
+      .eq('id', id)
+      .eq('status', expectedStatus)
+      .select('id')
+      .maybeSingle());
+  }
+  if (error) throw error;
+  if (!linked) throw new Error('Lost feedback ClickUp dispatch ownership before recording the outcome.');
+}
+
 export async function submitLeadRequest(formData) {
   const supabase = createAdminClient();
   const lead = {
@@ -442,30 +475,30 @@ export async function submitLeadRequest(formData) {
     'Workflow note: keep this as a light lead capture. If approved for a trial, send the hidden /onboarding link so the prospect can confirm mission/vision/values, strategic priorities, socials, keywords, schools, and exclusions before Canary runs manual review/backfill.',
   ].join('\n');
 
+  const clickupConfigured = isClickUpConfigured();
+  const leadDispatchStatus = clickupConfigured ? `lead_clickup_dispatching:${Date.now()}:${randomUUID()}` : 'lead_request';
   const { data: feedback, error } = await supabase.from('feedback').insert({
     message,
     district_name: lead.organization_name,
     district_id: null,
-    status: 'lead_request',
+    status: leadDispatchStatus,
   }).select('*').single();
 
   if (error) throw error;
 
-  if (isClickUpConfigured()) {
+  if (clickupConfigured) {
     try {
       const task = await createClickUpFeedbackTask(feedback);
-      await supabase.from('feedback').update({
-        status: 'lead_clickup_synced',
-        clickup_task_id: task?.id || null,
-        clickup_task_url: task?.url || null,
-        clickup_synced_at: new Date().toISOString(),
-        clickup_sync_error: null,
-      }).eq('id', feedback.id);
+      await transitionFeedbackClickUpDispatch(supabase, { id: feedback.id, expectedStatus: leadDispatchStatus, status: 'lead_clickup_synced', task });
     } catch (clickupError) {
-      await supabase.from('feedback').update({
-        status: 'lead_clickup_failed',
-        clickup_sync_error: clickupError.message || 'Unknown ClickUp error',
-      }).eq('id', feedback.id);
+      console.error('Canary lead ClickUp dispatch failed', { status: clickupError?.status || null, message: clickupError?.message || 'Unknown ClickUp error' });
+      const definiteRejection = Number.isInteger(clickupError.status)
+        && clickupError.status >= 400
+        && clickupError.status < 500
+        && ![408, 425, 429].includes(clickupError.status);
+      if (definiteRejection) {
+        await transitionFeedbackClickUpDispatch(supabase, { id: feedback.id, expectedStatus: leadDispatchStatus, status: 'lead_clickup_failed', errorMessage: clickupError.message || 'Unknown ClickUp error' });
+      }
     }
   }
 
@@ -513,12 +546,14 @@ export async function submitOnboardingRequest(formData) {
   if (!request.contact_name) throw new Error('Contact name is required');
   if (!request.contact_email) throw new Error('Contact email is required');
 
+  const clickupConfigured = isClickUpConfigured();
+  let onboardingDispatchStatus = clickupConfigured ? `onboarding_clickup_dispatching:${Date.now()}:${randomUUID()}` : 'submitted';
   let saved = null;
   let dbError = null;
   try {
     const { data, error } = await supabase
       .from('onboarding_requests')
-      .insert(request)
+      .insert({ ...request, status: onboardingDispatchStatus })
       .select('*')
       .single();
     if (error) throw error;
@@ -540,13 +575,14 @@ export async function submitOnboardingRequest(formData) {
         'Raw intake:',
         JSON.stringify(request, null, 2),
       ].join('\n');
+      onboardingDispatchStatus = clickupConfigured ? `onboarding_clickup_dispatching:${Date.now()}:${randomUUID()}` : 'onboarding_request';
       const { data: feedbackFallback, error: fallbackError } = await supabase
         .from('feedback')
         .insert({
           message: fallbackMessage,
           district_name: request.organization_name,
           district_id: null,
-          status: 'onboarding_request',
+          status: onboardingDispatchStatus,
         })
         .select('*')
         .single();
@@ -566,27 +602,50 @@ export async function submitOnboardingRequest(formData) {
 
   let clickupTask = null;
   let clickupError = null;
-  if (isClickUpConfigured()) {
+  if (clickupConfigured) {
     try {
       clickupTask = await createClickUpOnboardingTask(saved);
-      if (saved.id) {
-        await supabase
+      if (saved.id && saved.fallback_table === 'feedback') {
+        await transitionFeedbackClickUpDispatch(supabase, { id: saved.id, expectedStatus: onboardingDispatchStatus, status: 'onboarding_clickup_synced', task: clickupTask });
+      } else if (saved.id) {
+        const { data: linked, error: updateError } = await supabase
           .from('onboarding_requests')
           .update({
+            status: 'submitted',
             clickup_task_id: clickupTask?.id || null,
             clickup_task_url: clickupTask?.url || null,
             clickup_synced_at: new Date().toISOString(),
             clickup_sync_error: null,
           })
-          .eq('id', saved.id);
+          .eq('id', saved.id)
+          .eq('status', onboardingDispatchStatus)
+          .select('id')
+          .maybeSingle();
+        if (updateError || !linked) throw updateError || new Error('Lost onboarding ClickUp dispatch ownership before linking the task.');
       }
     } catch (error) {
       clickupError = error;
-      if (saved.id) {
-        await supabase
-          .from('onboarding_requests')
-          .update({ clickup_sync_error: error.message || 'Unknown ClickUp error' })
-          .eq('id', saved.id);
+      console.error('Canary onboarding ClickUp dispatch failed', { status: error?.status || null, message: error?.message || 'Unknown ClickUp error' });
+      if (saved.id && saved.fallback_table === 'feedback') {
+        const definiteRejection = Number.isInteger(error.status)
+          && error.status >= 400
+          && error.status < 500
+          && ![408, 425, 429].includes(error.status);
+        if (definiteRejection) {
+          await transitionFeedbackClickUpDispatch(supabase, { id: saved.id, expectedStatus: onboardingDispatchStatus, status: 'onboarding_clickup_failed', errorMessage: error.message || 'Unknown ClickUp error' });
+        }
+      } else if (saved.id) {
+        const definiteRejection = Number.isInteger(error.status)
+          && error.status >= 400
+          && error.status < 500
+          && ![408, 425, 429].includes(error.status);
+        if (definiteRejection) {
+          await supabase
+            .from('onboarding_requests')
+            .update({ status: 'clickup_failed', clickup_sync_error: error.message || 'Unknown ClickUp error' })
+            .eq('id', saved.id)
+            .eq('status', onboardingDispatchStatus);
+        }
       }
     }
   }
@@ -598,7 +657,6 @@ export async function submitOnboardingRequest(formData) {
   return {
     ok: true,
     id: saved.id,
-    clickup_task_url: clickupTask?.url || null,
     stored: Boolean(saved.id),
   };
 }
@@ -908,6 +966,140 @@ async function duplicateWriteError({ supabase, writtenQuery, rollbackValues, rec
   return 'That search query became a duplicate while saving, so your change was not kept. Refresh and try a different query.';
 }
 
+function formatQueryReviewMessage({ action, before, after }) {
+  const format = (query) => query ? [
+    `Query: ${query.query_text || 'None'}`,
+    `Channel: ${query.channels || 'news'}`,
+    `Location: ${[query.geo_city, query.geo_state, query.geo_zip].filter(Boolean).join(', ') || 'None'}`,
+    `Active in customer request list: ${query.active === false ? 'No' : 'Yes'}`,
+  ].join('\n') : 'None';
+
+  return [
+    '[Query activation review]',
+    `Requested action: ${action}`,
+    '',
+    'Previous customer request:',
+    format(before),
+    '',
+    'Requested customer configuration:',
+    format(after),
+    '',
+    'Canonical generated_queries monitoring was intentionally left unchanged pending Canary review and a controlled clean-results test.',
+  ].join('\n');
+}
+
+async function queueCustomerQueryReview({ actor, supabase, action, before = null, after = null }) {
+  if (actor.isAdmin) return null;
+  const current = after || before;
+  const districtId = current?.district_id || actor.districtId;
+  const districtName = current?.district_name || null;
+  const dispatchStatus = `query_review_dispatching:${Date.now()}:${randomUUID()}`;
+  const { data: request, error: requestError } = await supabase
+    .from('feedback')
+    .insert({
+      message: formatQueryReviewMessage({ action, before, after }),
+      district_id: districtId,
+      district_name: districtName,
+      // Reserve direct ClickUp dispatch for this request. The retry worker only
+      // claims pending rows, so it cannot race the server action.
+      status: dispatchStatus,
+    })
+    .select('*')
+    .single();
+
+  if (requestError || !request) {
+    console.error('Could not store customer query review request.', requestError?.message || 'No request row returned.');
+    return { status: 'queue_failed' };
+  }
+
+  const review = {
+    action,
+    before,
+    after,
+    district_id: districtId,
+    district_name: districtName,
+    query_id: current?.id || null,
+    request_id: request.id,
+    created_at: request.created_at,
+  };
+
+  if (!isClickUpConfigured()) {
+    await supabase.from('feedback').update({ status: 'query_review_pending' }).eq('id', request.id).eq('status', dispatchStatus);
+    return { status: 'stored', request_id: request.id };
+  }
+
+  try {
+    const task = await createClickUpQueryReviewTask(review);
+    const { data: linked, error: updateError } = await supabase
+      .from('feedback')
+      .update({ status: task?.id ? `query_review_synced:${task.id}` : 'query_review_synced' })
+      .eq('id', request.id)
+      .eq('status', dispatchStatus)
+      .select('id')
+      .maybeSingle();
+    if (updateError || !linked) {
+      console.error('Could not save customer query review task status.', updateError?.message || 'Dispatch ownership changed before the task could be linked.');
+      // The durable request already exists. Keep its dispatching state so no
+      // retry can create a second task before reconciliation by request ID.
+      return { status: 'stored', request_id: request.id };
+    }
+    return { status: 'queued', request_id: request.id };
+  } catch (clickupError) {
+    const definiteRejection = Number.isInteger(clickupError.status)
+      && clickupError.status >= 400
+      && clickupError.status < 500
+      && ![408, 425, 429].includes(clickupError.status);
+    if (definiteRejection) {
+      await supabase
+        .from('feedback')
+        .update({ status: 'query_review_pending' })
+        .eq('id', request.id)
+        .eq('status', dispatchStatus);
+    }
+    console.error('Could not create customer query review task.', clickupError.message || 'Unknown ClickUp error');
+    return { status: 'stored', request_id: request.id };
+  }
+}
+
+async function rollbackSearchQueryAfterReviewFailure({ supabase, data, rollbackValues }) {
+  if (!data?.id || !data?.district_id || !rollbackValues) return false;
+  let rollback = supabase
+    .from('search_queries')
+    .update(rollbackValues)
+    .eq('id', data.id)
+    .eq('district_id', data.district_id);
+  rollback = applySearchQuerySnapshotFilters(rollback, searchQuerySnapshot(data));
+  const { data: restored, error } = await rollback
+    .select(SEARCH_QUERY_RETURN_COLUMNS)
+    .maybeSingle();
+  if (error || !restored) return false;
+
+  if (restored.active !== false) {
+    const reconciliation = await reconcileSearchQueryWrite({
+      supabase,
+      writtenQuery: restored,
+      rollbackValues: { active: false },
+    });
+    if (reconciliation.duplicate) return false;
+  }
+  return true;
+}
+
+async function finishSearchQueryMutation({ actor, supabase, data, action, before = null, after = data, rollbackValues = null }) {
+  const canonicalReview = await queueCustomerQueryReview({ actor, supabase, action, before, after });
+  if (canonicalReview?.status === 'queue_failed') {
+    const rolledBack = await rollbackSearchQueryAfterReviewFailure({ supabase, data, rollbackValues });
+    revalidatePath('/dashboard');
+    return {
+      error: rolledBack
+        ? 'Canary could not save the required review request, so your query change was not kept. Please try again.'
+        : 'Canary could not save the required review request or safely restore the prior query state. Refresh before making another change and use Send Feedback for follow-up.',
+    };
+  }
+  revalidatePath('/dashboard');
+  return canonicalReview ? { ...data, canonical_review: canonicalReview } : data;
+}
+
 export async function addQuery({ query_text, district_id, district_name, geo_city, geo_state, geo_zip, channels }) {
   const { actor, admin: supabase } = await requireCanaryActor();
   const targetDistrictId = actor.isAdmin ? String(district_id || '').trim() : actor.districtId;
@@ -963,8 +1155,7 @@ export async function addQuery({ query_text, district_id, district_name, geo_cit
     if (!data) return { error: SEARCH_QUERY_RETRY_ERROR };
     const duplicateError = await duplicateWriteError({ supabase, writtenQuery: data, rollbackValues: { active: false } });
     if (duplicateError) return { error: duplicateError };
-    revalidatePath('/dashboard');
-    return data;
+    return finishSearchQueryMutation({ actor, supabase, data, action: 'add' });
   }
 
   if (!actor.isAdmin) {
@@ -988,8 +1179,7 @@ export async function addQuery({ query_text, district_id, district_name, geo_cit
       if (!data) return { error: SEARCH_QUERY_RETRY_ERROR };
       const duplicateError = await duplicateWriteError({ supabase, writtenQuery: data, rollbackValues: { active: false } });
       if (duplicateError) return { error: duplicateError };
-      revalidatePath('/dashboard');
-      return data;
+      return finishSearchQueryMutation({ actor, supabase, data, action: 'add', rollbackValues: searchQuerySnapshot(existingSlot) });
     }
 
     const { data, error } = await supabase
@@ -1001,8 +1191,7 @@ export async function addQuery({ query_text, district_id, district_name, geo_cit
     if (error) throw error;
     const duplicateError = await duplicateWriteError({ supabase, writtenQuery: data, rollbackValues: { active: false } });
     if (duplicateError) return { error: duplicateError };
-    revalidatePath('/dashboard');
-    return data;
+    return finishSearchQueryMutation({ actor, supabase, data, action: 'add', rollbackValues: { active: false } });
   }
 
   const { data, error } = await supabase
@@ -1013,8 +1202,7 @@ export async function addQuery({ query_text, district_id, district_name, geo_cit
   if (error) throw error;
   const duplicateError = await duplicateWriteError({ supabase, writtenQuery: data, rollbackValues: { active: false } });
   if (duplicateError) return { error: duplicateError };
-  revalidatePath('/dashboard');
-  return data;
+  return finishSearchQueryMutation({ actor, supabase, data, action: 'add' });
 }
 
 export async function updateQuery(changes) {
@@ -1067,19 +1255,32 @@ export async function updateQuery(changes) {
     reconcileRollback: true,
   });
   if (duplicateError) return { error: duplicateError };
-  revalidatePath('/dashboard');
-  return data;
+  return finishSearchQueryMutation({ actor, supabase, data, action: 'update', before: existingQuery, rollbackValues: originalSnapshot });
 }
 
 export async function deleteQuery(id) {
   const { actor, admin: supabase } = await requireCanaryActor();
-  const { data: query } = await supabase.from('search_queries').select('district_id, channels').eq('id', id).maybeSingle();
+  const { data: query } = await supabase
+    .from('search_queries')
+    .select('id, query_text, district_id, district_name, geo_city, geo_state, geo_zip, channels, active, created_at')
+    .eq('id', id)
+    .maybeSingle();
   if (!query) throw new Error('Search query not found.');
   assertDistrictAccess(actor, query?.district_id);
   if (!actor.isAdmin && query.channels !== 'news') throw new Error('Only Canary administrators can change advanced monitoring queries.');
-  const { error } = await supabase.from('search_queries').update({ active: false }).eq('id', id);
+  if (query.active !== true) return { error: 'That search query is already removed. Refresh before making another change.' };
+  let deactivate = supabase
+    .from('search_queries')
+    .update({ active: false })
+    .eq('id', id)
+    .eq('district_id', query.district_id);
+  deactivate = applySearchQuerySnapshotFilters(deactivate, searchQuerySnapshot(query));
+  const { data, error } = await deactivate
+    .select(SEARCH_QUERY_RETURN_COLUMNS)
+    .maybeSingle();
   if (error) throw error;
-  revalidatePath('/dashboard');
+  if (!data) return { error: SEARCH_QUERY_RETRY_ERROR };
+  return finishSearchQueryMutation({ actor, supabase, data, action: 'remove', before: query, after: data, rollbackValues: searchQuerySnapshot(query) });
 }
 
 export async function submitFeedback(formData) {
@@ -1110,41 +1311,35 @@ export async function submitFeedback(formData) {
     photoUrl = urlData.publicUrl;
   }
 
+  const clickupConfigured = isClickUpConfigured();
+  const dispatchStatus = clickupConfigured ? `clickup_dispatching:${Date.now()}:${randomUUID()}` : null;
   const { data: feedback, error } = await supabase.from('feedback').insert({
     message: message.trim(),
     photo_url: photoUrl,
     district_id: districtId,
     district_name: districtName,
+    status: dispatchStatus,
   }).select('*').single();
   if (error) throw error;
 
-  if (!isClickUpConfigured()) return;
+  if (!clickupConfigured) return;
 
   try {
     const task = await createClickUpFeedbackTask(feedback);
-    const { error: updateError } = await supabase
-      .from('feedback')
-      .update({
-        status: 'clickup_synced',
-        clickup_task_id: task?.id || null,
-        clickup_task_url: task?.url || null,
-        clickup_synced_at: new Date().toISOString(),
-        clickup_sync_error: null,
-      })
-      .eq('id', feedback.id);
-    if (updateError) {
-      await supabase.from('feedback').update({ status: 'clickup_synced' }).eq('id', feedback.id);
-    }
+    await transitionFeedbackClickUpDispatch(supabase, { id: feedback.id, expectedStatus: dispatchStatus, status: 'clickup_synced', task });
   } catch (clickupError) {
-    const { error: updateError } = await supabase
-      .from('feedback')
-      .update({
+    console.error('Canary feedback ClickUp dispatch failed', { status: clickupError?.status || null, message: clickupError?.message || 'Unknown ClickUp error' });
+    const definiteRejection = Number.isInteger(clickupError.status)
+      && clickupError.status >= 400
+      && clickupError.status < 500
+      && ![408, 425, 429].includes(clickupError.status);
+    if (definiteRejection) {
+      await transitionFeedbackClickUpDispatch(supabase, {
+        id: feedback.id,
+        expectedStatus: dispatchStatus,
         status: 'clickup_failed',
-        clickup_sync_error: clickupError.message || 'Unknown ClickUp error',
-      })
-      .eq('id', feedback.id);
-    if (updateError) {
-      await supabase.from('feedback').update({ status: 'clickup_failed' }).eq('id', feedback.id);
+        errorMessage: clickupError.message || 'Unknown ClickUp error',
+      });
     }
   }
 }
