@@ -4,7 +4,7 @@ import { useState, useMemo, useEffect, useRef, useTransition, useCallback } from
 import Image from 'next/image';
 import Link from 'next/link';
 import { loadStripe } from '@stripe/stripe-js';
-import { setEarnedMedia, saveNote, addQuery, deleteQuery, submitFeedback, addManualStory, excludeStory, restoreStory, reviewSocialThread, bulkReviewSocialThreads } from '@/app/actions';
+import { setEarnedMedia, saveNote, addQuery, updateQuery, deleteQuery, submitFeedback, addManualStory, excludeStory, restoreStory, reviewSocialThread, bulkReviewSocialThreads } from '@/app/actions';
 import { createEmbeddedCanaryCheckout, confirmEmbeddedCanaryCheckout, saveBillingPurchaseOrder } from '@/app/payment/actions';
 import { compareStrategicAlignmentRows } from '@/lib/strategicAlignmentSort.mjs';
 import { CORE_TAGS, canonicalTags } from '@/lib/canonicalTags.mjs';
@@ -609,6 +609,9 @@ function QueriesView({ initialQueries, districts, userDistrictId, selectedDistri
   });
   const [saving, setSaving] = useState(false);
   const [deletingId, setDeletingId] = useState(null);
+  const [editingId, setEditingId] = useState(null);
+  const [updatingId, setUpdatingId] = useState(null);
+  const [editForm, setEditForm] = useState(null);
   const [addError, setAddError] = useState('');
 
   const filtered = districtFilter === 'All'
@@ -620,6 +623,54 @@ function QueriesView({ initialQueries, districts, userDistrictId, selectedDistri
   // group by has-geo vs no-geo
   const geoQueries = filtered.filter((q) => q.geo_city || q.geo_state || q.geo_zip);
   const keywordQueries = filtered.filter((q) => !q.geo_city && !q.geo_state && !q.geo_zip);
+
+  function startEdit(query) {
+    if (!canManageQueries || (!isAdmin && query.channels !== 'news')) return;
+    setAddError('');
+    setEditingId(query.id);
+    setEditForm({
+      id: query.id,
+      query_text: query.query_text ?? '',
+      district_id: query.district_id,
+      channels: query.channels ?? 'news',
+      geo_city: query.geo_city ?? '',
+      geo_state: query.geo_state ?? '',
+      geo_zip: query.geo_zip ?? '',
+      original: {
+        query_text: query.query_text,
+        channels: query.channels,
+        active: query.active,
+        geo_city: query.geo_city,
+        geo_state: query.geo_state,
+        geo_zip: query.geo_zip,
+      },
+    });
+  }
+
+  function cancelEdit() {
+    setEditingId(null);
+    setEditForm(null);
+  }
+
+  async function handleUpdate(id) {
+    if (!canManageQueries || editForm?.id !== id) return;
+    if (!editForm.query_text.trim()) { setAddError('Query text is required.'); return; }
+    setAddError('');
+    setUpdatingId(id);
+    try {
+      const updatedQuery = await updateQuery(editForm);
+      if (updatedQuery?.error) {
+        setAddError(updatedQuery.error);
+        return;
+      }
+      setQueries((prev) => prev.map((query) => query.id === id ? updatedQuery : query));
+      cancelEdit();
+    } catch (err) {
+      setAddError(err.message ?? 'Failed to update query.');
+    } finally {
+      setUpdatingId(null);
+    }
+  }
 
   async function handleDelete(id) {
     if (!canManageQueries) return;
@@ -659,23 +710,56 @@ function QueriesView({ initialQueries, districts, userDistrictId, selectedDistri
     }
   }
 
-  function QueryRow({ q }) {
+  function renderQueryRow(q) {
+    const isEditing = editingId === q.id && editForm?.id === q.id;
     const ch = CHANNEL_COLORS[q.channels] ?? CHANNEL_COLORS.news;
     const geo = [q.geo_city, q.geo_state, q.geo_zip].filter(Boolean).join(', ');
+    const canEditQuery = isAdmin || q.channels === 'news';
     return (
       <tr key={q.id}>
-        <td style={{ fontWeight: 500, color: 'var(--text-primary)' }}>{q.query_text}</td>
-        <td>
-          <span style={{
-            padding: '3px 10px', borderRadius: 'var(--radius-full)',
-            fontSize: '0.72rem', fontWeight: 600,
-            background: ch.bg, color: ch.color,
-          }}>
-            {q.channels ?? 'news'}
-          </span>
+        <td style={{ fontWeight: 500, color: 'var(--text-primary)', minWidth: '260px' }}>
+          {isEditing ? (
+            <input
+              className="form-input"
+              aria-label="Query text"
+              value={editForm.query_text}
+              onChange={(e) => setEditForm((current) => ({ ...current, query_text: e.target.value }))}
+              onKeyDown={(e) => { if (e.key === 'Enter') { e.preventDefault(); handleUpdate(q.id); } }}
+              maxLength={200}
+              autoFocus
+            />
+          ) : q.query_text}
         </td>
-        <td style={{ color: 'var(--text-secondary)', fontSize: '0.82rem' }}>
-          {geo || <span style={{ color: 'var(--text-tertiary)', fontStyle: 'italic' }}>—</span>}
+        <td>
+          {isEditing && isAdmin ? (
+            <select
+              className="filter-select"
+              aria-label="Query channel"
+              value={editForm.channels}
+              onChange={(e) => setEditForm((current) => ({ ...current, channels: e.target.value }))}
+            >
+              <option value="news">News</option>
+              <option value="social">Social</option>
+              <option value="all">All</option>
+            </select>
+          ) : (
+            <span style={{
+              padding: '3px 10px', borderRadius: 'var(--radius-full)',
+              fontSize: '0.72rem', fontWeight: 600,
+              background: ch.bg, color: ch.color,
+            }}>
+              {q.channels ?? 'news'}
+            </span>
+          )}
+        </td>
+        <td style={{ color: 'var(--text-secondary)', fontSize: '0.82rem', minWidth: isEditing ? '310px' : undefined }}>
+          {isEditing ? (
+            <div style={{ display: 'grid', gridTemplateColumns: '1fr 80px 80px', gap: '6px' }}>
+              <input className="form-input" aria-label="Query city" placeholder="City" value={editForm.geo_city} onChange={(e) => setEditForm((current) => ({ ...current, geo_city: e.target.value }))} />
+              <input className="form-input" aria-label="Query state" placeholder="State" value={editForm.geo_state} onChange={(e) => setEditForm((current) => ({ ...current, geo_state: e.target.value }))} />
+              <input className="form-input" aria-label="Query ZIP" placeholder="ZIP" value={editForm.geo_zip} onChange={(e) => setEditForm((current) => ({ ...current, geo_zip: e.target.value }))} />
+            </div>
+          ) : (geo || <span style={{ color: 'var(--text-tertiary)', fontStyle: 'italic' }}>—</span>)}
         </td>
         {!userDistrictId && (
           <td style={{ color: 'var(--text-secondary)', fontSize: '0.82rem' }}>
@@ -683,17 +767,46 @@ function QueriesView({ initialQueries, districts, userDistrictId, selectedDistri
           </td>
         )}
         {canManageQueries && (
-          <td style={{ textAlign: 'right' }}>
-            {isAdmin || q.channels === 'news' ? (
-              <button
-                className="btn btn-danger btn-sm"
-                onClick={() => handleDelete(q.id)}
-                disabled={deletingId === q.id}
-                style={{ padding: '4px 10px', fontSize: '0.75rem' }}
-              >
-                {deletingId === q.id ? '…' : 'Remove'}
-              </button>
+          <td style={{ textAlign: 'right', whiteSpace: 'nowrap' }}>
+            {canEditQuery ? (isEditing ? (
+              <>
+                <button
+                  className="btn btn-primary btn-sm"
+                  onClick={() => handleUpdate(q.id)}
+                  disabled={updatingId === q.id}
+                  style={{ padding: '4px 10px', fontSize: '0.75rem', marginRight: '6px' }}
+                >
+                  {updatingId === q.id ? 'Saving…' : 'Save'}
+                </button>
+                <button
+                  className="btn btn-secondary btn-sm"
+                  onClick={cancelEdit}
+                  disabled={updatingId === q.id}
+                  style={{ padding: '4px 10px', fontSize: '0.75rem' }}
+                >
+                  Cancel
+                </button>
+              </>
             ) : (
+              <>
+                <button
+                  className="btn btn-secondary btn-sm"
+                  onClick={() => startEdit(q)}
+                  disabled={Boolean(updatingId || deletingId)}
+                  style={{ padding: '4px 10px', fontSize: '0.75rem', marginRight: '6px' }}
+                >
+                  Edit
+                </button>
+                <button
+                  className="btn btn-danger btn-sm"
+                  onClick={() => handleDelete(q.id)}
+                  disabled={deletingId === q.id || Boolean(updatingId)}
+                  style={{ padding: '4px 10px', fontSize: '0.75rem' }}
+                >
+                  {deletingId === q.id ? '…' : 'Remove'}
+                </button>
+              </>
+            )) : (
               <span style={{ color: 'var(--text-tertiary)', fontSize: '0.75rem', fontWeight: 600 }}>Managed by Canary</span>
             )}
           </td>
@@ -719,7 +832,7 @@ function QueriesView({ initialQueries, districts, userDistrictId, selectedDistri
             </tr>
           </thead>
           <tbody>
-            {rows.map((q) => <QueryRow key={q.id} q={q} />)}
+            {rows.map((q) => renderQueryRow(q))}
           </tbody>
         </table>
       </div>

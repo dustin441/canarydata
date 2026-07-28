@@ -20,7 +20,7 @@ assert.match(dashboard, /if \(!userDistrictId && !isAdmin\) redirect/);
 const actions = await readFile(new URL('../src/app/actions.js', import.meta.url), 'utf8');
 assert.match(actions, /async function requireCanaryActor/);
 assert.match(actions, /function assertDistrictAccess/);
-for (const action of ['setEarnedMedia', 'saveNote', 'addQuery', 'deleteQuery', 'submitFeedback']) {
+for (const action of ['setEarnedMedia', 'saveNote', 'addQuery', 'updateQuery', 'deleteQuery', 'submitFeedback']) {
   const start = actions.indexOf(`export async function ${action}`);
   assert.notEqual(start, -1, `${action} must exist`);
   assert.match(actions.slice(start, start + 350), /requireCanaryActor/, `${action} must authenticate and authorize the caller`);

@@ -5,7 +5,7 @@ import { createClient as createServerClient } from '@/lib/supabase/server';
 import { createClickUpFeedbackTask, createClickUpOnboardingTask, isClickUpConfigured } from '@/lib/clickup';
 import { revalidatePath } from 'next/cache';
 import { canonicalizeStoryUrl, requireCorrectionReason } from '@/lib/storyCorrections.mjs';
-import { CUSTOMER_SEARCH_QUERY_LIMIT, searchQueryFingerprint, validateSearchQueryText } from '@/lib/queryPolicy.mjs';
+import { CUSTOMER_SEARCH_QUERY_LIMIT, applySearchQuerySnapshotFilters, buildSearchQueryUpdate, hasActiveSearchQueryDuplicate, reconcileActiveSearchQueryWrite, searchQueryFingerprint, searchQuerySnapshot, validateSearchQueryText } from '@/lib/queryPolicy.mjs';
 import { lookup } from 'node:dns/promises';
 import { isIP } from 'node:net';
 import { createHash } from 'node:crypto';
@@ -853,6 +853,61 @@ export async function bulkReviewSocialThreads({ districtId, socialThreadIds, act
   return Array.isArray(result) ? result[0] : result;
 }
 
+const SEARCH_QUERY_RETURN_COLUMNS = 'id, query_text, district_id, district_name, geo_city, geo_state, geo_zip, channels, active, created_at';
+const SEARCH_QUERY_RETRY_ERROR = 'Queries changed while this request was saving. Refresh and try again.';
+
+async function reconcileSearchQueryWrite({ supabase, writtenQuery, rollbackValues }) {
+  return reconcileActiveSearchQueryWrite({
+    writtenQuery,
+    loadDistrictQueries: async () => {
+      const { data, error } = await supabase
+        .from('search_queries')
+        .select(SEARCH_QUERY_RETURN_COLUMNS)
+        .eq('district_id', writtenQuery.district_id);
+      if (error) throw error;
+      return data || [];
+    },
+    undoWrittenQuery: async (expectedWrite) => {
+      let rollback = supabase
+        .from('search_queries')
+        .update(rollbackValues)
+        .eq('id', writtenQuery.id)
+        .eq('district_id', writtenQuery.district_id);
+      rollback = applySearchQuerySnapshotFilters(rollback, expectedWrite);
+      const { data, error } = await rollback.select('id').maybeSingle();
+      if (error) throw error;
+      return Boolean(data);
+    },
+  });
+}
+
+async function duplicateWriteError({ supabase, writtenQuery, rollbackValues, reconcileRollback = false }) {
+  const reconciliation = await reconcileSearchQueryWrite({ supabase, writtenQuery, rollbackValues });
+  if (!reconciliation.duplicate) return null;
+  if (!reconciliation.reconciled) return SEARCH_QUERY_RETRY_ERROR;
+
+  // Restoring an edited row's original fingerprint can race with a third writer
+  // that claimed that fingerprint while the edit was in flight. Reconcile the
+  // restoration as a second guarded write; if it now duplicates another active
+  // row, deactivate only this row rather than leaving duplicate monitoring work.
+  if (reconcileRollback && rollbackValues?.active === true) {
+    const restoredQuery = { ...writtenQuery, ...rollbackValues };
+    const restoredReconciliation = await reconcileSearchQueryWrite({
+      supabase,
+      writtenQuery: restoredQuery,
+      rollbackValues: { active: false },
+    });
+    if (restoredReconciliation.duplicate && !restoredReconciliation.reconciled) {
+      return SEARCH_QUERY_RETRY_ERROR;
+    }
+    if (restoredReconciliation.duplicate) {
+      return 'That search query conflicted with another change while saving. Your edit was not kept, and this query was paused to prevent duplicate monitoring. Refresh before reactivating or adding it again.';
+    }
+  }
+
+  return 'That search query became a duplicate while saving, so your change was not kept. Refresh and try a different query.';
+}
+
 export async function addQuery({ query_text, district_id, district_name, geo_city, geo_state, geo_zip, channels }) {
   const { actor, admin: supabase } = await requireCanaryActor();
   const targetDistrictId = actor.isAdmin ? String(district_id || '').trim() : actor.districtId;
@@ -868,7 +923,7 @@ export async function addQuery({ query_text, district_id, district_name, geo_cit
   const queryChannel = actor.isAdmin && ['news', 'social', 'all'].includes(channels) ? channels : 'news';
   const { data: existingQueries, error: existingError } = await supabase
     .from('search_queries')
-    .select('id, query_text, channels, active')
+    .select(SEARCH_QUERY_RETURN_COLUMNS)
     .eq('district_id', targetDistrictId);
   if (existingError) throw existingError;
 
@@ -895,13 +950,19 @@ export async function addQuery({ query_text, district_id, district_name, geo_cit
   };
 
   if (actor.isAdmin && matchingQuery) {
-    const { data, error } = await supabase
+    let reactivate = supabase
       .from('search_queries')
       .update(queryValues)
       .eq('id', matchingQuery.id)
-      .select('id, query_text, district_id, district_name, geo_city, geo_state, geo_zip, channels, active, created_at')
-      .single();
+      .eq('district_id', targetDistrictId);
+    reactivate = applySearchQuerySnapshotFilters(reactivate, searchQuerySnapshot(matchingQuery));
+    const { data, error } = await reactivate
+      .select(SEARCH_QUERY_RETURN_COLUMNS)
+      .maybeSingle();
     if (error) throw error;
+    if (!data) return { error: SEARCH_QUERY_RETRY_ERROR };
+    const duplicateError = await duplicateWriteError({ supabase, writtenQuery: data, rollbackValues: { active: false } });
+    if (duplicateError) return { error: duplicateError };
     revalidatePath('/dashboard');
     return data;
   }
@@ -914,15 +975,19 @@ export async function addQuery({ query_text, district_id, district_name, geo_cit
 
     const existingSlot = (existingQueries || []).find((query) => query.id === slotId);
     if (existingSlot) {
-      const { data, error } = await supabase
+      let claimSlot = supabase
         .from('search_queries')
         .update(queryValues)
         .eq('id', slotId)
-        .eq('active', false)
-        .select('id, query_text, district_id, district_name, geo_city, geo_state, geo_zip, channels, active, created_at')
+        .eq('district_id', targetDistrictId);
+      claimSlot = applySearchQuerySnapshotFilters(claimSlot, searchQuerySnapshot(existingSlot));
+      const { data, error } = await claimSlot
+        .select(SEARCH_QUERY_RETURN_COLUMNS)
         .maybeSingle();
       if (error) throw error;
-      if (!data) return { error: 'Queries changed while this request was saving. Please try again.' };
+      if (!data) return { error: SEARCH_QUERY_RETRY_ERROR };
+      const duplicateError = await duplicateWriteError({ supabase, writtenQuery: data, rollbackValues: { active: false } });
+      if (duplicateError) return { error: duplicateError };
       revalidatePath('/dashboard');
       return data;
     }
@@ -930,10 +995,12 @@ export async function addQuery({ query_text, district_id, district_name, geo_cit
     const { data, error } = await supabase
       .from('search_queries')
       .insert({ ...queryValues, id: slotId })
-      .select('id, query_text, district_id, district_name, geo_city, geo_state, geo_zip, channels, active, created_at')
+      .select(SEARCH_QUERY_RETURN_COLUMNS)
       .single();
-    if (error?.code === '23505') return { error: 'Queries changed while this request was saving. Please try again.' };
+    if (error?.code === '23505') return { error: SEARCH_QUERY_RETRY_ERROR };
     if (error) throw error;
+    const duplicateError = await duplicateWriteError({ supabase, writtenQuery: data, rollbackValues: { active: false } });
+    if (duplicateError) return { error: duplicateError };
     revalidatePath('/dashboard');
     return data;
   }
@@ -941,9 +1008,65 @@ export async function addQuery({ query_text, district_id, district_name, geo_cit
   const { data, error } = await supabase
     .from('search_queries')
     .insert(queryValues)
-    .select('id, query_text, district_id, district_name, geo_city, geo_state, geo_zip, channels, active, created_at')
+    .select(SEARCH_QUERY_RETURN_COLUMNS)
     .single();
   if (error) throw error;
+  const duplicateError = await duplicateWriteError({ supabase, writtenQuery: data, rollbackValues: { active: false } });
+  if (duplicateError) return { error: duplicateError };
+  revalidatePath('/dashboard');
+  return data;
+}
+
+export async function updateQuery(changes) {
+  const { actor, admin: supabase } = await requireCanaryActor();
+  const id = String(changes?.id || '').trim();
+  if (!id) return { error: 'Search query not found.' };
+
+  let existingLookup = supabase
+    .from('search_queries')
+    .select('id, query_text, district_id, district_name, geo_city, geo_state, geo_zip, channels, active, created_at')
+    .eq('id', id);
+  if (!actor.isAdmin) existingLookup = existingLookup.eq('district_id', actor.districtId);
+  const { data: existingQuery, error: existingError } = await existingLookup.maybeSingle();
+  if (existingError) throw existingError;
+  if (!existingQuery) return { error: 'Search query not found.' };
+
+  let queryValues;
+  let originalSnapshot;
+  try {
+    queryValues = buildSearchQueryUpdate({ actor, existingQuery, changes });
+    originalSnapshot = searchQuerySnapshot(changes?.original);
+  } catch (error) {
+    return { error: error.message };
+  }
+
+  const { data: districtQueries, error: districtQueriesError } = await supabase
+    .from('search_queries')
+    .select('id, query_text, channels, active')
+    .eq('district_id', existingQuery.district_id);
+  if (districtQueriesError) throw districtQueriesError;
+  if (hasActiveSearchQueryDuplicate(districtQueries, { id, ...queryValues })) {
+    return { error: 'That search query is already active.' };
+  }
+
+  let update = supabase
+    .from('search_queries')
+    .update(queryValues)
+    .eq('id', id)
+    .eq('district_id', existingQuery.district_id);
+  update = applySearchQuerySnapshotFilters(update, originalSnapshot);
+  const { data, error } = await update
+    .select(SEARCH_QUERY_RETURN_COLUMNS)
+    .maybeSingle();
+  if (error) throw error;
+  if (!data) return { error: SEARCH_QUERY_RETRY_ERROR };
+  const duplicateError = await duplicateWriteError({
+    supabase,
+    writtenQuery: data,
+    rollbackValues: originalSnapshot,
+    reconcileRollback: true,
+  });
+  if (duplicateError) return { error: duplicateError };
   revalidatePath('/dashboard');
   return data;
 }
