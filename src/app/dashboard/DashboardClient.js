@@ -767,14 +767,14 @@ function QueriesView({ initialQueries, districts, userDistrictId, selectedDistri
           </td>
         )}
         {canManageQueries && (
-          <td style={{ textAlign: 'right', whiteSpace: 'nowrap' }}>
+          <td style={{ textAlign: 'right', minWidth: '86px' }}>
             {canEditQuery ? (isEditing ? (
-              <>
+              <div style={{ display: 'flex', flexWrap: 'wrap', justifyContent: 'flex-end', gap: '6px' }}>
                 <button
                   className="btn btn-primary btn-sm"
                   onClick={() => handleUpdate(q.id)}
                   disabled={updatingId === q.id}
-                  style={{ padding: '4px 10px', fontSize: '0.75rem', marginRight: '6px' }}
+                  style={{ padding: '4px 10px', fontSize: '0.75rem' }}
                 >
                   {updatingId === q.id ? 'Saving…' : 'Save'}
                 </button>
@@ -786,14 +786,14 @@ function QueriesView({ initialQueries, districts, userDistrictId, selectedDistri
                 >
                   Cancel
                 </button>
-              </>
+              </div>
             ) : (
-              <>
+              <div style={{ display: 'flex', flexWrap: 'wrap', justifyContent: 'flex-end', gap: '6px' }}>
                 <button
                   className="btn btn-secondary btn-sm"
                   onClick={() => startEdit(q)}
                   disabled={Boolean(updatingId || deletingId)}
-                  style={{ padding: '4px 10px', fontSize: '0.75rem', marginRight: '6px' }}
+                  style={{ padding: '4px 10px', fontSize: '0.75rem' }}
                 >
                   Edit
                 </button>
@@ -805,7 +805,7 @@ function QueriesView({ initialQueries, districts, userDistrictId, selectedDistri
                 >
                   {deletingId === q.id ? '…' : 'Remove'}
                 </button>
-              </>
+              </div>
             )) : (
               <span style={{ color: 'var(--text-tertiary)', fontSize: '0.75rem', fontWeight: 600 }}>Managed by Canary</span>
             )}
