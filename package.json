@@ -10,7 +10,7 @@
     "test:webhook": "node scripts/test-stripe-webhook.mjs",
     "test:authz": "node scripts/test-authz-metadata.mjs",
     "test:meta": "node scripts/test-meta-integration.mjs",
-    "test:quality": "node scripts/test-canary-quality.mjs && node scripts/test-collection-health.mjs && node scripts/test-health-monitor-policy.mjs && node scripts/test-feedback-dispatch.mjs && node scripts/test-onboarding-clickup-parity.mjs && node scripts/test-reporting-dataset.mjs && node scripts/test-meta-integration.mjs",
+    "test:quality": "node scripts/test-canary-quality.mjs && node scripts/test-ingestion-lineage.mjs && node scripts/test-news-identity-schema.mjs && node scripts/test-collection-health.mjs && node scripts/test-health-monitor-policy.mjs && node scripts/test-feedback-dispatch.mjs && node scripts/test-onboarding-clickup-parity.mjs && node scripts/test-reporting-dataset.mjs && node scripts/test-meta-integration.mjs",
     "test:corrections": "node scripts/test-story-corrections.mjs",
     "test:onboarding": "node scripts/test-onboarding-discovery.mjs",
     "health:canary": "node scripts/check-canary-health.mjs",

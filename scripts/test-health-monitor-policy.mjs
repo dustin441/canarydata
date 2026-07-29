@@ -17,6 +17,14 @@ assert.match(source, /uncertainOnboardingDispatches/, 'uncertain structured onbo
 assert.match(source, /feedbackDispatchAgeHours/, 'dispatch age must be derived from reservation metadata');
 assert.match(source, /feedbackDispatchAgeHours\(request, now\)/, 'one-hour uncertainty must use dispatch start, not feedback creation time');
 assert.match(source, /unresolved_query_reviews: pendingQueryReviews\.length/);
+assert.match(source, /scheduled_story_writer_ownership_invalid/, 'the monitor must enforce one canonical scheduled writer');
+assert.match(source, /canonical_workflow_inactive/, 'the monitor must detect a paused canonical collector');
+assert.match(source, /canonical_schedule_contract_invalid/, 'the monitor must pin the daily cron and timezone contract');
+assert.match(source, /canonical_lineage_contract_invalid/, 'the monitor must detect branch-lineage code drift');
+assert.match(source, /canonical_write_failure_contract_invalid/, 'the monitor must detect silent write-batch truncation');
+assert.match(source, /continueErrorOutput/, 'failed story writes must route to a structured error output');
+assert.match(source, /story_write_partial_failure/, 'partial story writes must fail visibly with stable lineage evidence');
+assert.ok(source.includes("itemMatching\\(index\\)"), 'the monitor must require linked-item resolution across AI branches');
 assert.match(source, /request_id: request_id \|\| null/, 'review request IDs must affect change fingerprints');
 assert.match(source, /\.sort\(\(a, b\) => JSON\.stringify\(a\)\.localeCompare\(JSON\.stringify\(b\)\)\)/, 'alert fingerprints must be order-stable');
 assert.match(wrapper, /sync-feedback-to-clickup\.mjs','--apply'/, 'the daily health job must run the ClickUp retry worker before monitoring');

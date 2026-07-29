@@ -39,11 +39,24 @@ async function optionalSupabase(table, params) {
     throw error;
   }
 }
+async function allN8nWorkflows() {
+  const workflows = [];
+  let cursor = null;
+  for (let page = 0; page < 10; page += 1) {
+    const query = new URLSearchParams({ limit: '250' });
+    if (cursor) query.set('cursor', cursor);
+    const response = await getJson(`${N8N_URL}/api/v1/workflows?${query}`, { 'X-N8N-API-KEY': N8N_KEY });
+    workflows.push(...(response.data || []));
+    cursor = response.nextCursor || null;
+    if (!cursor) return workflows;
+  }
+  throw new Error('n8n workflow inventory exceeded the 10-page safety cap.');
+}
 const latestDate = (values) => values.filter(Boolean).sort().at(-1) || null;
 const inc = (map, key) => map.set(key, (map.get(key) || 0) + 1);
 const activeWorkflowIds = ['dVIf6KnZklHYzQvi'];
 
-const [districts, generatedQueries, searchQueries, rawResults, stories, candidates, pendingQueryReviews, namedPendingFeedbackTasks, nullStatusFeedbackTasks, uncertainFeedbackDispatches, pendingOnboardingTasks, uncertainOnboardingDispatches, workflowExecutions] = await Promise.all([
+const [districts, generatedQueries, searchQueries, rawResults, stories, candidates, pendingQueryReviews, namedPendingFeedbackTasks, nullStatusFeedbackTasks, uncertainFeedbackDispatches, pendingOnboardingTasks, uncertainOnboardingDispatches, workflowExecutions, workflowDefinitions, workflowInventory] = await Promise.all([
   supabase('districts', { select: 'id,name', limit: '1000' }),
   supabase('generated_queries', { select: 'id,district_id,query_type,query_text,search_params,active', active: 'eq.true', limit: '1000' }),
   supabase('search_queries', { select: 'id,district_id,query_text,active', active: 'eq.true', limit: '1000' }),
@@ -60,6 +73,8 @@ const [districts, generatedQueries, searchQueries, rawResults, stories, candidat
     workflowId,
     executions: (await getJson(`${N8N_URL}/api/v1/executions?workflowId=${workflowId}&limit=20`, { 'X-N8N-API-KEY': N8N_KEY })).data || [],
   }))),
+  Promise.all(activeWorkflowIds.map((workflowId) => getJson(`${N8N_URL}/api/v1/workflows/${workflowId}`, { 'X-N8N-API-KEY': N8N_KEY }))),
+  allN8nWorkflows(),
 ]);
 const pendingFeedbackTasks = [...namedPendingFeedbackTasks, ...nullStatusFeedbackTasks];
 const pendingStructuredOnboarding = pendingOnboardingTasks.filter((request) => !request.clickup_task_id);
@@ -152,6 +167,55 @@ for (const [districtId, missing] of missingBaselineByDistrict) {
     add('warning', 'baseline_queries_zero_results_14d', `${missing.length} baseline query path(s) for ${districtName.get(districtId) || districtId} returned no raw results in 14 days.`, { district_id: districtId, missing_queries: missing });
   }
 }
+
+const scheduledStoryWriters = workflowInventory.filter((workflow) => {
+  if (!workflow.active) return false;
+  const hasSchedule = (workflow.nodes || []).some((node) => node.type === 'n8n-nodes-base.scheduleTrigger' && node.disabled !== true);
+  const writesStories = (workflow.nodes || []).some((node) => JSON.stringify(node.parameters || {}).includes('news_stories'));
+  return hasSchedule && writesStories;
+});
+if (scheduledStoryWriters.length !== 1 || scheduledStoryWriters[0]?.id !== activeWorkflowIds[0]) {
+  add('critical', 'scheduled_story_writer_ownership_invalid', `Expected exactly one active scheduled news_stories writer (${activeWorkflowIds[0]}), found ${scheduledStoryWriters.length}.`, {
+    workflow_id: activeWorkflowIds[0],
+    active_scheduled_writers: scheduledStoryWriters.map(({ id, name }) => ({ id, name })),
+  });
+}
+
+for (const workflow of workflowDefinitions) {
+  if (!workflow.active) add('critical', 'canonical_workflow_inactive', `Canonical Canary workflow ${workflow.id} is inactive.`, { workflow_id: workflow.id });
+  const schedules = (workflow.nodes || []).filter((node) => node.type === 'n8n-nodes-base.scheduleTrigger' && node.disabled !== true);
+  const cronExpressions = schedules.flatMap((node) => node.parameters?.rule?.interval || []).filter((entry) => entry.field === 'cronExpression').map((entry) => entry.expression);
+  if (schedules.length !== 1 || cronExpressions.length !== 1 || cronExpressions[0] !== '25 3 * * *' || workflow.settings?.timezone !== 'America/Phoenix') {
+    add('critical', 'canonical_schedule_contract_invalid', `Canonical Canary workflow ${workflow.id} does not have the approved 03:25 America/Phoenix daily schedule.`, {
+      workflow_id: workflow.id,
+      schedule_count: schedules.length,
+      cron_expressions: cronExpressions,
+      timezone: workflow.settings?.timezone || null,
+    });
+  }
+  const finalizer = (workflow.nodes || []).find((node) => node.name === 'Code in JavaScript1')?.parameters?.jsCode || '';
+  const usesLinkedIdentity = /\$\('Attach DB Strategic Priorities'\)\.itemMatching\(index\)/.test(finalizer);
+  const usesGlobalBranchArrays = /\$\('Format for AI'\)\.all\(\)|\$\('Prepare Validated Shadow Story'\)\.all\(\)/.test(finalizer);
+  const failsClosed = /lineage_missing/.test(finalizer) && /lineage_district_mismatch/.test(finalizer);
+  if (!usesLinkedIdentity || usesGlobalBranchArrays || !failsClosed) {
+    add('critical', 'canonical_lineage_contract_invalid', `Canonical Canary workflow ${workflow.id} can no longer prove AI output belongs to its linked source record.`, { workflow_id: workflow.id });
+  }
+  const storyWriter = (workflow.nodes || []).find((node) => node.name === 'Upsert Validated Shadow Story');
+  const writeFailureNode = (workflow.nodes || []).find((node) => node.name === 'Fail Story Write Batch');
+  const writeFailureCode = writeFailureNode?.parameters?.jsCode || '';
+  const errorConnections = workflow.connections?.['Upsert Validated Shadow Story']?.main?.[1] || [];
+  const isolatesWriteFailures = storyWriter?.onError === 'continueErrorOutput'
+    && storyWriter?.retryOnFail === true
+    && Number(storyWriter?.maxTries || 0) >= 2
+    && errorConnections.some((connection) => connection.node === 'Fail Story Write Batch')
+    && /story_write_partial_failure/.test(writeFailureCode)
+    && /raw_result_id/.test(writeFailureCode)
+    && /story_candidate_id/.test(writeFailureCode);
+  if (!isolatesWriteFailures) {
+    add('critical', 'canonical_write_failure_contract_invalid', `Canonical Canary workflow ${workflow.id} can silently truncate a story-write batch or hide failed row lineage.`, { workflow_id: workflow.id });
+  }
+}
+
 for (const item of workflowExecutions) {
   const successes = item.executions.filter((execution) => String(execution.status).toLowerCase() === 'success');
   const latestSuccess = successes.map((execution) => new Date(execution.stoppedAt || execution.startedAt || 0)).sort((a, b) => b - a)[0];
