@@ -95,7 +95,9 @@ export function calibrateSentiment(rawSentiment, fields = {}) {
   const proactiveTruthTelling = isProactiveTruthTelling(text);
   const sensitiveTrust = detectSensitivePersonnelTrustIssue(fields);
   if (sensitiveTrust && sentiment > -0.3) sentiment = -0.7;
-  if ((personalIncident || griefWithoutBlame) && !culpability && !sensitiveTrust && sentiment < -0.2) sentiment = -0.1;
+  if ((personalIncident || griefWithoutBlame) && !culpability && !sensitiveTrust) {
+    sentiment = Math.max(-0.1, Math.min(0.1, sentiment));
+  }
   if (proactiveTruthTelling && !culpability && !sensitiveTrust && sentiment < 0.1) sentiment = 0.1;
   if (sourceAuthored && !culpability && !sensitiveTrust && sentiment > 0.25) sentiment = 0.25;
   return sentiment;

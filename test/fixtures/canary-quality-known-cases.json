@@ -33,6 +33,28 @@
     "expected": { "sentiment": -0.1, "sensitive_personnel": false }
   },
   {
+    "id": "klein-student-death-sad-not-district-fault-negative-input",
+    "kind": "sentiment",
+    "input": {
+      "raw_sentiment": -0.7,
+      "headline": "Klein ISD student killed in mini-bike crash near Spring Cypress",
+      "summary": "The student died in a crash while traveling to school. Klein ISD expressed condolences and made counseling resources available.",
+      "tags": "Safety & Wellness"
+    },
+    "expected": { "sentiment": -0.1, "sensitive_personnel": false }
+  },
+  {
+    "id": "klein-student-death-cannot-score-like-positive-achievement",
+    "kind": "sentiment",
+    "input": {
+      "raw_sentiment": 0.7,
+      "headline": "Klein ISD student killed in e-bike crash",
+      "summary": "A student died in a crash. The district offered grief support and protected the family's privacy.",
+      "tags": "Safety & Wellness"
+    },
+    "expected": { "sentiment": 0.1, "sensitive_personnel": false }
+  },
+  {
     "id": "fort-wayne-proactive-budget-truth-telling",
     "kind": "sentiment",
     "input": {

@@ -15,6 +15,7 @@ import { CUSTOMER_SEARCH_QUERY_LIMIT, activeNewsQueryCount } from '@/lib/queryPo
 import { buildCommunicationsBrief, formatCommunicationsBriefRecommendation } from '@/lib/communicationsBrief.mjs';
 import { buildStrategicGovernance } from '@/lib/strategicGovernance.mjs';
 import { buildReportingDataset, filterReportingDataset } from '@/lib/reportingDataset.mjs';
+import { articleMatchesSearch } from '@/lib/articleSearch.mjs';
 
 const stripePromise = process.env.NEXT_PUBLIC_STRIPE_PUBLISHABLE_KEY
   ? loadStripe(process.env.NEXT_PUBLIC_STRIPE_PUBLISHABLE_KEY)
@@ -3900,14 +3901,7 @@ export default function DashboardClient({ articles, districts, queries: initialQ
     return campaignArticles.filter((a) => {
       if (seenArticleIds.has(a.id)) return false;
       seenArticleIds.add(a.id);
-      const matchSearch =
-        !search ||
-        a.headline?.toLowerCase().includes(q) ||
-        a.summary?.toLowerCase().includes(q) ||
-        getNoteText(a)?.toLowerCase().includes(q) ||
-        a.recommendation?.toLowerCase().includes(q) ||
-        a.innovation_reason?.toLowerCase().includes(q) ||
-        a.source_query?.toLowerCase().includes(q);
+      const matchSearch = articleMatchesSearch(a, q, getNoteText(a));
       const articleSource = a.source_type ?? 'other';
       const matchSource =
         sourceFilter === 'All' ||

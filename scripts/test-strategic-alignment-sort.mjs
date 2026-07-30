@@ -43,6 +43,22 @@ assert.deepEqual(
 
 assert.deepEqual(
   labels([
+    { label: 'Goal 3: Ensure safe, engaging, and welcoming schools', count: 18 },
+    { label: 'Goal 2: Support high expectations for academic performance and expand opportunities for every student', count: 11 },
+    { label: 'Goal 1: Ensure meaningful post-secondary outcomes for every student', count: 4 },
+    { label: 'Goal 4: Support and invest in all staff', count: 7 },
+  ]),
+  [
+    'Goal 1: Ensure meaningful post-secondary outcomes for every student',
+    'Goal 2: Support high expectations for academic performance and expand opportunities for every student',
+    'Goal 3: Ensure safe, engaging, and welcoming schools',
+    'Goal 4: Support and invest in all staff',
+  ],
+  'Stafford Arabic-numbered goals should remain in natural order regardless of mention counts',
+);
+
+assert.deepEqual(
+  labels([
     { label: 'Priority 10: Long-term Sustainability', count: 9 },
     { label: 'Priority 2: Staff Success', count: 1 },
     { label: 'Priority 1: Student Success', count: 2 },

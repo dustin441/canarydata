@@ -150,7 +150,9 @@ return $input.all().map((item, index) => {
     const districtCulpability = /(district|school|board|superintendent|leadership).{0,80}(neglig|cover.?up|failed|failure|fault|liable|lawsuit|sued|policy failure|supervision|misconduct under supervision|student harm|under district care|public criticism|backlash|scandal)|(neglig|cover.?up|failed|failure|fault|liable|lawsuit|sued|policy failure|supervision|student harm|under district care|public criticism|backlash|scandal).{0,80}(district|school|board|superintendent|leadership)/i.test(haystack);
     const sensitivePersonnelTrustIssue = detectSensitivePersonnelTrustIssue(fields);
     if (sensitivePersonnelTrustIssue && s > -0.3) s = -0.7;
-    if ((personalIncident || griefWithoutBlame) && !districtCulpability && !sensitivePersonnelTrustIssue && s < -0.2) s = -0.1;
+    if ((personalIncident || griefWithoutBlame) && !districtCulpability && !sensitivePersonnelTrustIssue) {
+      s = Math.max(-0.1, Math.min(0.1, s));
+    }
     if (isProactiveTruthTelling(haystack) && !districtCulpability && !sensitivePersonnelTrustIssue && s < 0.1) s = 0.1;
     if (isSourceAuthoredContent(haystack) && !districtCulpability && !sensitivePersonnelTrustIssue && s > 0.25) s = 0.25;
     return s;
