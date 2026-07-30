@@ -133,16 +133,37 @@ return $input.all().map((item, index) => {
     return /(teacher|educator|staff|employee|principal|coach|school employee|high school employee).{0,120}(arrest|charged|charges|obscene|sexual|child|children|minor|internet crime|distribution|misconduct|investigation)|(?:arrest|charged|charges|obscene|sexual|child|children|minor|internet crime|distribution|misconduct|investigation).{0,120}(teacher|educator|staff|employee|principal|coach|school employee|high school employee)/i.test(haystack);
   }
 
+  function isSourceAuthoredContent(text) {
+    return /\b(superintendent|district|school board)(?:['’]s)?\s+(?:column|op[- ]?ed)\b|\b(?:column|op[- ]?ed)\b.{0,80}\b(superintendent|district|school board)\b/i.test(text);
+  }
+
+  function isProactiveTruthTelling(text) {
+    return /\b(news conference|press conference|public statement|column|op[- ]?ed|explains?|warns?|advocat(?:e|es|ed|ing)|communicat(?:e|es|ed|ing)|transparent|transparency)\b/i.test(text)
+      && /\b(budget|funding|fiscal|legislation|financial|revenue|deficit|costs?|property tax)\b/i.test(text);
+  }
+
   function calibrateSadVsBadSentiment(rawSentiment, fields = {}) {
     let s = Number(rawSentiment || 0);
-    const haystack = [fields.headline, fields.summary, fields.recommendation, fields.risk, fields.tags].join(' ').toLowerCase();
+    const haystack = [fields.headline, fields.summary, fields.recommendation, fields.risk, fields.tags, fields.author, fields.source, fields.link].join(' ').toLowerCase();
     const personalIncident = /(teacher|educator|staff|employee|principal|coach).{0,80}(bac|dui|dwi|intoxicated|drunk|fatal crash|deadly crash|crash|killed|died|death|arrest|illness)|(?:bac|dui|dwi|intoxicated|drunk|fatal crash|deadly crash|crash|killed|died|death|arrest|illness).{0,80}(teacher|educator|staff|employee|principal|coach)/i.test(haystack);
     const griefWithoutBlame = /\b(mourns?|mourning|death|died|killed|loss of|memorial|grief)\b/i.test(haystack);
     const districtCulpability = /(district|school|board|superintendent|leadership).{0,80}(neglig|cover.?up|failed|failure|fault|liable|lawsuit|sued|policy failure|supervision|misconduct under supervision|student harm|under district care|public criticism|backlash|scandal)|(neglig|cover.?up|failed|failure|fault|liable|lawsuit|sued|policy failure|supervision|student harm|under district care|public criticism|backlash|scandal).{0,80}(district|school|board|superintendent|leadership)/i.test(haystack);
     const sensitivePersonnelTrustIssue = detectSensitivePersonnelTrustIssue(fields);
     if (sensitivePersonnelTrustIssue && s > -0.3) s = -0.7;
     if ((personalIncident || griefWithoutBlame) && !districtCulpability && !sensitivePersonnelTrustIssue && s < -0.2) s = -0.1;
+    if (isProactiveTruthTelling(haystack) && !districtCulpability && !sensitivePersonnelTrustIssue && s < 0.1) s = 0.1;
+    if (isSourceAuthoredContent(haystack) && !districtCulpability && !sensitivePersonnelTrustIssue && s > 0.25) s = 0.25;
     return s;
+  }
+
+  const ACCESS_LIMITATION_CLAIM = /\b(paywall(?:ed)?|behind (?:a )?paywall|article (?:content )?(?:provided )?is incomplete|incomplete article|full article (?:text|content)|article (?:is )?truncated|truncated article|content (?:is )?unavailable|await (?:the )?(?:full )?article|monitor for full article)\b/i;
+  function deterministicSentimentFallback(fields = {}) {
+    const haystack = [fields.headline, fields.summary, fields.monitoringExcerpt].join(' ').toLowerCase();
+    const positive = /\b(achievement|award|improv(?:e|ed|ement)|increase|growth|success|successful|launch(?:ed)?|creative|innovation|innovative|partnership|opportunity|proactive|transparent|transparency|responsib(?:le|ility)|savings?|surplus|graduation)\b/i.test(haystack);
+    const negative = /\b(backlash|criticism|controversy|lawsuit|negligence|failure|failed|unsafe|harm|arrest|misconduct|decline|deficit|shortage|disruption|closure|cuts?)\b/i.test(haystack);
+    if (positive && !negative) return 0.25;
+    if (negative && !positive) return -0.25;
+    return 0;
   }
 
   const CORE_TAGS = new Set(['Academic Success', 'Engagement', 'Innovation', 'Operations & Finance', 'Safety & Wellness']);
@@ -152,8 +173,39 @@ return $input.all().map((item, index) => {
   }
 
   const cpm = 12.50;
-  const sentimentFields = { headline: title, summary: cleanJson.summary, recommendation: cleanJson.local_recommendation, risk: cleanJson.risk, tags: Array.isArray(cleanJson.tags) ? cleanJson.tags.join(' ') : '' };
-  const sentiment = calibrateSadVsBadSentiment(cleanJson.sentiment, sentimentFields);
+  const rawData = String(prepared.data ?? '');
+  const normalizedData = rawData.replace(/\\n/g, '\n');
+  const dataParts = normalizedData.split(/\n\s*\n/).map(part => part.trim()).filter(Boolean);
+  const monitoringExcerpt = String(prepared.monitoring_excerpt || prepared.snippet || prepared.summary || (dataParts.length > 1 ? dataParts.slice(1).join('\n\n') : '')).trim();
+  const originalSummary = String(cleanJson.summary ?? '').trim();
+  const originalRecommendation = String(cleanJson.local_recommendation ?? '').trim();
+  const summary = ACCESS_LIMITATION_CLAIM.test(originalSummary) && monitoringExcerpt ? monitoringExcerpt : originalSummary;
+  let recommendation = ACCESS_LIMITATION_CLAIM.test(originalSummary) || ACCESS_LIMITATION_CLAIM.test(originalRecommendation)
+    ? 'N/A'
+    : (originalRecommendation || 'N/A');
+  const interpretationText = [title, summary, monitoringExcerpt, cleanJson.author, source, link].join(' ').toLowerCase();
+  const repeatsDeliveredTransparency = /\b(prepare|issue|hold|publish|write|create|communicate|explain|provide)\b.{0,100}\b(statement|press conference|news conference|column|op[- ]?ed|budget|funding|fiscal|legislation|transparent|transparency)\b/i.test(originalRecommendation);
+  if (isProactiveTruthTelling(interpretationText) && repeatsDeliveredTransparency) {
+    recommendation = "Amplify the district's existing transparent communication and monitor stakeholder understanding; do not recommend repeating actions already documented in the story.";
+  }
+  const hasSentiment = cleanJson.sentiment !== null
+    && cleanJson.sentiment !== undefined
+    && String(cleanJson.sentiment).trim() !== ''
+    && Number.isFinite(Number(cleanJson.sentiment));
+  const rawSentiment = hasSentiment
+    ? Number(cleanJson.sentiment)
+    : deterministicSentimentFallback({ headline: title, summary, monitoringExcerpt });
+  const sentimentFields = {
+    headline: title,
+    summary,
+    recommendation,
+    risk: cleanJson.risk,
+    tags: Array.isArray(cleanJson.tags) ? cleanJson.tags.join(' ') : '',
+    author: cleanJson.author,
+    source,
+    link,
+  };
+  const sentiment = calibrateSadVsBadSentiment(rawSentiment, sentimentFields);
   const sensitivePersonnelTrustIssue = detectSensitivePersonnelTrustIssue(sentimentFields);
   const outputRisk = sensitivePersonnelTrustIssue ? 'High' : cleanJson.risk;
   const outputTags = canonicalTags(sensitivePersonnelTrustIssue ? ['Safety & Wellness'] : cleanJson.tags);
@@ -182,7 +234,7 @@ return $input.all().map((item, index) => {
       profile_version: prepared.profile_version || meta.profile_version || 1,
       date: formatDate(date),
       headline: title,
-      summary: cleanJson.summary,
+      summary,
       source,
       author: cleanJson.author,
       contact_info: cleanJson.contact_info,
@@ -193,7 +245,7 @@ return $input.all().map((item, index) => {
       tags: outputTags,
       innovation_flag: outputStrategicAlignment.flag,
       innovation_reason: normalizeDistrictEntityLanguage(outputStrategicAlignment.reason, meta.district_id || (typeof prepared !== 'undefined' && prepared.district_id) || ''),
-      recommendation: cleanJson.local_recommendation,
+      recommendation,
       source_query: prepared.source_query || meta.source_query || '',
       district_id: prepared.district_id || meta.district_id || '',
       source_type: prepared.source_type || meta.source_type || 'news',

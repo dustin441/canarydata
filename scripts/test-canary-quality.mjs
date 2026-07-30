@@ -5,6 +5,7 @@ import {
   canonicalStrategicAlignment,
   classifySource,
   detectSensitivePersonnelTrustIssue,
+  normalizeArticleInterpretation,
   validateCandidate,
 } from './canary-quality-policy.mjs';
 
@@ -14,9 +15,22 @@ const failures = [];
 for (const fixture of fixtures) {
   try {
     if (fixture.kind === 'sentiment') {
-      const fields = { headline: fixture.input.headline, summary: fixture.input.summary, tags: fixture.input.tags };
+      const fields = {
+        headline: fixture.input.headline,
+        summary: fixture.input.summary,
+        recommendation: fixture.input.recommendation,
+        tags: fixture.input.tags,
+        author: fixture.input.author,
+        source: fixture.input.source,
+        link: fixture.input.link,
+      };
       assert.equal(detectSensitivePersonnelTrustIssue(fields), fixture.expected.sensitive_personnel);
       assert.equal(calibrateSentiment(fixture.input.raw_sentiment, fields), fixture.expected.sentiment);
+    } else if (fixture.kind === 'interpretation') {
+      const result = normalizeArticleInterpretation(fixture.input.ai, fixture.input.evidence);
+      assert.equal(result.summary, fixture.expected.summary);
+      assert.equal(result.recommendation, fixture.expected.recommendation);
+      assert.equal(result.sentiment, fixture.expected.sentiment);
     } else if (fixture.kind === 'alignment') {
       const result = canonicalStrategicAlignment(fixture.input.ai, fixture.input.priorities);
       assert.equal(result.flag, fixture.expected.flag);

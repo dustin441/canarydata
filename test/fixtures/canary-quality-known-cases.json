@@ -33,6 +33,93 @@
     "expected": { "sentiment": -0.1, "sensitive_personnel": false }
   },
   {
+    "id": "fort-wayne-proactive-budget-truth-telling",
+    "kind": "sentiment",
+    "input": {
+      "raw_sentiment": -0.45,
+      "headline": "Superintendent: Fort Wayne Community Schools could lose $14.5 million if legislation passes",
+      "summary": "The superintendent held a news conference to explain the legislation, quantify its potential impact and advocate publicly for students.",
+      "recommendation": "Prepare a superintendent statement and communicate the fiscal threat transparently.",
+      "tags": "Operations & Finance",
+      "source": "The Journal Gazette"
+    },
+    "expected": { "sentiment": 0.1, "sensitive_personnel": false }
+  },
+  {
+    "id": "garfield-superintendent-op-ed-is-owned-voice-not-earned-validation",
+    "kind": "sentiment",
+    "input": {
+      "raw_sentiment": 0.45,
+      "headline": "Garfield Re-2 superintendent's column: Maintaining momentum through fiscal responsibility",
+      "summary": "The superintendent explains the district's structural deficit and documents cost reductions, grants and transparent budgeting.",
+      "author": "Kirk Banghart, Superintendent",
+      "source": "Post Independent Opinion",
+      "link": "https://www.postindependent.com/opinion/garfield-re-2-superintendents-column/",
+      "tags": "Operations & Finance"
+    },
+    "expected": { "sentiment": 0.25, "sensitive_personnel": false }
+  },
+  {
+    "id": "fort-wayne-snippet-does-not-prove-incomplete-article",
+    "kind": "interpretation",
+    "input": {
+      "ai": {
+        "summary": "The article content provided is incomplete and does not include details about the transportation changes.",
+        "local_recommendation": "Await full article text, then prepare a family FAQ.",
+        "sentiment": -0.1
+      },
+      "evidence": {
+        "headline": "Fort Wayne Community Schools announces transportation changes ahead of new school year",
+        "monitoring_excerpt": "FWCS will use late starts or early dismissals during driver shortages and is adding route changes, ID scanners, cameras and a parent bus-tracking app."
+      }
+    },
+    "expected": {
+      "summary": "FWCS will use late starts or early dismissals during driver shortages and is adding route changes, ID scanners, cameras and a parent bus-tracking app.",
+      "recommendation": "N/A",
+      "sentiment": -0.1
+    }
+  },
+  {
+    "id": "garfield-missing-sentiment-gets-deterministic-fallback",
+    "kind": "interpretation",
+    "input": {
+      "ai": {
+        "summary": "Rifle Middle School created a forensic science course after a housing-related staffing challenge interrupted band instruction.",
+        "local_recommendation": "Explain the creative response while acknowledging the continuing band and workforce-housing challenges."
+      },
+      "evidence": {
+        "headline": "Musicians Reach for Magnifying Glasses at Rifle Middle School",
+        "monitoring_excerpt": "The school launched a new hands-on forensic science course and an after-school band club in response to a staffing challenge."
+      }
+    },
+    "expected": {
+      "summary": "Rifle Middle School created a forensic science course after a housing-related staffing challenge interrupted band instruction.",
+      "recommendation": "Explain the creative response while acknowledging the continuing band and workforce-housing challenges.",
+      "sentiment": 0.25
+    }
+  },
+  {
+    "id": "fort-wayne-recommendation-does-not-repeat-transparency-already-delivered",
+    "kind": "interpretation",
+    "input": {
+      "ai": {
+        "summary": "The superintendent held a news conference to explain the legislation, quantify its potential impact and advocate publicly for students.",
+        "local_recommendation": "Prepare a superintendent statement and communicate the fiscal threat transparently.",
+        "sentiment": -0.45
+      },
+      "evidence": {
+        "headline": "Superintendent: Fort Wayne Community Schools could lose $14.5 million if legislation passes",
+        "source": "The Journal Gazette",
+        "monitoring_excerpt": "District leaders held a news conference and publicly explained the proposed legislation's financial impact."
+      }
+    },
+    "expected": {
+      "summary": "The superintendent held a news conference to explain the legislation, quantify its potential impact and advocate publicly for students.",
+      "recommendation": "Amplify the district's existing transparent communication and monitor stakeholder understanding; do not recommend repeating actions already documented in the story.",
+      "sentiment": 0.1
+    }
+  },
+  {
     "id": "cabrillo-exact-pillars-1-2-4",
     "kind": "alignment",
     "input": {

@@ -73,16 +73,75 @@ export function detectSensitivePersonnelTrustIssue(fields = {}) {
   return /(teacher|educator|staff|employee|principal|coach|school employee|high school employee).{0,120}(arrest|charged|charges|obscene|sexual|child|children|minor|internet crime|distribution|misconduct|investigation)|(?:arrest|charged|charges|obscene|sexual|child|children|minor|internet crime|distribution|misconduct|investigation).{0,120}(teacher|educator|staff|employee|principal|coach|school employee|high school employee)/i.test(text);
 }
 
+function isSourceAuthoredContent(text) {
+  return /\b(superintendent|district|school board)(?:['’]s)?\s+(?:column|op[- ]?ed)\b|\b(?:column|op[- ]?ed)\b.{0,80}\b(superintendent|district|school board)\b/i.test(text);
+}
+
+function isProactiveTruthTelling(text) {
+  return /\b(news conference|press conference|public statement|column|op[- ]?ed|explains?|warns?|advocat(?:e|es|ed|ing)|communicat(?:e|es|ed|ing)|transparent|transparency)\b/i.test(text)
+    && /\b(budget|funding|fiscal|legislation|financial|revenue|deficit|costs?|property tax)\b/i.test(text);
+}
+
 export function calibrateSentiment(rawSentiment, fields = {}) {
   let sentiment = Number(rawSentiment || 0);
-  const text = normalize([fields.headline, fields.summary, fields.recommendation, fields.risk, fields.tags].join(' '));
+  const text = normalize([
+    fields.headline, fields.summary, fields.recommendation, fields.risk, fields.tags,
+    fields.author, fields.source, fields.link,
+  ].join(' '));
   const personalIncident = /(teacher|educator|staff|employee|principal|coach).{0,80}(bac|dui|dwi|intoxicated|drunk|fatal crash|deadly crash|crash|killed|died|death|arrest|illness)|(?:bac|dui|dwi|intoxicated|drunk|fatal crash|deadly crash|crash|killed|died|death|arrest|illness).{0,80}(teacher|educator|staff|employee|principal|coach)/i.test(text);
   const griefWithoutBlame = /\b(mourns?|mourning|death|died|killed|loss of|memorial|grief)\b/i.test(text);
   const culpability = /(district|school|board|superintendent|leadership).{0,80}(neglig|cover.?up|failed|failure|fault|liable|lawsuit|sued|policy failure|supervision|student harm|under district care|public criticism|backlash|scandal)|(neglig|cover.?up|failed|failure|fault|liable|lawsuit|sued|policy failure|supervision|student harm|under district care|public criticism|backlash|scandal).{0,80}(district|school|board|superintendent|leadership)/i.test(text);
+  const sourceAuthored = isSourceAuthoredContent(text);
+  const proactiveTruthTelling = isProactiveTruthTelling(text);
   const sensitiveTrust = detectSensitivePersonnelTrustIssue(fields);
   if (sensitiveTrust && sentiment > -0.3) sentiment = -0.7;
   if ((personalIncident || griefWithoutBlame) && !culpability && !sensitiveTrust && sentiment < -0.2) sentiment = -0.1;
+  if (proactiveTruthTelling && !culpability && !sensitiveTrust && sentiment < 0.1) sentiment = 0.1;
+  if (sourceAuthored && !culpability && !sensitiveTrust && sentiment > 0.25) sentiment = 0.25;
   return sentiment;
+}
+
+const ACCESS_LIMITATION_CLAIM = /\b(paywall(?:ed)?|behind (?:a )?paywall|article (?:content )?(?:provided )?is incomplete|incomplete article|full article (?:text|content)|article (?:is )?truncated|truncated article|content (?:is )?unavailable|await (?:the )?(?:full )?article|monitor for full article)\b/i;
+
+function deterministicSentimentFallback(fields = {}) {
+  const text = normalize([fields.headline, fields.summary, fields.monitoring_excerpt].join(' '));
+  const positive = /\b(achievement|award|improv(?:e|ed|ement)|increase|growth|success|successful|launch(?:ed)?|creative|innovation|innovative|partnership|opportunity|proactive|transparent|transparency|responsib(?:le|ility)|savings?|surplus|graduation)\b/i.test(text);
+  const negative = /\b(backlash|criticism|controversy|lawsuit|negligence|failure|failed|unsafe|harm|arrest|misconduct|decline|deficit|shortage|disruption|closure|cuts?)\b/i.test(text);
+  if (positive && !negative) return 0.25;
+  if (negative && !positive) return -0.25;
+  return 0;
+}
+
+export function normalizeArticleInterpretation(ai = {}, evidence = {}) {
+  const originalSummary = String(ai.summary ?? '').trim();
+  const originalRecommendation = String(ai.local_recommendation ?? ai.recommendation ?? '').trim();
+  const monitoringExcerpt = String(evidence.monitoring_excerpt ?? evidence.snippet ?? '').trim();
+  const summary = ACCESS_LIMITATION_CLAIM.test(originalSummary) && monitoringExcerpt
+    ? monitoringExcerpt
+    : originalSummary;
+  let recommendation = ACCESS_LIMITATION_CLAIM.test(originalSummary) || ACCESS_LIMITATION_CLAIM.test(originalRecommendation)
+    ? 'N/A'
+    : (originalRecommendation || 'N/A');
+  const interpretationText = normalize([
+    evidence.headline, summary, monitoringExcerpt, evidence.author, evidence.source, evidence.link,
+  ].join(' '));
+  const repeatsDeliveredTransparency = /\b(prepare|issue|hold|publish|write|create|communicate|explain|provide)\b.{0,100}\b(statement|press conference|news conference|column|op[- ]?ed|budget|funding|fiscal|legislation|transparent|transparency)\b/i.test(originalRecommendation);
+  if (isProactiveTruthTelling(interpretationText) && repeatsDeliveredTransparency) {
+    recommendation = "Amplify the district's existing transparent communication and monitor stakeholder understanding; do not recommend repeating actions already documented in the story.";
+  }
+  const hasSentiment = ai.sentiment !== null
+    && ai.sentiment !== undefined
+    && String(ai.sentiment).trim() !== ''
+    && Number.isFinite(Number(ai.sentiment));
+  const rawSentiment = hasSentiment
+    ? Number(ai.sentiment)
+    : deterministicSentimentFallback({ ...evidence, summary });
+  const sentiment = calibrateSentiment(rawSentiment, {
+    ...evidence,
+    summary,
+    recommendation,
+  });
+  return { summary, recommendation, sentiment };
 }
 
 const canonical = (value) => normalize(value).replace(/^\*\*|\*\*$/g, '').replace(/[“”]/g, '"').replace(/[’]/g, "'").replace(/\s+/g, ' ').trim();

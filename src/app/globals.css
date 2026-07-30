@@ -35,6 +35,8 @@
   --blue-500: #3B82F6;
   --blue-400: #60A5FA;
   --blue-bg: rgba(59, 130, 246, 0.1);
+  --neutral-500: #60A5FA;
+  --neutral-bg: rgba(96, 165, 250, 0.12);
   --orange-500: #F97316;
   --orange-bg: rgba(249, 115, 22, 0.1);
 
@@ -3415,8 +3417,8 @@ input[type="date"]::-webkit-calendar-picker-indicator {
 }
 
 .score-badge.medium {
-  background: var(--orange-bg);
-  color: var(--orange-500);
+  background: var(--neutral-bg);
+  color: var(--neutral-500);
 }
 
 .score-badge.low {

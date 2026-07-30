@@ -471,8 +471,8 @@ function ScoreGauge({ score }) {
 
   const progressLen = C * nScore / 10;
 
-  let fillColor = '#EF4444';           // 0–3  red
-  if (nScore >= 3) fillColor = '#F5C518'; // 3–7  yellow
+  let fillColor = '#EF4444';              // 0–3  red
+  if (nScore >= 3) fillColor = '#60A5FA'; // 3–7  calm blue
   if (nScore >= 7) fillColor = '#22C55E'; // 7–10 green
 
   return (
@@ -489,7 +489,7 @@ function ScoreGauge({ score }) {
 
         {/* Dim zone tints — show threshold bands even when score = 0 */}
         <path d={d} fill="none" stroke="#EF4444" strokeWidth="16" strokeLinecap="butt" opacity="0.22" {...zoneStroke(0, 3)} />
-        <path d={d} fill="none" stroke="#F5C518" strokeWidth="16" strokeLinecap="butt" opacity="0.22" {...zoneStroke(3, 7)} />
+        <path d={d} fill="none" stroke="#60A5FA" strokeWidth="16" strokeLinecap="butt" opacity="0.22" {...zoneStroke(3, 7)} />
         <path d={d} fill="none" stroke="#22C55E" strokeWidth="16" strokeLinecap="butt" opacity="0.22" {...zoneStroke(7, 10)} />
 
         {/* Progress fill up to current score */}
@@ -516,7 +516,7 @@ function ScoreGauge({ score }) {
 
         {/* Zone labels */}
         <text x="14"  y="116" textAnchor="middle" fill="#EF4444" fontSize="7.5" fontWeight="700" opacity="0.75">Concern</text>
-        <text x="100" y="9"   textAnchor="middle" fill="#F5C518" fontSize="7.5" fontWeight="700" opacity="0.75">Neutral</text>
+        <text x="100" y="9"   textAnchor="middle" fill="#60A5FA" fontSize="7.5" fontWeight="700" opacity="0.75">Neutral</text>
         <text x="186" y="116" textAnchor="middle" fill="#22C55E" fontSize="7.5" fontWeight="700" opacity="0.75">Positive</text>
 
         {/* Score value */}
