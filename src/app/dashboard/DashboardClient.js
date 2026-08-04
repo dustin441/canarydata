@@ -3288,8 +3288,8 @@ function SocialView({ socialResults, socialSources, socialReviewEvents = [], dis
           </div>
         </details>
       )}
-      {/* Legacy approval/card workspace intentionally removed from the rendered Social experience. */}
-      {false && <>
+      {/* Admins review all collected mentions here; district clients see only approved active mentions. */}
+      {(isAdmin || summary.ambient > 0) && <>
       <section className="social-monitor-hero">
         <div>
           <span className="social-eyebrow">Posts and public monitoring</span>
