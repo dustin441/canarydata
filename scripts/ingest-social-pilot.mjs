@@ -123,7 +123,7 @@ function validateAccountRows(data) {
       || !isNonemptyString(row.platform)
       || !ALLOWED_SOCIAL_PLATFORMS.has(row.platform)
       || typeof row.active !== 'boolean'
-      || ![row.handle, row.profile_url].every((value) => value === null || value === undefined || typeof value === 'string'))) {
+      || ![row.handle, row.profile_url].every((value) => value === null || typeof value === 'string'))) {
     throw new Error('Social account lookup returned an invalid response.');
   }
   return data;

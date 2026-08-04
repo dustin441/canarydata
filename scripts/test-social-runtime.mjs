@@ -448,6 +448,8 @@ for (const malformedAccount of [
   { ...matchingAccount, provider: '' },
   { ...matchingAccount, platform: 'mastodon' },
   { ...matchingAccount, active: 'true' },
+  Object.fromEntries(Object.entries(matchingAccount).filter(([key]) => key !== 'handle')),
+  Object.fromEntries(Object.entries(matchingAccount).filter(([key]) => key !== 'profile_url')),
   { ...matchingAccount, handle: 42 },
   { ...matchingAccount, profile_url: {} },
 ]) {
@@ -658,6 +660,7 @@ for (const malformedRpcResponse of [
   { id: STORED_THREAD_ID, district_id: DISTRICT_ID, provider: 'apify', platform: 'facebook', external_thread_id: 'post-1', visibility_status: 'invalid', review_version: 0 },
   { id: STORED_THREAD_ID, district_id: DISTRICT_ID, provider: 'apify', platform: 'facebook', external_thread_id: 'post-1', visibility_status: 'active', review_version: -1 },
   { id: STORED_THREAD_ID, district_id: 'wrong-district', provider: 'apify', platform: 'facebook', external_thread_id: 'post-1', visibility_status: 'active', review_version: 0 },
+  { id: STORED_THREAD_ID, district_id: DISTRICT_ID, provider: 'wrong-provider', platform: 'facebook', external_thread_id: 'post-1', visibility_status: 'active', review_version: 0 },
   { id: STORED_THREAD_ID, district_id: DISTRICT_ID, provider: 'apify', platform: 'instagram', external_thread_id: 'post-1', visibility_status: 'active', review_version: 0 },
   { id: STORED_THREAD_ID, district_id: DISTRICT_ID, provider: 'apify', platform: 'facebook', external_thread_id: 'wrong-thread', visibility_status: 'active', review_version: 0 },
 ]) {
