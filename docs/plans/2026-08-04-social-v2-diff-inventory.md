@@ -20,6 +20,8 @@
 
 A candidate classification is not approval to copy a whole file. Only the named hunk family may be considered later.
 
+Task 1 enforces this table as a strict allowlist. No rejected commit may be cherry-picked, no whole file may be copied from the rejected worktree, and every manually reimplemented hunk must map to a specifically named `Approved candidate for later manual reapplication` family. `Requires independent redesign` is not an allowlist entry; that work must be newly designed and implemented from baseline `6fa8728` in its assigned later task.
+
 ## File and hunk-family inventory
 
 | Rejected file | Hunk family | Classification | Review decision |
@@ -74,8 +76,9 @@ The existing admin and district access checks visible only as unchanged context 
 
 ## Manual reapplication order
 
-1. Task 3 may manually reapply only approved UI and UI-test candidates from the stable baseline.
-2. Task 4 must independently design and prove exclusion replay safety before any default-active writer change.
-3. Task 5 must replace the rejected broad SQL edit with a timestamped, backed-up, reversible migration and restore test.
-4. Task 6 must stage inactive workflow copies before any production writer changes.
-5. No candidate may be cherry-picked from `729da75a8981a3cd2084ae3e34c9a5af73152676`.
+1. Task 1 must attach a hunk-by-hunk allowlist map and reject any hunk that does not map to a specifically named approved-candidate family.
+2. Task 3 may manually reimplement only approved UI and UI-test candidates from the stable baseline. It may not copy whole files.
+3. Task 4 must independently design and prove exclusion replay safety before any default-active writer change. Stable code has one direct application writer, `scripts/ingest-social-pilot.mjs`. `src/lib/meta-page-sync.mjs` does not exist at the stable baseline and is not in the rejected 11-file diff. Production n8n writers enter only as staged inactive Task 6 copies. Any future Meta sync writer requires separate delivery and review before it enters this inventory.
+4. Task 5 must replace the rejected broad SQL edit with a timestamped, backed-up, reversible migration and restore test.
+5. Task 6 must stage inactive workflow copies before any production writer changes.
+6. No candidate may be cherry-picked from `729da75a8981a3cd2084ae3e34c9a5af73152676`, any descendant, or any other rejected commit.
