@@ -2961,7 +2961,7 @@ function MonthlySocialPerformance({
   );
 }
 
-function SocialView({ socialResults, socialSources, socialReviewEvents = [], districtFilter, districts, campaignSearch, setCampaignSearch, isAdmin = false }) {
+export function SocialView({ socialResults, socialSources, socialReviewEvents = [], districtFilter, districts, campaignSearch, setCampaignSearch, isAdmin = false }) {
   const [socialPageTab, setSocialPageTab] = useState('overview');
   const [relationshipFilter, setRelationshipFilter] = useState('all');
   const socialSearch = campaignSearch;
@@ -2980,6 +2980,10 @@ function SocialView({ socialResults, socialSources, socialReviewEvents = [], dis
   const [sourcesOpen, setSourcesOpen] = useState(false);
   const [socialReportMode, setSocialReportMode] = useState(false);
   const [socialAnalystDrafts, setSocialAnalystDrafts] = useState({});
+  const [correctionHistoryPage, setCorrectionHistoryPage] = useState({ districtFilter, limit: 100 });
+  if (correctionHistoryPage.districtFilter !== districtFilter) {
+    setCorrectionHistoryPage({ districtFilter, limit: 100 });
+  }
   useEffect(() => {
     const timer = window.setTimeout(() => {
       try {
@@ -3136,6 +3140,8 @@ function SocialView({ socialResults, socialSources, socialReviewEvents = [], dis
   const hasActiveSocialFilters = relationshipFilter !== 'all' || platformFilter !== 'all' || mediaFilter !== 'all'
     || performanceFilter !== 'all' || minimumEngagementRate !== '' || maximumEngagementRate !== '' || socialDateStart !== '' || socialDateEnd !== '' || socialSearch !== '' || socialSort !== 'newest';
   const scopedReviewEvents = socialReviewEvents.filter((event) => districtFilter === 'All' || event.district_id === districtFilter);
+  const correctionHistoryLimit = correctionHistoryPage.districtFilter === districtFilter ? correctionHistoryPage.limit : 100;
+  const visibleReviewEvents = scopedReviewEvents.slice(0, correctionHistoryLimit);
 
   function exportSocialCsv() {
     downloadCsv(
@@ -3389,7 +3395,7 @@ function SocialView({ socialResults, socialSources, socialReviewEvents = [], dis
         <details className="social-audit-history">
           <summary><span><strong>Correction history</strong><small>Immutable correction history retains every recorded event type, including historical approvals, classifications, notes, exclusions, and restorations.</small></span><em>{scopedReviewEvents.length} event{scopedReviewEvents.length === 1 ? '' : 's'}</em></summary>
           <div className="social-audit-list">
-            {scopedReviewEvents.length === 0 ? <p>No social correction events yet.</p> : scopedReviewEvents.slice(0, 100).map((event) => (
+            {scopedReviewEvents.length === 0 ? <p>No social correction events yet.</p> : visibleReviewEvents.map((event) => (
               <article key={event.id}>
                 <div><strong>{String(event.action || '').replaceAll('_', ' ')}</strong><time>{new Date(event.created_at).toLocaleString()}</time></div>
                 <p>{event.after_state?.headline || event.before_state?.headline || event.social_thread_id}</p>
@@ -3397,6 +3403,20 @@ function SocialView({ socialResults, socialSources, socialReviewEvents = [], dis
               </article>
             ))}
           </div>
+          {scopedReviewEvents.length > 0 && (
+            <div className="social-load-more">
+              <span>Showing {visibleReviewEvents.length} of {scopedReviewEvents.length} correction events</span>
+              {visibleReviewEvents.length < scopedReviewEvents.length && (
+                <button
+                  type="button"
+                  className="btn btn-secondary"
+                  onClick={() => setCorrectionHistoryPage({ districtFilter, limit: correctionHistoryLimit + 100 })}
+                >
+                  Load 100 more correction events
+                </button>
+              )}
+            </div>
+          )}
         </details>
       )}
       </>}

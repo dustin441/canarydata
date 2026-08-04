@@ -1,5 +1,6 @@
 import assert from 'node:assert/strict';
 import { readFile } from 'node:fs/promises';
+import { loadBindings } from 'next/dist/build/swc/index.js';
 import { normalizeSocialResult } from '../src/lib/social.mjs';
 import {
   calculateSocialMetricChange,
@@ -193,6 +194,354 @@ const [sql, actions, dashboard, styles, data, melodi] = await Promise.all([
   readFile(new URL('../src/app/api/melodi/route.js', import.meta.url), 'utf8'),
 ]);
 
+function createHookRenderer() {
+  const componentState = new Map();
+  let currentInstance = null;
+  let hookCursor = 0;
+  let pendingEffects = [];
+
+  const sameDependencies = (left, right) => left && right && left.length === right.length && left.every((value, index) => Object.is(value, right[index]));
+  const slot = () => {
+    assert.ok(currentInstance, 'Hooks may only run while rendering a component.');
+    const index = hookCursor++;
+    const hooks = componentState.get(currentInstance);
+    return { hooks, index };
+  };
+  const react = {
+    useState(initialValue) {
+      const { hooks, index } = slot();
+      if (!(index in hooks)) hooks[index] = typeof initialValue === 'function' ? initialValue() : initialValue;
+      const setValue = (nextValue) => {
+        hooks[index] = typeof nextValue === 'function' ? nextValue(hooks[index]) : nextValue;
+      };
+      return [hooks[index], setValue];
+    },
+    useMemo(factory) {
+      const { hooks, index } = slot();
+      hooks[index] = factory();
+      return hooks[index];
+    },
+    useEffect(effect, dependencies) {
+      const { hooks, index } = slot();
+      const previous = hooks[index];
+      if (!previous || !sameDependencies(previous.dependencies, dependencies)) {
+        pendingEffects.push(() => {
+          previous?.cleanup?.();
+          hooks[index] = { dependencies, cleanup: effect() };
+        });
+      }
+    },
+    useRef(initialValue) {
+      const { hooks, index } = slot();
+      if (!(index in hooks)) hooks[index] = { current: initialValue };
+      return hooks[index];
+    },
+    useTransition() {
+      slot();
+      return [false, (callback) => callback()];
+    },
+    useCallback(callback) {
+      slot();
+      return callback;
+    },
+  };
+  const Fragment = Symbol('Fragment');
+  const jsx = (type, props = {}, key = null) => ({ type, props, key });
+
+  function renderNode(node, path = '0') {
+    if (node === null || node === undefined || typeof node === 'boolean') return null;
+    if (typeof node === 'string' || typeof node === 'number') return String(node);
+    if (Array.isArray(node)) return node.map((child, index) => renderNode(child, `${path}.${index}`)).flat().filter((child) => child !== null);
+    if (node.type === Fragment) return renderNode(node.props.children, `${path}.f`);
+    if (typeof node.type === 'function') {
+      const previousInstance = currentInstance;
+      const previousCursor = hookCursor;
+      const identity = `${path}:${node.type.name || 'anonymous'}:${node.key ?? ''}`;
+      if (!componentState.has(identity)) componentState.set(identity, []);
+      currentInstance = identity;
+      hookCursor = 0;
+      const rendered = node.type(node.props);
+      currentInstance = previousInstance;
+      hookCursor = previousCursor;
+      return renderNode(rendered, `${path}.c`);
+    }
+    const children = renderNode(node.props?.children, `${path}.h`);
+    return { type: node.type, props: { ...node.props, children }, key: node.key };
+  }
+
+  function render(Component, props) {
+    pendingEffects = [];
+    const tree = renderNode(jsx(Component, props));
+    const effects = pendingEffects;
+    pendingEffects = [];
+    effects.forEach((effect) => effect());
+    return tree;
+  }
+
+  return { react, jsxRuntime: { Fragment, jsx, jsxs: jsx }, render };
+}
+
+function nodeText(node) {
+  if (node === null || node === undefined) return '';
+  if (typeof node === 'string') return node;
+  if (Array.isArray(node)) return node.map(nodeText).join('');
+  return nodeText(node.props?.children);
+}
+
+function findNodes(node, predicate, matches = []) {
+  if (node === null || node === undefined || typeof node === 'string') return matches;
+  if (Array.isArray(node)) {
+    node.forEach((child) => findNodes(child, predicate, matches));
+    return matches;
+  }
+  if (predicate(node)) matches.push(node);
+  findNodes(node.props?.children, predicate, matches);
+  return matches;
+}
+
+function findButton(tree, label) {
+  const button = findNodes(tree, (node) => node.type === 'button' && nodeText(node).includes(label))[0];
+  assert.ok(button, `Expected a ${label} button.`);
+  return button;
+}
+
+async function compileSocialViewForInteractionTest(source, reviewSocialThreadMock) {
+  const [socialModule, socialReportModule, dateModule] = await Promise.all([
+    import('../src/lib/social.mjs'),
+    import('../src/lib/socialReport.mjs'),
+    import('../src/lib/date.mjs'),
+  ]);
+  const renderer = createHookRenderer();
+  const hostComponent = ({ children, ...props }) => renderer.jsxRuntime.jsx('stub', { ...props, children });
+  const actionModule = {
+    setEarnedMedia() {}, saveNote() {}, addQuery() {}, updateQuery() {}, deleteQuery() {}, submitFeedback() {},
+    addManualStory() {}, excludeStory() {}, restoreStory() {}, reviewSocialThread: reviewSocialThreadMock,
+  };
+  const modules = {
+    react: renderer.react,
+    'react/jsx-runtime': renderer.jsxRuntime,
+    'next/image': { __esModule: true, default: hostComponent },
+    'next/link': { __esModule: true, default: hostComponent },
+    '@stripe/stripe-js': { loadStripe: () => null },
+    '@/app/actions': actionModule,
+    '@/app/payment/actions': { createEmbeddedCanaryCheckout() {}, confirmEmbeddedCanaryCheckout() {}, saveBillingPurchaseOrder() {} },
+    '@/lib/strategicAlignmentSort.mjs': { compareStrategicAlignmentRows: () => 0 },
+    '@/lib/canonicalTags.mjs': { CORE_TAGS: [], canonicalTags: () => [] },
+    '@/lib/social.mjs': socialModule,
+    '@/lib/socialReport.mjs': socialReportModule,
+    '@/lib/date.mjs': dateModule,
+    '@/lib/queryPolicy.mjs': { CUSTOMER_SEARCH_QUERY_LIMIT: 10, activeNewsQueryCount: () => 0 },
+    '@/lib/communicationsBrief.mjs': { buildCommunicationsBrief: () => ({}), formatCommunicationsBriefRecommendation: () => '' },
+    '@/lib/strategicGovernance.mjs': { buildStrategicGovernance: () => ({}) },
+    '@/lib/reportingDataset.mjs': { buildReportingDataset: () => ({}), filterReportingDataset: () => ({}) },
+    '@/lib/articleSearch.mjs': { articleMatchesSearch: () => true },
+    recharts: new Proxy({}, { get: () => hostComponent }),
+  };
+  const bindings = await loadBindings();
+  const compiled = await bindings.transform(source, {
+    filename: 'DashboardClient.js',
+    jsc: {
+      parser: { syntax: 'ecmascript', jsx: true },
+      transform: { react: { runtime: 'automatic' } },
+      target: 'es2022',
+    },
+    module: { type: 'commonjs' },
+  });
+  const moduleRecord = { exports: {} };
+  const fixedNow = Date.parse('2026-08-04T12:00:00.000Z');
+  class FixedDate extends Date {
+    constructor(...args) { super(...(args.length ? args : [fixedNow])); }
+    static now() { return fixedNow; }
+  }
+  const controlledRequire = (specifier) => {
+    assert.ok(specifier in modules, `Unexpected module import in component harness: ${specifier}`);
+    return modules[specifier];
+  };
+  const evaluate = new Function('require', 'module', 'exports', 'process', 'Date', compiled.code);
+  evaluate(controlledRequire, moduleRecord, moduleRecord.exports, { env: {} }, FixedDate);
+  return { SocialView: moduleRecord.exports.SocialView, renderer };
+}
+
+const baseSocialResult = {
+  id: 'actionable-result',
+  provider: 'apify',
+  externalThreadId: 'provider-thread-42',
+  socialAccountId: 'official-facebook',
+  districtId: 'district-a',
+  platform: 'facebook',
+  relationshipType: 'owned',
+  relationshipLabel: 'Official district post',
+  visibilityStatus: 'active',
+  reviewVersion: 7,
+  date: '2026-08-03T12:00:00.000Z',
+  headline: 'Actionable official post',
+  summary: 'Actionable official post summary',
+  authorName: 'District A',
+  mediaType: 'text',
+  mediaUrl: '',
+  videoUrl: '',
+  url: 'https://example.test/actionable',
+  isTextOnly: true,
+  isSharedPost: false,
+  carouselCount: 0,
+  reactionCount: 12,
+  commentCount: 3,
+  replyCount: 0,
+  shareCount: 2,
+  viewCount: 100,
+  engagementTotal: 17,
+  hasPerformanceData: true,
+  metricAvailability: { reactions: true, comments: true, shares: true, views: true },
+  representativeComments: [],
+  actionIntelligence: {
+    actionType: 'respond', actionLabel: 'Respond', urgency: 'today', confidence: 0.9,
+    recommendedAction: 'Reply after review.', situationSummary: 'A response is warranted.',
+    strategicPriorityLabels: [], missionOrValueEvidence: [], factsToVerify: [],
+  },
+};
+const excludedSocialResult = {
+  ...baseSocialResult,
+  id: 'excluded-result',
+  externalThreadId: 'provider-thread-99',
+  reviewVersion: 11,
+  visibilityStatus: 'excluded',
+  date: '2026-07-01T12:00:00.000Z',
+  headline: 'Previously hidden result',
+  summary: 'Previously hidden result',
+  actionIntelligence: null,
+};
+const mentionResult = {
+  ...baseSocialResult,
+  id: 'public-mention',
+  externalThreadId: 'provider-mention-1',
+  relationshipType: 'direct',
+  relationshipLabel: 'Public mention',
+  date: '2026-08-02T12:00:00.000Z',
+  headline: 'Public mention should stay out of official reporting',
+  summary: 'Public mention should stay out of official reporting',
+  actionIntelligence: null,
+};
+const missingProviderResult = {
+  ...baseSocialResult,
+  id: 'missing-provider',
+  provider: '',
+  externalThreadId: 'provider-thread-without-provider',
+  date: '2026-07-03T12:00:00.000Z',
+  headline: 'Missing provider result',
+  summary: 'Missing provider result',
+  actionIntelligence: null,
+};
+const missingExternalIdResult = {
+  ...baseSocialResult,
+  id: 'missing-external-id',
+  externalThreadId: '',
+  date: '2026-07-02T12:00:00.000Z',
+  headline: 'Missing external ID result',
+  summary: 'Missing external ID result',
+  actionIntelligence: null,
+};
+const sourceFixture = [{
+  id: 'official-facebook', district_id: 'district-a', platform: 'facebook', active: true,
+  handle: 'districta', profile_url: 'https://facebook.example/districta', metadata: { followers_count: 500 },
+}];
+const districtsFixture = [{ id: 'district-a', name: 'District A' }, { id: 'district-b', name: 'District B' }];
+const historyFixture = Array.from({ length: 105 }, (_, index) => ({
+  id: `event-${index}`,
+  action: index % 2 ? 'exclude' : 'restore',
+  district_id: 'district-a',
+  social_thread_id: `thread-${index}`,
+  resulting_version: index + 1,
+  created_at: `2026-08-03T${String(index % 24).padStart(2, '0')}:00:00.000Z`,
+  after_state: { headline: `Correction event ${index}` },
+  before_state: {},
+}));
+const reviewCalls = [];
+const windowStub = {
+  location: { reload() {} },
+  localStorage: { getItem: () => null, setItem() {} },
+  setTimeout: () => 1,
+  clearTimeout() {},
+  addEventListener() {},
+};
+const documentStub = { querySelectorAll: () => [] };
+globalThis.window = windowStub;
+globalThis.document = documentStub;
+
+const { SocialView, renderer } = await compileSocialViewForInteractionTest(dashboard, async (payload) => reviewCalls.push(payload));
+assert.equal(typeof SocialView, 'function', 'The compiled DashboardClient must expose its real SocialView component.');
+const socialProps = {
+  socialResults: [baseSocialResult, excludedSocialResult, mentionResult, missingProviderResult, missingExternalIdResult],
+  socialSources: sourceFixture,
+  socialReviewEvents: historyFixture,
+  districtFilter: 'district-a',
+  districts: districtsFixture,
+  campaignSearch: '',
+  setCampaignSearch() {},
+  isAdmin: true,
+};
+let socialTree = renderer.render(SocialView, socialProps);
+let overviewButton = findButton(socialTree, 'Overview');
+let feedButton = findButton(socialTree, 'Posts & mentions');
+assert.equal(overviewButton.props['aria-pressed'], true);
+assert.equal(feedButton.props['aria-pressed'], false);
+assert.match(nodeText(socialTree), /Actionable official post/);
+assert.doesNotMatch(nodeText(socialTree), /Public mention should stay out of official reporting/);
+
+feedButton.props.onClick();
+socialTree = renderer.render(SocialView, socialProps);
+overviewButton = findButton(socialTree, 'Overview');
+feedButton = findButton(socialTree, 'Posts & mentions');
+assert.equal(overviewButton.props['aria-pressed'], false);
+assert.equal(feedButton.props['aria-pressed'], true);
+assert.match(nodeText(socialTree), /Posts and public mentions/);
+assert.match(nodeText(socialTree), /Public mention should stay out of official reporting/);
+
+const actionableCard = findNodes(socialTree, (node) => node.type === 'article' && nodeText(node).includes('Actionable official post'))
+  .find((node) => findNodes(node, (child) => child.type === 'button' && nodeText(child) === 'Hide as irrelevant').length === 1);
+const excludedCard = findNodes(socialTree, (node) => node.type === 'article' && nodeText(node).includes('Previously hidden result'))
+  .find((node) => findNodes(node, (child) => child.type === 'button' && nodeText(child) === 'Restore').length === 1);
+assert.ok(actionableCard, 'An actionable admin result with provider identifiers must expose the hide correction.');
+assert.ok(excludedCard, 'An excluded admin result with provider identifiers must expose the restore correction.');
+for (const ineligibleHeadline of ['Missing provider result', 'Missing external ID result']) {
+  const ineligibleCard = findNodes(socialTree, (node) => node.type === 'article' && nodeText(node).includes(ineligibleHeadline))[0];
+  assert.ok(ineligibleCard, `Expected to render ${ineligibleHeadline}.`);
+  assert.equal(findNodes(ineligibleCard, (node) => node.props?.['aria-label'] === 'Social correction controls').length, 0);
+}
+await findButton(actionableCard, 'Hide as irrelevant').props.onClick();
+await findButton(excludedCard, 'Restore').props.onClick();
+assert.deepEqual(reviewCalls, [
+  { socialThreadId: 'actionable-result', action: 'exclude', expectedVersion: 7 },
+  { socialThreadId: 'excluded-result', action: 'restore', expectedVersion: 11 },
+]);
+assert.equal(baseSocialResult.provider, 'apify');
+assert.equal(baseSocialResult.externalThreadId, 'provider-thread-42');
+assert.equal(excludedSocialResult.provider, 'apify');
+assert.equal(excludedSocialResult.externalThreadId, 'provider-thread-99');
+
+const nonAdminHarness = await compileSocialViewForInteractionTest(dashboard, async () => assert.fail('A non-admin must never invoke reviewSocialThread.'));
+let nonAdminTree = nonAdminHarness.renderer.render(nonAdminHarness.SocialView, { ...socialProps, isAdmin: false });
+findButton(nonAdminTree, 'Posts & mentions').props.onClick();
+nonAdminTree = nonAdminHarness.renderer.render(nonAdminHarness.SocialView, { ...socialProps, isAdmin: false });
+assert.equal(findNodes(nonAdminTree, (node) => node.props?.['aria-label'] === 'Social correction controls').length, 0);
+assert.equal(findNodes(nonAdminTree, (node) => node.type === 'button' && ['Hide as irrelevant', 'Restore'].includes(nodeText(node))).length, 0);
+
+assert.match(nodeText(socialTree), /Showing 100 of 105 correction events/);
+assert.equal(findNodes(socialTree, (node) => node.type === 'article' && nodeText(node).includes('Correction event ')).length, 100);
+assert.doesNotMatch(nodeText(socialTree), /Correction event 104/);
+findButton(socialTree, 'Load 100 more correction events').props.onClick();
+socialTree = renderer.render(SocialView, socialProps);
+assert.match(nodeText(socialTree), /Showing 105 of 105 correction events/);
+assert.equal(findNodes(socialTree, (node) => node.type === 'article' && nodeText(node).includes('Correction event ')).length, 105);
+assert.match(nodeText(socialTree), /Correction event 104/);
+assert.equal(findNodes(socialTree, (node) => node.type === 'button' && nodeText(node).includes('Load 100 more correction events')).length, 0);
+
+const districtBEvents = historyFixture.map((event) => ({ ...event, id: `b-${event.id}`, district_id: 'district-b' }));
+socialTree = renderer.render(SocialView, { ...socialProps, districtFilter: 'district-b', socialReviewEvents: districtBEvents });
+socialTree = renderer.render(SocialView, { ...socialProps, districtFilter: 'district-b', socialReviewEvents: districtBEvents });
+assert.match(nodeText(socialTree), /Showing 100 of 105 correction events/);
+socialTree = renderer.render(SocialView, socialProps);
+assert.match(nodeText(socialTree), /Showing 100 of 105 correction events/);
+
 assert.match(sql, /visibility_status in \('review', 'approved', 'active', 'excluded'\)/);
 assert.match(sql, /social_review_events_immutable/);
 assert.match(sql, /before_state jsonb not null/);
@@ -220,6 +569,11 @@ assert.doesNotMatch(actions, /Only approved results can be promoted/);
 for (const marker of ['Overview', 'Posts & mentions', 'Hide as irrelevant', 'Correction history', 'Compact list', 'Official district post', 'Public mention']) {
   assert.ok(dashboard.includes(marker), `Dashboard must include ${marker}`);
 }
+assert.match(dashboard, /export function SocialView\(/);
+assert.match(dashboard, /const \[correctionHistoryPage, setCorrectionHistoryPage\] = useState\(\{ districtFilter, limit: 100 \}\)/);
+assert.match(dashboard, /Showing \{visibleReviewEvents\.length\} of \{scopedReviewEvents\.length\} correction events/);
+assert.match(dashboard, /Load 100 more correction events/);
+assert.doesNotMatch(dashboard, /scopedReviewEvents\.slice\(0, 100\)/);
 assert.match(dashboard, /const \[socialPageTab, setSocialPageTab\] = useState\('overview'\)/);
 assert.match(dashboard, /const \[compactListMode, setCompactListMode\] = useState\(true\)/);
 assert.match(dashboard, /aria-label="Social page sections"/);
