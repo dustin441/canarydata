@@ -193,9 +193,35 @@ const baseItem = {
 };
 const fsFor = (items) => ({ readFile: async () => JSON.stringify({ items }) });
 const canonicalEnv = {
-  CANARY_PROD_SUPABASE_URL: 'https://canonical.supabase.test/',
+  CANARY_PROD_SUPABASE_URL: 'https://fehdonfrlsrrkzaemkxp.supabase.co/',
   CANARY_PROD_SUPABASE_SERVICE_ROLE_KEY: 'canonical-secret-key',
 };
+const APPROVED_ORIGIN = 'https://fehdonfrlsrrkzaemkxp.supabase.co';
+const contaminatedUrls = [
+  'http://fehdonfrlsrrkzaemkxp.supabase.co',
+  'https://evil.example',
+  'https://fehdonfrlsrrkzaemkxp.supabase.co.evil.example',
+  'https://evil-fehdonfrlsrrkzaemkxp.supabase.co',
+  'https://user@fehdonfrlsrrkzaemkxp.supabase.co',
+  'https://fehdonfrlsrrkzaemkxp.supabase.co:443',
+  'https://fehdonfrlsrrkzaemkxp.supabase.co/rest/v1',
+  'https://fehdonfrlsrrkzaemkxp.supabase.co/?query=1',
+  'https://fehdonfrlsrrkzaemkxp.supabase.co/#fragment',
+];
+assert.deepEqual(environment(canonicalEnv), {
+  url: APPROVED_ORIGIN,
+  key: canonicalEnv.CANARY_PROD_SUPABASE_SERVICE_ROLE_KEY,
+});
+for (const contaminatedUrl of contaminatedUrls) {
+  assert.throws(
+    () => environment({ ...canonicalEnv, CANARY_PROD_SUPABASE_URL: contaminatedUrl }),
+    (error) => {
+      assert.doesNotMatch(error.message, new RegExp(contaminatedUrl.replace(/[.*+?^${}()|[\]\\]/g, '\\$&')));
+      assert.doesNotMatch(error.message, /canonical-secret-key/);
+      return true;
+    },
+  );
+}
 
 const dryFetchCalls = [];
 const dryLogs = [];
@@ -214,9 +240,18 @@ function response(data, status = 200) {
   return { ok: status >= 200 && status < 300, status, text: async () => data === null ? '' : JSON.stringify(data) };
 }
 
-function createPilotFetch({ accounts = [], duplicate = [], rpcShapes = ['object'], storedRows = [], rpcFailure = null } = {}) {
+function createPilotFetch({
+  accounts = [],
+  accountError = null,
+  runResponse = [{ id: 'run-1' }],
+  duplicate = [],
+  rpcResults = [],
+  storedRows = [],
+  patchResults = [],
+} = {}) {
   const calls = [];
   let rpcIndex = 0;
+  let patchIndex = 0;
   const fetchImpl = async (url, options) => {
     const call = {
       url,
@@ -226,23 +261,36 @@ function createPilotFetch({ accounts = [], duplicate = [], rpcShapes = ['object'
     };
     calls.push(call);
     const path = new URL(url).pathname + new URL(url).search;
-    if (call.method === 'GET' && path.includes('/social_accounts?')) return response(accounts);
-    if (call.method === 'POST' && path.endsWith('/social_collection_runs')) return response([{ id: 'run-1' }]);
+    if (call.method === 'GET' && path.includes('/social_accounts?')) {
+      if (accountError) throw accountError;
+      return response(accounts);
+    }
+    if (call.method === 'POST' && path.endsWith('/social_collection_runs')) return response(runResponse);
     if (call.method === 'GET' && path.includes('/social_threads?')) return response(duplicate);
     if (call.method === 'POST' && path.endsWith('/rpc/canary_ingest_social_thread')) {
-      if (rpcFailure) return response(rpcFailure, 500);
+      const configured = rpcResults[rpcIndex];
+      if (configured?.throw) throw configured.throw;
+      if (configured && Object.hasOwn(configured, 'data')) {
+        rpcIndex += 1;
+        return response(configured.data, configured.status || 200);
+      }
       const stored = { id: `stored-${rpcIndex + 1}`, ...call.body.p_thread, ...(storedRows[rpcIndex] || {}) };
-      const shape = rpcShapes[rpcIndex++] || 'object';
-      return response(shape === 'array' ? [stored] : stored);
+      rpcIndex += 1;
+      return response(stored);
     }
-    if (call.method === 'PATCH' && path.includes('/social_collection_runs?')) return response(null);
+    if (call.method === 'PATCH' && path.includes('/social_collection_runs?')) {
+      const configured = patchResults[patchIndex++];
+      if (configured?.throw) throw configured.throw;
+      if (configured && Object.hasOwn(configured, 'data')) return response(configured.data, configured.status || 200);
+      return response(null);
+    }
     throw new Error(`Unexpected pilot request: ${call.method} ${url}`);
   };
   return { calls, fetchImpl };
 }
 
-async function runCommittedPilot({ items, accounts, duplicate, rpcShapes, storedRows, rpcFailure, processEnv = canonicalEnv }) {
-  const mock = createPilotFetch({ accounts, duplicate, rpcShapes, storedRows, rpcFailure });
+async function runCommittedPilot({ items = [baseItem], processEnv = canonicalEnv, ...mockOptions } = {}) {
+  const mock = createPilotFetch(mockOptions);
   const logs = [];
   const promise = runSocialPilot({
     argv: ['--input', 'fixture.json', '--provider', 'apify', '--district', DISTRICT_ID, '--commit'],
@@ -262,7 +310,7 @@ const matchingRun = await runCommittedPilot({
   items: [baseItem, { ...baseItem, external_thread_id: 'post-2', canonical_url: 'https://facebook.test/post-2' }],
   accounts: [matchingAccount],
   duplicate: [{ id: 'diagnostic-duplicate' }],
-  rpcShapes: ['object', 'array'],
+  rpcResults: [undefined, { data: [{ id: 'stored-2', visibility_status: 'active' }] }],
 });
 const matchingResult = await matchingRun.promise;
 const matchingRpcCalls = matchingRun.mock.calls.filter((call) => call.url.endsWith('/rest/v1/rpc/canary_ingest_social_thread'));
@@ -303,6 +351,15 @@ const excludedRpc = excludedRun.mock.calls.find((call) => call.url.endsWith('/re
 assert.equal(excludedRpc.body.p_thread.social_account_id, null);
 assert.equal(excludedRpc.body.p_thread.visibility_status, 'excluded');
 
+const publicRun = await runCommittedPilot({
+  items: [{ ...baseItem, relationship_type: 'ambient' }],
+  accounts: [matchingAccount],
+});
+await publicRun.promise;
+const publicRpc = publicRun.mock.calls.find((call) => call.url.endsWith('/rest/v1/rpc/canary_ingest_social_thread'));
+assert.equal(publicRpc.body.p_thread.social_account_id, null);
+assert.equal(publicRpc.body.p_thread.visibility_status, 'review');
+
 const lifecyclePreservedRun = await runCommittedPilot({
   items: [baseItem],
   accounts: [matchingAccount],
@@ -321,27 +378,162 @@ const genericOnlyEnv = {
 };
 assert.throws(() => environment(genericOnlyEnv), /Canonical Canary Supabase/);
 const genericRun = await runCommittedPilot({ items: [baseItem], accounts: [], processEnv: genericOnlyEnv });
-await assert.rejects(genericRun.promise, /Canonical Canary Supabase/);
+await assert.rejects(genericRun.promise, (error) => {
+  assert.match(error.message, /Canonical Canary Supabase/);
+  assert.doesNotMatch(error.message, /generic\.supabase\.test|generic-secret/);
+  return true;
+});
 assert.equal(genericRun.mock.calls.length, 0, 'Generic-only credentials must be rejected before fetch.');
+assert.doesNotMatch(genericRun.logs.join('\n'), /generic\.supabase\.test|generic-secret/);
+
+for (const contaminatedUrl of contaminatedUrls) {
+  const contaminatedRun = await runCommittedPilot({
+    processEnv: { ...canonicalEnv, CANARY_PROD_SUPABASE_URL: contaminatedUrl },
+  });
+  await assert.rejects(contaminatedRun.promise, (error) => {
+    assert.doesNotMatch(error.message, new RegExp(contaminatedUrl.replace(/[.*+?^${}()|[\]\\]/g, '\\$&')));
+    assert.doesNotMatch(error.message, /canonical-secret-key/);
+    return true;
+  });
+  assert.equal(contaminatedRun.mock.calls.length, 0, 'Contaminated origins must fail before fetch.');
+  assert.doesNotMatch(contaminatedRun.logs.join('\n'), /canonical-secret-key|fehdonfrlsrrkzaemkxp/);
+}
+
+const ambiguousAccounts = [matchingAccount, { ...matchingAccount, id: 'account-second', profile_url: 'https://facebook.test/district' }];
+const ambiguityMessages = [];
+for (const accounts of [ambiguousAccounts, [...ambiguousAccounts].reverse()]) {
+  const ambiguousRun = await runCommittedPilot({ accounts });
+  await assert.rejects(ambiguousRun.promise, (error) => {
+    assert.match(error.message, /Multiple verified Social accounts/);
+    ambiguityMessages.push(error.message);
+    return true;
+  });
+  assert.equal(ambiguousRun.mock.calls.length, 1, 'Ambiguity must stop after account lookup.');
+  assert.equal(ambiguousRun.mock.calls.filter((call) => call.method === 'POST').length, 0);
+  assert.equal(ambiguousRun.mock.calls.filter((call) => call.method === 'PATCH').length, 0);
+}
+assert.equal(ambiguityMessages[0], ambiguityMessages[1], 'Account response order must not affect ambiguity rejection.');
+
+for (const malformedAccounts of [null, {}]) {
+  const malformedAccountRun = await runCommittedPilot({ accounts: malformedAccounts });
+  await assert.rejects(malformedAccountRun.promise, /invalid response/);
+  assert.equal(malformedAccountRun.mock.calls.length, 1);
+  assert.equal(malformedAccountRun.mock.calls.filter((call) => call.method === 'PATCH').length, 0);
+}
+
+const accountNetworkRun = await runCommittedPilot({
+  accountError: new Error(`lookup failed ${APPROVED_ORIGIN} canonical-secret-key`),
+});
+await assert.rejects(accountNetworkRun.promise, (error) => {
+  assert.equal(error.code, 'SUPABASE_REQUEST_FAILED');
+  assert.match(error.message, /lookup failed \[REDACTED\] \[REDACTED\]/);
+  return true;
+});
+assert.equal(accountNetworkRun.mock.calls.length, 1);
+assert.equal(accountNetworkRun.mock.calls.filter((call) => call.method === 'PATCH').length, 0);
+
+for (const malformedRunResponse of [null, {}, [], [{}], [{ id: 'run-1' }, { id: 'run-2' }]]) {
+  const malformedRun = await runCommittedPilot({ runResponse: malformedRunResponse });
+  await assert.rejects(malformedRun.promise, /could not be created/);
+  assert.equal(malformedRun.mock.calls.length, 2, 'Malformed run creation must stop before processing.');
+  assert.equal(malformedRun.mock.calls.filter((call) => call.method === 'PATCH').length, 0);
+}
+
+const objectRunResponse = await runCommittedPilot({ runResponse: { id: 'run-object' } });
+assert.equal((await objectRunResponse.promise).runId, 'run-object');
 
 const failingRun = await runCommittedPilot({
-  items: [baseItem],
   accounts: [matchingAccount],
-  rpcFailure: { code: 'RPC_FAILURE', message: `atomic failure ${canonicalEnv.CANARY_PROD_SUPABASE_SERVICE_ROLE_KEY}` },
+  rpcResults: [{ data: { code: 'RPC_FAILURE', message: `atomic failure ${canonicalEnv.CANARY_PROD_SUPABASE_SERVICE_ROLE_KEY}` }, status: 500 }],
 });
 await assert.rejects(failingRun.promise, (error) => {
+  assert.equal(error.code, 'RPC_FAILURE');
   assert.match(error.message, /atomic failure \[REDACTED\]/);
   assert.doesNotMatch(error.message, /canonical-secret-key/);
   return true;
 });
 const failedPatch = failingRun.mock.calls.find((call) => call.method === 'PATCH');
+assert.equal(failingRun.mock.calls.length, 5);
 assert.equal(failedPatch.body.status, 'failed');
 assert.equal(failedPatch.body.error_message, 'atomic failure [REDACTED]');
 assert.doesNotMatch(JSON.stringify(failedPatch.body), /canonical-secret-key/);
 assert.doesNotMatch(failingRun.logs.join('\n'), /canonical-secret-key/);
 
-for (const mock of [matchingRun.mock, untrustedRun.mock, excludedRun.mock, lifecyclePreservedRun.mock, failingRun.mock]) {
-  assert.ok(mock.calls.every((call) => call.url.startsWith('https://canonical.supabase.test/rest/v1/')), 'Runtime requests must stay on the canonical Supabase REST origin.');
+const transientFinalizationRun = await runCommittedPilot({
+  accounts: [matchingAccount],
+  rpcResults: [{ throw: new Error('RPC network primary') }],
+  patchResults: [{ data: { code: 'PATCH_TEMP', message: 'temporary patch failure' }, status: 503 }, { data: null }],
+});
+await assert.rejects(transientFinalizationRun.promise, (error) => {
+  assert.equal(error.code, 'SUPABASE_REQUEST_FAILED');
+  assert.match(error.message, /RPC network primary/);
+  return true;
+});
+assert.equal(transientFinalizationRun.mock.calls.filter((call) => call.method === 'PATCH').length, 2);
+assert.equal(transientFinalizationRun.mock.calls.length, 6);
+assert.ok(transientFinalizationRun.mock.calls.filter((call) => call.method === 'PATCH').every((call) => call.body.status === 'failed'));
+
+const persistentFinalizationRun = await runCommittedPilot({
+  accounts: [matchingAccount],
+  rpcResults: [{ data: { code: 'PRIMARY_SAFE', message: 'primary RPC failure' }, status: 500 }],
+  patchResults: [1, 2, 3].map(() => ({
+    throw: new Error(`patch failure ${APPROVED_ORIGIN} canonical-secret-key`),
+  })),
+});
+await assert.rejects(persistentFinalizationRun.promise, (error) => {
+  assert.equal(error.code, 'PRIMARY_SAFE');
+  assert.equal(error.cause?.code, 'PRIMARY_SAFE');
+  assert.match(error.message, /^primary RPC failure Failed to finalize/);
+  assert.doesNotMatch(error.message, /canonical-secret-key|fehdonfrlsrrkzaemkxp/);
+  return true;
+});
+assert.equal(persistentFinalizationRun.mock.calls.filter((call) => call.method === 'PATCH').length, 3);
+assert.equal(persistentFinalizationRun.mock.calls.length, 7);
+
+const successPatchFailureRun = await runCommittedPilot({
+  accounts: [matchingAccount],
+  patchResults: [
+    { data: { code: 'SUCCESS_PATCH_FAILED', message: 'success finalization failed' }, status: 500 },
+    { data: null },
+  ],
+});
+await assert.rejects(successPatchFailureRun.promise, (error) => {
+  assert.equal(error.code, 'SUCCESS_PATCH_FAILED');
+  assert.match(error.message, /success finalization failed/);
+  return true;
+});
+const successThenFailurePatches = successPatchFailureRun.mock.calls.filter((call) => call.method === 'PATCH');
+assert.deepEqual(successThenFailurePatches.map((call) => call.body.status), ['success', 'failed']);
+assert.equal(successPatchFailureRun.mock.calls.length, 6);
+
+const rpcNetworkRun = await runCommittedPilot({
+  accounts: [matchingAccount],
+  rpcResults: [{ throw: new Error(`RPC network ${APPROVED_ORIGIN} canonical-secret-key`) }],
+});
+await assert.rejects(rpcNetworkRun.promise, (error) => {
+  assert.match(error.message, /RPC network \[REDACTED\] \[REDACTED\]/);
+  assert.doesNotMatch(error.message, /canonical-secret-key|fehdonfrlsrrkzaemkxp/);
+  return true;
+});
+assert.equal(rpcNetworkRun.mock.calls.filter((call) => call.method === 'PATCH' && call.body.status === 'failed').length, 1);
+assert.equal(rpcNetworkRun.mock.calls.length, 5);
+
+for (const malformedRpcResponse of [null, [], [{ id: 'one' }, { id: 'two' }], {}]) {
+  const malformedRpcRun = await runCommittedPilot({
+    accounts: [matchingAccount],
+    rpcResults: [{ data: malformedRpcResponse }],
+  });
+  await assert.rejects(malformedRpcRun.promise, /did not return a stored thread/);
+  assert.equal(malformedRpcRun.mock.calls.filter((call) => call.method === 'PATCH' && call.body.status === 'failed').length, 1);
+  assert.equal(malformedRpcRun.mock.calls.length, 5);
+}
+
+for (const mock of [
+  matchingRun.mock, untrustedRun.mock, excludedRun.mock, publicRun.mock, lifecyclePreservedRun.mock, objectRunResponse.mock, failingRun.mock,
+  transientFinalizationRun.mock, persistentFinalizationRun.mock, successPatchFailureRun.mock, rpcNetworkRun.mock,
+]) {
+  assert.ok(mock.calls.every((call) => new URL(call.url).origin === APPROVED_ORIGIN), 'Runtime requests must stay on the canonical Supabase REST origin.');
+  assert.ok(mock.calls.every((call) => call.url.startsWith(`${APPROVED_ORIGIN}/rest/v1/`)), 'Runtime requests must use the canonical Supabase REST root.');
   assert.ok(mock.calls.every((call) => !/n8n/i.test(call.url)), 'Runtime must make no n8n calls.');
   assert.equal(mock.calls.filter((call) => call.method === 'POST' && /\/social_threads(?:\?|$)/.test(call.url)).length, 0, 'No direct social_threads mutation is allowed.');
 }
