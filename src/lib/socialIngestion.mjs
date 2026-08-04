@@ -1,6 +1,23 @@
 const ALLOWED_PLATFORMS = new Set(['facebook', 'instagram', 'youtube', 'x', 'twitter', 'threads', 'tiktok', 'linkedin']);
 const ALLOWED_RELATIONSHIPS = new Set(['owned', 'direct_tag', 'direct_mention', 'ambient']);
 
+export function resolveIngestionVisibilityStatus(existingStatus = null) {
+  return String(existingStatus || '').toLowerCase() === 'excluded' ? 'excluded' : 'active';
+}
+
+export function filterDurablyVisibleSocialThreads(threads = [], reviewEvents = []) {
+  const latestVisibilityAction = new Map();
+  [...reviewEvents]
+    .filter((event) => ['exclude', 'restore'].includes(String(event?.action || '').toLowerCase()))
+    .sort((left, right) => new Date(right?.created_at || 0).getTime() - new Date(left?.created_at || 0).getTime())
+    .forEach((event) => {
+      if (event?.social_thread_id && !latestVisibilityAction.has(event.social_thread_id)) {
+        latestVisibilityAction.set(event.social_thread_id, String(event.action).toLowerCase());
+      }
+    });
+  return threads.filter((thread) => latestVisibilityAction.get(thread?.id) !== 'exclude');
+}
+
 function nonNegativeNumber(value) {
   const number = Number(value || 0);
   return Number.isFinite(number) && number >= 0 ? number : 0;
@@ -47,7 +64,10 @@ function normalizeProviderItem({ provider, districtId, item }) {
   if (!body && !suppliedHeadline) throw new Error('missing_content');
   const headline = suppliedHeadline || body;
 
-  const visibilityStatus = String(item?.visibility_status || 'review').toLowerCase();
+  // Accepted public Social records are customer-visible by default. Relevance,
+  // geography, source, and duplicate checks belong in ingestion; human review
+  // is a correction path, not a publication gate.
+  const visibilityStatus = String(item?.visibility_status || 'active').toLowerCase();
   if (!['review', 'active', 'excluded'].includes(visibilityStatus)) throw new Error('invalid_visibility_status');
 
   const commentCount = nonNegativeNumber(item?.comment_count);

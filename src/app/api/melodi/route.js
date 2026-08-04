@@ -3,6 +3,7 @@ import { NextResponse } from 'next/server';
 import { createClient as createSessionClient } from '@/lib/supabase/server';
 import { createAdminClient } from '@/lib/supabase/admin';
 import { safeMelodiSourceUrl, selectMelodiContext, stableMelodiCitationId, validateMelodiAnswer } from '@/lib/melodi.mjs';
+import { filterDurablyVisibleSocialThreads } from '@/lib/socialIngestion.mjs';
 
 export const runtime = 'nodejs';
 export const maxDuration = 60;
@@ -160,19 +161,23 @@ export async function POST(request) {
     }
 
     const socialVisibility = isAdmin ? ['active', 'approved', 'review'] : ['active'];
-    const [districtResult, profileResult, prioritiesResult, newsResult, socialResult] = await Promise.all([
+    const [districtResult, profileResult, prioritiesResult, newsResult, socialResult, socialReviewResult] = await Promise.all([
       admin.from('districts').select('id, name').eq('id', districtId).maybeSingle(),
       admin.from('strategic_profiles').select('district_id, source_confidence, mission, vision, values, source_urls, last_reviewed_at').eq('district_id', districtId).maybeSingle(),
       admin.from('strategic_priorities').select('id, label, description, confidence, source_urls').eq('district_id', districtId).eq('active', true).order('label').limit(20),
       admin.from('news_stories').select('id, date, headline, summary, source, source_type, canary_score, tags, is_earned_media, link, canonical_url, innovation_reason, recommendation, created_at').eq('district_id', districtId).eq('visibility_status', 'active').order('date', { ascending: false }).limit(120),
       admin.from('social_threads').select('id, platform, canonical_url, relationship_type, author_name, author_handle, headline, body, summary, recommendation, published_at, engagement_total, sentiment, risk_level, tags, strategic_alignment, visibility_status, created_at').eq('district_id', districtId).in('visibility_status', socialVisibility).order('published_at', { ascending: false }).limit(120),
+      admin.from('social_review_events').select('social_thread_id, action, created_at').eq('district_id', districtId).in('action', ['exclude', 'restore']).order('created_at', { ascending: false }).limit(500),
     ]);
-    const queryError = [districtResult, profileResult, prioritiesResult, newsResult, socialResult].find((result) => result.error)?.error;
+    const queryError = [districtResult, profileResult, prioritiesResult, newsResult, socialResult, socialReviewResult].find((result) => result.error)?.error;
     if (queryError || !districtResult.data) return NextResponse.json({ error: 'MELODI could not load the selected district context.' }, { status: 500 });
 
     const history = cleanHistory(body?.history);
     const retrievalQuestion = [...history.filter((item) => item.role === 'user').map((item) => item.content), message].join('\n');
-    const selectedRaw = selectMelodiContext({ question: retrievalQuestion, news: newsResult.data || [], social: socialResult.data || [], newsLimit: 18, socialLimit: 12 });
+    const socialContext = isAdmin
+      ? (socialResult.data || [])
+      : filterDurablyVisibleSocialThreads(socialResult.data || [], socialReviewResult.data || []);
+    const selectedRaw = selectMelodiContext({ question: retrievalQuestion, news: newsResult.data || [], social: socialContext, newsLimit: 18, socialLimit: 12 });
     const selected = { ...selectedRaw, news: addCitationIds('N', selectedRaw.news), social: addCitationIds('S', selectedRaw.social) };
     const priorities = addCitationIds('P', prioritiesResult.data || []);
     const profile = profileResult.data ? { ...profileResult.data, citationId: stableMelodiCitationId('P', { id: `profile-${districtId}` }) } : null;

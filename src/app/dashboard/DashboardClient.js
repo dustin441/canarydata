@@ -4,11 +4,11 @@ import { useState, useMemo, useEffect, useRef, useTransition, useCallback } from
 import Image from 'next/image';
 import Link from 'next/link';
 import { loadStripe } from '@stripe/stripe-js';
-import { setEarnedMedia, saveNote, addQuery, updateQuery, deleteQuery, submitFeedback, addManualStory, excludeStory, restoreStory, reviewSocialThread, bulkReviewSocialThreads } from '@/app/actions';
+import { setEarnedMedia, saveNote, addQuery, updateQuery, deleteQuery, submitFeedback, addManualStory, excludeStory, restoreStory, reviewSocialThread } from '@/app/actions';
 import { createEmbeddedCanaryCheckout, confirmEmbeddedCanaryCheckout, saveBillingPurchaseOrder } from '@/app/payment/actions';
 import { compareStrategicAlignmentRows } from '@/lib/strategicAlignmentSort.mjs';
 import { CORE_TAGS, canonicalTags } from '@/lib/canonicalTags.mjs';
-import { calculateSocialEngagementRate, rankTopSocialResults, resolveSocialFollowerCount, safeSocialMediaUrl, safeSocialUrl, socialActionFilterMatches, socialDateFilterMatches, socialRelationshipFilterMatches, summarizeSocialActions, summarizeSocialResults } from '@/lib/social.mjs';
+import { calculateSocialEngagementRate, rankTopSocialResults, resolveSocialFollowerCount, safeSocialMediaUrl, safeSocialUrl, socialDateFilterMatches, socialRelationshipFilterMatches, summarizeSocialActions, summarizeSocialResults } from '@/lib/social.mjs';
 import { calculateSocialMetricChange, dateInputValue, groupTopReportPostsByPlatform, isEligibleSocialReportPost, neutralizeSpreadsheetFormula, rankSocialReportTopPerformers, resolveSocialReportComparisonWindow, resolveSocialReportWindow, selectOfficialSocialReportPosts, socialReportInteractionTotal, socialReportMetricValue, summarizeSocialContentFormats, summarizeSocialReport } from '@/lib/socialReport.mjs';
 import { formatDisplayDate } from '@/lib/date.mjs';
 import { CUSTOMER_SEARCH_QUERY_LIMIT, activeNewsQueryCount } from '@/lib/queryPolicy.mjs';
@@ -2401,7 +2401,7 @@ function formatSocialUrgency(value) {
   return labels[value] || String(value || 'Routine').replaceAll('_', ' ');
 }
 
-function SocialPostPreviewCard({ result, source, rank = null, showContext = false, compact = false, listCompact = false, reviewEnabled = false, selected = false, onToggleSelected = null }) {
+function SocialPostPreviewCard({ result, source, rank = null, showContext = false, compact = false, listCompact = false, correctionEnabled = false }) {
   const mediaUrl = safeSocialMediaUrl(result.mediaUrl);
   const videoUrl = safeSocialMediaUrl(result.videoUrl);
   const profileImageUrl = safeSocialMediaUrl(result.profileImageUrl || (result.relationshipType === 'owned' ? source?.metadata?.profile_picture_url : ''));
@@ -2413,8 +2413,7 @@ function SocialPostPreviewCard({ result, source, rank = null, showContext = fals
   const [videoOpen, setVideoOpen] = useState(false);
   const [reviewSaving, setReviewSaving] = useState(false);
   const [reviewMessage, setReviewMessage] = useState('');
-  const [classification, setClassification] = useState(result.rawRelationshipType || 'ambient');
-  const [reviewerNote, setReviewerNote] = useState(result.reviewerNote || '');
+
   const imageFailed = Boolean(mediaUrl && failedMediaUrl === mediaUrl);
   const profileImageFailed = Boolean(profileImageUrl && failedProfileImageUrl === profileImageUrl);
 
@@ -2426,19 +2425,7 @@ function SocialPostPreviewCard({ result, source, rank = null, showContext = fals
   const postCopy = result.summary || result.headline;
   const isVideo = result.mediaType === 'video';
   const action = result.actionIntelligence;
-  const statusLabel = { review: 'Needs approval', approved: 'Needs approval', active: 'Client visible · report eligible', excluded: 'Excluded' }[result.visibilityStatus] || result.visibilityStatus;
-  const approvalPending = ['review', 'approved'].includes(result.visibilityStatus);
-  const hasVerifiedOfficialSource = result.rawRelationshipType === 'owned'
-    && source?.id === result.socialAccountId
-    && source?.district_id === result.districtId
-    && source?.platform === result.platform
-    && source?.active === true
-    && Boolean(source?.handle || source?.profile_url);
-  const approvalDisabledReason = reviewSaving
-    ? 'Saving this review decision…'
-    : !hasVerifiedOfficialSource
-      ? 'Approval is available only for owned posts tied to a verified, active official district source.'
-      : '';
+
 
   async function applyReviewAction(reviewAction, values = {}) {
     setReviewSaving(true);
@@ -2478,12 +2465,7 @@ function SocialPostPreviewCard({ result, source, rank = null, showContext = fals
             {result.relationshipType !== 'owned' && <span className="social-content-badge">{result.relationshipLabel}</span>}
             {action && <span className={`social-action-badge ${action.actionType}`}>{action.actionLabel}</span>}
             {result.isSharedPost && <span className="social-content-badge">Shared</span>}
-            {reviewEnabled && <span className={`social-review-badge ${result.visibilityStatus}`}>{statusLabel}</span>}
-            {reviewEnabled && onToggleSelected && (
-              <label className="social-review-select" title="Select for a bulk review action">
-                <input type="checkbox" checked={selected} onChange={() => onToggleSelected(result.id)} aria-label={`Select ${result.headline} for bulk review`} />
-              </label>
-            )}
+            {result.visibilityStatus === 'excluded' && <span className="social-review-badge excluded">Hidden as irrelevant</span>}
           </div>
         </header>
 
@@ -2616,31 +2598,12 @@ function SocialPostPreviewCard({ result, source, rank = null, showContext = fals
           </div>
         )}
 
-        {reviewEnabled && (
-          <section className="social-review-controls" aria-label="Reviewer controls">
-            <header><strong>Review decision</strong><span>Review-only records are not yet client-visible or included in reports. Saved changes are added to the immutable audit history.</span></header>
-            <div className="social-review-fields">
-              <label>
-                <span>Classification</span>
-                <select value={classification} onChange={(event) => setClassification(event.target.value)} disabled={reviewSaving}>
-                  <option value="owned">Official district post</option>
-                  <option value="direct_tag">Tagged district</option>
-                  <option value="direct_mention">Mentioned district</option>
-                  <option value="ambient">Public mention</option>
-                </select>
-              </label>
-              <button type="button" className="btn btn-secondary btn-sm" disabled={reviewSaving || classification === result.rawRelationshipType} onClick={() => applyReviewAction('classification', { classification })}>Save classification</button>
-            </div>
-            <label className="social-review-note">
-              <span>Reviewer note</span>
-              <textarea value={reviewerNote} maxLength={2000} rows={2} onChange={(event) => setReviewerNote(event.target.value)} placeholder="Add context for the next reviewer…" disabled={reviewSaving} />
-            </label>
-            <div className="social-review-actions">
-              <button type="button" className="btn btn-secondary btn-sm" disabled={reviewSaving || reviewerNote.trim() === (result.reviewerNote || '')} onClick={() => applyReviewAction('note', { reviewerNote })}>Save note</button>
-              {approvalPending && <button type="button" className="btn btn-primary btn-sm" disabled={reviewSaving || !hasVerifiedOfficialSource} title={approvalDisabledReason || 'Make this verified official post client-visible and eligible for reports.'} onClick={() => applyReviewAction('approve')}>Approve for client and reports</button>}
-              {result.visibilityStatus !== 'excluded' && <button type="button" className="btn btn-secondary btn-sm social-exclude-button" disabled={reviewSaving} onClick={() => applyReviewAction('exclude')}>Exclude</button>}
-              {result.visibilityStatus === 'excluded' && <button type="button" className="btn btn-secondary btn-sm" disabled={reviewSaving} onClick={() => applyReviewAction('restore')}>Restore to review</button>}
-            </div>
+        {correctionEnabled && (
+          <section className="social-correction-controls" aria-label="Social correction controls">
+            <div><strong>Wrong result?</strong><span>Hide irrelevant posts without delaying visibility for everything else.</span></div>
+            {result.visibilityStatus !== 'excluded'
+              ? <button type="button" className="btn btn-secondary btn-sm social-exclude-button" disabled={reviewSaving} onClick={() => applyReviewAction('exclude')}>Hide as irrelevant</button>
+              : <button type="button" className="btn btn-secondary btn-sm" disabled={reviewSaving} onClick={() => applyReviewAction('restore')}>Restore to Social</button>}
             {reviewMessage && <p className="social-review-error" role="alert">{reviewMessage}</p>}
           </section>
         )}
@@ -2807,7 +2770,7 @@ function SocialReportView({ districtName, reportWindow, filterContext, posts, an
         </>
       ) : (
         <aside className="social-report-empty">
-          <strong>No approved official posts were published in this reporting window.</strong>
+          <strong>No report-eligible official posts were published in this reporting window.</strong>
           <span>Choose Last 30 Days or expand the custom date range to generate a performance report. Canary does not treat missing posts or unavailable platform metrics as zero performance.</span>
         </aside>
       )}
@@ -2834,7 +2797,7 @@ function BoardReportView({ districtName, mediaArticles, socialResults, isEarned 
   return (
     <section className="board-report" aria-label={`${districtName} Board Report`}>
       <header className="board-report-header">
-        <div><span>Canary Data</span><h1>{districtName} Board Report</h1><p>Media Intelligence, Strategic Alignment, and approved Social evidence · {new Date().toLocaleDateString()}</p></div>
+        <div><span>Canary Data</span><h1>{districtName} Board Report</h1><p>Media Intelligence, Strategic Alignment, and visible Social evidence · {new Date().toLocaleDateString()}</p></div>
       </header>
       <div className="board-report-kpis">
         <article><span>News mentions</span><strong>{newsArticles.length}</strong></article>
@@ -2847,8 +2810,8 @@ function BoardReportView({ districtName, mediaArticles, socialResults, isEarned 
         {alignment.length ? <div className="board-report-alignment">{alignment.slice(0, 9).map((item) => <article key={item.label}><span>{item.label}</span><strong>{item.count}</strong></article>)}</div> : <p>No strategically aligned coverage is available for this report period.</p>}
       </section>
       <section className="board-report-section">
-        <h2>Top approved, client-visible district social posts</h2>
-        {topSocial.length ? <div className="board-report-social">{topSocial.map((result, index) => <SocialReportCard key={result.id} result={result} rank={index + 1} />)}</div> : <p>No approved, client-visible owned social posts are available yet. Review-only records are intentionally excluded.</p>}
+        <h2>Top client-visible district social posts</h2>
+        {topSocial.length ? <div className="board-report-social">{topSocial.map((result, index) => <SocialReportCard key={result.id} result={result} rank={index + 1} />)}</div> : <p>No client-visible owned social posts are available yet.</p>}
       </section>
       <section className="board-report-section board-report-evidence">
         <h2>Evidence appendix</h2>
@@ -2921,11 +2884,12 @@ function MonthlySocialPerformance({
         </div>
       </header>
 
-      <section className="social-monthly-analyst-note social-monthly-analyst-note-top">
-        <div><span className="social-eyebrow">Analyst insight</span><h3>Social Media Brief</h3><p>Write the leadership context first. This human-reviewed note appears near the top of the monthly PDF.</p></div>
+      <details className="social-monthly-analyst-note social-monthly-analyst-note-top">
+        <summary><span><strong>Add report insight</strong><small>Optional leadership context for the monthly PDF</small></span><em>{analystNote ? 'Draft saved' : 'Optional'}</em></summary>
+        <div><span className="social-eyebrow">Analyst insight</span><h3>Social Media Brief</h3><p>This human-written note appears near the top of the monthly PDF.</p></div>
         <textarea value={analystNote} onChange={(event) => setAnalystNote(event.target.value)} maxLength={2000} placeholder="Example: This month we focused on back-to-school preparation and family readiness. The highlighted posts show how those priorities performed and what we plan to carry forward." />
         <small>{analystNote.length}/2,000 characters · Draft is local to this browser until report archiving is added.</small>
-      </section>
+      </details>
 
       <div className="social-monthly-controls">
         <label><span>Reporting period</span><select value={period} onChange={(event) => setPeriod(event.target.value)}>
@@ -2947,8 +2911,6 @@ function MonthlySocialPerformance({
         <article><span>Reported interactions</span><strong>{summary.totalInteractions === null ? 'Not available' : formatSocialMetric(summary.totalInteractions)}</strong><small>{formatSocialComparison(comparisons.interactions)} vs. prior period · available for {summary.interactionsAvailable}/{summary.officialPosts}</small></article>
         <article><span>Average interactions</span><strong>{summary.averageInteractions === null ? 'Not available' : formatSocialMetric(summary.averageInteractions)}</strong><small>Based only on posts with available interaction metrics</small></article>
         <article><span>Reported views</span><strong>{summary.reportedViews === null ? 'Not available' : formatSocialMetric(summary.reportedViews)}</strong><small>{formatSocialComparison(comparisons.views)} vs. prior period · available for {summary.viewsCoverage.available}/{summary.viewsCoverage.total}</small></article>
-        <article className="pending-meta"><span>Impressions / reach</span><strong>Not available</strong><small>Requires an authorized Meta account connection</small></article>
-        <article className="pending-meta"><span>Net follower growth</span><strong>Not available</strong><small>Requires daily official-account snapshots</small></article>
       </div>
 
       <div className="social-monthly-analysis-grid">
@@ -2998,8 +2960,8 @@ function MonthlySocialPerformance({
 }
 
 function SocialView({ socialResults, socialSources, socialReviewEvents = [], districtFilter, districts, campaignSearch, setCampaignSearch, isAdmin = false }) {
+  const [socialPageTab, setSocialPageTab] = useState('overview');
   const [relationshipFilter, setRelationshipFilter] = useState('all');
-  const [actionFilter, setActionFilter] = useState('all');
   const socialSearch = campaignSearch;
   const setSocialSearch = setCampaignSearch;
   const [socialResultLimit, setSocialResultLimit] = useState(12);
@@ -3012,10 +2974,8 @@ function SocialView({ socialResults, socialSources, socialReviewEvents = [], dis
   const [socialDateEnd, setSocialDateEnd] = useState('');
   const [socialSort, setSocialSort] = useState('newest');
   const [reviewStatusFilter, setReviewStatusFilter] = useState('all');
-  const [compactListMode, setCompactListMode] = useState(false);
-  const [selectedSocialIds, setSelectedSocialIds] = useState(new Set());
-  const [bulkReviewSaving, setBulkReviewSaving] = useState(false);
-  const [bulkReviewMessage, setBulkReviewMessage] = useState('');
+  const [compactListMode, setCompactListMode] = useState(true);
+  const [socialMessage, setSocialMessage] = useState('');
   const [sourcesOpen, setSourcesOpen] = useState(false);
   const [socialReportMode, setSocialReportMode] = useState(false);
   const [socialAnalystDrafts, setSocialAnalystDrafts] = useState({});
@@ -3055,26 +3015,7 @@ function SocialView({ socialResults, socialSources, socialReviewEvents = [], dis
     }
     return next;
   });
-  const topPlatformGroups = useMemo(() => {
-    const preferredOrder = ['facebook', 'instagram'];
-    const recentOwnedResults = results.filter((result) => {
-      const timestamp = new Date(result.date).getTime();
-      return result.relationshipType === 'owned'
-        && result.visibilityStatus !== 'excluded'
-        && timestamp >= topPostsWindow.start.getTime()
-        && timestamp <= topPostsWindow.end.getTime();
-    });
-    const platforms = [...new Set(recentOwnedResults.map((result) => result.platform))]
-      .sort((a, b) => {
-        const aIndex = preferredOrder.indexOf(a);
-        const bIndex = preferredOrder.indexOf(b);
-        if (aIndex >= 0 || bIndex >= 0) return (aIndex < 0 ? preferredOrder.length : aIndex) - (bIndex < 0 ? preferredOrder.length : bIndex);
-        return a.localeCompare(b);
-      });
-    return platforms
-      .map((platform) => ({ platform, posts: rankTopSocialResults(recentOwnedResults.filter((result) => result.platform === platform), 3) }))
-      .filter((group) => group.posts.length > 0);
-  }, [results, topPostsWindow]);
+
   const scopedSources = useMemo(
     () => socialSources.filter((source) => districtFilter === 'All' || source.district_id === districtFilter),
     [socialSources, districtFilter],
@@ -3104,21 +3045,19 @@ function SocialView({ socialResults, socialSources, socialReviewEvents = [], dis
       const minimumMatches = minRate === null || (rate !== null && Number.isFinite(minRate) && rate >= minRate);
       const maximumMatches = maxRate === null || (rate !== null && Number.isFinite(maxRate) && rate <= maxRate);
       const dateMatches = socialDateFilterMatches(result, socialDateStart, socialDateEnd);
-      const reviewStatusMatches = !isAdmin || reviewStatusFilter === 'all' || result.visibilityStatus === reviewStatusFilter;
+      const reviewStatusMatches = !isAdmin || reviewStatusFilter === 'all'
+        || (reviewStatusFilter === 'visible' ? result.visibilityStatus !== 'excluded' : result.visibilityStatus === 'excluded');
       const searchMatches = !query || [result.headline, result.summary, result.authorName, result.platform, result.matchReason, result.actionIntelligence?.actionLabel, result.actionIntelligence?.recommendedAction, result.actionIntelligence?.strategicAlignmentReason, ...(result.actionIntelligence?.strategicPriorityLabels || [])]
         .some((value) => String(value || '').toLowerCase().includes(query));
       return relationshipMatches && platformMatches && mediaMatches && performanceMatches && minimumMatches && maximumMatches && dateMatches && reviewStatusMatches && searchMatches;
     });
   }, [results, relationshipFilter, platformFilter, mediaFilter, performanceFilter, minimumEngagementRate, maximumEngagementRate, socialDateStart, socialDateEnd, reviewStatusFilter, socialSearch, sourceByDistrictPlatform, isAdmin]);
-  const actionSummary = useMemo(() => summarizeSocialActions(facetedResults), [facetedResults]);
-  const selectedActionLabel = { respond: 'Respond', amplify: 'Amplify', strategy: 'Strategy', monitor: 'Monitor', elevate: 'Elevate' }[actionFilter] || null;
   const visibleResults = useMemo(() => {
     const rateFor = (result) => {
       const source = sourceByDistrictPlatform.get(`${result.districtId}:${result.platform}`);
       return result.hasPerformanceData ? calculateSocialEngagementRate(result, resolveSocialFollowerCount(result, source)) : null;
     };
-    const filtered = facetedResults.filter((result) => socialActionFilterMatches(result, actionFilter));
-    return filtered.sort((a, b) => {
+    return facetedResults.sort((a, b) => {
       if (socialSort === 'engagement') return b.engagementTotal - a.engagementTotal;
       if (socialSort === 'engagement-rate') return (rateFor(b) ?? -1) - (rateFor(a) ?? -1);
       if (socialSort === 'reactions') return b.reactionCount - a.reactionCount;
@@ -3128,7 +3067,7 @@ function SocialView({ socialResults, socialSources, socialReviewEvents = [], dis
       if (socialSort === 'oldest') return new Date(a.date).getTime() - new Date(b.date).getTime();
       return new Date(b.date).getTime() - new Date(a.date).getTime();
     });
-  }, [facetedResults, actionFilter, socialSort, sourceByDistrictPlatform]);
+  }, [facetedResults, socialSort, sourceByDistrictPlatform]);
   const verifiedOfficialSourceKeys = useMemo(() => new Set(
     scopedSources
       .filter((source) => source.active === true && (source.handle || source.profile_url))
@@ -3165,7 +3104,6 @@ function SocialView({ socialResults, socialSources, socialReviewEvents = [], dis
   };
   const resetSocialFilters = () => {
     setRelationshipFilter('all');
-    setActionFilter('all');
     setPlatformFilter('all');
     setMediaFilter('all');
     setPerformanceFilter('all');
@@ -3178,12 +3116,8 @@ function SocialView({ socialResults, socialSources, socialReviewEvents = [], dis
     setReviewStatusFilter('all');
     setSocialResultLimit(12);
   };
-  const hasActiveSocialFilters = relationshipFilter !== 'all' || actionFilter !== 'all' || platformFilter !== 'all' || mediaFilter !== 'all'
+  const hasActiveSocialFilters = relationshipFilter !== 'all' || platformFilter !== 'all' || mediaFilter !== 'all'
     || performanceFilter !== 'all' || minimumEngagementRate !== '' || maximumEngagementRate !== '' || socialDateStart !== '' || socialDateEnd !== '' || reviewStatusFilter !== 'all' || socialSearch !== '' || socialSort !== 'newest';
-  const reviewableVisibleResults = visibleResults.filter((result) => Boolean(result.provider && result.externalThreadId));
-  const selectedResults = reviewableVisibleResults.filter((result) => selectedSocialIds.has(result.id));
-  const safeOfficialResults = reviewableVisibleResults.filter((result) => result.rawRelationshipType === 'owned' && ['review', 'approved'].includes(result.visibilityStatus) && hasVerifiedOfficialSource(result));
-  const canBulkApprove = selectedResults.length > 0 && selectedResults.every((result) => result.rawRelationshipType === 'owned' && ['review', 'approved'].includes(result.visibilityStatus) && hasVerifiedOfficialSource(result));
   const scopedReviewEvents = socialReviewEvents.filter((event) => districtFilter === 'All' || event.district_id === districtFilter);
 
   function exportSocialCsv() {
@@ -3199,7 +3133,7 @@ function SocialView({ socialResults, socialSources, socialReviewEvents = [], dis
 
   function exportSocialPdf() {
     if (districtFilter === 'All') {
-      setBulkReviewMessage('Choose one district before exporting a Social Report.');
+      setSocialMessage('Choose one district before exporting a Social Report.');
       return;
     }
     setSocialReportMode(true);
@@ -3216,30 +3150,6 @@ function SocialView({ socialResults, socialSources, socialReviewEvents = [], dis
     window.setTimeout(restore, 15000);
   }
 
-  const toggleSocialSelection = (id) => {
-    setSelectedSocialIds((current) => {
-      const next = new Set(current);
-      if (next.has(id)) next.delete(id);
-      else next.add(id);
-      return next;
-    });
-  };
-
-  async function handleBulkSocialReview(action) {
-    if (districtFilter === 'All') {
-      setBulkReviewMessage('Choose one district before running a bulk review action.');
-      return;
-    }
-    setBulkReviewSaving(true);
-    setBulkReviewMessage('');
-    try {
-      await bulkReviewSocialThreads({ districtId: districtFilter, socialThreadIds: [...selectedSocialIds], action });
-      window.location.reload();
-    } catch (error) {
-      setBulkReviewMessage(error?.message || 'Unable to complete the bulk review action.');
-      setBulkReviewSaving(false);
-    }
-  }
 
   return (
     <div className={`social-monitor-view${socialReportMode ? ' social-report-mode' : ''}`}>
@@ -3252,6 +3162,15 @@ function SocialView({ socialResults, socialSources, socialReviewEvents = [], dis
           analystNote={socialAnalystNote}
         />
       )}
+      <nav className="social-page-tabs" aria-label="Social page sections">
+        <button type="button" className={socialPageTab === 'overview' ? 'active' : ''} aria-pressed={socialPageTab === 'overview'} onClick={() => setSocialPageTab('overview')}>
+          <strong>Overview</strong><span>Performance, top content, and reports</span>
+        </button>
+        <button type="button" className={socialPageTab === 'feed' ? 'active' : ''} aria-pressed={socialPageTab === 'feed'} onClick={() => setSocialPageTab('feed')}>
+          <strong>Posts & mentions</strong><span>Everything Canary found</span>
+        </button>
+      </nav>
+      {socialPageTab === 'overview' && <>
       <MonthlySocialPerformance
         districtName={reportDistrictName}
         period={topPostsPeriod}
@@ -3288,18 +3207,13 @@ function SocialView({ socialResults, socialSources, socialReviewEvents = [], dis
           </div>
         </details>
       )}
-      {/* Admins review all collected mentions here; district clients see only approved active mentions. */}
-      {(isAdmin || summary.ambient > 0) && <>
+      </>}
+      {socialPageTab === 'feed' && <>
       <section className="social-monitor-hero">
         <div>
           <span className="social-eyebrow">Posts and public monitoring</span>
-          <h2>Explore the complete Social evidence</h2>
-          <p>Use the workspace below for post-level review, public mentions, and administrative corrections. Monthly Performance above is the customer-facing reporting view.</p>
-          <nav className="social-workflow-links" aria-label="Social review shortcuts">
-            <a href="#social-results">Review recent results</a>
-            <a href="#social-top-posts">See top posts</a>
-            <a href="#social-sources" onClick={() => setSourcesOpen(true)}>Check monitored sources</a>
-          </nav>
+          <h2>Posts and public mentions</h2>
+          <p>Canary shows accepted public Social results immediately. Use the simple filters below to separate official district posts, direct tags, and public conversation.</p>
         </div>
         <div className="social-coverage-note">
           <strong>Coverage boundary</strong>
@@ -3309,7 +3223,7 @@ function SocialView({ socialResults, socialSources, socialReviewEvents = [], dis
 
       <section className="social-review-scope" aria-label="Social review scope">
         <div className="social-navigation-heading">
-          <div><strong>Choose what to review</strong><span>Relationship and channel filters work together.</span></div>
+          <div><strong>Choose what to see</strong><span>Content type and platform filters work together.</span></div>
           <em>{summary.total} collected results</em>
         </div>
         <div className="social-summary-grid" aria-label="Social result summary">
@@ -3339,96 +3253,22 @@ function SocialView({ socialResults, socialSources, socialReviewEvents = [], dis
         </div>
       </section>
 
-      {actionSummary.total > 0 && <section className="social-action-queue" aria-label="Action Queue">
-        <div className="social-navigation-heading">
-          <div><strong>Action Queue</strong><span>District-grounded recommendations stay review-only until a communicator approves the next step.</span></div>
-          <em>{actionSummary.total} enriched result{actionSummary.total === 1 ? '' : 's'}</em>
-        </div>
-        <div className="social-action-tabs">
-          {[
-            ['respond', 'Respond'],
-            ['amplify', 'Amplify'],
-            ['strategy', 'Strategy'],
-            ['monitor', 'Monitor'],
-            ['elevate', 'Elevate'],
-          ].map(([value, label]) => (
-            <button type="button" key={value} aria-pressed={actionFilter === value} className={`${value} ${actionFilter === value ? 'active' : ''}`} onClick={() => changeSocialFilter(setActionFilter, actionFilter === value ? 'all' : value)}>
-              <span>{label}</span><strong>{actionSummary[value]}</strong>
-            </button>
-          ))}
-        </div>
-      </section>}
-
-      <section className="social-top-section" id="social-top-posts">
-        <div className="social-section-heading">
-          <div>
-            <h3>Top district posts by platform</h3>
-            <p>Up to three owned posts per platform for {topPostsWindow.label.toLowerCase()}, ranked by public engagement. This reference stays fixed while you filter the review feed below. Engagement rate uses public interactions divided by public followers.</p>
-          </div>
-          <div className="social-top-period-controls">
-            <label>
-              <span>Top posts period</span>
-              <select value={topPostsPeriod} onChange={(event) => setTopPostsPeriod(event.target.value)}>
-                <option value="last-30-days">Last 30 days</option>
-                <option value="this-month">This month</option>
-                <option value="previous-month">Previous month</option>
-                <option value="school-year">Current school year</option>
-                <option value="calendar-year">Current calendar year</option>
-                <option value="custom">Custom range</option>
-              </select>
-            </label>
-            <span>{topPlatformGroups.reduce((total, group) => total + group.posts.length, 0)} ranked posts</span>
-          </div>
-        </div>
-        {topPostsPeriod === 'custom' && (
-          <div className="social-top-custom-range" aria-label="Custom top posts date range">
-            <label><span>From</span><input type="date" value={topPostsCustomStart} max={topPostsCustomEnd || topPostsWindow.endInput} onChange={(event) => setTopPostsCustomStart(event.target.value)} /></label>
-            <label><span>To</span><input type="date" value={topPostsCustomEnd} min={topPostsCustomStart || undefined} max={dateInputValue(new Date(topPostsAsOf))} onChange={(event) => setTopPostsCustomEnd(event.target.value)} /></label>
-          </div>
-        )}
-        {topPlatformGroups.length === 0 ? (
-          <div className="social-empty-inline">No reviewed owned posts are available for {topPostsWindow.label.toLowerCase()} yet.</div>
-        ) : (
-          <div className="social-top-groups">
-            {topPlatformGroups.map((group) => (
-              <div className="social-top-group" key={group.platform}>
-                <h4><span className={`social-platform-dot ${group.platform}`} aria-hidden="true" />{formatSourceLabel(group.platform)}</h4>
-                <div className="social-top-grid">
-                  {group.posts.map((result, index) => (
-                    <SocialPostPreviewCard
-                      key={`top-${result.platform}-${result.id}`}
-                      result={result}
-                      source={sourceForResult(result)}
-                      rank={index + 1}
-                      compact
-                    />
-                  ))}
-                </div>
-              </div>
-            ))}
-          </div>
-        )}
-      </section>
-
       <section className="social-results-section" id="social-results">
         <div className="social-section-heading">
           <div>
-            <h3>{selectedActionLabel ? `${selectedActionLabel} Action Queue` : 'All social posts and conversations'}</h3>
-            <p>{selectedActionLabel ? `Showing review-only ${selectedActionLabel.toLowerCase()} recommendations that also match the selected channel and relationship.` : 'Every result uses the same post scorecard. Metrics show N/A when the original monitoring record did not collect that field.'}</p>
+            <h3>All social posts and conversations</h3>
+            <p>Official posts and public mentions remain clearly labeled. Metrics show N/A when the source did not provide that field.</p>
           </div>
           <div className="social-results-heading-controls">
             <span>{visibleResults.length} result{visibleResults.length === 1 ? '' : 's'}</span>
-            <button type="button" className="social-view-mode" onClick={exportSocialCsv}>Export CSV</button>
-            <button type="button" className="social-view-mode export-pdf-btn" onClick={exportSocialPdf}>Export PDF</button>
             <button type="button" className="social-view-mode" aria-pressed={compactListMode} onClick={() => setCompactListMode((current) => !current)}>{compactListMode ? 'Scorecard mode' : 'Compact list'}</button>
             <input className="filter-input" value={socialSearch} onChange={(event) => changeSocialFilter(setSocialSearch, event.target.value)} placeholder="Search social results…" />
           </div>
         </div>
 
         <div className="social-filter-panel" aria-label="Social result filters">
-          <label><span>Platform</span><select value={platformFilter} onChange={(event) => changeSocialFilter(setPlatformFilter, event.target.value)}><option value="all">All platforms</option>{platformOptions.map((platform) => <option key={platform} value={platform}>{formatSourceLabel(platform)}</option>)}</select></label>
           <label><span>Content</span><select value={mediaFilter} onChange={(event) => changeSocialFilter(setMediaFilter, event.target.value)}><option value="all">All content</option><option value="image">Images</option><option value="video">Videos</option><option value="text">Text-only / no media</option></select></label>
-          {isAdmin && <label><span>Review state</span><select value={reviewStatusFilter} onChange={(event) => changeSocialFilter(setReviewStatusFilter, event.target.value)}><option value="all">All review states</option><option value="review">Needs approval · not client-visible/reported</option><option value="approved">Needs approval · legacy record</option><option value="active">Client visible · report eligible</option><option value="excluded">Excluded</option></select></label>}
+          {isAdmin && <label><span>Visibility</span><select value={reviewStatusFilter} onChange={(event) => changeSocialFilter(setReviewStatusFilter, event.target.value)}><option value="all">Visible and hidden</option><option value="visible">Visible</option><option value="hidden">Hidden as irrelevant</option></select></label>}
           <label><span>From date</span><input type="date" value={socialDateStart} max={socialDateEnd || undefined} onChange={(event) => changeSocialFilter(setSocialDateStart, event.target.value)} /></label>
           <label><span>To date</span><input type="date" value={socialDateEnd} min={socialDateStart || undefined} onChange={(event) => changeSocialFilter(setSocialDateEnd, event.target.value)} /></label>
           <label><span>Sort by</span><select value={socialSort} onChange={(event) => changeSocialFilter(setSocialSort, event.target.value)}><option value="newest">Newest first</option><option value="oldest">Oldest first</option><option value="engagement">Highest engagement</option><option value="engagement-rate">Highest engagement rate</option><option value="reactions">Most reactions</option><option value="comments">Most comments</option><option value="shares">Most shares</option><option value="views">Most views</option></select></label>
@@ -3443,24 +3283,8 @@ function SocialView({ socialResults, socialSources, socialReviewEvents = [], dis
           </div>
         </details>
 
-        {isAdmin && (
-          <section className="social-bulk-review" aria-label="Bulk social review actions">
-            <div>
-              <strong>{selectedResults.length} selected</strong>
-              <span>Approval is restricted to verified official district posts and makes them client-visible and report eligible in one step.</span>
-            </div>
-            <div className="social-bulk-review-actions">
-              <button type="button" className="btn btn-secondary btn-sm" disabled={bulkReviewSaving || districtFilter === 'All' || safeOfficialResults.length === 0} title={districtFilter === 'All' ? 'Choose one district before selecting approval candidates.' : safeOfficialResults.length === 0 ? 'No verified official posts awaiting client approval match the current filters.' : 'Select verified official posts awaiting client approval.'} onClick={() => setSelectedSocialIds(new Set(safeOfficialResults.slice(0, 250).map((result) => result.id)))}>Select eligible official posts ({Math.min(safeOfficialResults.length, 250)})</button>
-              <button type="button" className="btn btn-secondary btn-sm" disabled={bulkReviewSaving || selectedResults.length === 0} title={selectedResults.length === 0 ? 'Select at least one social result to clear the selection.' : 'Clear the selected social results.'} onClick={() => setSelectedSocialIds(new Set())}>Clear</button>
-              <button type="button" className="btn btn-primary btn-sm" disabled={bulkReviewSaving || districtFilter === 'All' || !canBulkApprove} title={districtFilter === 'All' ? 'Choose one district before approving posts.' : !canBulkApprove ? 'Select only verified official posts awaiting client approval.' : 'Make the selected official posts client-visible and eligible for reports.'} onClick={() => handleBulkSocialReview('approve_official')}>Approve for client and reports</button>
-            </div>
-            {districtFilter === 'All' && <p>Choose one district in the sidebar to use bulk review.</p>}
-            {bulkReviewMessage && <p role="alert">{bulkReviewMessage}</p>}
-          </section>
-        )}
-
         {visibleResults.length === 0 ? (
-          <div className="empty-state"><div className="empty-state-icon">💬</div><h3>No reviewed social results found</h3><p>Try another filter, or check back after collected posts complete review.</p></div>
+          <div className="empty-state"><div className="empty-state-icon">💬</div><h3>No social results found</h3><p>Try another filter, or check back after the next collection.</p></div>
         ) : (
           <>
             <div className={`social-scorecard-grid${compactListMode ? ' compact-list' : ''}`}>
@@ -3472,9 +3296,7 @@ function SocialView({ socialResults, socialSources, socialReviewEvents = [], dis
                   showContext
                   compact={compactListMode}
                   listCompact={compactListMode}
-                  reviewEnabled={isAdmin && Boolean(result.provider && result.externalThreadId)}
-                  selected={selectedSocialIds.has(result.id)}
-                  onToggleSelected={isAdmin && result.provider && result.externalThreadId ? toggleSocialSelection : null}
+                  correctionEnabled={isAdmin && Boolean(result.provider && result.externalThreadId)}
                 />
               ))}
             </div>
@@ -3492,9 +3314,9 @@ function SocialView({ socialResults, socialSources, socialReviewEvents = [], dis
 
       {isAdmin && (
         <details className="social-audit-history">
-          <summary><span><strong>Review audit history</strong><small>Immutable approvals, exclusions, classifications, notes, restorations, and historical status changes.</small></span><em>{scopedReviewEvents.length} event{scopedReviewEvents.length === 1 ? '' : 's'}</em></summary>
+          <summary><span><strong>Correction history</strong><small>Immutable exclusions, restorations, and historical Social corrections.</small></span><em>{scopedReviewEvents.length} event{scopedReviewEvents.length === 1 ? '' : 's'}</em></summary>
           <div className="social-audit-list">
-            {scopedReviewEvents.length === 0 ? <p>No social review events yet.</p> : scopedReviewEvents.slice(0, 100).map((event) => (
+            {scopedReviewEvents.length === 0 ? <p>No social correction events yet.</p> : scopedReviewEvents.slice(0, 100).map((event) => (
               <article key={event.id}>
                 <div><strong>{String(event.action || '').replaceAll('_', ' ')}</strong><time>{new Date(event.created_at).toLocaleString()}</time></div>
                 <p>{event.after_state?.headline || event.before_state?.headline || event.social_thread_id}</p>
@@ -3504,6 +3326,7 @@ function SocialView({ socialResults, socialSources, socialReviewEvents = [], dis
           </div>
         </details>
       )}
+      {socialMessage && <p className="social-review-error" role="alert">{socialMessage}</p>}
       </>}
 
       <details className="social-account-section social-account-details" id="social-sources" open={sourcesOpen} onToggle={(event) => setSourcesOpen(event.currentTarget.open)}>
@@ -3933,6 +3756,29 @@ export default function DashboardClient({ articles, districts, queries: initialQ
   // Keep KPI/charts aligned with the visible media table. Every media view starts
   // from the same district and campaign slice of the central reporting dataset.
   const chartArticles = filtered;
+  const crossChannelSnapshot = useMemo(() => {
+    const mediaItems = chartArticles.map((article) => ({
+      id: `news:${article.id}`,
+      type: 'news',
+      date: article.date,
+      title: article.headline || 'Untitled media mention',
+      source: formatSourceLabel(article.source_type || 'news'),
+      url: safeExternalHttpUrl(article.link),
+    }));
+    const socialItems = campaignSocialResults
+      .filter((result) => result.visibilityStatus === 'active')
+      .map((result) => ({
+        id: `social:${result.id}`,
+        type: result.relationshipType === 'owned' ? 'official-social' : 'public-social',
+        date: result.date,
+        title: result.headline || result.summary || 'Untitled social post',
+        source: formatSourceLabel(result.platform || 'social'),
+        url: safeSocialUrl(result.url),
+      }));
+    return [...mediaItems, ...socialItems]
+      .sort((a, b) => String(b.date || '').localeCompare(String(a.date || '')) || a.id.localeCompare(b.id))
+      .slice(0, 8);
+  }, [chartArticles, campaignSocialResults]);
   const articleCount = chartArticles.length;
   const notesCount = chartArticles.filter((article) => getNoteText(article)).length;
   const earnedMediaCount = chartArticles.filter((article) => isEarned(article)).length;
@@ -4255,7 +4101,7 @@ export default function DashboardClient({ articles, districts, queries: initialQ
                 type="button"
                 onClick={handleBoardReportPdf}
                 disabled={districtFilter === 'All'}
-                title={districtFilter === 'All' ? 'Choose one district to create a Board Report.' : 'Combines Media Intelligence, Strategic Alignment, approved Social, and an evidence appendix.'}
+                title={districtFilter === 'All' ? 'Choose one district to create a Board Report.' : 'Combines Media Intelligence, Strategic Alignment, visible Social, and an evidence appendix.'}
               >
                 ⬇ Board Report PDF
               </button>
@@ -4425,6 +4271,24 @@ export default function DashboardClient({ articles, districts, queries: initialQ
             </div>
           </section>
 
+          <section className="cross-channel-snapshot" aria-label="Latest news and social">
+            <header>
+              <div><span>Daily view</span><h2>Latest news and Social together</h2><p>See topic overlap without switching pages. Social labels distinguish official district posts from public conversation.</p></div>
+              <div><strong>{chartArticles.length}</strong><span>news</span><strong>{campaignSocialResults.filter((result) => result.visibilityStatus === 'active').length}</strong><span>social</span></div>
+            </header>
+            {crossChannelSnapshot.length > 0 ? (
+              <div className="cross-channel-snapshot-list">
+                {crossChannelSnapshot.map((item) => (
+                  <article key={item.id}>
+                    <div><span className={`cross-channel-chip ${item.type}`}>{item.type === 'news' ? 'News' : item.type === 'official-social' ? 'Official social' : 'Public mention'}</span><time>{formatDate(item.date)}</time></div>
+                    <h3>{item.title}</h3>
+                    <footer><span>{item.source}</span>{item.url && <a href={item.url} target="_blank" rel="noopener noreferrer">Open source ↗</a>}</footer>
+                  </article>
+                ))}
+              </div>
+            ) : <p className="communications-brief-empty">No matching news or Social results are available for this district and topic.</p>}
+          </section>
+
           {/* KPI Cards */}
           <div className="kpi-grid">
             <div className="kpi-card">
@@ -4501,10 +4365,10 @@ export default function DashboardClient({ articles, districts, queries: initialQ
               <div>
                 <span>Communications brief</span>
                 <h2>Here is what matters and what to do</h2>
-                <p>Media values follow the active filters. Social action cues include all enriched results for the selected district. Recommendations are review-only and require source verification.</p>
+                <p>Media values follow the active filters. Social cues include visible results for the selected district. Recommendations remain advisory and require source verification.</p>
               </div>
               <button type="button" className="btn btn-secondary btn-sm" onClick={() => setCurrentView('social')}>
-                Open Social Action Queue{socialActionSummary.total ? ` (${socialActionSummary.total})` : ''}
+                View Social posts
               </button>
             </header>
 

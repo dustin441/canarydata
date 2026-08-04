@@ -13,7 +13,7 @@ import {
   summarizeSocialActions,
   summarizeSocialResults,
 } from '../src/lib/social.mjs';
-import { normalizeProviderBatch } from '../src/lib/socialIngestion.mjs';
+import { filterDurablyVisibleSocialThreads, normalizeProviderBatch, resolveIngestionVisibilityStatus } from '../src/lib/socialIngestion.mjs';
 import { formatDisplayDate } from '../src/lib/date.mjs';
 
 assert.equal(formatDisplayDate('2026-06-09'), 'Jun 9, 2026');
@@ -259,7 +259,7 @@ assert.equal(batch.threads.length, 1);
 assert.equal(batch.rejected.length, 1);
 assert.equal(batch.threads[0].provider, 'meta');
 assert.equal(batch.threads[0].district_id, 'alabaster-city-schools');
-assert.equal(batch.threads[0].visibility_status, 'review', 'non-owned public content must remain review-only by default');
+assert.equal(batch.threads[0].visibility_status, 'active', 'accepted public content must be visible without human approval');
 const ownedBatch = normalizeProviderBatch({
   provider: 'meta',
   districtId: 'alabaster-city-schools',
@@ -272,7 +272,23 @@ const ownedBatch = normalizeProviderBatch({
     body: 'Official district post.',
   }],
 });
-assert.equal(ownedBatch.threads[0].visibility_status, 'review', 'normalization alone cannot verify an official account');
+assert.equal(ownedBatch.threads[0].visibility_status, 'active', 'accepted official content must be visible without human approval');
+assert.equal(resolveIngestionVisibilityStatus(), 'active');
+assert.equal(resolveIngestionVisibilityStatus('review'), 'active');
+assert.equal(resolveIngestionVisibilityStatus('active'), 'active');
+assert.equal(resolveIngestionVisibilityStatus('excluded'), 'excluded', 'ingestion replay must preserve a prior exclusion');
+assert.deepEqual(
+  filterDurablyVisibleSocialThreads(
+    [{ id: 'keep' }, { id: 'hidden' }, { id: 'restored' }],
+    [
+      { social_thread_id: 'hidden', action: 'exclude', created_at: '2026-08-04T10:00:00Z' },
+      { social_thread_id: 'restored', action: 'restore', created_at: '2026-08-04T11:00:00Z' },
+      { social_thread_id: 'restored', action: 'exclude', created_at: '2026-08-04T09:00:00Z' },
+    ],
+  ).map((thread) => thread.id),
+  ['keep', 'restored'],
+  'the latest exclusion event must remain authoritative even if ingestion replays the row',
+);
 assert.deepEqual(batch.threads[0].provider_metadata.metric_availability, {
   reactions: false, comments: false, shares: false, views: false,
 });
@@ -305,7 +321,7 @@ assert.match(dashboardSource, /social-report-card-meta[\s\S]{0,300}social-platfo
 assert.match(dashboardSource, /<h2>Complete Post Evidence<\/h2>[\s\S]{0,300}<SocialReportTable results=\{allPosts\}/, 'the Social PDF must contain the complete eligible post table');
 assert.doesNotMatch(dashboardSource, /kindergarten registration and staff back-to-school preparation/, 'seasonally incompatible briefing guidance must not return');
 assert.match(dashboardSource, /function BoardReportView\(/);
-assert.match(dashboardSource, /result\.visibilityStatus === 'active'/, 'Board Report must exclude review-only canonical Social records');
+assert.match(dashboardSource, /result\.visibilityStatus === 'active'/, 'Board Report must use visible canonical Social records');
 assert.match(dashboardSource, /Board Report PDF/);
 assert.match(dashboardSource, /current === label \? 'All' : label/, 'Strategic Alignment chart clicks must toggle the active filter off');
 assert.match(dashboardSource, /className="active-filter-chip"/);

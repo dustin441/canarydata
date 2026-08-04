@@ -1,5 +1,6 @@
 import { createAdminClient } from '@/lib/supabase/admin';
 import { buildCollectionHealth } from '@/lib/collectionHealth.mjs';
+import { filterDurablyVisibleSocialThreads } from '@/lib/socialIngestion.mjs';
 
 const ARTICLE_COLUMNS = 'id, created_at, date, headline, summary, source, source_type, canary_score, tags, notes, is_earned_media, is_perched, link, district_id, innovation_reason, recommendation, source_query, canonical_url, visibility_status, manual_override, correction_version';
 const ARTICLE_PAGE_SIZE = 1000;
@@ -137,9 +138,28 @@ export async function getSocialThreads(districtId = null, includeReview = false)
 
   if (threads.length === 0) return threads;
 
+  let visibleThreads = threads;
+  if (!includeReview) {
+    const reviewEvents = [];
+    for (let start = 0; start < threads.length; start += 100) {
+      const threadIds = threads.slice(start, start + 100).map((thread) => thread.id);
+      const { data: eventPage, error: eventError } = await supabase
+        .from('social_review_events')
+        .select('social_thread_id, action, created_at')
+        .in('social_thread_id', threadIds)
+        .in('action', ['exclude', 'restore'])
+        .order('created_at', { ascending: false });
+      if (eventError) throw eventError;
+      reviewEvents.push(...(eventPage ?? []));
+    }
+    visibleThreads = filterDurablyVisibleSocialThreads(threads, reviewEvents);
+  }
+
+  if (visibleThreads.length === 0) return visibleThreads;
+
   const comments = [];
-  for (let start = 0; start < threads.length; start += 100) {
-    const threadIds = threads.slice(start, start + 100).map((thread) => thread.id);
+  for (let start = 0; start < visibleThreads.length; start += 100) {
+    const threadIds = visibleThreads.slice(start, start + 100).map((thread) => thread.id);
     const { data: commentPage, error: commentError } = await supabase
       .from('social_comments')
       .select('id, social_thread_id, author_name, body, published_at, reaction_count, is_representative')
@@ -158,7 +178,7 @@ export async function getSocialThreads(districtId = null, includeReview = false)
     commentsByThread.set(comment.social_thread_id, current);
   });
 
-  return threads.map((thread) => ({
+  return visibleThreads.map((thread) => ({
     ...thread,
     social_comments: commentsByThread.get(thread.id) ?? [],
   }));

@@ -1,5 +1,5 @@
 import fs from 'node:fs/promises';
-import { normalizeProviderBatch } from '../src/lib/socialIngestion.mjs';
+import { normalizeProviderBatch, resolveIngestionVisibilityStatus } from '../src/lib/socialIngestion.mjs';
 
 function parseArgs(argv) {
   const args = { commit: false };
@@ -83,7 +83,7 @@ async function run() {
       const existing = await supabaseRequest(
         env,
         'GET',
-        `social_threads?district_id=eq.${encodeURIComponent(thread.district_id)}&platform=eq.${encodeURIComponent(thread.platform)}&external_thread_id=eq.${encodeURIComponent(thread.external_thread_id)}&select=id`,
+        `social_threads?district_id=eq.${encodeURIComponent(thread.district_id)}&platform=eq.${encodeURIComponent(thread.platform)}&external_thread_id=eq.${encodeURIComponent(thread.external_thread_id)}&select=id,visibility_status`,
       );
       if (existing.length > 0) duplicates += 1;
       const [record] = await supabaseRequest(
@@ -93,9 +93,7 @@ async function run() {
         {
           ...thread,
           social_account_id: accountByPlatform.get(thread.platform) || null,
-          visibility_status: thread.relationship_type === 'owned' && accountByPlatform.has(thread.platform)
-            ? 'active'
-            : (thread.visibility_status === 'excluded' ? 'excluded' : 'review'),
+          visibility_status: resolveIngestionVisibilityStatus(existing[0]?.visibility_status),
           last_seen_at: completedAt(),
           provider_metadata: { ...thread.provider_metadata, pilot_ingestion: true },
         },
@@ -105,12 +103,12 @@ async function run() {
     }
 
     const activeThreads = stored.filter((thread) => thread.visibility_status === 'active').length;
-    const reviewThreads = stored.filter((thread) => thread.visibility_status === 'review').length;
+    const excludedThreads = stored.filter((thread) => thread.visibility_status === 'excluded').length;
     const diagnostics = {
       pilot: true,
-      visibility_policy: 'verified owned posts auto-active; non-owned public records remain review-only',
+      visibility_policy: 'accepted Social is visible immediately; prior exclusions remain excluded',
       active_threads: activeThreads,
-      review_threads: reviewThreads,
+      excluded_threads: excludedThreads,
       rejected: batch.rejected,
       stored_thread_ids: stored.map((thread) => thread.id),
     };
@@ -146,7 +144,7 @@ async function run() {
       provider_errors: Math.max(1, batch.providerErrors),
       error_code: error.code || 'STORAGE_ERROR',
       error_message: error.message,
-      diagnostics: { pilot: true, visibility_policy: 'verified owned posts auto-active; non-owned public records remain review-only', rejected: batch.rejected },
+      diagnostics: { pilot: true, visibility_policy: 'accepted Social is visible immediately; prior exclusions remain excluded', rejected: batch.rejected },
     }, 'return=minimal');
     throw error;
   }

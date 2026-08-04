@@ -1,23 +1,15 @@
--- Canary Social: remove routine approval as the default official-post path.
+-- Canary Social: make accepted public Social visible without human approval.
 -- Review this migration in Supabase SQL Editor before applying.
 begin;
 
--- The database default remains review-safe for unclassified/public records.
--- Application ingestion explicitly sets verified owned posts active.
+-- New accepted records are visible by default. Deterministic ingestion performs
+-- relevance, geography, source, and duplicate checks before this lifecycle.
+alter table public.social_threads
+  alter column visibility_status set default 'active';
 
--- Existing verified official posts become report eligible automatically.
-update public.social_threads thread
+-- Existing accepted records become visible. Explicit exclusions remain hidden.
+update public.social_threads
 set visibility_status = 'active'
-where thread.relationship_type = 'owned'
-  and thread.visibility_status in ('review', 'approved')
-  and exists (
-    select 1
-    from public.social_accounts account
-    where account.id = thread.social_account_id
-      and account.district_id = thread.district_id
-      and account.platform = thread.platform
-      and account.active = true
-      and (nullif(btrim(account.handle), '') is not null or nullif(btrim(account.profile_url), '') is not null)
-  );
+where visibility_status in ('review', 'approved');
 
 commit;

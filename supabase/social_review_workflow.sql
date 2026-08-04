@@ -155,7 +155,7 @@ begin
   elsif p_action = 'restore' then
     if before_row.visibility_status <> 'excluded' then raise exception 'Only excluded results can be restored'; end if;
     update public.social_threads
-      set visibility_status = 'review', reviewed_at = now(), reviewed_by = p_actor_user_id,
+      set visibility_status = 'active', reviewed_at = now(), reviewed_by = p_actor_user_id,
           review_version = review_version + 1
       where id = before_row.id returning * into after_row;
   elsif p_action = 'classification' then

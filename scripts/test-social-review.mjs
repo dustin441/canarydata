@@ -184,8 +184,9 @@ assert.deepEqual(
   ['fb-high', 'ig-tie-a', 'ig-tie-b'],
 );
 
-const [sql, actions, dashboard, styles, data, melodi] = await Promise.all([
+const [sql, autoVisibilitySql, actions, dashboard, styles, data, melodi] = await Promise.all([
   readFile(new URL('../supabase/social_review_workflow.sql', import.meta.url), 'utf8'),
+  readFile(new URL('../supabase/social_auto_eligibility.sql', import.meta.url), 'utf8'),
   readFile(new URL('../src/app/actions.js', import.meta.url), 'utf8'),
   readFile(new URL('../src/app/dashboard/DashboardClient.js', import.meta.url), 'utf8'),
   readFile(new URL('../src/app/globals.css', import.meta.url), 'utf8'),
@@ -205,22 +206,24 @@ assert.match(sql, /account\.id = social_threads\.social_account_id/);
 assert.match(sql, /account\.active = true/);
 assert.match(sql, /revoke all on function public\.canary_review_social_thread[\s\S]*from public, anon, authenticated/);
 assert.match(sql, /revoke all on function public\.canary_bulk_review_social_threads[\s\S]*from public, anon, authenticated/);
+assert.match(autoVisibilitySql, /alter column visibility_status set default 'active'/);
+assert.match(autoVisibilitySql, /where visibility_status in \('review', 'approved'\)/);
+assert.doesNotMatch(autoVisibilitySql, /relationship_type = 'owned'/);
+assert.match(sql, /elsif p_action = 'restore'[\s\S]*set visibility_status = 'active'/);
 
 assert.match(actions, /function assertCanaryReviewer/);
 assert.match(actions, /if \(!actor\.isAdmin\)/);
-assert.match(actions, /Selection contains missing or cross-district social results/);
-assert.match(actions, /Bulk approval is limited to verified official district posts awaiting client approval/);
-assert.match(actions, /runReviewAction\('promote', current\.review_version\)/);
-assert.match(actions, /runBulkAction\('promote', promotionIds\)/);
-assert.match(actions, /\.select\('visibility_status, review_version'\)/);
-assert.match(actions, /expectedCurrentVersion/);
+assert.match(actions, /new Set\(\['exclude', 'restore', 'classification', 'note'\]\)/);
+assert.doesNotMatch(actions, /bulkReviewSocialThreads/);
+assert.doesNotMatch(actions, /action === 'approve'/);
+assert.match(actions, /action === 'restore'[\s\S]*visibility_status: 'active'/);
 assert.match(sql, /p_action not in \('approve', 'promote'/);
 assert.match(sql, /p_action not in \('approve_official', 'promote'\)/);
 assert.doesNotMatch(actions, /Only approved results can be promoted/);
-for (const marker of ['Approve for client and reports', 'not yet client-visible or included in reports', 'Select eligible official posts', 'Review audit history', 'Compact list']) {
+for (const marker of ['Posts & mentions', 'Hide as irrelevant', 'Correction history', 'Compact list', 'Latest news and Social together']) {
   assert.ok(dashboard.includes(marker), `Dashboard must include ${marker}`);
 }
-assert.doesNotMatch(dashboard, /Promote to client|Promote approved batch|Approved internally/);
+assert.doesNotMatch(dashboard.replace(/\{\/\*[\s\S]*?\*\/\}/g, ''), /Approve for client and reports|Needs approval|Promote to client|Promote approved batch|Approved internally/);
 
 const socialReportSource = dashboard.slice(dashboard.indexOf('function SocialReportThumbnail'), dashboard.indexOf('function BoardReportView'));
 for (const marker of [
@@ -246,7 +249,7 @@ assert.match(socialReportSource, /topPerformerGroups\.map/);
 assert.match(socialReportSource, /<SocialReportTable results=\{group\.posts\} ranked \/>/);
 assert.doesNotMatch(socialReportSource, /news|evidence appendix|Strategic Alignment/i);
 assert.doesNotMatch(socialReportSource, /Official Post Detail|Complete detail for every eligible post/);
-for (const marker of ['Monthly Social Performance', 'Latest completed month', 'Campaign or topic', 'Platform performance', 'Content format', 'Leadership highlights', 'All official posts', 'Sort posts', 'Open post ↗', 'Social Media Brief', 'Requires an authorized Meta account connection']) {
+for (const marker of ['Monthly Social Performance', 'Latest completed month', 'Campaign or topic', 'Platform performance', 'Content format', 'Leadership highlights', 'All official posts', 'Sort posts', 'Open post ↗', 'Social Media Brief', 'Add report insight']) {
   assert.ok(dashboard.includes(marker), `Monthly Social Performance must include ${marker}`);
 }
 assert.match(dashboard, /const \[postTableSort, setPostTableSort\] = useState\('newest'\)/);
@@ -261,7 +264,7 @@ assert.match(styles, /\.social-report-media-image[\s\S]*object-fit: contain/);
 assert.match(styles, /@media print[\s\S]*\.social-monthly-top-posts \.social-report-card \{ grid-template-columns: minmax\(0, 1fr\); \}/);
 assert.match(styles, /@media print[\s\S]*\.social-report-media-backdrop \{ display: none; \}/);
 assert.doesNotMatch(dashboard, /\{false && <>/);
-assert.match(dashboard, /isAdmin \|\| summary\.ambient > 0/);
+assert.match(dashboard, /socialPageTab === 'feed'/);
 assert.match(dashboard, /function formatSocialComparison\(change\)[\s\S]*Intl\.NumberFormat\('en-US'/);
 assert.doesNotMatch(dashboard, /formatSocialComparison\(change\)[\s\S]{0,500}formatSocialMetric\(change\.absolute\)/);
 assert.match(dashboard, /useState\('this-month'\)/);
@@ -310,6 +313,8 @@ assert.match(dashboard, /filterReportingDataset\(reportingDataset, \{ districtId
 assert.match(dashboard, /return campaignArticles\.filter/);
 assert.match(dashboard, /const reportScores = chartArticles[\s\S]*\.filter\(Number\.isFinite\)/);
 assert.match(dashboard, /className="campaign-overview"/);
+assert.match(dashboard, /className="cross-channel-snapshot"/);
+assert.match(dashboard, /cross-channel-chip/);
 assert.match(dashboard, /campaignSearch=\{campaignSearch\}/);
 assert.match(dashboard, /setCampaignSearch=\{setCampaignSearch\}/);
 assert.match(dashboard, /Campaign: \{campaignSearch\} ✕/);
@@ -338,6 +343,9 @@ assert.ok(
   'The saved analyst insight must appear before scorecards in the exported report.',
 );
 assert.match(styles, /\.campaign-overview[\s\S]*grid-template-columns/);
+assert.match(styles, /\.social-page-tabs/);
+assert.match(styles, /\.cross-channel-snapshot/);
+assert.match(styles, /\.social-correction-controls/);
 assert.match(styles, /\.social-monthly-analyst-note-top/);
 assert.match(dashboard, /<SocialReportMetric result=\{result\} metric="reactions"/);
 const socialReportCardSource = dashboard.slice(dashboard.indexOf('function SocialReportCard'), dashboard.indexOf('function SocialReportThumbnail'));
