@@ -4,6 +4,9 @@ import { normalizeProviderBatch } from '../src/lib/socialIngestion.mjs';
 
 const APPROVED_SUPABASE_ORIGIN = 'https://fehdonfrlsrrkzaemkxp.supabase.co';
 const FAILED_RUN_PATCH_ATTEMPTS = 3;
+const ALLOWED_SOCIAL_PLATFORMS = new Set(['facebook', 'instagram', 'youtube', 'x', 'twitter', 'threads', 'tiktok', 'linkedin']);
+const ALLOWED_VISIBILITY_STATUSES = new Set(['review', 'approved', 'active', 'excluded']);
+const UUID_PATTERN = /^[0-9a-f]{8}-[0-9a-f]{4}-[1-5][0-9a-f]{3}-[89ab][0-9a-f]{3}-[0-9a-f]{12}$/i;
 
 export function parseArgs(argv) {
   const args = { commit: false };
@@ -72,9 +75,31 @@ export async function supabaseRequest(env, method, path, body, prefer, fetchImpl
   }
 }
 
-function singleRpcRow(data) {
+function isNonemptyString(value) {
+  return typeof value === 'string' && value.trim().length > 0;
+}
+
+function isUuid(value) {
+  return typeof value === 'string' && UUID_PATTERN.test(value);
+}
+
+function singleRpcRow(data, expectedThread) {
   const row = Array.isArray(data) ? (data.length === 1 ? data[0] : null) : data;
-  if (!row || typeof row !== 'object' || !row.id) {
+  if (!row
+    || typeof row !== 'object'
+    || Array.isArray(row)
+    || !isUuid(row.id)
+    || !isNonemptyString(row.district_id)
+    || !isNonemptyString(row.provider)
+    || !isNonemptyString(row.platform)
+    || !isNonemptyString(row.external_thread_id)
+    || !ALLOWED_VISIBILITY_STATUSES.has(row.visibility_status)
+    || !Number.isInteger(row.review_version)
+    || row.review_version < 0
+    || row.district_id !== expectedThread.district_id
+    || row.provider !== expectedThread.provider
+    || row.platform !== expectedThread.platform
+    || row.external_thread_id !== expectedThread.external_thread_id) {
     throw new Error('Atomic Social ingestion RPC did not return a stored thread.');
   }
   return row;
@@ -82,8 +107,38 @@ function singleRpcRow(data) {
 
 function singleRunRow(data) {
   const row = Array.isArray(data) ? (data.length === 1 ? data[0] : null) : data;
-  if (!row || typeof row !== 'object' || Array.isArray(row) || !row.id) {
+  if (!row || typeof row !== 'object' || Array.isArray(row) || !isUuid(row.id) || row.status !== 'running') {
     throw new Error('Social collection run could not be created.');
+  }
+  return row;
+}
+
+function validateAccountRows(data) {
+  if (!Array.isArray(data)
+    || data.some((row) => !row
+      || typeof row !== 'object'
+      || Array.isArray(row)
+      || !isUuid(row.id)
+      || !isNonemptyString(row.provider)
+      || !isNonemptyString(row.platform)
+      || !ALLOWED_SOCIAL_PLATFORMS.has(row.platform)
+      || typeof row.active !== 'boolean'
+      || ![row.handle, row.profile_url].every((value) => value === null || value === undefined || typeof value === 'string'))) {
+    throw new Error('Social account lookup returned an invalid response.');
+  }
+  return data;
+}
+
+function terminalRunRow(data, runId, expectedStatus) {
+  const row = Array.isArray(data) && data.length === 1 ? data[0] : null;
+  if (!row
+    || typeof row !== 'object'
+    || Array.isArray(row)
+    || row.id !== runId
+    || row.status !== expectedStatus
+    || !isNonemptyString(row.completed_at)
+    || !Number.isFinite(Date.parse(row.completed_at))) {
+    throw new Error('Social collection run finalization response was invalid.');
   }
   return row;
 }
@@ -111,7 +166,8 @@ async function finalizeFailedRun({ request, runId, payload, attempts = FAILED_RU
   let finalizationError;
   for (let attempt = 0; attempt < attempts; attempt += 1) {
     try {
-      await request('PATCH', `social_collection_runs?id=eq.${encodeURIComponent(runId)}`, payload, 'return=minimal');
+      const rows = await request('PATCH', `social_collection_runs?id=eq.${encodeURIComponent(runId)}`, payload, 'return=representation');
+      terminalRunRow(rows, runId, 'failed');
       return;
     } catch (error) {
       finalizationError = error;
@@ -146,11 +202,10 @@ export async function runSocialPilot({
   const env = environment(processEnv);
   const request = (method, path, body, prefer) => supabaseRequest(env, method, path, body, prefer, fetchImpl);
   const completedAt = () => now().toISOString();
-  const accounts = await request(
+  const accounts = validateAccountRows(await request(
     'GET',
     `social_accounts?district_id=eq.${encodeURIComponent(args.district)}&active=eq.true&select=id,provider,platform,handle,profile_url,active`,
-  );
-  if (!Array.isArray(accounts)) throw new Error('Social account lookup returned an invalid response.');
+  ));
   const ownedPlatforms = new Set(batch.threads
     .filter((thread) => thread.relationship_type === 'owned')
     .map((thread) => thread.platform));
@@ -205,7 +260,7 @@ export async function runSocialPilot({
         'POST',
         'rpc/canary_ingest_social_thread',
         { p_thread: threadPayload },
-      ));
+      ), threadPayload);
       stored.push(record);
     }
 
@@ -222,7 +277,7 @@ export async function runSocialPilot({
       rejected: batch.rejected,
       stored_thread_ids: stored.map((thread) => thread.id),
     };
-    await request('PATCH', `social_collection_runs?id=eq.${encodeURIComponent(runRecord.id)}`, {
+    const finalizedRows = await request('PATCH', `social_collection_runs?id=eq.${encodeURIComponent(runRecord.id)}`, {
       status: batch.status,
       completed_at: completedAt(),
       accepted_threads: stored.length,
@@ -232,7 +287,8 @@ export async function runSocialPilot({
       error_code: batch.errorCode,
       error_message: batch.errorMessage,
       diagnostics,
-    }, 'return=minimal');
+    }, 'return=representation');
+    terminalRunRow(finalizedRows, runRecord.id, batch.status);
 
     const result = {
       mode: 'commit',

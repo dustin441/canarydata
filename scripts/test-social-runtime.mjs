@@ -12,6 +12,10 @@ import { environment, runSocialPilot } from './ingest-social-pilot.mjs';
 const require = createRequire(import.meta.url);
 const ACTOR_ID = '11111111-1111-1111-1111-111111111111';
 const THREAD_ID = '22222222-2222-2222-2222-222222222222';
+const RUN_ID = '33333333-3333-4333-8333-333333333333';
+const ACCOUNT_ID = '44444444-4444-4444-8444-444444444444';
+const STORED_THREAD_ID = '55555555-5555-4555-8555-555555555555';
+const STORED_THREAD_ID_2 = '66666666-6666-4666-8666-666666666666';
 const DISTRICT_ID = 'district-a';
 const expectedCorrectionArgs = {
   p_actor_user_id: ACTOR_ID,
@@ -243,7 +247,7 @@ function response(data, status = 200) {
 function createPilotFetch({
   accounts = [],
   accountError = null,
-  runResponse = [{ id: 'run-1' }],
+  runResponse = [{ id: RUN_ID, status: 'running' }],
   duplicate = [],
   rpcResults = [],
   storedRows = [],
@@ -274,7 +278,12 @@ function createPilotFetch({
         rpcIndex += 1;
         return response(configured.data, configured.status || 200);
       }
-      const stored = { id: `stored-${rpcIndex + 1}`, ...call.body.p_thread, ...(storedRows[rpcIndex] || {}) };
+      const stored = {
+        ...call.body.p_thread,
+        id: rpcIndex === 0 ? STORED_THREAD_ID : STORED_THREAD_ID_2,
+        review_version: 0,
+        ...(storedRows[rpcIndex] || {}),
+      };
       rpcIndex += 1;
       return response(stored);
     }
@@ -282,7 +291,11 @@ function createPilotFetch({
       const configured = patchResults[patchIndex++];
       if (configured?.throw) throw configured.throw;
       if (configured && Object.hasOwn(configured, 'data')) return response(configured.data, configured.status || 200);
-      return response(null);
+      return response([{
+        id: RUN_ID,
+        status: call.body.status,
+        completed_at: call.body.completed_at,
+      }]);
     }
     throw new Error(`Unexpected pilot request: ${call.method} ${url}`);
   };
@@ -304,34 +317,42 @@ async function runCommittedPilot({ items = [baseItem], processEnv = canonicalEnv
 }
 
 const matchingAccount = {
-  id: 'account-match', provider: 'apify', platform: 'facebook', handle: 'district', profile_url: null, active: true,
+  id: ACCOUNT_ID, provider: 'apify', platform: 'facebook', handle: 'district', profile_url: null, active: true,
 };
 const matchingRun = await runCommittedPilot({
   items: [baseItem, { ...baseItem, external_thread_id: 'post-2', canonical_url: 'https://facebook.test/post-2' }],
   accounts: [matchingAccount],
   duplicate: [{ id: 'diagnostic-duplicate' }],
-  rpcResults: [undefined, { data: [{ id: 'stored-2', visibility_status: 'active' }] }],
+  rpcResults: [undefined, { data: [{
+    id: STORED_THREAD_ID_2,
+    district_id: DISTRICT_ID,
+    provider: 'apify',
+    platform: 'facebook',
+    external_thread_id: 'post-2',
+    visibility_status: 'active',
+    review_version: 0,
+  }] }],
 });
 const matchingResult = await matchingRun.promise;
 const matchingRpcCalls = matchingRun.mock.calls.filter((call) => call.url.endsWith('/rest/v1/rpc/canary_ingest_social_thread'));
 assert.equal(matchingRpcCalls.length, 2, 'Duplicate diagnostics must not suppress atomic mutation calls.');
 for (const call of matchingRpcCalls) {
-  assert.equal(call.body.p_thread.social_account_id, 'account-match');
+  assert.equal(call.body.p_thread.social_account_id, ACCOUNT_ID);
   assert.equal(call.body.p_thread.visibility_status, 'active');
   assert.equal(call.body.p_thread.provider_metadata.pilot_ingestion, true);
   assert.equal(call.body.p_thread.last_seen_at, '2026-08-04T13:00:00.000Z');
 }
 assert.equal(matchingResult.duplicateItems, 2);
 assert.equal(matchingResult.acceptedThreads, 2);
-assert.deepEqual(matchingResult.threadIds, ['stored-1', 'stored-2']);
+assert.deepEqual(matchingResult.threadIds, [STORED_THREAD_ID, STORED_THREAD_ID_2]);
 
 const untrustedRun = await runCommittedPilot({
   items: [baseItem],
   accounts: [
-    { ...matchingAccount, id: 'wrong-provider', provider: 'other' },
-    { ...matchingAccount, id: 'wrong-platform', platform: 'instagram' },
-    { ...matchingAccount, id: 'inactive-match', active: false },
-    { ...matchingAccount, id: 'unverified-match', handle: '', profile_url: '' },
+    { ...matchingAccount, id: '77777777-7777-4777-8777-777777777777', provider: 'other' },
+    { ...matchingAccount, id: '88888888-8888-4888-8888-888888888888', platform: 'instagram' },
+    { ...matchingAccount, id: '99999999-9999-4999-8999-999999999999', active: false },
+    { ...matchingAccount, id: 'aaaaaaaa-aaaa-4aaa-8aaa-aaaaaaaaaaaa', handle: '', profile_url: '' },
   ],
 });
 await untrustedRun.promise;
@@ -364,7 +385,7 @@ const lifecyclePreservedRun = await runCommittedPilot({
   items: [baseItem],
   accounts: [matchingAccount],
   duplicate: [{ id: 'already-there' }],
-  storedRows: [{ id: 'already-there', visibility_status: 'excluded', review_version: 4 }],
+  storedRows: [{ id: STORED_THREAD_ID, visibility_status: 'excluded', review_version: 4 }],
 });
 const lifecyclePreservedResult = await lifecyclePreservedRun.promise;
 const lifecycleRequest = lifecyclePreservedRun.mock.calls.find((call) => call.url.endsWith('/rest/v1/rpc/canary_ingest_social_thread'));
@@ -399,7 +420,7 @@ for (const contaminatedUrl of contaminatedUrls) {
   assert.doesNotMatch(contaminatedRun.logs.join('\n'), /canonical-secret-key|fehdonfrlsrrkzaemkxp/);
 }
 
-const ambiguousAccounts = [matchingAccount, { ...matchingAccount, id: 'account-second', profile_url: 'https://facebook.test/district' }];
+const ambiguousAccounts = [matchingAccount, { ...matchingAccount, id: 'bbbbbbbb-bbbb-4bbb-8bbb-bbbbbbbbbbbb', profile_url: 'https://facebook.test/district' }];
 const ambiguityMessages = [];
 for (const accounts of [ambiguousAccounts, [...ambiguousAccounts].reverse()]) {
   const ambiguousRun = await runCommittedPilot({ accounts });
@@ -421,6 +442,20 @@ for (const malformedAccounts of [null, {}]) {
   assert.equal(malformedAccountRun.mock.calls.filter((call) => call.method === 'PATCH').length, 0);
 }
 
+for (const malformedAccount of [
+  {},
+  { ...matchingAccount, id: 'truthy-not-a-uuid' },
+  { ...matchingAccount, provider: '' },
+  { ...matchingAccount, platform: 'mastodon' },
+  { ...matchingAccount, active: 'true' },
+  { ...matchingAccount, handle: 42 },
+  { ...matchingAccount, profile_url: {} },
+]) {
+  const malformedAccountRun = await runCommittedPilot({ accounts: [malformedAccount] });
+  await assert.rejects(malformedAccountRun.promise, /invalid response/);
+  assert.equal(malformedAccountRun.mock.calls.length, 1, 'Every account row must be validated before run creation.');
+}
+
 const accountNetworkRun = await runCommittedPilot({
   accountError: new Error(`lookup failed ${APPROVED_ORIGIN} canonical-secret-key`),
 });
@@ -432,15 +467,24 @@ await assert.rejects(accountNetworkRun.promise, (error) => {
 assert.equal(accountNetworkRun.mock.calls.length, 1);
 assert.equal(accountNetworkRun.mock.calls.filter((call) => call.method === 'PATCH').length, 0);
 
-for (const malformedRunResponse of [null, {}, [], [{}], [{ id: 'run-1' }, { id: 'run-2' }]]) {
+for (const malformedRunResponse of [
+  null,
+  {},
+  [],
+  [{}],
+  [{ id: 'truthy-not-a-uuid', status: 'running' }],
+  [{ id: RUN_ID }],
+  [{ id: RUN_ID, status: 'success' }],
+  [{ id: RUN_ID, status: 'running' }, { id: '77777777-7777-4777-8777-777777777777', status: 'running' }],
+]) {
   const malformedRun = await runCommittedPilot({ runResponse: malformedRunResponse });
   await assert.rejects(malformedRun.promise, /could not be created/);
   assert.equal(malformedRun.mock.calls.length, 2, 'Malformed run creation must stop before processing.');
   assert.equal(malformedRun.mock.calls.filter((call) => call.method === 'PATCH').length, 0);
 }
 
-const objectRunResponse = await runCommittedPilot({ runResponse: { id: 'run-object' } });
-assert.equal((await objectRunResponse.promise).runId, 'run-object');
+const objectRunResponse = await runCommittedPilot({ runResponse: { id: RUN_ID, status: 'running' } });
+assert.equal((await objectRunResponse.promise).runId, RUN_ID);
 
 const failingRun = await runCommittedPilot({
   accounts: [matchingAccount],
@@ -462,7 +506,10 @@ assert.doesNotMatch(failingRun.logs.join('\n'), /canonical-secret-key/);
 const transientFinalizationRun = await runCommittedPilot({
   accounts: [matchingAccount],
   rpcResults: [{ throw: new Error('RPC network primary') }],
-  patchResults: [{ data: { code: 'PATCH_TEMP', message: 'temporary patch failure' }, status: 503 }, { data: null }],
+  patchResults: [
+    { data: { code: 'PATCH_TEMP', message: 'temporary patch failure' }, status: 503 },
+    { data: [{ id: RUN_ID, status: 'failed', completed_at: '2026-08-04T13:00:00.000Z' }] },
+  ],
 });
 await assert.rejects(transientFinalizationRun.promise, (error) => {
   assert.equal(error.code, 'SUPABASE_REQUEST_FAILED');
@@ -494,7 +541,7 @@ const successPatchFailureRun = await runCommittedPilot({
   accounts: [matchingAccount],
   patchResults: [
     { data: { code: 'SUCCESS_PATCH_FAILED', message: 'success finalization failed' }, status: 500 },
-    { data: null },
+    { data: [{ id: RUN_ID, status: 'failed', completed_at: '2026-08-04T13:00:00.000Z' }] },
   ],
 });
 await assert.rejects(successPatchFailureRun.promise, (error) => {
@@ -505,6 +552,89 @@ await assert.rejects(successPatchFailureRun.promise, (error) => {
 const successThenFailurePatches = successPatchFailureRun.mock.calls.filter((call) => call.method === 'PATCH');
 assert.deepEqual(successThenFailurePatches.map((call) => call.body.status), ['success', 'failed']);
 assert.equal(successPatchFailureRun.mock.calls.length, 6);
+
+const zeroRowSuccessRun = await runCommittedPilot({
+  accounts: [matchingAccount],
+  patchResults: [
+    { data: [] },
+    { data: [{ id: RUN_ID, status: 'failed', completed_at: '2026-08-04T13:00:00.000Z' }] },
+  ],
+});
+await assert.rejects(zeroRowSuccessRun.promise, /finalization response/i);
+const zeroRowSuccessPatches = zeroRowSuccessRun.mock.calls.filter((call) => call.method === 'PATCH');
+assert.deepEqual(zeroRowSuccessPatches.map((call) => call.body.status), ['success', 'failed']);
+assert.equal(zeroRowSuccessPatches.length, 2);
+assert.ok(zeroRowSuccessPatches.every((call) => call.headers.Prefer === 'return=representation'));
+
+const noContentSuccessRun = await runCommittedPilot({
+  accounts: [matchingAccount],
+  patchResults: [
+    { data: null, status: 204 },
+    { data: [{ id: RUN_ID, status: 'failed', completed_at: '2026-08-04T13:00:00.000Z' }] },
+  ],
+});
+await assert.rejects(noContentSuccessRun.promise, /finalization response/i);
+assert.deepEqual(
+  noContentSuccessRun.mock.calls.filter((call) => call.method === 'PATCH').map((call) => call.body.status),
+  ['success', 'failed'],
+);
+
+const terminalMalformedRows = [
+  null,
+  [],
+  {},
+  [{ id: '77777777-7777-4777-8777-777777777777', status: 'success', completed_at: '2026-08-04T13:00:00.000Z' }],
+  [{ id: RUN_ID, status: 'failed', completed_at: '2026-08-04T13:00:00.000Z' }],
+  [
+    { id: RUN_ID, status: 'success', completed_at: '2026-08-04T13:00:00.000Z' },
+    { id: RUN_ID, status: 'success', completed_at: '2026-08-04T13:00:00.000Z' },
+  ],
+  [{ id: RUN_ID, status: 'success', completed_at: '' }],
+  [{ id: RUN_ID, status: 'success', completed_at: 'not-a-date' }],
+];
+for (const malformedTerminalResponse of terminalMalformedRows) {
+  const malformedTerminalRun = await runCommittedPilot({
+    accounts: [matchingAccount],
+    patchResults: [
+      { data: malformedTerminalResponse },
+      { data: [{ id: RUN_ID, status: 'failed', completed_at: '2026-08-04T13:00:00.000Z' }] },
+    ],
+  });
+  await assert.rejects(malformedTerminalRun.promise, /finalization response/i);
+  const patches = malformedTerminalRun.mock.calls.filter((call) => call.method === 'PATCH');
+  assert.equal(patches.length, 2);
+  assert.deepEqual(patches.map((call) => call.body.status), ['success', 'failed']);
+}
+
+const invalidThenValidFailureFinalizationRun = await runCommittedPilot({
+  accounts: [matchingAccount],
+  rpcResults: [{ throw: new Error('primary RPC network failure') }],
+  patchResults: [
+    { data: [] },
+    { data: [{ id: RUN_ID, status: 'failed', completed_at: '2026-08-04T13:00:00.000Z' }] },
+  ],
+});
+await assert.rejects(invalidThenValidFailureFinalizationRun.promise, /primary RPC network failure/);
+const invalidThenValidPatches = invalidThenValidFailureFinalizationRun.mock.calls.filter((call) => call.method === 'PATCH');
+assert.equal(invalidThenValidPatches.length, 2);
+assert.ok(invalidThenValidPatches.every((call) => call.headers.Prefer === 'return=representation'));
+
+const zeroRowFailureFinalizationRun = await runCommittedPilot({
+  accounts: [matchingAccount],
+  rpcResults: [{ data: { code: 'PRIMARY_ZERO_ROWS', message: 'primary zero-row failure' }, status: 500 }],
+  patchResults: [{ data: [] }, { data: [] }, { data: [] }],
+});
+await assert.rejects(zeroRowFailureFinalizationRun.promise, (error) => {
+  assert.equal(error.code, 'PRIMARY_ZERO_ROWS');
+  assert.equal(error.cause?.code, 'PRIMARY_ZERO_ROWS');
+  assert.match(error.message, /^primary zero-row failure Failed to finalize/);
+  assert.doesNotMatch(error.message, /canonical-secret-key|fehdonfrlsrrkzaemkxp/);
+  return true;
+});
+const zeroRowFailurePatches = zeroRowFailureFinalizationRun.mock.calls.filter((call) => call.method === 'PATCH');
+assert.equal(zeroRowFailurePatches.length, 3);
+assert.ok(zeroRowFailurePatches.every((call) => call.body.status === 'failed'));
+assert.ok(zeroRowFailurePatches.every((call) => call.headers.Prefer === 'return=representation'));
 
 const rpcNetworkRun = await runCommittedPilot({
   accounts: [matchingAccount],
@@ -518,7 +648,19 @@ await assert.rejects(rpcNetworkRun.promise, (error) => {
 assert.equal(rpcNetworkRun.mock.calls.filter((call) => call.method === 'PATCH' && call.body.status === 'failed').length, 1);
 assert.equal(rpcNetworkRun.mock.calls.length, 5);
 
-for (const malformedRpcResponse of [null, [], [{ id: 'one' }, { id: 'two' }], {}]) {
+for (const malformedRpcResponse of [
+  null,
+  [],
+  [{ id: STORED_THREAD_ID }, { id: STORED_THREAD_ID_2 }],
+  {},
+  { id: STORED_THREAD_ID },
+  { id: 'truthy-not-a-uuid', district_id: DISTRICT_ID, provider: 'apify', platform: 'facebook', external_thread_id: 'post-1', visibility_status: 'active', review_version: 0 },
+  { id: STORED_THREAD_ID, district_id: DISTRICT_ID, provider: 'apify', platform: 'facebook', external_thread_id: 'post-1', visibility_status: 'invalid', review_version: 0 },
+  { id: STORED_THREAD_ID, district_id: DISTRICT_ID, provider: 'apify', platform: 'facebook', external_thread_id: 'post-1', visibility_status: 'active', review_version: -1 },
+  { id: STORED_THREAD_ID, district_id: 'wrong-district', provider: 'apify', platform: 'facebook', external_thread_id: 'post-1', visibility_status: 'active', review_version: 0 },
+  { id: STORED_THREAD_ID, district_id: DISTRICT_ID, provider: 'apify', platform: 'instagram', external_thread_id: 'post-1', visibility_status: 'active', review_version: 0 },
+  { id: STORED_THREAD_ID, district_id: DISTRICT_ID, provider: 'apify', platform: 'facebook', external_thread_id: 'wrong-thread', visibility_status: 'active', review_version: 0 },
+]) {
   const malformedRpcRun = await runCommittedPilot({
     accounts: [matchingAccount],
     rpcResults: [{ data: malformedRpcResponse }],
