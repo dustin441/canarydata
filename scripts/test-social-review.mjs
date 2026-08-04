@@ -217,10 +217,27 @@ assert.match(actions, /expectedCurrentVersion/);
 assert.match(sql, /p_action not in \('approve', 'promote'/);
 assert.match(sql, /p_action not in \('approve_official', 'promote'\)/);
 assert.doesNotMatch(actions, /Only approved results can be promoted/);
-for (const marker of ['Approve for client and reports', 'not yet client-visible or included in reports', 'Select eligible official posts', 'Review audit history', 'Compact list']) {
+for (const marker of ['Overview', 'Posts & mentions', 'Hide as irrelevant', 'Correction history', 'Compact list', 'Official district post', 'Public mention']) {
   assert.ok(dashboard.includes(marker), `Dashboard must include ${marker}`);
 }
+assert.match(dashboard, /const \[socialPageTab, setSocialPageTab\] = useState\('overview'\)/);
+assert.match(dashboard, /const \[compactListMode, setCompactListMode\] = useState\(true\)/);
+assert.match(dashboard, /aria-label="Social page sections"/);
+assert.match(dashboard, /correctionEnabled=\{isAdmin && Boolean\(result\.provider && result\.externalThreadId\)\}/);
+assert.match(dashboard, /applyReviewAction\('exclude'\)[\s\S]*Hide as irrelevant/);
+assert.match(dashboard, /applyReviewAction\('restore'\)[\s\S]*>Restore</);
+assert.match(dashboard, /Immutable correction history retains every recorded event type/);
+assert.match(dashboard, /<details className="social-monthly-analyst-note social-monthly-analyst-note-top">/);
+assert.doesNotMatch(dashboard, /Approve for client and reports|Select eligible official posts|Review audit history|Needs approval|Bulk social review actions|Action Queue|review feed|reviewed owned posts/);
+assert.doesNotMatch(dashboard, /bulkReviewSocialThreads|socialActionFilterMatches|actionFilter|onToggleSelected|social-review-select/);
 assert.doesNotMatch(dashboard, /Promote to client|Promote approved batch|Approved internally/);
+assert.match(dashboard, /Social cues include all enriched results for the selected district/);
+assert.match(dashboard, /View Social posts\s*<\/button>/);
+assert.doesNotMatch(dashboard, /Open Social Action Queue/);
+assert.match(styles, /\.social-page-tabs[\s\S]*grid-template-columns: repeat\(2, minmax\(0, 1fr\)\)/);
+assert.match(styles, /\.social-correction-controls/);
+assert.match(styles, /\.social-monthly-analyst-note > summary/);
+assert.match(styles, /@media \(max-width: 768px\)[\s\S]*\.social-page-tabs[\s\S]*grid-template-columns: minmax\(0, 1fr\)/);
 
 const socialReportSource = dashboard.slice(dashboard.indexOf('function SocialReportThumbnail'), dashboard.indexOf('function BoardReportView'));
 for (const marker of [
@@ -261,7 +278,8 @@ assert.match(styles, /\.social-report-media-image[\s\S]*object-fit: contain/);
 assert.match(styles, /@media print[\s\S]*\.social-monthly-top-posts \.social-report-card \{ grid-template-columns: minmax\(0, 1fr\); \}/);
 assert.match(styles, /@media print[\s\S]*\.social-report-media-backdrop \{ display: none; \}/);
 assert.doesNotMatch(dashboard, /\{false && <>/);
-assert.match(dashboard, /isAdmin \|\| summary\.ambient > 0/);
+assert.match(dashboard, /socialPageTab === 'feed'/);
+assert.doesNotMatch(dashboard, /isAdmin \|\| summary\.ambient > 0/);
 assert.match(dashboard, /function formatSocialComparison\(change\)[\s\S]*Intl\.NumberFormat\('en-US'/);
 assert.doesNotMatch(dashboard, /formatSocialComparison\(change\)[\s\S]{0,500}formatSocialMetric\(change\.absolute\)/);
 assert.match(dashboard, /useState\('this-month'\)/);

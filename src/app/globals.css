@@ -1313,6 +1313,38 @@ a:hover {
 .social-monthly-data-readiness { display: flex; gap: 10px; padding: 14px 16px; border-radius: var(--radius-md); color: var(--text-secondary); background: rgba(59, 130, 246, 0.1); line-height: 1.5; }
 .social-monthly-data-readiness strong { flex: 0 0 auto; color: var(--blue-400); }
 
+.social-page-tabs {
+  display: grid;
+  grid-template-columns: repeat(2, minmax(0, 1fr));
+  gap: 10px;
+  min-width: 0;
+  padding: 6px;
+  border: 1px solid var(--border-primary);
+  border-radius: var(--radius-lg);
+  background: var(--bg-elevated);
+}
+
+.social-page-tabs button {
+  display: grid;
+  gap: 3px;
+  min-width: 0;
+  padding: 13px 16px;
+  color: var(--text-secondary);
+  border: 1px solid transparent;
+  border-radius: var(--radius-md);
+  background: transparent;
+  cursor: pointer;
+  text-align: left;
+}
+
+.social-page-tabs button span { color: var(--text-tertiary); font-size: 0.72rem; overflow-wrap: anywhere; }
+.social-page-tabs button.active { color: var(--text-primary); border-color: rgba(245, 197, 24, 0.45); background: rgba(245, 197, 24, 0.1); }
+.social-monthly-analyst-note > summary { display: flex; align-items: center; justify-content: space-between; gap: 14px; cursor: pointer; }
+.social-monthly-analyst-note > summary span { display: grid; gap: 2px; }
+.social-monthly-analyst-note > summary small,
+.social-monthly-analyst-note > summary em { color: var(--text-tertiary); font-size: 0.72rem; font-style: normal; }
+.social-monthly-analyst-note[open] > summary { margin-bottom: 12px; }
+
 .social-legacy-evidence {
   min-width: 0;
   border: 1px solid var(--border-primary);
@@ -2550,6 +2582,21 @@ input[type="date"]::-webkit-calendar-picker-indicator {
   background: rgba(239, 68, 68, 0.12);
 }
 
+.social-correction-controls {
+  display: flex;
+  align-items: center;
+  justify-content: space-between;
+  gap: 12px;
+  min-width: 0;
+  padding: 12px 15px;
+  border-top: 1px solid var(--border-primary);
+  background: rgba(148, 163, 184, 0.045);
+}
+
+.social-correction-controls > div { display: grid; gap: 2px; min-width: 0; }
+.social-correction-controls > div strong { font-size: 0.76rem; }
+.social-correction-controls > div span { color: var(--text-tertiary); font-size: 0.68rem; overflow-wrap: anywhere; }
+
 .social-review-controls {
   display: grid;
   gap: 12px;
@@ -3006,6 +3053,20 @@ input[type="date"]::-webkit-calendar-picker-indicator {
   color: var(--text-tertiary);
   font-size: 0.74rem;
   text-align: center;
+}
+
+@media (max-width: 768px) {
+  .social-page-tabs { grid-template-columns: minmax(0, 1fr); }
+  .social-correction-controls { align-items: stretch; flex-direction: column; }
+  .social-correction-controls .btn { width: 100%; justify-content: center; }
+  .social-section-heading,
+  .social-results-heading-controls { align-items: stretch; flex-direction: column; }
+  .social-results-heading-controls { width: 100%; flex-wrap: wrap; }
+  .social-results-heading-controls .filter-input { width: 100%; min-width: 0; }
+  .social-post-preview-header { align-items: flex-start; flex-wrap: wrap; }
+  .social-post-preview-badges { max-width: 100%; flex-wrap: wrap; }
+  .social-monitor-view,
+  .social-monitor-view > * { min-width: 0; max-width: 100%; }
 }
 
 @media (max-width: 900px) {
