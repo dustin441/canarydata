@@ -1,5 +1,8 @@
 -- Transactional Social visibility lifecycle and exclusion-preserving ingestion.
 -- This migration intentionally leaves legacy RPCs, existing rows, and the visibility default unchanged.
+-- SECURITY DEFINER callers using service_role must pass the authenticated reviewer's UUID as actor;
+-- service_role itself is never accepted as an audit identity. Idempotent replays return the stored
+-- historical result snapshot from the first completed request, not a fresh read of social_threads.
 
 begin;
 
@@ -182,6 +185,9 @@ begin
   if p_thread is null or jsonb_typeof(p_thread) <> 'object' then
     raise exception 'Social thread payload must be a JSON object';
   end if;
+  if octet_length(p_thread::text) > 262144 then
+    raise exception 'Social thread payload must be 262144 bytes or fewer';
+  end if;
 
   incoming := jsonb_populate_record(null::public.social_threads, p_thread);
 
@@ -209,6 +215,14 @@ begin
   if incoming.published_at is null then
     raise exception 'published_at is required';
   end if;
+  if not isfinite(incoming.published_at)
+     or (incoming.first_seen_at is not null and not isfinite(incoming.first_seen_at))
+     or (incoming.last_seen_at is not null and not isfinite(incoming.last_seen_at)) then
+    raise exception 'Social timestamps must be finite';
+  end if;
+  if coalesce(incoming.first_seen_at, now()) > coalesce(incoming.last_seen_at, now()) then
+    raise exception 'first_seen_at must not be after last_seen_at';
+  end if;
   if incoming.visibility_status is null or incoming.visibility_status not in ('review', 'active', 'excluded') then
     raise exception 'visibility_status must be review, active, or excluded';
   end if;
@@ -234,8 +248,9 @@ begin
     where account.id = incoming.social_account_id
       and account.district_id = incoming.district_id
       and account.platform = incoming.platform
+      and account.provider = btrim(incoming.provider)
   ) then
-    raise exception 'Social account does not match the thread district and platform';
+    raise exception 'Social account does not match the thread district, platform, and provider';
   end if;
 
   insert into public.social_threads (
@@ -318,8 +333,7 @@ begin
     now()
   )
   on conflict (district_id, platform, external_thread_id) do update
-  set social_account_id = excluded.social_account_id,
-      provider = excluded.provider,
+  set social_account_id = coalesce(social_threads.social_account_id, excluded.social_account_id),
       canonical_url = excluded.canonical_url,
       author_name = excluded.author_name,
       author_handle = excluded.author_handle,
@@ -345,7 +359,26 @@ begin
       identity_confidence = excluded.identity_confidence,
       provider_metadata = excluded.provider_metadata,
       updated_at = now()
+  where social_threads.provider = excluded.provider
+    and (
+      social_threads.social_account_id is null
+      or excluded.social_account_id is null
+      or social_threads.social_account_id = excluded.social_account_id
+    )
   returning * into stored_row;
+
+  if not found then
+    if exists (
+      select 1 from public.social_threads current_row
+      where current_row.district_id = incoming.district_id
+        and current_row.platform = incoming.platform
+        and current_row.external_thread_id = btrim(incoming.external_thread_id)
+        and current_row.provider <> btrim(incoming.provider)
+    ) then
+      raise exception 'Social thread provider lineage is immutable';
+    end if;
+    raise exception 'Social account reassignment is not allowed';
+  end if;
 
   return stored_row;
 end;

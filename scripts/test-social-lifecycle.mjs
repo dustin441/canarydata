@@ -80,8 +80,9 @@ await withSocialDatabase('lifecycle', async ({ sql, sqlAsync, expectFailure }) =
   assert.equal(sql('select count(*) from public.social_review_events;'), beforeFailures, 'rejected corrections must not mutate audit state');
 
   const sequentialFirst = sql(call(ADMIN, 'district-a', THREAD_ACTIVE, 'restore', 8, 'sequential-same-1'));
+  sql(`update public.social_threads set headline='fresh database value after completed correction' where id='${THREAD_ACTIVE}';`);
   const sequentialReplay = sql(call(ADMIN, 'district-a', THREAD_ACTIVE, 'restore', 8, 'sequential-same-1'));
-  assert.equal(sequentialReplay, sequentialFirst, 'sequential replay must return the original completed row');
+  assert.equal(sequentialReplay, sequentialFirst, 'idempotent replay must return the historical completed snapshot, not a fresh row read');
   sql(`do $$ begin
     if (select review_version from public.social_threads where id='${THREAD_ACTIVE}') <> 9 then raise exception 'sequential replay incremented twice'; end if;
     if (select count(*) from public.social_review_events where social_thread_id='${THREAD_ACTIVE}' and action='restore') <> 1 then raise exception 'sequential replay audited twice'; end if;
@@ -100,6 +101,7 @@ await withSocialDatabase('lifecycle', async ({ sql, sqlAsync, expectFailure }) =
   expectFailure('update public.social_review_events set action=action where social_thread_id is not null;', /immutable/i);
   expectFailure('delete from public.social_review_batches;', /immutable/i);
 
+  // SECURITY DEFINER service_role callers must pass the authenticated actor UUID for authorization and audit.
   sql(call(ADMIN, 'district-a', THREAD_DUP, 'restore', 1, 'service-role-0001'), { role: 'service_role' });
   sql(`select (public.canary_ingest_social_thread('{"district_id":"district-a","social_account_id":"11111111-1111-1111-1111-111111111111","provider":"meta","platform":"facebook","external_thread_id":"service-ingest-1","canonical_url":"https://facebook.test/service-ingest-1","relationship_type":"owned","published_at":"2026-08-04T12:00:00Z","visibility_status":"review"}'::jsonb)).*;`, { role: 'service_role' });
 

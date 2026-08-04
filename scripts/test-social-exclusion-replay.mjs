@@ -121,5 +121,34 @@ await withSocialDatabase('replay', async ({ sql, sqlAsync, expectFailure }) => {
   expectFailure(ingest({ ...base, external_thread_id: 'negative-count', comment_count: -1 }), /metrics must be non-negative/i);
   expectFailure(ingest({ ...base, external_thread_id: 'wrong-account', social_account_id: '22222222-2222-2222-2222-222222222222' }), /social account does not match/i);
 
-  console.log('Social exclusion replay PostgreSQL integration tests passed: atomic ingestion, lifecycle preservation, tenant identity, and parallel replay.');
+  // Trusted association is monotonic: provider lineage and a non-null account cannot be downgraded or reassigned.
+  sql(ingest({ ...base, external_thread_id: 'association-1', headline: 'trusted original' }));
+  sql(ingest({ ...base, external_thread_id: 'association-1', social_account_id: null, headline: 'null refresh accepted' }));
+  sql(ingest({ ...base, external_thread_id: 'association-1', headline: 'same account accepted' }));
+  sql(ingest({ ...base, external_thread_id: 'association-first-link', social_account_id: null, headline: 'unlinked' }));
+  sql(ingest({ ...base, external_thread_id: 'association-first-link', headline: 'linked once' }));
+  sql(`do $$ begin
+    if (select social_account_id from public.social_threads where external_thread_id='association-1') <> '11111111-1111-1111-1111-111111111111' then raise exception 'null ingestion downgraded trusted account'; end if;
+    if (select social_account_id from public.social_threads where external_thread_id='association-first-link') <> '11111111-1111-1111-1111-111111111111' then raise exception 'first compatible link failed'; end if;
+  end $$;`);
+  for (const [payload, pattern] of [
+    [{ ...base, external_thread_id: 'association-1', provider: 'other-provider', social_account_id: null, headline: 'must not update provider' }, /provider lineage/i],
+    [{ ...base, external_thread_id: 'bad-account-provider', social_account_id: '44444444-4444-4444-4444-444444444444' }, /social account does not match.*provider/i],
+    [{ ...base, external_thread_id: 'association-1', social_account_id: '33333333-3333-3333-3333-333333333333', headline: 'must not reassign' }, /reassign/i],
+  ]) expectFailure(ingest(payload), pattern);
+  sql(`do $$ begin
+    if (select provider from public.social_threads where external_thread_id='association-1') <> 'meta'
+       or (select social_account_id from public.social_threads where external_thread_id='association-1') <> '11111111-1111-1111-1111-111111111111'
+       or (select headline from public.social_threads where external_thread_id='association-1') <> 'same account accepted'
+       or (select review_version from public.social_threads where external_thread_id='association-1') <> 0
+    then raise exception 'rejected association upsert partially mutated the row'; end if;
+  end $$;`);
+
+  expectFailure(ingest({ ...base, external_thread_id: 'infinite-published', published_at: 'infinity' }), /finite/i);
+  expectFailure(ingest({ ...base, external_thread_id: 'infinite-seen', last_seen_at: '-infinity' }), /finite/i);
+  expectFailure(ingest({ ...base, external_thread_id: 'reversed-seen', first_seen_at: '2026-08-03T00:00:00Z', last_seen_at: '2026-08-02T00:00:00Z' }), /first_seen_at.*last_seen_at/i);
+  const oversized = { ...base, external_thread_id: 'oversized-payload', body: 'x'.repeat(262145) };
+  expectFailure(ingest(oversized), /payload.*262144 bytes/i);
+
+  console.log('Social exclusion replay PostgreSQL integration tests passed: lifecycle, trusted associations, bounded payloads, timestamps, and replay.');
 });

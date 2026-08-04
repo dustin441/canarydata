@@ -134,4 +134,6 @@ insert into auth.users (id, raw_app_meta_data) values
 insert into public.social_accounts (id, district_id, platform, provider, platform_account_id, handle, profile_url)
 values
   ('11111111-1111-1111-1111-111111111111', 'district-a', 'facebook', 'meta', 'page-a', 'districta', 'https://facebook.test/districta'),
-  ('22222222-2222-2222-2222-222222222222', 'district-b', 'facebook', 'meta', 'page-b', 'districtb', 'https://facebook.test/districtb');
+  ('22222222-2222-2222-2222-222222222222', 'district-b', 'facebook', 'meta', 'page-b', 'districtb', 'https://facebook.test/districtb'),
+  ('33333333-3333-3333-3333-333333333333', 'district-a', 'facebook', 'meta', 'page-a-2', 'districta2', 'https://facebook.test/districta2'),
+  ('44444444-4444-4444-4444-444444444444', 'district-a', 'facebook', 'other-provider', 'page-a-3', 'districta3', 'https://facebook.test/districta3');
