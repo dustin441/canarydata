@@ -10,6 +10,7 @@ import { lookup } from 'node:dns/promises';
 import { isIP } from 'node:net';
 import { createHash, randomUUID } from 'node:crypto';
 import { assertStrategicPlanFileSize } from '@/lib/onboarding-upload.mjs';
+import { buildSocialCorrectionRpcArgs, requireSocialCorrectionExpectedVersion } from '@/lib/socialLifecycle.mjs';
 
 async function requireCanaryActor() {
   const sessionClient = await createServerClient();
@@ -789,6 +790,9 @@ export async function reviewSocialThread({ socialThreadId, action, expectedVersi
   if (action === 'classification' && !SOCIAL_CLASSIFICATIONS.has(classification)) {
     throw new Error('Choose a valid social classification.');
   }
+  const lifecycleVersion = ['exclude', 'restore'].includes(action)
+    ? requireSocialCorrectionExpectedVersion(expectedVersion)
+    : null;
   const thread = await requireSocialThreadForReview(supabase, actor, socialThreadId);
   if (action === 'approve') {
     const { data: officialAccount, error: accountError } = await supabase
@@ -805,6 +809,19 @@ export async function reviewSocialThread({ socialThreadId, action, expectedVersi
       && Boolean(String(officialAccount.handle || '').trim() || String(officialAccount.profile_url || '').trim());
     if (!isVerifiedOfficial) throw new Error('Approval is limited to verified official district posts awaiting client approval.');
   }
+  if (lifecycleVersion !== null) {
+    const { data, error } = await supabase.rpc('canary_apply_social_correction', buildSocialCorrectionRpcArgs({
+      actorId: actor.id,
+      districtId: thread.district_id,
+      socialThreadId: thread.id,
+      action,
+      expectedVersion: lifecycleVersion,
+    }));
+    if (error) throw error;
+    revalidatePath('/dashboard');
+    return data;
+  }
+
   const version = Number.isInteger(expectedVersion) ? expectedVersion : thread.review_version;
   const runReviewAction = (reviewAction, reviewVersion) => supabase.rpc('canary_review_social_thread', {
     p_actor_user_id: actor.id,

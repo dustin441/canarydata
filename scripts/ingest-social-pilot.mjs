@@ -1,7 +1,8 @@
 import fs from 'node:fs/promises';
+import { pathToFileURL } from 'node:url';
 import { normalizeProviderBatch } from '../src/lib/socialIngestion.mjs';
 
-function parseArgs(argv) {
+export function parseArgs(argv) {
   const args = { commit: false };
   for (let index = 0; index < argv.length; index += 1) {
     const token = argv[index];
@@ -14,15 +15,23 @@ function parseArgs(argv) {
   return args;
 }
 
-function environment() {
-  const url = process.env.CANARY_PROD_SUPABASE_URL || process.env.NEXT_PUBLIC_SUPABASE_URL;
-  const key = process.env.CANARY_PROD_SUPABASE_SERVICE_ROLE_KEY || process.env.SUPABASE_SERVICE_ROLE_KEY;
+export function environment(processEnv = process.env) {
+  const url = processEnv.CANARY_PROD_SUPABASE_URL;
+  const key = processEnv.CANARY_PROD_SUPABASE_SERVICE_ROLE_KEY;
   if (!url || !key) throw new Error('Canonical Canary Supabase URL and service-role key are required.');
   return { url: url.replace(/\/$/, ''), key };
 }
 
-async function supabaseRequest(env, method, path, body, prefer) {
-  const response = await fetch(`${env.url}/rest/v1/${path}`, {
+function redactSecrets(value, env) {
+  let message = String(value || '');
+  for (const secret of [env?.key, env?.url].filter(Boolean)) {
+    message = message.split(secret).join('[REDACTED]');
+  }
+  return message;
+}
+
+export async function supabaseRequest(env, method, path, body, prefer, fetchImpl = fetch) {
+  const response = await fetchImpl(`${env.url}/rest/v1/${path}`, {
     method,
     headers: {
       apikey: env.key,
@@ -33,18 +42,39 @@ async function supabaseRequest(env, method, path, body, prefer) {
     ...(body === undefined ? {} : { body: JSON.stringify(body) }),
   });
   const text = await response.text();
-  const data = text ? JSON.parse(text) : null;
+  let data = null;
+  try {
+    data = text ? JSON.parse(text) : null;
+  } catch {
+    data = null;
+  }
   if (!response.ok) {
-    const error = new Error(data?.message || `Supabase request failed (${response.status}).`);
-    error.code = data?.code || `HTTP_${response.status}`;
+    const message = redactSecrets(data?.message || `Supabase request failed (${response.status}).`, env);
+    const error = new Error(message);
+    error.code = redactSecrets(data?.code || `HTTP_${response.status}`, env);
     throw error;
   }
   return data;
 }
 
-async function run() {
-  const args = parseArgs(process.argv.slice(2));
-  const payload = JSON.parse(await fs.readFile(args.input, 'utf8'));
+function singleRpcRow(data) {
+  const row = Array.isArray(data) ? (data.length === 1 ? data[0] : null) : data;
+  if (!row || typeof row !== 'object' || !row.id) {
+    throw new Error('Atomic Social ingestion RPC did not return a stored thread.');
+  }
+  return row;
+}
+
+export async function runSocialPilot({
+  argv = process.argv.slice(2),
+  processEnv = process.env,
+  fsImpl = fs,
+  fetchImpl = fetch,
+  log = console.log,
+  now = () => new Date(),
+} = {}) {
+  const args = parseArgs(argv);
+  const payload = JSON.parse(await fsImpl.readFile(args.input, 'utf8'));
   const batch = normalizeProviderBatch({
     provider: args.provider,
     districtId: args.district,
@@ -53,68 +83,76 @@ async function run() {
   });
 
   if (!args.commit) {
-    console.log(JSON.stringify({ mode: 'dry-run', ...batch }, null, 2));
-    return;
+    const result = { mode: 'dry-run', ...batch };
+    log(JSON.stringify(result, null, 2));
+    return result;
   }
 
-  const env = environment();
-  const completedAt = () => new Date().toISOString();
-  const accounts = await supabaseRequest(
-    env,
+  const env = environment(processEnv);
+  const request = (method, path, body, prefer) => supabaseRequest(env, method, path, body, prefer, fetchImpl);
+  const completedAt = () => now().toISOString();
+  const accounts = await request(
     'GET',
-    `social_accounts?district_id=eq.${encodeURIComponent(args.district)}&active=eq.true&select=id,platform,handle,profile_url`,
+    `social_accounts?district_id=eq.${encodeURIComponent(args.district)}&active=eq.true&select=id,provider,platform,handle,profile_url,active`,
   );
-  const accountByPlatform = new Map(accounts
-    .filter((account) => String(account.handle || '').trim() || String(account.profile_url || '').trim())
+  const trustedAccountByPlatform = new Map((Array.isArray(accounts) ? accounts : [])
+    .filter((account) => account.active === true
+      && account.provider === batch.provider
+      && (String(account.handle || '').trim() || String(account.profile_url || '').trim()))
     .map((account) => [account.platform, account.id]));
-  const [runRecord] = await supabaseRequest(env, 'POST', 'social_collection_runs', {
+  const runRows = await request('POST', 'social_collection_runs', {
     district_id: args.district,
     provider: batch.provider,
     run_type: args.runType || 'backfill',
     status: 'running',
     raw_items: Array.isArray(payload) ? payload.length : (payload.items || []).length,
-    diagnostics: { pilot: true, source_file: args.input },
+    diagnostics: { pilot: true, source_file: args.input, writer: 'atomic RPC, lifecycle-preserving' },
   }, 'return=representation');
+  const runRecord = Array.isArray(runRows) ? runRows[0] : runRows;
+  if (!runRecord?.id) throw new Error('Social collection run could not be created.');
 
   let duplicates = 0;
   const stored = [];
   try {
     for (const thread of batch.threads) {
-      const existing = await supabaseRequest(
-        env,
+      const existing = await request(
         'GET',
         `social_threads?district_id=eq.${encodeURIComponent(thread.district_id)}&platform=eq.${encodeURIComponent(thread.platform)}&external_thread_id=eq.${encodeURIComponent(thread.external_thread_id)}&select=id`,
       );
-      if (existing.length > 0) duplicates += 1;
-      const [record] = await supabaseRequest(
-        env,
+      if (Array.isArray(existing) && existing.length > 0) duplicates += 1;
+
+      const trustedAccountId = trustedAccountByPlatform.get(thread.platform) || null;
+      const threadPayload = {
+        ...thread,
+        social_account_id: trustedAccountId,
+        visibility_status: thread.relationship_type === 'owned' && trustedAccountId
+          ? 'active'
+          : (thread.visibility_status === 'excluded' ? 'excluded' : 'review'),
+        last_seen_at: completedAt(),
+        provider_metadata: { ...thread.provider_metadata, pilot_ingestion: true },
+      };
+      const record = singleRpcRow(await request(
         'POST',
-        'social_threads?on_conflict=district_id,platform,external_thread_id',
-        {
-          ...thread,
-          social_account_id: accountByPlatform.get(thread.platform) || null,
-          visibility_status: thread.relationship_type === 'owned' && accountByPlatform.has(thread.platform)
-            ? 'active'
-            : (thread.visibility_status === 'excluded' ? 'excluded' : 'review'),
-          last_seen_at: completedAt(),
-          provider_metadata: { ...thread.provider_metadata, pilot_ingestion: true },
-        },
-        'resolution=merge-duplicates,return=representation',
-      );
+        'rpc/canary_ingest_social_thread',
+        { p_thread: threadPayload },
+      ));
       stored.push(record);
     }
 
     const activeThreads = stored.filter((thread) => thread.visibility_status === 'active').length;
     const reviewThreads = stored.filter((thread) => thread.visibility_status === 'review').length;
+    const excludedThreads = stored.filter((thread) => thread.visibility_status === 'excluded').length;
     const diagnostics = {
       pilot: true,
-      visibility_policy: 'verified owned posts auto-active; non-owned public records remain review-only',
+      writer: 'atomic RPC, lifecycle-preserving',
+      visibility_policy: 'verified matching owned posts auto-active; excluded input remains excluded; other public records remain review-only',
       active_threads: activeThreads,
       review_threads: reviewThreads,
+      excluded_threads: excludedThreads,
       rejected: batch.rejected,
       stored_thread_ids: stored.map((thread) => thread.id),
     };
-    await supabaseRequest(env, 'PATCH', `social_collection_runs?id=eq.${runRecord.id}`, {
+    await request('PATCH', `social_collection_runs?id=eq.${runRecord.id}`, {
       status: batch.status,
       completed_at: completedAt(),
       accepted_threads: stored.length,
@@ -126,7 +164,7 @@ async function run() {
       diagnostics,
     }, 'return=minimal');
 
-    console.log(JSON.stringify({
+    const result = {
       mode: 'commit',
       runId: runRecord.id,
       status: batch.status,
@@ -135,24 +173,38 @@ async function run() {
       rejectedItems: batch.rejected.length,
       visibilityStatuses: stored.reduce((counts, thread) => ({ ...counts, [thread.visibility_status]: (counts[thread.visibility_status] || 0) + 1 }), {}),
       threadIds: stored.map((thread) => thread.id),
-    }, null, 2));
+    };
+    log(JSON.stringify(result, null, 2));
+    return result;
   } catch (error) {
-    await supabaseRequest(env, 'PATCH', `social_collection_runs?id=eq.${runRecord.id}`, {
+    const safeMessage = redactSecrets(error.message, env);
+    await request('PATCH', `social_collection_runs?id=eq.${runRecord.id}`, {
       status: 'failed',
       completed_at: completedAt(),
       accepted_threads: stored.length,
       duplicate_items: duplicates,
       rejected_items: batch.rejected.length,
       provider_errors: Math.max(1, batch.providerErrors),
-      error_code: error.code || 'STORAGE_ERROR',
-      error_message: error.message,
-      diagnostics: { pilot: true, visibility_policy: 'verified owned posts auto-active; non-owned public records remain review-only', rejected: batch.rejected },
+      error_code: redactSecrets(error.code || 'STORAGE_ERROR', env),
+      error_message: safeMessage,
+      diagnostics: {
+        pilot: true,
+        writer: 'atomic RPC, lifecycle-preserving',
+        visibility_policy: 'verified matching owned posts auto-active; excluded input remains excluded; other public records remain review-only',
+        rejected: batch.rejected,
+      },
     }, 'return=minimal');
-    throw error;
+    const safeError = new Error(safeMessage);
+    safeError.code = redactSecrets(error.code || 'STORAGE_ERROR', env);
+    throw safeError;
   }
 }
 
-run().catch((error) => {
-  console.error(`Social pilot failed: ${error.message}`);
-  process.exit(1);
-});
+const invokedDirectly = process.argv[1]
+  && import.meta.url === pathToFileURL(process.argv[1]).href;
+if (invokedDirectly) {
+  runSocialPilot().catch((error) => {
+    console.error(`Social pilot failed: ${error.message}`);
+    process.exitCode = 1;
+  });
+}

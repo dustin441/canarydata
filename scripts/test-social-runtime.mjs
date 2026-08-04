@@ -1,0 +1,354 @@
+import assert from 'node:assert/strict';
+import { createRequire } from 'node:module';
+import { readFile } from 'node:fs/promises';
+import { loadBindings } from 'next/dist/build/swc/index.js';
+import {
+  buildSocialCorrectionIdempotencyKey,
+  buildSocialCorrectionRpcArgs,
+  requireSocialCorrectionExpectedVersion,
+} from '../src/lib/socialLifecycle.mjs';
+import { environment, runSocialPilot } from './ingest-social-pilot.mjs';
+
+const require = createRequire(import.meta.url);
+const ACTOR_ID = '11111111-1111-1111-1111-111111111111';
+const THREAD_ID = '22222222-2222-2222-2222-222222222222';
+const DISTRICT_ID = 'district-a';
+const expectedCorrectionArgs = {
+  p_actor_user_id: ACTOR_ID,
+  p_expected_district_id: DISTRICT_ID,
+  p_social_thread_id: THREAD_ID,
+  p_action: 'exclude',
+  p_expected_version: 7,
+  p_idempotency_key: `social:${THREAD_ID}:exclude:v7`,
+};
+assert.equal(requireSocialCorrectionExpectedVersion(0), 0);
+assert.equal(buildSocialCorrectionIdempotencyKey({ socialThreadId: THREAD_ID, action: 'exclude', expectedVersion: 7 }), expectedCorrectionArgs.p_idempotency_key);
+assert.deepEqual(buildSocialCorrectionRpcArgs({
+  actorId: ACTOR_ID,
+  districtId: DISTRICT_ID,
+  socialThreadId: THREAD_ID,
+  action: 'exclude',
+  expectedVersion: 7,
+}), expectedCorrectionArgs);
+for (const invalidVersion of [undefined, null, -1, 1.5, '7']) {
+  assert.throws(() => requireSocialCorrectionExpectedVersion(invalidVersion), /non-negative integer/);
+}
+assert.throws(() => buildSocialCorrectionIdempotencyKey({ socialThreadId: 'x'.repeat(120), action: 'restore', expectedVersion: 1 }), /8 to 128/);
+assert.throws(() => buildSocialCorrectionRpcArgs({ actorId: ACTOR_ID, districtId: DISTRICT_ID, socialThreadId: THREAD_ID, action: 'approve', expectedVersion: 1 }), /Unsupported social correction/);
+
+const actionsSource = await readFile(new URL('../src/app/actions.js', import.meta.url), 'utf8');
+const pilotSource = await readFile(new URL('./ingest-social-pilot.mjs', import.meta.url), 'utf8');
+
+async function compileActionsHarness({
+  isAdmin = true,
+  actorDistrictId = DISTRICT_ID,
+  thread = {
+    id: THREAD_ID,
+    district_id: DISTRICT_ID,
+    social_account_id: 'account-1',
+    platform: 'facebook',
+    relationship_type: 'owned',
+    visibility_status: 'active',
+    review_version: 7,
+  },
+  rpcError = null,
+  rpcData = { id: THREAD_ID, visibility_status: 'excluded', review_version: 8 },
+} = {}) {
+  const calls = { tables: [], rpcs: [], revalidated: [] };
+  const admin = {
+    auth: { admin: { getUserById: async () => ({ data: { user: {
+      id: ACTOR_ID,
+      app_metadata: { role: isAdmin ? 'admin' : 'customer', district_id: actorDistrictId },
+    } } }) } },
+    from(table) {
+      const call = { table, select: null, predicates: [] };
+      calls.tables.push(call);
+      const query = {
+        select(columns) { call.select = columns; return query; },
+        eq(column, value) { call.predicates.push([column, value]); return query; },
+        maybeSingle: async () => {
+          if (table === 'social_threads') return { data: thread, error: null };
+          if (table === 'social_accounts') return { data: {
+            id: 'account-1', district_id: DISTRICT_ID, platform: 'facebook', handle: 'district', profile_url: null, active: true,
+          }, error: null };
+          throw new Error(`Unexpected maybeSingle table: ${table}`);
+        },
+        single: async () => {
+          if (table === 'social_threads') return { data: { visibility_status: 'active', review_version: thread.review_version + 1 }, error: null };
+          throw new Error(`Unexpected single table: ${table}`);
+        },
+      };
+      return query;
+    },
+    async rpc(name, args) {
+      calls.rpcs.push({ name, args });
+      return { data: rpcData, error: rpcError };
+    },
+  };
+  const lifecycle = await import('../src/lib/socialLifecycle.mjs');
+  const modules = {
+    '@/lib/supabase/admin': { createAdminClient: () => admin },
+    '@/lib/supabase/server': { createClient: async () => ({ auth: { getUser: async () => ({ data: { user: { id: ACTOR_ID } } }) } }) },
+    '@/lib/clickup': {
+      createClickUpFeedbackTask() {}, createClickUpOnboardingTask() {}, createClickUpQueryReviewTask() {}, isClickUpConfigured: () => false,
+    },
+    'next/cache': { revalidatePath: (path) => calls.revalidated.push(path) },
+    '@/lib/storyCorrections.mjs': { canonicalizeStoryUrl: (value) => value, requireCorrectionReason: (value) => value },
+    '@/lib/queryPolicy.mjs': {
+      CUSTOMER_SEARCH_QUERY_LIMIT: 10,
+      applySearchQuerySnapshotFilters: (value) => value,
+      buildSearchQueryUpdate: () => ({}),
+      hasActiveSearchQueryDuplicate: () => false,
+      reconcileActiveSearchQueryWrite: () => ({}),
+      searchQueryFingerprint: (value) => value,
+      searchQuerySnapshot: (value) => value,
+      validateSearchQueryText: (value) => value,
+    },
+    '@/lib/onboarding-upload.mjs': { assertStrategicPlanFileSize() {} },
+    '@/lib/socialLifecycle.mjs': lifecycle,
+  };
+  const bindings = await loadBindings();
+  const compiled = await bindings.transform(actionsSource, {
+    filename: 'actions.js',
+    jsc: { parser: { syntax: 'ecmascript' }, target: 'es2022' },
+    module: { type: 'commonjs' },
+  });
+  const moduleRecord = { exports: {} };
+  const controlledRequire = (specifier) => {
+    if (specifier.startsWith('node:')) return require(specifier);
+    assert.ok(specifier in modules, `Unexpected module import in actions harness: ${specifier}`);
+    return modules[specifier];
+  };
+  new Function('require', 'module', 'exports', compiled.code)(controlledRequire, moduleRecord, moduleRecord.exports);
+  return { reviewSocialThread: moduleRecord.exports.reviewSocialThread, calls };
+}
+
+for (const action of ['exclude', 'restore']) {
+  const thread = {
+    id: THREAD_ID, district_id: DISTRICT_ID, social_account_id: 'account-1', platform: 'facebook',
+    relationship_type: 'owned', visibility_status: action === 'exclude' ? 'active' : 'excluded', review_version: 7,
+  };
+  const returned = { id: THREAD_ID, visibility_status: action === 'exclude' ? 'excluded' : 'active', review_version: 8 };
+  const harness = await compileActionsHarness({ thread, rpcData: returned });
+  assert.deepEqual(await harness.reviewSocialThread({ socialThreadId: THREAD_ID, action, expectedVersion: 7 }), returned);
+  assert.equal(harness.calls.tables.length, 1, `${action} must read the target thread once.`);
+  assert.equal(harness.calls.tables[0].table, 'social_threads');
+  assert.deepEqual(harness.calls.tables[0].predicates, [['id', THREAD_ID]]);
+  assert.deepEqual(harness.calls.rpcs, [{
+    name: 'canary_apply_social_correction',
+    args: { ...expectedCorrectionArgs, p_action: action, p_idempotency_key: `social:${THREAD_ID}:${action}:v7` },
+  }]);
+  assert.deepEqual(harness.calls.revalidated, ['/dashboard']);
+}
+
+for (const invalidVersion of [undefined, -1, 2.5, '7']) {
+  const harness = await compileActionsHarness();
+  await assert.rejects(
+    harness.reviewSocialThread({ socialThreadId: THREAD_ID, action: 'exclude', expectedVersion: invalidVersion }),
+    /non-negative integer/,
+  );
+  assert.equal(harness.calls.rpcs.length, 0, 'Invalid lifecycle versions must fail before RPC execution.');
+  assert.equal(harness.calls.tables.length, 0, 'Invalid lifecycle versions must fail before the thread query.');
+}
+
+const rpcFailure = new Error('atomic correction failed');
+const failingActionHarness = await compileActionsHarness({ rpcError: rpcFailure });
+await assert.rejects(
+  failingActionHarness.reviewSocialThread({ socialThreadId: THREAD_ID, action: 'exclude', expectedVersion: 7 }),
+  (error) => error === rpcFailure,
+);
+assert.deepEqual(failingActionHarness.calls.revalidated, []);
+
+const nonAdminHarness = await compileActionsHarness({ isAdmin: false, actorDistrictId: 'district-b' });
+await assert.rejects(
+  nonAdminHarness.reviewSocialThread({ socialThreadId: THREAD_ID, action: 'exclude', expectedVersion: 7 }),
+  /Canary reviewer access is required/,
+);
+assert.equal(nonAdminHarness.calls.rpcs.length, 0, 'A non-admin cross-district caller must not reach an RPC.');
+assert.equal(nonAdminHarness.calls.tables.length, 0, 'Reviewer denial must precede cross-district thread access.');
+
+const approveThread = {
+  id: THREAD_ID, district_id: DISTRICT_ID, social_account_id: 'account-1', platform: 'facebook',
+  relationship_type: 'owned', visibility_status: 'review', review_version: 7,
+};
+const approveHarness = await compileActionsHarness({ thread: approveThread, rpcData: { id: THREAD_ID, visibility_status: 'active' } });
+await approveHarness.reviewSocialThread({ socialThreadId: THREAD_ID, action: 'approve' });
+assert.equal(approveHarness.calls.rpcs[0].name, 'canary_review_social_thread', 'Approve must retain the N-1 legacy RPC.');
+assert.deepEqual(approveHarness.calls.rpcs[0].args, {
+  p_actor_user_id: ACTOR_ID,
+  p_social_thread_id: THREAD_ID,
+  p_action: 'approve',
+  p_expected_version: 7,
+  p_classification: null,
+  p_reviewer_note: null,
+});
+
+const baseItem = {
+  platform: 'facebook',
+  external_thread_id: 'post-1',
+  canonical_url: 'https://facebook.test/post-1',
+  relationship_type: 'owned',
+  body: 'District update',
+  published_at: '2026-08-04T12:00:00Z',
+};
+const fsFor = (items) => ({ readFile: async () => JSON.stringify({ items }) });
+const canonicalEnv = {
+  CANARY_PROD_SUPABASE_URL: 'https://canonical.supabase.test/',
+  CANARY_PROD_SUPABASE_SERVICE_ROLE_KEY: 'canonical-secret-key',
+};
+
+const dryFetchCalls = [];
+const dryLogs = [];
+const dryResult = await runSocialPilot({
+  argv: ['--input', 'fixture.json', '--provider', 'apify', '--district', DISTRICT_ID],
+  processEnv: {},
+  fsImpl: fsFor([baseItem]),
+  fetchImpl: async (...args) => { dryFetchCalls.push(args); throw new Error('dry-run fetched'); },
+  log: (value) => dryLogs.push(value),
+});
+assert.equal(dryResult.mode, 'dry-run');
+assert.equal(dryFetchCalls.length, 0, 'Dry-run must not perform any fetch.');
+assert.match(dryLogs[0], /"mode": "dry-run"/);
+
+function response(data, status = 200) {
+  return { ok: status >= 200 && status < 300, status, text: async () => data === null ? '' : JSON.stringify(data) };
+}
+
+function createPilotFetch({ accounts = [], duplicate = [], rpcShapes = ['object'], storedRows = [], rpcFailure = null } = {}) {
+  const calls = [];
+  let rpcIndex = 0;
+  const fetchImpl = async (url, options) => {
+    const call = {
+      url,
+      method: options.method,
+      headers: options.headers,
+      body: options.body ? JSON.parse(options.body) : undefined,
+    };
+    calls.push(call);
+    const path = new URL(url).pathname + new URL(url).search;
+    if (call.method === 'GET' && path.includes('/social_accounts?')) return response(accounts);
+    if (call.method === 'POST' && path.endsWith('/social_collection_runs')) return response([{ id: 'run-1' }]);
+    if (call.method === 'GET' && path.includes('/social_threads?')) return response(duplicate);
+    if (call.method === 'POST' && path.endsWith('/rpc/canary_ingest_social_thread')) {
+      if (rpcFailure) return response(rpcFailure, 500);
+      const stored = { id: `stored-${rpcIndex + 1}`, ...call.body.p_thread, ...(storedRows[rpcIndex] || {}) };
+      const shape = rpcShapes[rpcIndex++] || 'object';
+      return response(shape === 'array' ? [stored] : stored);
+    }
+    if (call.method === 'PATCH' && path.includes('/social_collection_runs?')) return response(null);
+    throw new Error(`Unexpected pilot request: ${call.method} ${url}`);
+  };
+  return { calls, fetchImpl };
+}
+
+async function runCommittedPilot({ items, accounts, duplicate, rpcShapes, storedRows, rpcFailure, processEnv = canonicalEnv }) {
+  const mock = createPilotFetch({ accounts, duplicate, rpcShapes, storedRows, rpcFailure });
+  const logs = [];
+  const promise = runSocialPilot({
+    argv: ['--input', 'fixture.json', '--provider', 'apify', '--district', DISTRICT_ID, '--commit'],
+    processEnv,
+    fsImpl: fsFor(items),
+    fetchImpl: mock.fetchImpl,
+    log: (value) => logs.push(value),
+    now: () => new Date('2026-08-04T13:00:00.000Z'),
+  });
+  return { mock, logs, promise };
+}
+
+const matchingAccount = {
+  id: 'account-match', provider: 'apify', platform: 'facebook', handle: 'district', profile_url: null, active: true,
+};
+const matchingRun = await runCommittedPilot({
+  items: [baseItem, { ...baseItem, external_thread_id: 'post-2', canonical_url: 'https://facebook.test/post-2' }],
+  accounts: [matchingAccount],
+  duplicate: [{ id: 'diagnostic-duplicate' }],
+  rpcShapes: ['object', 'array'],
+});
+const matchingResult = await matchingRun.promise;
+const matchingRpcCalls = matchingRun.mock.calls.filter((call) => call.url.endsWith('/rest/v1/rpc/canary_ingest_social_thread'));
+assert.equal(matchingRpcCalls.length, 2, 'Duplicate diagnostics must not suppress atomic mutation calls.');
+for (const call of matchingRpcCalls) {
+  assert.equal(call.body.p_thread.social_account_id, 'account-match');
+  assert.equal(call.body.p_thread.visibility_status, 'active');
+  assert.equal(call.body.p_thread.provider_metadata.pilot_ingestion, true);
+  assert.equal(call.body.p_thread.last_seen_at, '2026-08-04T13:00:00.000Z');
+}
+assert.equal(matchingResult.duplicateItems, 2);
+assert.equal(matchingResult.acceptedThreads, 2);
+assert.deepEqual(matchingResult.threadIds, ['stored-1', 'stored-2']);
+
+const untrustedRun = await runCommittedPilot({
+  items: [baseItem],
+  accounts: [
+    { ...matchingAccount, id: 'wrong-provider', provider: 'other' },
+    { ...matchingAccount, id: 'wrong-platform', platform: 'instagram' },
+    { ...matchingAccount, id: 'inactive-match', active: false },
+    { ...matchingAccount, id: 'unverified-match', handle: '', profile_url: '' },
+  ],
+});
+await untrustedRun.promise;
+const untrustedRpc = untrustedRun.mock.calls.find((call) => call.url.endsWith('/rest/v1/rpc/canary_ingest_social_thread'));
+assert.equal(untrustedRpc.body.p_thread.social_account_id, null);
+assert.equal(untrustedRpc.body.p_thread.visibility_status, 'review');
+const accountLookup = untrustedRun.mock.calls.find((call) => call.url.includes('/social_accounts?'));
+assert.match(accountLookup.url, /active=eq\.true/);
+assert.match(accountLookup.url, /select=id,provider,platform,handle,profile_url,active/);
+
+const excludedRun = await runCommittedPilot({
+  items: [{ ...baseItem, relationship_type: 'ambient', visibility_status: 'excluded' }],
+  accounts: [],
+});
+await excludedRun.promise;
+const excludedRpc = excludedRun.mock.calls.find((call) => call.url.endsWith('/rest/v1/rpc/canary_ingest_social_thread'));
+assert.equal(excludedRpc.body.p_thread.social_account_id, null);
+assert.equal(excludedRpc.body.p_thread.visibility_status, 'excluded');
+
+const lifecyclePreservedRun = await runCommittedPilot({
+  items: [baseItem],
+  accounts: [matchingAccount],
+  duplicate: [{ id: 'already-there' }],
+  storedRows: [{ id: 'already-there', visibility_status: 'excluded', review_version: 4 }],
+});
+const lifecyclePreservedResult = await lifecyclePreservedRun.promise;
+const lifecycleRequest = lifecyclePreservedRun.mock.calls.find((call) => call.url.endsWith('/rest/v1/rpc/canary_ingest_social_thread'));
+assert.equal(lifecycleRequest.body.p_thread.visibility_status, 'active', 'N-1 input policy should still request active for a trusted owned post.');
+assert.deepEqual(lifecyclePreservedResult.visibilityStatuses, { excluded: 1 }, 'The writer must report the lifecycle-preserving RPC result, not infer mutation state from the duplicate GET.');
+assert.equal(lifecyclePreservedRun.mock.calls.filter((call) => call.method === 'POST' && call.url.includes('/social_threads')).length, 0);
+
+const genericOnlyEnv = {
+  NEXT_PUBLIC_SUPABASE_URL: 'https://generic.supabase.test',
+  SUPABASE_SERVICE_ROLE_KEY: 'generic-secret',
+};
+assert.throws(() => environment(genericOnlyEnv), /Canonical Canary Supabase/);
+const genericRun = await runCommittedPilot({ items: [baseItem], accounts: [], processEnv: genericOnlyEnv });
+await assert.rejects(genericRun.promise, /Canonical Canary Supabase/);
+assert.equal(genericRun.mock.calls.length, 0, 'Generic-only credentials must be rejected before fetch.');
+
+const failingRun = await runCommittedPilot({
+  items: [baseItem],
+  accounts: [matchingAccount],
+  rpcFailure: { code: 'RPC_FAILURE', message: `atomic failure ${canonicalEnv.CANARY_PROD_SUPABASE_SERVICE_ROLE_KEY}` },
+});
+await assert.rejects(failingRun.promise, (error) => {
+  assert.match(error.message, /atomic failure \[REDACTED\]/);
+  assert.doesNotMatch(error.message, /canonical-secret-key/);
+  return true;
+});
+const failedPatch = failingRun.mock.calls.find((call) => call.method === 'PATCH');
+assert.equal(failedPatch.body.status, 'failed');
+assert.equal(failedPatch.body.error_message, 'atomic failure [REDACTED]');
+assert.doesNotMatch(JSON.stringify(failedPatch.body), /canonical-secret-key/);
+assert.doesNotMatch(failingRun.logs.join('\n'), /canonical-secret-key/);
+
+for (const mock of [matchingRun.mock, untrustedRun.mock, excludedRun.mock, lifecyclePreservedRun.mock, failingRun.mock]) {
+  assert.ok(mock.calls.every((call) => call.url.startsWith('https://canonical.supabase.test/rest/v1/')), 'Runtime requests must stay on the canonical Supabase REST origin.');
+  assert.ok(mock.calls.every((call) => !/n8n/i.test(call.url)), 'Runtime must make no n8n calls.');
+  assert.equal(mock.calls.filter((call) => call.method === 'POST' && /\/social_threads(?:\?|$)/.test(call.url)).length, 0, 'No direct social_threads mutation is allowed.');
+}
+assert.doesNotMatch(pilotSource, /NEXT_PUBLIC_SUPABASE_URL|(?<!CANARY_PROD_)SUPABASE_SERVICE_ROLE_KEY/);
+assert.doesNotMatch(pilotSource, /social_threads\?on_conflict/);
+assert.match(pilotSource, /rpc\/canary_ingest_social_thread/);
+assert.doesNotMatch(pilotSource, /n8n/i);
+assert.match(actionsSource, /canary_apply_social_correction/);
+
+console.log('Offline Social runtime wiring tests passed.');
