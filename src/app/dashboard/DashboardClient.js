@@ -2981,9 +2981,12 @@ export function SocialView({ socialResults, socialSources, socialReviewEvents = 
   const [socialReportMode, setSocialReportMode] = useState(false);
   const [socialAnalystDrafts, setSocialAnalystDrafts] = useState({});
   const [correctionHistoryPage, setCorrectionHistoryPage] = useState({ districtFilter, limit: 100 });
-  if (correctionHistoryPage.districtFilter !== districtFilter) {
-    setCorrectionHistoryPage({ districtFilter, limit: 100 });
-  }
+  useEffect(() => {
+    const timer = window.setTimeout(() => {
+      setCorrectionHistoryPage({ districtFilter, limit: 100 });
+    }, 0);
+    return () => window.clearTimeout(timer);
+  }, [districtFilter]);
   useEffect(() => {
     const timer = window.setTimeout(() => {
       try {

@@ -115,6 +115,8 @@ export async function getSocialSources(districtId = null) {
 
 const SOCIAL_THREAD_COLUMNS = 'id, district_id, social_account_id, provider, platform, external_thread_id, canonical_url, relationship_type, author_name, author_handle, headline, body, summary, recommendation, published_at, comment_count, reply_count, reaction_count, share_count, view_count, engagement_total, sentiment, risk_level, canary_score, tags, strategic_alignment, matched_terms, match_reason, identity_confidence, visibility_status, reviewer_note, review_version, reviewed_at, reviewed_by, provider_metadata, created_at, updated_at';
 const SOCIAL_THREAD_PAGE_SIZE = 1000;
+const SOCIAL_REVIEW_EVENT_COLUMNS = 'id, batch_id, district_id, social_thread_id, actor_user_id, action, before_state, after_state, resulting_version, created_at';
+const SOCIAL_REVIEW_EVENT_PAGE_SIZE = 1000;
 
 export async function getSocialThreads(districtId = null, includeReview = false) {
   const supabase = createAdminClient();
@@ -164,17 +166,27 @@ export async function getSocialThreads(districtId = null, includeReview = false)
   }));
 }
 
+export async function readAllSocialReviewEvents(supabase, districtId = null) {
+  const events = [];
+  for (let from = 0; ; from += SOCIAL_REVIEW_EVENT_PAGE_SIZE) {
+    let query = supabase
+      .from('social_review_events')
+      .select(SOCIAL_REVIEW_EVENT_COLUMNS)
+      .order('created_at', { ascending: false })
+      .order('id', { ascending: false })
+      .range(from, from + SOCIAL_REVIEW_EVENT_PAGE_SIZE - 1);
+    if (districtId) query = query.eq('district_id', districtId);
+    const { data, error } = await query;
+    if (error) throw error;
+    const page = data ?? [];
+    events.push(...page);
+    if (page.length < SOCIAL_REVIEW_EVENT_PAGE_SIZE) break;
+  }
+  return events;
+}
+
 export async function getSocialReviewEvents(districtId = null) {
-  const supabase = createAdminClient();
-  let query = supabase
-    .from('social_review_events')
-    .select('id, batch_id, district_id, social_thread_id, actor_user_id, action, before_state, after_state, resulting_version, created_at')
-    .order('created_at', { ascending: false })
-    .limit(500);
-  if (districtId) query = query.eq('district_id', districtId);
-  const { data, error } = await query;
-  if (error) throw error;
-  return data ?? [];
+  return readAllSocialReviewEvents(createAdminClient(), districtId);
 }
 
 export async function updateArticleNote(id, notes) {

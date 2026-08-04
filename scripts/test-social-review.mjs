@@ -194,6 +194,78 @@ const [sql, actions, dashboard, styles, data, melodi] = await Promise.all([
   readFile(new URL('../src/app/api/melodi/route.js', import.meta.url), 'utf8'),
 ]);
 
+async function compileDataModuleForPaginationTest(source, createAdminClient) {
+  const bindings = await loadBindings();
+  const compiled = await bindings.transform(source, {
+    filename: 'data.js',
+    jsc: {
+      parser: { syntax: 'ecmascript' },
+      target: 'es2022',
+    },
+    module: { type: 'commonjs' },
+  });
+  const moduleRecord = { exports: {} };
+  const modules = {
+    '@/lib/supabase/admin': { createAdminClient },
+    '@/lib/collectionHealth.mjs': { buildCollectionHealth: () => ({}) },
+  };
+  const controlledRequire = (specifier) => {
+    assert.ok(specifier in modules, `Unexpected module import in data harness: ${specifier}`);
+    return modules[specifier];
+  };
+  const evaluate = new Function('require', 'module', 'exports', compiled.code);
+  evaluate(controlledRequire, moduleRecord, moduleRecord.exports);
+  return moduleRecord.exports;
+}
+
+function createSocialReviewEventsClient(rows, { errorFrom = null } = {}) {
+  const calls = [];
+  const client = {
+    from(table) {
+      const call = { table, selected: null, orders: [], ranges: [], predicates: [] };
+      calls.push(call);
+      const query = {
+        select(columns) { call.selected = columns; return query; },
+        order(column, options) { call.orders.push([column, options]); return query; },
+        range(from, to) { call.ranges.push([from, to]); call.from = from; call.to = to; return query; },
+        limit(limit) { call.from = 0; call.to = limit - 1; return query; },
+        eq(column, value) { call.predicates.push([column, value]); return query; },
+        then(resolve) {
+          if (call.from === errorFrom) return resolve({ data: null, error: new Error(`page failed at ${errorFrom}`) });
+          return resolve({ data: rows.slice(call.from, call.to + 1), error: null });
+        },
+      };
+      return query;
+    },
+  };
+  return { client, calls };
+}
+
+const auditRows = Array.from({ length: 1205 }, (_, index) => ({ id: `audit-${String(index).padStart(4, '0')}` }));
+const auditHarness = createSocialReviewEventsClient(auditRows);
+const dataModule = await compileDataModuleForPaginationTest(data, () => auditHarness.client);
+const auditEvents = await dataModule.getSocialReviewEvents('district-a');
+assert.equal(typeof dataModule.readAllSocialReviewEvents, 'function', 'Audit pagination must be separately exported and testable.');
+assert.equal(auditEvents.length, 1205);
+assert.equal(new Set(auditEvents.map((event) => event.id)).size, 1205);
+assert.deepEqual(auditEvents.map((event) => event.id), auditRows.map((event) => event.id));
+assert.deepEqual(auditHarness.calls.map((call) => call.ranges[0]), [[0, 999], [1000, 1999]]);
+for (const call of auditHarness.calls) {
+  assert.equal(call.table, 'social_review_events');
+  assert.equal(call.selected, 'id, batch_id, district_id, social_thread_id, actor_user_id, action, before_state, after_state, resulting_version, created_at');
+  assert.deepEqual(call.orders, [['created_at', { ascending: false }], ['id', { ascending: false }]]);
+  assert.deepEqual(call.predicates, [['district_id', 'district-a']]);
+}
+
+const failingAuditHarness = createSocialReviewEventsClient(auditRows, { errorFrom: 1000 });
+const failingDataModule = await compileDataModuleForPaginationTest(data, () => failingAuditHarness.client);
+await assert.rejects(
+  failingDataModule.getSocialReviewEvents('district-a'),
+  /page failed at 1000/,
+  'A later page error must reject instead of returning a partial audit history.',
+);
+assert.deepEqual(failingAuditHarness.calls.map((call) => call.ranges[0]), [[0, 999], [1000, 1999]]);
+
 function createHookRenderer() {
   const componentState = new Map();
   let currentInstance = null;
@@ -459,7 +531,7 @@ const reviewCalls = [];
 const windowStub = {
   location: { reload() {} },
   localStorage: { getItem: () => null, setItem() {} },
-  setTimeout: () => 1,
+  setTimeout: (callback) => { callback(); return 1; },
   clearTimeout() {},
   addEventListener() {},
 };
@@ -571,6 +643,8 @@ for (const marker of ['Overview', 'Posts & mentions', 'Hide as irrelevant', 'Cor
 }
 assert.match(dashboard, /export function SocialView\(/);
 assert.match(dashboard, /const \[correctionHistoryPage, setCorrectionHistoryPage\] = useState\(\{ districtFilter, limit: 100 \}\)/);
+assert.match(dashboard, /useEffect\(\(\) => \{[\s\S]*?setCorrectionHistoryPage\(\{ districtFilter, limit: 100 \}\);[\s\S]*?\}, \[districtFilter\]\);/);
+assert.doesNotMatch(dashboard, /if \(correctionHistoryPage\.districtFilter !== districtFilter\) \{\s*setCorrectionHistoryPage/);
 assert.match(dashboard, /Showing \{visibleReviewEvents\.length\} of \{scopedReviewEvents\.length\} correction events/);
 assert.match(dashboard, /Load 100 more correction events/);
 assert.doesNotMatch(dashboard, /scopedReviewEvents\.slice\(0, 100\)/);
@@ -589,6 +663,7 @@ assert.match(dashboard, /Social cues include all enriched results for the select
 assert.match(dashboard, /View Social posts\s*<\/button>/);
 assert.doesNotMatch(dashboard, /Open Social Action Queue/);
 assert.match(styles, /\.social-page-tabs[\s\S]*grid-template-columns: repeat\(2, minmax\(0, 1fr\)\)/);
+assert.match(styles, /\.btn:focus-visible\s*\{[^}]*outline:\s*[2-9]px\s+solid\s+var\(--canary-yellow(?:-light)?\);[^}]*outline-offset:\s*[2-9]px;/);
 assert.match(styles, /\.social-correction-controls/);
 assert.match(styles, /\.social-monthly-analyst-note > summary/);
 assert.match(styles, /@media \(max-width: 768px\)[\s\S]*\.social-page-tabs[\s\S]*grid-template-columns: minmax\(0, 1fr\)/);
