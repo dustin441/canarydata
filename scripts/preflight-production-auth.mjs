@@ -1,7 +1,7 @@
 import { createHash, timingSafeEqual } from 'node:crypto';
 import { pathToFileURL } from 'node:url';
 
-const EXPECTED_SUPABASE_PROJECT_REF = 'fehdonfrlsrrkzaemkxp';
+const EXPECTED_SUPABASE_ORIGIN = 'https://fehdonfrlsrrkzaemkxp.supabase.co';
 const VERCEL_PROJECT_ID = 'prj_Y9Gbzajz4KVgDD1tYnUXKcyHMdOl';
 const VERCEL_TEAM_ID = 'team_Sxyeod3LY9PSUrI7F0cev2lN';
 const VERCEL_API_BASE = `https://api.vercel.com/v9/projects/${VERCEL_PROJECT_ID}/env`;
@@ -56,18 +56,8 @@ async function getJson({ fetchImpl, url, headers, check, fail }) {
   }
 }
 
-function projectReference(urlValue) {
-  try {
-    const url = new URL(urlValue);
-    if (url.protocol !== 'https:') return null;
-    const suffix = '.supabase.co';
-    if (!url.hostname.endsWith(suffix)) return null;
-    const reference = url.hostname.slice(0, -suffix.length);
-    if (!reference || reference.includes('.')) return null;
-    return reference;
-  } catch {
-    return null;
-  }
+function isExpectedSupabaseOrigin(urlValue) {
+  return urlValue === EXPECTED_SUPABASE_ORIGIN || urlValue === `${EXPECTED_SUPABASE_ORIGIN}/`;
 }
 
 export async function runProductionAuthPreflight({
@@ -84,10 +74,10 @@ export async function runProductionAuthPreflight({
   }
   pass('canonical credentials');
 
-  const supabaseUrl = env.CANARY_PROD_SUPABASE_URL.replace(/\/$/, '');
-  if (projectReference(supabaseUrl) !== EXPECTED_SUPABASE_PROJECT_REF) {
+  if (!isExpectedSupabaseOrigin(env.CANARY_PROD_SUPABASE_URL)) {
     fail('Supabase project reference', 'project mismatch');
   }
+  const supabaseUrl = EXPECTED_SUPABASE_ORIGIN;
   pass('Supabase project reference');
 
   const anonHeaders = {
@@ -148,18 +138,25 @@ export async function runProductionAuthPreflight({
   }
   pass('Vercel environment metadata');
 
+  const entriesByKey = new Map();
+  for (const entry of metadata.envs) {
+    const entries = entriesByKey.get(entry?.key) ?? [];
+    entries.push(entry);
+    entriesByKey.set(entry?.key, entries);
+  }
+
   const selectedEntries = [];
   for (const [vercelName, localName] of VERCEL_ENVIRONMENT_CHECKS) {
     const check = `Vercel ${vercelName} metadata`;
-    const matches = metadata.envs.filter((entry) => (
-      entry?.key === vercelName
-      && Array.isArray(entry.target)
-      && entry.target.includes('production')
-    ));
+    const matches = entriesByKey.get(vercelName) ?? [];
     if (matches.length === 0) fail(check, 'missing production entry');
-    if (matches.length !== 1) fail(check, 'duplicate production entries');
-    if (typeof matches[0].id !== 'string' || matches[0].id === '') fail(check, 'invalid response');
-    selectedEntries.push({ entryId: matches[0].id, vercelName, localName });
+    if (matches.length !== 1) fail(check, 'duplicate entries');
+    const [entry] = matches;
+    if (!Array.isArray(entry.target) || !entry.target.includes('production')) {
+      fail(check, 'missing production target');
+    }
+    if (typeof entry.id !== 'string' || entry.id === '') fail(check, 'invalid response');
+    selectedEntries.push({ entryId: entry.id, vercelName, localName });
     pass(check);
   }
 

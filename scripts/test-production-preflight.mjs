@@ -102,16 +102,25 @@ async function testSuccess() {
   assert.equal(harness.calls[3].init.headers.Authorization, `Bearer ${secrets.vercel}`);
 }
 
-async function testMissingCanonicalDespiteGeneric() {
-  const env = canonicalEnv({
-    CANARY_PROD_SUPABASE_ANON_KEY: '',
-    NEXT_PUBLIC_SUPABASE_URL: secrets.url,
-    NEXT_PUBLIC_SUPABASE_ANON_KEY: secrets.anon,
-    SUPABASE_SERVICE_ROLE_KEY: secrets.service,
-  });
+async function testGenericOnlyEnvironmentFailsBeforeRequests() {
+  const genericSecrets = {
+    url: 'https://generic-only-project.supabase.co',
+    anon: 'generic-only-anon-secret',
+    service: 'generic-only-service-secret',
+  };
+  const env = {
+    VERCEL_TOKEN: secrets.vercel,
+    NEXT_PUBLIC_SUPABASE_URL: genericSecrets.url,
+    NEXT_PUBLIC_SUPABASE_ANON_KEY: genericSecrets.anon,
+    SUPABASE_SERVICE_ROLE_KEY: genericSecrets.service,
+  };
   const harness = createHarness({ env });
-  await expectFailure(harness, /^canonical credentials: fail \(missing CANARY_PROD_SUPABASE_ANON_KEY\)$/);
+  const error = await expectFailure(harness, /^canonical credentials: fail \(missing CANARY_PROD_SUPABASE_URL\)$/);
   assert.equal(harness.calls.length, 0);
+  const output = [error.message, ...harness.logs].join('\n');
+  for (const value of Object.values(genericSecrets)) {
+    assert.equal(output.includes(value), false, 'generic Supabase values must not leak');
+  }
 }
 
 async function testProjectMismatch() {
@@ -119,6 +128,22 @@ async function testProjectMismatch() {
   const harness = createHarness({ env: canonicalEnv({ CANARY_PROD_SUPABASE_URL: wrongUrl }) });
   await expectFailure(harness, /^Supabase project reference: fail \(project mismatch\)$/);
   assert.equal(harness.calls.length, 0);
+}
+
+async function testSupabaseUrlPathRejectedWithoutLeakage() {
+  const contaminatedUrl = `${secrets.url}/auth/v1`;
+  const harness = createHarness({ env: canonicalEnv({ CANARY_PROD_SUPABASE_URL: contaminatedUrl }) });
+  const error = await expectFailure(harness, /^Supabase project reference: fail \(project mismatch\)$/);
+  assert.equal(harness.calls.length, 0);
+  assert.equal([error.message, ...harness.logs].join('\n').includes(contaminatedUrl), false);
+}
+
+async function testSupabaseUrlCredentialsAndCustomOriginRejectedWithoutLeakage() {
+  const contaminatedUrl = `https://user:password@${PROJECT_REF}.supabase.co:8443`;
+  const harness = createHarness({ env: canonicalEnv({ CANARY_PROD_SUPABASE_URL: contaminatedUrl }) });
+  const error = await expectFailure(harness, /^Supabase project reference: fail \(project mismatch\)$/);
+  assert.equal(harness.calls.length, 0);
+  assert.equal([error.message, ...harness.logs].join('\n').includes(contaminatedUrl), false);
 }
 
 async function testAnon401() {
@@ -145,13 +170,19 @@ async function testMissingVercelEntry() {
 async function testDuplicateVercelEntry() {
   const entries = [...validVercelEntries(), { id: 'env-anon-copy', key: 'NEXT_PUBLIC_SUPABASE_ANON_KEY', target: ['production'] }];
   const harness = createHarness({ routeOverrides: { entries } });
-  await expectFailure(harness, /^Vercel NEXT_PUBLIC_SUPABASE_ANON_KEY metadata: fail \(duplicate production entries\)$/);
+  await expectFailure(harness, /^Vercel NEXT_PUBLIC_SUPABASE_ANON_KEY metadata: fail \(duplicate entries\)$/);
+}
+
+async function testProductionAndPreviewVercelDuplicate() {
+  const entries = [...validVercelEntries(), { id: 'env-anon-preview', key: 'NEXT_PUBLIC_SUPABASE_ANON_KEY', target: ['preview'] }];
+  const harness = createHarness({ routeOverrides: { entries } });
+  await expectFailure(harness, /^Vercel NEXT_PUBLIC_SUPABASE_ANON_KEY metadata: fail \(duplicate entries\)$/);
 }
 
 async function testNonProductionVercelEntry() {
   const entries = validVercelEntries().map((entry) => entry.key === 'NEXT_PUBLIC_SUPABASE_URL' ? { ...entry, target: ['preview'] } : entry);
   const harness = createHarness({ routeOverrides: { entries } });
-  await expectFailure(harness, /^Vercel NEXT_PUBLIC_SUPABASE_URL metadata: fail \(missing production entry\)$/);
+  await expectFailure(harness, /^Vercel NEXT_PUBLIC_SUPABASE_URL metadata: fail \(missing production target\)$/);
 }
 
 async function testVercelValueMismatch() {
@@ -182,13 +213,16 @@ async function testSecretsNeverAppearInLogsOrErrors() {
 }
 
 await testSuccess();
-await testMissingCanonicalDespiteGeneric();
+await testGenericOnlyEnvironmentFailsBeforeRequests();
 await testProjectMismatch();
+await testSupabaseUrlPathRejectedWithoutLeakage();
+await testSupabaseUrlCredentialsAndCustomOriginRejectedWithoutLeakage();
 await testAnon401();
 await testServiceAdmin401();
 await testEmptyAdminList();
 await testMissingVercelEntry();
 await testDuplicateVercelEntry();
+await testProductionAndPreviewVercelDuplicate();
 await testNonProductionVercelEntry();
 await testVercelValueMismatch();
 await testSecretsNeverAppearInLogsOrErrors();
