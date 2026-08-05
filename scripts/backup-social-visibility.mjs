@@ -71,6 +71,7 @@ let schemaIdentity = get('schema-identity');
 let schemaFingerprint = get('schema-fingerprint');
 let expectedRowCount;
 let schemaContractArtifactSha256;
+let migrationStateIdentity;
 let verificationMode;
 const unsafeDevelopmentMode = argv.includes('--unsafe-dev-schema-assertions');
 if (get('schema-contract')) {
@@ -83,6 +84,12 @@ if (get('schema-contract')) {
     claimedSchemaHash,
     'Schema contract artifact SHA-256 mismatch',
   );
+  assert.equal(
+    schemaArtifact.migrationStateIdentity,
+    'task5-n-1',
+    'Production visibility backups require the exact task5-n-1 migration-state contract',
+  );
+  assert.equal(schemaArtifact.contract?.migration_state_identity, 'task5-n-1', 'Schema contract identity is inconsistent');
   schemaIdentity = schemaArtifact.contract?.schema_identity;
   schemaFingerprint = schemaArtifact.contract?.schema_fingerprint_md5;
   const contractRowCount = schemaArtifact.contract?.row_count;
@@ -90,6 +97,7 @@ if (get('schema-contract')) {
   assert.equal(rows.length, contractRowCount, 'Backup rows do not match schema contract row count');
   expectedRowCount = contractRowCount;
   schemaContractArtifactSha256 = claimedSchemaHash;
+  migrationStateIdentity = schemaArtifact.migrationStateIdentity;
   verificationMode = 'production-sealed-schema-contract';
 }
 const explicitExpectedRowCount = get('expected-row-count');
@@ -114,7 +122,7 @@ assert.match(schemaFingerprint || '', /^[a-f0-9]{32}$/, 'A verified schema finge
 const aggregateChecksum = sha256(rows.map((row) => `${row.id}:${row.canonical_checksum_sha256}`).join('\n'));
 const artifact = {
   format: 'canary-social-visibility-backup/v1',
-  manifest: { watermark: source.watermark, rowCount: rows.length, expectedRowCount, aggregateChecksumSha256: aggregateChecksum, schemaIdentity, schemaFingerprintMd5: schemaFingerprint, schemaContractArtifactSha256: schemaContractArtifactSha256 || null, verificationMode, artifactSha256: null },
+  manifest: { watermark: source.watermark, rowCount: rows.length, expectedRowCount, aggregateChecksumSha256: aggregateChecksum, schemaIdentity, migrationStateIdentity: migrationStateIdentity || null, schemaFingerprintMd5: schemaFingerprint, schemaContractArtifactSha256: schemaContractArtifactSha256 || null, verificationMode, artifactSha256: null },
   rows,
 };
 artifact.manifest.artifactSha256 = sha256(canonicalJson(artifact));

@@ -34,7 +34,14 @@ begin
   execute 'lock table public.social_review_events in share mode';
   select * into strict expected from pg_temp._social_rollback_evidence_ack;
   select count(*), encode(digest(convert_to(coalesce(string_agg(
-    actor_user_id::text || ':' || idempotency_key || ':' || encode(digest(convert_to(to_jsonb(r)::text, 'UTF8'), 'sha256'), 'hex'),
+    actor_user_id::text || ':' || idempotency_key || ':' || encode(digest(convert_to(concat_ws('|',
+      octet_length(r.actor_user_id::text)::text || ':' || r.actor_user_id::text,
+      octet_length(r.idempotency_key)::text || ':' || r.idempotency_key,
+      octet_length(r.request_payload::text)::text || ':' || r.request_payload::text,
+      case when r.result_row is null then '6:<NULL>' else octet_length(r.result_row::text)::text || ':' || r.result_row::text end,
+      octet_length(to_char(r.created_at at time zone 'UTC','YYYY-MM-DD"T"HH24:MI:SS.US"Z"'))::text || ':' || to_char(r.created_at at time zone 'UTC','YYYY-MM-DD"T"HH24:MI:SS.US"Z"'),
+      case when r.completed_at is null then '6:<NULL>' else octet_length(to_char(r.completed_at at time zone 'UTC','YYYY-MM-DD"T"HH24:MI:SS.US"Z"'))::text || ':' || to_char(r.completed_at at time zone 'UTC','YYYY-MM-DD"T"HH24:MI:SS.US"Z"') end
+    ), 'UTF8'), 'sha256'), 'hex'),
     E'\n' order by actor_user_id, idempotency_key), ''), 'UTF8'), 'sha256'), 'hex')
     into actual_correction_count, actual_correction_checksum from public.social_correction_requests r;
   select count(*) into actual_audit_batch_count from public.social_review_batches;
@@ -49,6 +56,80 @@ begin
      or actual_audit_event_count <> expected.audit_event_count
      or actual_audit_checksum <> expected.audit_linkage_checksum_sha256 then
     raise exception 'Rollback evidence no longer matches correction requests or immutable audit linkage';
+  end if;
+  if jsonb_typeof(expected.correction_requests) <> 'array'
+     or jsonb_array_length(expected.correction_requests) <> expected.correction_request_count
+     or exists (
+       select 1
+       from jsonb_array_elements(expected.correction_requests) item
+       left join public.social_correction_requests r
+         on r.actor_user_id::text=item->>'actorUserId' and r.idempotency_key=item->>'idempotencyKey'
+       where r.actor_user_id is null
+         or item->'retainedRow' <> jsonb_build_object(
+           'actor_user_id', r.actor_user_id::text,
+           'idempotency_key', r.idempotency_key,
+           'request_payload', r.request_payload,
+           'result_row', r.result_row,
+           'created_at', to_char(r.created_at at time zone 'UTC','YYYY-MM-DD"T"HH24:MI:SS.US"Z"'),
+           'completed_at', case when r.completed_at is null then null else to_char(r.completed_at at time zone 'UTC','YYYY-MM-DD"T"HH24:MI:SS.US"Z"') end
+         )
+         or item->>'requestPayloadCanonical' <> r.request_payload::text
+         or item->>'resultRowCanonical' is distinct from case when r.result_row is null then null else r.result_row::text end
+         or item->>'currentChecksumSha256' <> encode(digest(convert_to(concat_ws('|',
+           octet_length(item->>'actorUserId')::text || ':' || (item->>'actorUserId'),
+           octet_length(item->>'idempotencyKey')::text || ':' || (item->>'idempotencyKey'),
+           octet_length(item->>'requestPayloadCanonical')::text || ':' || (item->>'requestPayloadCanonical'),
+           case when item->>'resultRowCanonical' is null then '6:<NULL>' else octet_length(item->>'resultRowCanonical')::text || ':' || (item->>'resultRowCanonical') end,
+           octet_length(item->>'createdAt')::text || ':' || (item->>'createdAt'),
+           case when item->>'completedAt' is null then '6:<NULL>' else octet_length(item->>'completedAt')::text || ':' || (item->>'completedAt') end
+         ), 'UTF8'), 'sha256'), 'hex')
+         or item->'requestPayload' <> r.request_payload
+         or item->'resultRow' is distinct from r.result_row
+         or item->>'createdAt' <> to_char(r.created_at at time zone 'UTC','YYYY-MM-DD"T"HH24:MI:SS.US"Z"')
+         or item->>'completedAt' is distinct from case when r.completed_at is null then null else to_char(r.completed_at at time zone 'UTC','YYYY-MM-DD"T"HH24:MI:SS.US"Z"') end
+         or item->'auditEventIds' <> coalesce((
+           select jsonb_agg(e.id::text order by e.id)
+           from public.social_review_events e join public.social_review_batches b on b.id=e.batch_id
+           where e.actor_user_id=r.actor_user_id
+             and e.social_thread_id=(r.request_payload->>'social_thread_id')::uuid
+             and b.criteria->>'idempotency_key'=r.idempotency_key
+         ), '[]'::jsonb)
+         or item->'auditBatchIds' <> coalesce((
+           select jsonb_agg(distinct b.id::text order by b.id::text)
+           from public.social_review_events e join public.social_review_batches b on b.id=e.batch_id
+           where e.actor_user_id=r.actor_user_id
+             and e.social_thread_id=(r.request_payload->>'social_thread_id')::uuid
+             and b.criteria->>'idempotency_key'=r.idempotency_key
+         ), '[]'::jsonb)
+     )
+     or exists (
+       select 1
+       from jsonb_array_elements(expected.correction_requests) item
+       join public.social_correction_requests r
+         on r.actor_user_id::text=item->>'actorUserId' and r.idempotency_key=item->>'idempotencyKey'
+       left join public.social_review_events e on e.id::text=item->'auditEventIds'->>0
+       left join public.social_review_batches b on b.id=e.batch_id
+       where r.completed_at is not null and (
+         jsonb_array_length(item->'auditEventIds') <> 1
+         or jsonb_array_length(item->'auditBatchIds') <> 1
+         or item->'auditBatchIds'->>0 <> b.id::text
+         or e.actor_user_id <> r.actor_user_id
+         or e.social_thread_id::text <> r.request_payload->>'social_thread_id'
+         or e.district_id <> r.request_payload->>'expected_district_id'
+         or e.action <> r.request_payload->>'action'
+         or e.resulting_version <> (r.request_payload->>'expected_version')::integer + 1
+         or e.before_state->>'id' <> r.request_payload->>'social_thread_id'
+         or (e.before_state->>'review_version')::integer <> (r.request_payload->>'expected_version')::integer
+         or e.after_state <> r.result_row
+         or b.actor_user_id <> r.actor_user_id
+         or b.district_id <> r.request_payload->>'expected_district_id'
+         or b.action <> r.request_payload->>'action'
+         or b.item_count <> 1
+         or b.criteria->>'social_thread_id' <> r.request_payload->>'social_thread_id'
+         or b.criteria->>'idempotency_key' <> r.idempotency_key
+       )
+     ) then
+    raise exception 'Rollback correction evidence content or source-bound audit proof is invalid';
   end if;
   if not exists (select 1 from pg_trigger where tgrelid='public.social_review_batches'::regclass and tgname='social_review_batches_immutable' and tgenabled='O')
      or not exists (select 1 from pg_trigger where tgrelid='public.social_review_events'::regclass and tgname='social_review_events_immutable' and tgenabled='O')
