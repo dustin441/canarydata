@@ -51,6 +51,10 @@ try{
  assert.ok(n1.objects.some(({kind,name})=>kind==='column'&&name==='social_correction_requests.actor_user_id'));
  assert.ok(n1.objects.some(({kind,name})=>kind==='function'&&name==='canary_apply_social_correction(uuid,text,uuid,text,integer,text)'));
  assert.ok(n1.objects.some(({kind,name})=>kind==='function'&&name==='canary_ingest_social_thread(jsonb)'));
+ assert.ok(n1.objects.some(({kind,name})=>kind==='relation_owner'&&name==='social_threads'));
+ assert.ok(n1.objects.some(({kind,name})=>kind==='relation_owner'&&name==='social_correction_requests'));
+ assert.ok(n1.objects.some(({kind,name})=>kind==='function_owner'&&name==='canary_assert_social_reviewer(uuid)'));
+ assert.ok(n1.objects.some(({kind,name})=>kind==='function_owner'&&name==='canary_apply_social_correction(uuid,text,uuid,text,integer,text)'));
  assert.ok(Number.isSafeInteger(n1.task4_object_oids.social_correction_requests));
  await writeFile(join(temp,'n1-raw.txt'),n1Raw);
  await writeFile(join(temp,'n1.csv'),csv('social_visibility_contract',n1));
@@ -61,10 +65,10 @@ try{
  const boundRestoredVerify=await readFile(join(temp,'verify-restored.sql'),'utf8');
  const verifyMutationFails=(mutation,state='N-1')=>{
   const result=psql(`begin;${mutation};set canary.expected_social_state='${state}';set canary.expected_social_rows='6';set canary.expected_social_exclusions='1';${verify}`,false);
-  assert.match(result.stderr,new RegExp(`Social ${state} contract verification failed|requires complete exact Task 4 additive objects`));
+  assert.match(result.stderr,new RegExp(`Social ${state} contract verification failed|requires complete exact Task 4 additive objects|ownership differs from exact postgres baseline`));
  };
  const psqlDb=(database,sql,ok=true)=>{const result=spawnSync('docker',['exec','-i',container,'psql','-X','-qAt','-v','ON_ERROR_STOP=1','-U','postgres','-d',database],{input:sql,encoding:'utf8',maxBuffer:128*1024*1024});if(ok&&result.status!==0)throw new Error(result.stderr);if(!ok&&result.status===0)throw new Error('Expected SQL failure');return result;};
- const duplicateDatabase=(label,setup,expectedFresh,state='N-1')=>{
+ const duplicateDatabase=(label,setup,expectedFresh,state='N-1',verifyRestoredRemnant=false)=>{
   const database=`task4_${label}_${process.pid}`;
   run('docker',['exec',container,'createdb','-U','postgres','-T','postgres',database]);
   try{
@@ -78,6 +82,10 @@ try{
    }
    const result=psqlDb(database,`set canary.expected_social_state='${state}';set canary.expected_social_rows='6';set canary.expected_social_exclusions='1';${verify}`,false);
    assert.match(result.stderr,/requires complete exact Task 4 additive objects/i);
+   if(verifyRestoredRemnant){
+    const restoredResult=psqlDb(database,`drop function public.canary_apply_social_correction(uuid,text,uuid,text,integer,text);drop function public.canary_ingest_social_thread(jsonb);drop table public.social_correction_requests;${verifyRestored}`,false);
+    assert.match(restoredResult.stderr,/Task 4 table candidates remain in restored N-1/i);
+   }
   }finally{run('docker',['exec',container,'dropdb','-U','postgres','--force',database]);}
  };
  const task4Table=task4.slice(task4.indexOf('create table public.social_correction_requests'),task4.indexOf('create or replace function public.canary_apply_social_correction'));
@@ -106,6 +114,26 @@ try{
    alter function public.canary_ingest_social_thread(jsonb) rename to archived_task4_ingest;
    ${task4}`;
  duplicateDatabase('complete_n1',archiveAndRecreate,['table','apply','ingest']);
+ const reviewRepro=`alter table public.social_correction_requests rename to archived_task4_review_repro;
+   alter table public.archived_task4_review_repro rename constraint social_correction_requests_pkey to archived_task4_review_repro_pkey;
+   alter table public.archived_task4_review_repro rename constraint social_correction_requests_key_check to archived_task4_review_repro_key_check;
+   alter table public.archived_task4_review_repro rename constraint social_correction_requests_completion_check to archived_task4_review_repro_completion_check;
+   alter table public.archived_task4_review_repro rename column result_row to archived_result_row;
+   alter table public.archived_task4_review_repro add column remnant_marker text;
+   drop function public.canary_apply_social_correction(uuid,text,uuid,text,integer,text);
+   drop function public.canary_ingest_social_thread(jsonb);
+   ${task4}`;
+ duplicateDatabase('review_repro',reviewRepro,['table','apply','ingest'],'N-1',true);
+ const renamedSignatureRepro=`alter table public.social_correction_requests rename to archived_task4_renamed_signature;
+   alter table public.archived_task4_renamed_signature rename column actor_user_id to archived_actor;
+   alter table public.archived_task4_renamed_signature rename column idempotency_key to archived_key;
+   alter table public.archived_task4_renamed_signature rename column request_payload to archived_payload;
+   alter table public.archived_task4_renamed_signature rename column result_row to archived_result;
+   alter table public.archived_task4_renamed_signature add column remnant_marker boolean;
+   drop function public.canary_apply_social_correction(uuid,text,uuid,text,integer,text);
+   drop function public.canary_ingest_social_thread(jsonb);
+   ${task4}`;
+ duplicateDatabase('renamed_signature',renamedSignatureRepro,['table','apply','ingest'],'N-1',true);
  const functionDefinition=(signature)=>psql(`select pg_get_functiondef('${signature}'::regprocedure);`).stdout;
  const correctionDefaultDefinition=functionDefinition('public.canary_apply_social_correction(uuid,text,uuid,text,integer,text)').replace('p_idempotency_key text','p_idempotency_key text DEFAULT \'default-key\'::text');
  const ingestionDefaultDefinition=functionDefinition('public.canary_ingest_social_thread(jsonb)').replace('p_thread jsonb','p_thread jsonb DEFAULT \'{}\'::jsonb');
@@ -127,6 +155,8 @@ try{
  verifyMutationFails('alter table public.social_correction_requests disable row level security');
  verifyMutationFails('alter table public.social_correction_requests force row level security');
  verifyMutationFails('alter table public.social_correction_requests owner to authenticated');
+ verifyMutationFails('alter table public.social_threads owner to authenticated');
+ verifyMutationFails('alter function public.canary_assert_social_reviewer(uuid) owner to authenticated');
  verifyMutationFails('alter function public.canary_apply_social_correction(uuid,text,uuid,text,integer,text) owner to authenticated');
  verifyMutationFails('alter function public.canary_ingest_social_thread(jsonb) owner to authenticated');
  verifyMutationFails("create policy correction_requests_leak on public.social_correction_requests for select to authenticated using (true)");
@@ -198,6 +228,8 @@ try{
  verifyMutationFails(ingestionDefaultDefinition,'N');
  verifyMutationFails('alter table public.social_correction_requests disable row level security','N');
  verifyMutationFails('alter table public.social_correction_requests owner to authenticated','N');
+ verifyMutationFails('alter table public.social_threads owner to authenticated','N');
+ verifyMutationFails('alter function public.canary_assert_social_reviewer(uuid) owner to authenticated','N');
  verifyMutationFails('alter function public.canary_ingest_social_thread(jsonb) owner to authenticated','N');
  verifyMutationFails('grant select on public.social_correction_requests to service_role','N');
  verifyMutationFails('revoke execute on function public.canary_ingest_social_thread(jsonb) from service_role','N');
@@ -262,6 +294,12 @@ try{
  assert.equal(restored.verification_identity,'exact-restored-pure-n-1-non-sealing');
  assert.equal(restored.sealable,false);
  assert.equal(restored.pure_n1_schema_fingerprint_md5,pureN1.pure_n1_schema_fingerprint_md5);assert.deepEqual(functionMd5(),expectedFunctionMd5);
+ assert.ok(restored.objects.some(({kind,name})=>kind==='relation_owner'&&name==='social_threads'));
+ assert.ok(restored.objects.some(({kind,name})=>kind==='function_owner'&&name==='canary_assert_social_reviewer(uuid)'));
+ const restoredTableOwnerDrift=psql(`begin;alter table public.social_threads owner to authenticated;${boundRestoredVerify}`,false);
+ assert.match(restoredTableOwnerDrift.stderr,/Restored Social relation ownership differs from exact postgres baseline/i);
+ const restoredFunctionOwnerDrift=psql(`begin;alter function public.canary_assert_social_reviewer(uuid) owner to authenticated;${boundRestoredVerify}`,false);
+ assert.match(restoredFunctionOwnerDrift.stderr,/Restored Social function ownership differs from exact postgres baseline/i);
  await writeFile(join(temp,'restored.csv'),csv('social_restored_n1_verification',restored));
  node('scripts/verify-social-restored-n1.mjs',['--input',join(temp,'restored.csv'),'--baseline-artifact',join(temp,'pure-n1-baseline.json'),'--additive-contract',join(temp,'n1-contract.json'),'--output',join(temp,'restored-evidence.json')]);
  assert.equal(JSON.parse(await readFile(join(temp,'restored-evidence.json'),'utf8')).sealable,false);

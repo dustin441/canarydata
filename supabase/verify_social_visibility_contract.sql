@@ -26,21 +26,39 @@ declare
   task4_complete boolean;
 begin
   if to_regclass('public.social_threads') is null then raise exception 'social_threads is absent'; end if;
+  if (select count(*) from pg_class c join pg_namespace n on n.oid=c.relnamespace
+      where n.nspname='public' and c.relkind='r'
+        and c.relname in ('social_threads','social_review_batches','social_review_events')
+        and pg_get_userbyid(c.relowner)='postgres') <> 3 then
+    raise exception 'Social relation ownership differs from exact postgres baseline';
+  end if;
+  if exists(select 1 from pg_proc p join pg_namespace n on n.oid=p.pronamespace
+      where n.nspname='public'
+        and p.proname in ('canary_assert_social_reviewer','canary_review_social_thread','canary_bulk_review_social_threads','canary_apply_social_correction','canary_ingest_social_thread','prevent_social_review_audit_mutation','touch_social_updated_at')
+        and pg_get_userbyid(p.proowner)<>'postgres') then
+    raise exception 'Social function ownership differs from exact postgres baseline';
+  end if;
   -- Names are intentionally excluded from candidate discovery. A renamed Task 4 object must
   -- not become invisible when a migration rerun creates a fresh canonical replacement.
   select count(*),min(c.oid::bigint)::oid into task4_table_candidate_count,task4_table_candidate
   from pg_class c join pg_namespace n on n.oid=c.relnamespace
-  where n.nspname='public' and c.relkind='r'
-    and (select count(*) from pg_attribute a left join pg_attrdef d on d.adrelid=a.attrelid and d.adnum=a.attnum
-      where a.attrelid=c.oid and a.attnum>0 and not a.attisdropped and a.atttypmod=-1
-        and a.attidentity='' and a.attgenerated='' and (
-          (a.attname='actor_user_id' and a.atttypid='uuid'::regtype and a.attnotnull and d.oid is null)
-          or (a.attname='idempotency_key' and a.atttypid='text'::regtype and a.attnotnull and d.oid is null)
-          or (a.attname='request_payload' and a.atttypid='jsonb'::regtype and a.attnotnull and d.oid is null)
-          or (a.attname='result_row' and a.atttypid='jsonb'::regtype and not a.attnotnull and d.oid is null)
-          or (a.attname='created_at' and a.atttypid='timestamptz'::regtype and a.attnotnull and pg_get_expr(d.adbin,d.adrelid)='now()')
-          or (a.attname='completed_at' and a.atttypid='timestamptz'::regtype and not a.attnotnull and d.oid is null)
-        ))=6;
+  where n.nspname='public' and c.relkind='r' and (
+    (exists(select 1 from pg_attribute a where a.attrelid=c.oid and a.attnum>0 and not a.attisdropped and a.attname='actor_user_id' and a.atttypid='uuid'::regtype and a.attnotnull)
+      and exists(select 1 from pg_attribute a where a.attrelid=c.oid and a.attnum>0 and not a.attisdropped and a.attname='idempotency_key' and a.atttypid='text'::regtype and a.attnotnull)
+      and (select count(*) from pg_attribute a where a.attrelid=c.oid and a.attnum>0 and not a.attisdropped and (
+        (a.attname='request_payload' and a.atttypid='jsonb'::regtype)
+        or (a.attname='result_row' and a.atttypid='jsonb'::regtype)
+        or (a.attname='completed_at' and a.atttypid='timestamptz'::regtype)))>=1)
+    or
+    (exists(select 1 from pg_constraint con where con.conrelid=c.oid and con.contype='c'
+        and pg_get_constraintdef(con.oid,true) like 'CHECK (% ~ ''^[A-Za-z0-9][A-Za-z0-9._:-]{7,127}$''::text)')
+      and exists(select 1 from pg_constraint con where con.conrelid=c.oid and con.contype='p'
+        and cardinality(con.conkey)=2
+        and (select array_agg(a.atttypid order by a.atttypid) from unnest(con.conkey) k(attnum) join pg_attribute a on a.attrelid=c.oid and a.attnum=k.attnum)
+          = (select array_agg(x order by x) from unnest(array['uuid'::regtype::oid,'text'::regtype::oid]) x))
+      and exists(select 1 from pg_constraint con where con.conrelid=c.oid and con.contype='c'
+        and pg_get_constraintdef(con.oid,true) like 'CHECK (%IS NULL AND %IS NULL OR %IS NOT NULL AND %IS NOT NULL)'))
+  );
 
   select count(*),min(p.oid::bigint)::oid into task4_apply_candidate_count,task4_apply_candidate
   from pg_proc p join pg_namespace n on n.oid=p.pronamespace join pg_language l on l.oid=p.prolang
@@ -48,7 +66,7 @@ begin
     and oidvectortypes(p.proargtypes)='uuid, text, uuid, text, integer, text'
     and p.proargnames=ARRAY['p_actor_user_id','p_expected_district_id','p_social_thread_id','p_action','p_expected_version','p_idempotency_key']
     and p.prorettype='public.social_threads'::regtype and l.lanname='plpgsql' and p.prokind='f'
-    and p.prosecdef and not p.proisstrict and pg_get_userbyid(p.proowner)='postgres'
+    and p.prosecdef and not p.proisstrict
     and p.provolatile='v' and p.proparallel='u' and p.pronargdefaults=0 and p.proargdefaults is null
     and p.proconfig=ARRAY['search_path=pg_catalog, public'];
 
@@ -57,7 +75,7 @@ begin
   where n.nspname='public' and md5(p.prosrc)='89d2d1ef8f7a3ff7c26e74aeb450bd5c'
     and oidvectortypes(p.proargtypes)='jsonb' and p.proargnames=ARRAY['p_thread']
     and p.prorettype='public.social_threads'::regtype and l.lanname='plpgsql' and p.prokind='f'
-    and p.prosecdef and not p.proisstrict and pg_get_userbyid(p.proowner)='postgres'
+    and p.prosecdef and not p.proisstrict
     and p.provolatile='v' and p.proparallel='u' and p.pronargdefaults=0 and p.proargdefaults is null
     and p.proconfig=ARRAY['search_path=pg_catalog, public'];
 
@@ -150,7 +168,7 @@ end
 $verify$;
 
 with affected_relations as (
-  select c.oid,c.relname,c.relrowsecurity,c.relforcerowsecurity
+  select c.oid,c.relname,c.relowner,c.relrowsecurity,c.relforcerowsecurity
   from pg_class c join pg_namespace n on n.oid=c.relnamespace
   where n.nspname='public' and c.relname in ('social_threads','social_review_batches','social_review_events','social_correction_requests')
 ), contract as (
@@ -165,6 +183,9 @@ with affected_relations as (
   union all select 'function_grant',r.routine_name||':'||r.grantee||':'||r.privilege_type,concat_ws('|',r.grantor,r.is_grantable) from information_schema.routine_privileges r where r.routine_schema='public' and r.routine_name in ('canary_assert_social_reviewer','canary_review_social_thread','canary_bulk_review_social_threads','canary_apply_social_correction','canary_ingest_social_thread')
   union all select 'policy',p.tablename||'.'||p.policyname,concat_ws('|',p.permissive,array_to_string(p.roles,','),p.cmd,coalesce(p.qual,'<null>'),coalesce(p.with_check,'<null>')) from pg_policies p where p.schemaname='public' and p.tablename in (select relname from affected_relations)
   union all select 'rls',relname,concat_ws('|',relrowsecurity,relforcerowsecurity) from affected_relations
+  union all select 'relation_owner',relname,pg_get_userbyid(relowner) from affected_relations
+  union all select 'function_owner',p.oid::regprocedure::text,pg_get_userbyid(p.proowner) from pg_proc p join pg_namespace n on n.oid=p.pronamespace
+    where n.nspname='public' and p.proname in ('canary_assert_social_reviewer','canary_review_social_thread','canary_bulk_review_social_threads','canary_apply_social_correction','canary_ingest_social_thread','prevent_social_review_audit_mutation','touch_social_updated_at')
 ), status_counts as (
   select coalesce(jsonb_object_agg(visibility_status,n order by visibility_status),'{}'::jsonb) value from (select visibility_status,count(*) n from public.social_threads group by visibility_status)x
 ), relationship_counts as (
