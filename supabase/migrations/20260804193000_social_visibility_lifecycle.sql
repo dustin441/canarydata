@@ -21,7 +21,7 @@ create table public.social_correction_requests (
 );
 
 alter table public.social_correction_requests enable row level security;
-revoke all on table public.social_correction_requests from public, anon, authenticated;
+revoke all on table public.social_correction_requests from public, anon, authenticated, service_role;
 
 create or replace function public.canary_apply_social_correction(
   p_actor_user_id uuid,

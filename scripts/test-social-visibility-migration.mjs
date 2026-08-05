@@ -36,8 +36,11 @@ try{
  ('50000000-0000-0000-0000-000000000004','district-a',null,'meta','facebook','a-excluded-ambient','https://x/4','ambient','2026-08-01Z','excluded',3,null,null,'2026-08-01Z','2026-08-01Z'),
  ('50000000-0000-0000-0000-000000000005','district-b','22222222-2222-2222-2222-222222222222','meta','facebook','b-review-owned','https://x/5','owned','2026-08-01Z','review',4,null,null,'2026-08-01Z','2026-08-01Z'),
  ('50000000-0000-0000-0000-000000000006','district-b',null,'meta','facebook','b-review-ambient','https://x/6','ambient','2026-08-01Z','review',0,null,null,'2026-08-01Z','2026-08-01Z');`);
- const pureN1=parseJson(psql(`set canary.expected_social_state='N-1';set canary.expected_social_rows='6';set canary.expected_social_exclusions='1';${verify}`).stdout);
- assert.equal(pureN1.migration_state_identity,'task5-n-1');
+ const pureN1Raw=psql(`set canary.expected_social_state='N-1';set canary.expected_social_rows='6';set canary.expected_social_exclusions='1';${verify}`).stdout;
+ const pureN1=parseJson(pureN1Raw);
+ assert.equal(pureN1.migration_state_identity,'task5-restored-n-1');
+ await writeFile(join(temp,'pure-n1.csv'),csv('social_visibility_contract',pureN1));
+ node('scripts/capture-social-schema-contract.mjs',['--input',join(temp,'pure-n1.csv'),'--output',join(temp,'pure-n1-contract.json')]);
  psql(forward,false);psql(task4);
  const n1Raw=psql(`set canary.expected_social_state='N-1';set canary.expected_social_rows='6';set canary.expected_social_exclusions='1';${verify}`).stdout;
  const n1=parseJson(n1Raw);
@@ -70,14 +73,26 @@ try{
  verifyMutationFails('alter table public.social_correction_requests alter column request_payload drop not null');
  verifyMutationFails('alter table public.social_correction_requests disable row level security');
  verifyMutationFails('alter table public.social_correction_requests force row level security');
+ verifyMutationFails('alter table public.social_correction_requests owner to authenticated');
+ verifyMutationFails('alter function public.canary_apply_social_correction(uuid,text,uuid,text,integer,text) owner to authenticated');
+ verifyMutationFails('alter function public.canary_ingest_social_thread(jsonb) owner to authenticated');
  verifyMutationFails("create policy correction_requests_leak on public.social_correction_requests for select to authenticated using (true)");
  verifyMutationFails('grant select on public.social_correction_requests to authenticated');
+ verifyMutationFails('grant select on public.social_correction_requests to service_role');
+ verifyMutationFails('grant select on public.social_correction_requests to service_role with grant option');
  verifyMutationFails('grant execute on function public.canary_apply_social_correction(uuid,text,uuid,text,integer,text) to authenticated');
  verifyMutationFails('revoke execute on function public.canary_apply_social_correction(uuid,text,uuid,text,integer,text) from service_role');
+ verifyMutationFails('grant execute on function public.canary_ingest_social_thread(jsonb) to service_role with grant option');
  verifyMutationFails('alter function public.canary_apply_social_correction(uuid,text,uuid,text,integer,text) security invoker');
  verifyMutationFails('alter function public.canary_ingest_social_thread(jsonb) set search_path=public');
  verifyMutationFails(`create or replace function public.canary_ingest_social_thread(p_thread jsonb) returns public.social_threads language plpgsql security definer set search_path=pg_catalog,public as $malformed$ begin raise exception 'malformed'; end $malformed$`);
  verifyMutationFails(`drop function public.canary_ingest_social_thread(jsonb);create function public.canary_ingest_social_thread(p_thread text) returns public.social_threads language plpgsql security definer set search_path=pg_catalog,public as $malformed$ begin raise exception 'malformed'; end $malformed$`);
+ verifyMutationFails(`alter table public.social_correction_requests rename to social_correction_requests_hidden;
+   alter table public.social_correction_requests_hidden rename constraint social_correction_requests_pkey to correction_requests_hidden_pkey;
+   alter table public.social_correction_requests_hidden rename constraint social_correction_requests_key_check to correction_requests_hidden_key_check;
+   alter table public.social_correction_requests_hidden rename constraint social_correction_requests_completion_check to correction_requests_hidden_completion_check;
+   alter function public.canary_apply_social_correction(uuid,text,uuid,text,integer,text) rename to canary_apply_social_correction_hidden;
+   alter function public.canary_ingest_social_thread(jsonb) rename to canary_ingest_social_thread_hidden`);
  const unscopedMalformed=psql(`begin;alter table public.social_correction_requests drop constraint social_correction_requests_completion_check;${verify}`,false);
  assert.match(unscopedMalformed.stderr,/Social Task 4 structural contract verification failed/);
  await writeFile(join(temp,'n1-raw.txt'),n1Raw);
@@ -87,6 +102,8 @@ try{
  assert.equal(contract.toolVersion,'2.0.0');assert.equal(contract.migrationStateIdentity,'task5-n-1');assert.equal(contract.contract.schema_fingerprint_md5,n1.schema_fingerprint_md5);
  const rows=parseJson(psql(`select jsonb_build_object('watermark','2026-08-05T12:00:00.000000Z','rows',jsonb_agg(jsonb_build_object('id',id::text,'district_id',district_id,'relationship_type',relationship_type,'visibility_status',visibility_status,'review_version',review_version,'reviewed_at',case when reviewed_at is null then null else to_char(reviewed_at at time zone 'UTC','YYYY-MM-DD"T"HH24:MI:SS.US"Z"') end,'reviewed_by',reviewed_by::text,'created_at',to_char(created_at at time zone 'UTC','YYYY-MM-DD"T"HH24:MI:SS.US"Z"'),'updated_at',to_char(updated_at at time zone 'UTC','YYYY-MM-DD"T"HH24:MI:SS.US"Z"')) order by id)) from public.social_threads;`).stdout);
  await writeFile(join(temp,'rows.csv'),csv('social_visibility_backup',rows));
+ const pureBackup=node('scripts/backup-social-visibility.mjs',['--input',join(temp,'rows.csv'),'--schema-contract',join(temp,'pure-n1-contract.json'),'--output',join(temp,'pure-n1-backup.json')],false);
+ assert.match(pureBackup.stderr,/task5-n-1/i);
  node('scripts/backup-social-visibility.mjs',['--input',join(temp,'rows.csv'),'--schema-contract',join(temp,'n1-contract.json'),'--output',join(temp,'backup.json')]);
  const backup=JSON.parse(await readFile(join(temp,'backup.json'),'utf8'));
  assert.equal(backup.manifest.verificationMode,'production-sealed-schema-contract');assert.equal(backup.manifest.schemaContractArtifactSha256,contract.artifactSha256);assert.equal(backup.manifest.rowCount,6);assert.equal(backup.manifest.expectedRowCount,6);
@@ -101,7 +118,11 @@ try{
  verifyMutationFails(correctionDefaultDefinition,'N');
  verifyMutationFails(ingestionDefaultDefinition,'N');
  verifyMutationFails('alter table public.social_correction_requests disable row level security','N');
+ verifyMutationFails('alter table public.social_correction_requests owner to authenticated','N');
+ verifyMutationFails('alter function public.canary_ingest_social_thread(jsonb) owner to authenticated','N');
+ verifyMutationFails('grant select on public.social_correction_requests to service_role','N');
  verifyMutationFails('revoke execute on function public.canary_ingest_social_thread(jsonb) from service_role','N');
+ verifyMutationFails('grant execute on function public.canary_ingest_social_thread(jsonb) to service_role with grant option','N');
  verifyMutationFails(`create or replace function public.canary_apply_social_correction(p_actor_user_id uuid,p_expected_district_id text,p_social_thread_id uuid,p_action text,p_expected_version integer,p_idempotency_key text) returns public.social_threads language plpgsql security definer set search_path=pg_catalog,public as $malformed$ begin raise exception 'malformed'; end $malformed$`,'N');
  await writeFile(join(temp,'n-contract-input.csv'),csv('social_visibility_contract',n));
  node('scripts/capture-social-schema-contract.mjs',['--input',join(temp,'n-contract-input.csv'),'--output',join(temp,'n-contract.json')]);
@@ -149,6 +170,7 @@ try{
  psql(`insert into public.social_threads(district_id,provider,platform,external_thread_id,canonical_url,relationship_type,published_at,created_at,updated_at) values('district-b','meta','facebook','phantom-before-watermark','https://x/phantom','ambient','2026-08-05T11:00:00Z','2026-08-05T11:00:00Z','2026-08-05T11:00:00Z');`);
  psql(restoreSql,false);psql("delete from public.social_threads where external_thread_id='phantom-before-watermark';");psql(restoreSql);
  const restored=parseJson(psql(`set canary.expected_social_state='N-1';set canary.expected_social_rows='9';set canary.expected_social_exclusions='2';${verify}`).stdout);
+ assert.equal(restored.migration_state_identity,'task5-restored-n-1');
  assert.equal(restored.schema_fingerprint_md5,pureN1.schema_fingerprint_md5);assert.notEqual(restored.schema_fingerprint_md5,n1.schema_fingerprint_md5);assert.deepEqual(functionMd5(),expectedFunctionMd5);
  assert.equal(psql(`select visibility_status from social_threads where id='${activeId}';`).stdout.trim(),'review');
  assert.equal(psql(`select visibility_status from social_threads where id='${excludedId}';`).stdout.trim(),'excluded');

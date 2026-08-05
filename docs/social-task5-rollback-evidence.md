@@ -5,7 +5,7 @@ This is a fail-closed rollback workflow, not authorization to execute against pr
 ## Required retained inputs
 
 - The production-sealed visibility backup created with `--schema-contract`. `--schema-identity`, `--schema-fingerprint`, and `--expected-row-count` are accepted only with the explicitly unsafe `--unsafe-dev-schema-assertions` flag; such artifacts are labeled `unsafe-development-only` and cannot be restored.
-- The hashed schema-contract artifact. For a production rollback backup it must record capture tool version and the exact `task5-n-1` migration-state identity. A `task5-n` contract cannot seal a rollback backup.
+- The hashed schema-contract artifact. For a production rollback backup it must record capture tool version and the exact additive `task5-n-1` migration-state identity, including complete Task 4 objects. Neither a `task5-n` nor a pure restored `task5-restored-n-1` contract can seal a rollback backup.
 - A fresh rollback-evidence artifact captured from the same watermark. It contains every correction request's payload, stored result, actor, idempotency key, timestamps, row checksum, aggregate checksum, and artifact hash; every post-watermark row's complete content, source identity, replay key, current checksum, audit IDs, and tenant; and immutable audit counts/linkage checksum.
 - Every post-watermark row must be replayable through the N-1 writer contract from sealed source identity and audit evidence. There is no generic or manifest-based deletion path; any row that cannot be replayed blocks exact rollback.
 
@@ -21,6 +21,6 @@ Normal one-column Supabase SQL Editor CSV downloads are supported by both schema
 6. Execute the generated down SQL only through the separately approved database channel. It locks and rechecks correction-request content and audit linkage before removing Task 4 runtime/idempotency objects. Missing audit tables, empty look-alikes, changed rows, or changed linkage abort the transaction.
 7. Generate restore/replay SQL with `npm run social:visibility:restore -- --artifact <backup> --rollback-evidence <evidence> --sql-output <new-restore-sql>`.
 8. Execute the generated restore SQL through the approved channel. It restores backed-up rows exactly, replays every N-created `active` row to N-1 `review`, and replays every N-created `excluded` row as excluded. There is no deletion path. Any unresolved row, checksum drift, source-identity mismatch, audit mismatch, or replay failure aborts the transaction.
-9. Capture and compare the restored N-1 contract and retain the visibility backup, schema contracts, rollback evidence, generated SQL, and verification output together.
+9. Capture the restored contract as `task5-restored-n-1`, compare its fingerprint to the captured pure baseline (which also rejects renamed Task 4 remnants), and retain the visibility backup, schema contracts, rollback evidence, generated SQL, and verification output together.
 
 Never edit artifact hashes, generate a fresh checksum to bless changed current state, use the unsafe development mode for a sealed backup, recreate missing audit tables, or delete an unresolved real row.

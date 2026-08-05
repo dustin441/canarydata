@@ -32,7 +32,10 @@ function parseContract(text) {
   const parsed = unwrapSingleSqlEditorValue(exported, 'social_visibility_contract');
   assert.equal(parsed.schema_identity, 'canary-social-visibility-v2');
   assert.match(parsed.schema_fingerprint_md5, /^[a-f0-9]{32}$/);
-  assert.match(parsed.migration_state_identity || '', /^task5-n(?:-1)?$/, 'Contract migration-state identity is missing or unknown');
+  assert.ok(
+    ['task5-n', 'task5-n-1', 'task5-restored-n-1'].includes(parsed.migration_state_identity),
+    'Contract migration-state identity is missing or unknown',
+  );
   return parsed;
 }
 

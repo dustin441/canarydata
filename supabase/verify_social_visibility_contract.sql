@@ -21,14 +21,33 @@ begin
   select
     exists (
       select 1 from pg_class c join pg_namespace n on n.oid=c.relnamespace
-      where n.nspname='public' and c.relname='social_correction_requests'
+      where n.nspname='public' and (
+        c.relname='social_correction_requests'
+        or (
+          c.relkind='r'
+          and (select count(*) from pg_attribute a where a.attrelid=c.oid and a.attnum>0 and not a.attisdropped)=6
+          and (select count(*) from pg_attribute a where a.attrelid=c.oid and a.attnum>0 and not a.attisdropped
+               and (a.attname,a.atttypid) in (
+                 ('actor_user_id','uuid'::regtype),('idempotency_key','text'::regtype),
+                 ('request_payload','jsonb'::regtype),('result_row','jsonb'::regtype),
+                 ('created_at','timestamptz'::regtype),('completed_at','timestamptz'::regtype)
+               ))=6
+        )
+      )
     ) or exists (
       select 1 from pg_proc p join pg_namespace n on n.oid=p.pronamespace
-      where n.nspname='public' and p.proname in ('canary_apply_social_correction','canary_ingest_social_thread')
+      where n.nspname='public' and (
+        p.proname in ('canary_apply_social_correction','canary_ingest_social_thread')
+        or (md5(p.prosrc)='2159589b09d094e5a9052fd399a1d3cf'
+            and oidvectortypes(p.proargtypes)='uuid, text, uuid, text, integer, text')
+        or (md5(p.prosrc)='89d2d1ef8f7a3ff7c26e74aeb450bd5c'
+            and oidvectortypes(p.proargtypes)='jsonb')
+      )
     ),
     coalesce((
       select
         c.relkind='r'
+        and pg_get_userbyid(c.relowner)='postgres'
         and c.relrowsecurity
         and not c.relforcerowsecurity
         and (select count(*) from pg_attribute a where a.attrelid=c.oid and a.attnum>0 and not a.attisdropped)=6
@@ -62,7 +81,6 @@ begin
         and not exists (
           select 1 from aclexplode(coalesce(c.relacl,acldefault('r',c.relowner))) acl
           where acl.grantee<>c.relowner
-            and (acl.grantee=0 or pg_get_userbyid(acl.grantee)<>'service_role' or acl.is_grantable)
         )
       from pg_class c join pg_namespace n on n.oid=c.relnamespace
       where n.nspname='public' and c.relname='social_correction_requests'
@@ -73,6 +91,7 @@ begin
     and coalesce((
       select bool_and(
         l.lanname='plpgsql' and p.prokind='f' and p.prosecdef and not p.proisstrict
+        and pg_get_userbyid(p.proowner)='postgres'
         and p.provolatile='v' and p.proparallel='u'
         -- Task 4 defines every input as required. Check both catalog representations so
         -- CREATE OR REPLACE cannot preserve the exact signature/body while adding defaults.
@@ -147,46 +166,69 @@ $verify$;
 with affected_relations as (
   select c.oid, c.relname, c.relrowsecurity, c.relforcerowsecurity
   from pg_class c join pg_namespace n on n.oid=c.relnamespace
-  where n.nspname='public' and c.relname in
-    ('social_threads','social_review_batches','social_review_events','social_correction_requests')
+  where n.nspname='public' and (
+    c.relname in ('social_threads','social_review_batches','social_review_events','social_correction_requests')
+    or (
+      c.relkind='r'
+      and (select count(*) from pg_attribute a where a.attrelid=c.oid and a.attnum>0 and not a.attisdropped)=6
+      and (select count(*) from pg_attribute a where a.attrelid=c.oid and a.attnum>0 and not a.attisdropped
+           and (a.attname,a.atttypid) in (
+             ('actor_user_id','uuid'::regtype),('idempotency_key','text'::regtype),
+             ('request_payload','jsonb'::regtype),('result_row','jsonb'::regtype),
+             ('created_at','timestamptz'::regtype),('completed_at','timestamptz'::regtype)
+           ))=6
+    )
+  )
 ), contract as (
   select 'column'::text kind, c.table_name||'.'||c.column_name name,
     concat_ws('|',c.data_type,c.udt_name,c.is_nullable,coalesce(c.column_default,'<null>')) definition
   from information_schema.columns c
-  where c.table_schema='public' and c.table_name in
-    ('social_threads','social_review_batches','social_review_events','social_correction_requests')
+  where c.table_schema='public' and c.table_name in (select relname from affected_relations)
   union all
   select 'constraint', r.relname||'.'||con.conname, pg_get_constraintdef(con.oid,true)
   from pg_constraint con join affected_relations r on r.oid=con.conrelid
   union all
   select 'function', p.oid::regprocedure::text, pg_get_functiondef(p.oid)
   from pg_proc p join pg_namespace n on n.oid=p.pronamespace
-  where n.nspname='public' and p.proname in
-    ('canary_assert_social_reviewer','canary_review_social_thread','canary_bulk_review_social_threads',
-     'canary_apply_social_correction','canary_ingest_social_thread','prevent_social_review_audit_mutation','touch_social_updated_at')
+  where n.nspname='public' and (
+    p.proname in ('canary_assert_social_reviewer','canary_review_social_thread','canary_bulk_review_social_threads',
+      'canary_apply_social_correction','canary_ingest_social_thread','prevent_social_review_audit_mutation','touch_social_updated_at')
+    or (md5(p.prosrc)='2159589b09d094e5a9052fd399a1d3cf'
+        and oidvectortypes(p.proargtypes)='uuid, text, uuid, text, integer, text')
+    or (md5(p.prosrc)='89d2d1ef8f7a3ff7c26e74aeb450bd5c'
+        and oidvectortypes(p.proargtypes)='jsonb')
+  )
   union all
   select 'trigger', r.relname||'.'||t.tgname, pg_get_triggerdef(t.oid,true)
   from pg_trigger t join affected_relations r on r.oid=t.tgrelid where not t.tgisinternal
   union all
   select 'index', i.tablename||'.'||i.indexname, i.indexdef
-  from pg_indexes i where i.schemaname='public' and i.tablename in
-    ('social_threads','social_review_batches','social_review_events','social_correction_requests')
+  from pg_indexes i where i.schemaname='public' and i.tablename in (select relname from affected_relations)
   union all
   select 'table_grant', g.table_name||':'||g.grantee||':'||g.privilege_type,
     concat_ws('|',g.grantor,g.is_grantable)
-  from information_schema.role_table_grants g where g.table_schema='public' and g.table_name in
-    ('social_threads','social_review_batches','social_review_events','social_correction_requests')
+  from information_schema.role_table_grants g where g.table_schema='public'
+    and g.table_name in (select relname from affected_relations)
   union all
   select 'function_grant', r.routine_name||':'||r.grantee||':'||r.privilege_type,
     concat_ws('|',r.grantor,r.is_grantable)
-  from information_schema.routine_privileges r where r.routine_schema='public' and r.routine_name in
-    ('canary_assert_social_reviewer','canary_review_social_thread','canary_bulk_review_social_threads',
-     'canary_apply_social_correction','canary_ingest_social_thread')
+  from information_schema.routine_privileges r where r.routine_schema='public' and (
+    r.routine_name in ('canary_assert_social_reviewer','canary_review_social_thread','canary_bulk_review_social_threads',
+      'canary_apply_social_correction','canary_ingest_social_thread')
+    or r.routine_name in (
+      select p.proname from pg_proc p join pg_namespace n on n.oid=p.pronamespace
+      where n.nspname='public' and (
+        (md5(p.prosrc)='2159589b09d094e5a9052fd399a1d3cf'
+          and oidvectortypes(p.proargtypes)='uuid, text, uuid, text, integer, text')
+        or (md5(p.prosrc)='89d2d1ef8f7a3ff7c26e74aeb450bd5c'
+          and oidvectortypes(p.proargtypes)='jsonb')
+      )
+    )
+  )
   union all
   select 'policy', p.tablename||'.'||p.policyname,
     concat_ws('|',p.permissive,array_to_string(p.roles,','),p.cmd,coalesce(p.qual,'<null>'),coalesce(p.with_check,'<null>'))
-  from pg_policies p where p.schemaname='public' and p.tablename in
-    ('social_threads','social_review_batches','social_review_events','social_correction_requests')
+  from pg_policies p where p.schemaname='public' and p.tablename in (select relname from affected_relations)
   union all
   select 'rls', relname, concat_ws('|',relrowsecurity,relforcerowsecurity) from affected_relations
 ), status_counts as (
@@ -229,7 +271,12 @@ select jsonb_pretty(jsonb_build_object(
       and schema_state.visibility_check = 'CHECK (visibility_status = ANY (ARRAY[''review''::text, ''approved''::text, ''active''::text, ''excluded''::text]))'
       and schema_state.legacy_review_present
       and schema_state.legacy_bulk_review_present
-      and (not schema_state.task4_any or schema_state.task4_complete) then 'task5-n-1'
+      and schema_state.task4_complete then 'task5-n-1'
+    when schema_state.visibility_default in ('''review''::text','''review''')
+      and schema_state.visibility_check = 'CHECK (visibility_status = ANY (ARRAY[''review''::text, ''approved''::text, ''active''::text, ''excluded''::text]))'
+      and schema_state.legacy_review_present
+      and schema_state.legacy_bulk_review_present
+      and not schema_state.task4_any then 'task5-restored-n-1'
     else 'unknown' end,
   'objects',object_rows.objects,'row_count',(select count(*) from public.social_threads),
   'exclusion_count',(select count(*) from public.social_threads where visibility_status='excluded'),
