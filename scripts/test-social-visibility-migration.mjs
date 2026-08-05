@@ -63,6 +63,49 @@ try{
   const result=psql(`begin;${mutation};set canary.expected_social_state='${state}';set canary.expected_social_rows='6';set canary.expected_social_exclusions='1';${verify}`,false);
   assert.match(result.stderr,new RegExp(`Social ${state} contract verification failed|requires complete exact Task 4 additive objects`));
  };
+ const psqlDb=(database,sql,ok=true)=>{const result=spawnSync('docker',['exec','-i',container,'psql','-X','-qAt','-v','ON_ERROR_STOP=1','-U','postgres','-d',database],{input:sql,encoding:'utf8',maxBuffer:128*1024*1024});if(ok&&result.status!==0)throw new Error(result.stderr);if(!ok&&result.status===0)throw new Error('Expected SQL failure');return result;};
+ const duplicateDatabase=(label,setup,expectedFresh,state='N-1')=>{
+  const database=`task4_${label}_${process.pid}`;
+  run('docker',['exec',container,'createdb','-U','postgres','-T','postgres',database]);
+  try{
+   const original=parseJson(psqlDb(database,"select jsonb_build_object('table','public.social_correction_requests'::regclass::oid,'apply','public.canary_apply_social_correction(uuid,text,uuid,text,integer,text)'::regprocedure::oid,'ingest','public.canary_ingest_social_thread(jsonb)'::regprocedure::oid);").stdout);
+   psqlDb(database,setup);
+   const replacement=parseJson(psqlDb(database,"select jsonb_build_object('table',to_regclass('public.social_correction_requests')::oid,'apply',to_regprocedure('public.canary_apply_social_correction(uuid,text,uuid,text,integer,text)')::oid,'ingest',to_regprocedure('public.canary_ingest_social_thread(jsonb)')::oid);").stdout);
+   for(const kind of ['table','apply','ingest']){
+    assert.notEqual(replacement[kind],null);
+    if(expectedFresh.includes(kind))assert.notEqual(replacement[kind],original[kind],`${label} must create a fresh canonical ${kind} OID`);
+    else assert.equal(replacement[kind],original[kind],`${label} must retain the canonical ${kind} OID`);
+   }
+   const result=psqlDb(database,`set canary.expected_social_state='${state}';set canary.expected_social_rows='6';set canary.expected_social_exclusions='1';${verify}`,false);
+   assert.match(result.stderr,/requires complete exact Task 4 additive objects/i);
+  }finally{run('docker',['exec',container,'dropdb','-U','postgres','--force',database]);}
+ };
+ const task4Table=task4.slice(task4.indexOf('create table public.social_correction_requests'),task4.indexOf('create or replace function public.canary_apply_social_correction'));
+ const task4Functions=task4.slice(task4.indexOf('create or replace function public.canary_apply_social_correction'),task4.indexOf('revoke all on function public.canary_apply_social_correction'));
+ const task4Grants=task4.slice(task4.indexOf('revoke all on function public.canary_apply_social_correction'),task4.indexOf('commit;'));
+ duplicateDatabase('functions',`alter function public.canary_apply_social_correction(uuid,text,uuid,text,integer,text) rename to archived_task4_apply;
+   alter function public.canary_ingest_social_thread(jsonb) rename to archived_task4_ingest;
+   ${task4Functions}${task4Grants}`,['apply','ingest']);
+ duplicateDatabase('apply_function',`alter function public.canary_apply_social_correction(uuid,text,uuid,text,integer,text) rename to archived_task4_apply;
+   ${task4Functions}${task4Grants}`,['apply']);
+ duplicateDatabase('ingest_function',`alter function public.canary_ingest_social_thread(jsonb) rename to archived_task4_ingest;
+   ${task4Functions}${task4Grants}`,['ingest']);
+ duplicateDatabase('table',`alter table public.social_correction_requests rename to archived_task4_requests;
+   alter table public.archived_task4_requests rename constraint social_correction_requests_pkey to archived_task4_requests_pkey;
+   alter table public.archived_task4_requests rename constraint social_correction_requests_key_check to archived_task4_requests_key_check;
+   alter table public.archived_task4_requests rename constraint social_correction_requests_completion_check to archived_task4_requests_completion_check;
+   ${task4Table}`,['table']);
+ duplicateDatabase('near_table',`create table public.archived_task4_near
+   (like public.social_correction_requests including defaults including constraints);
+   alter table public.archived_task4_near add column remnant_marker text`,[]);
+ const archiveAndRecreate=`alter table public.social_correction_requests rename to archived_task4_requests;
+   alter table public.archived_task4_requests rename constraint social_correction_requests_pkey to archived_task4_requests_pkey;
+   alter table public.archived_task4_requests rename constraint social_correction_requests_key_check to archived_task4_requests_key_check;
+   alter table public.archived_task4_requests rename constraint social_correction_requests_completion_check to archived_task4_requests_completion_check;
+   alter function public.canary_apply_social_correction(uuid,text,uuid,text,integer,text) rename to archived_task4_apply;
+   alter function public.canary_ingest_social_thread(jsonb) rename to archived_task4_ingest;
+   ${task4}`;
+ duplicateDatabase('complete_n1',archiveAndRecreate,['table','apply','ingest']);
  const functionDefinition=(signature)=>psql(`select pg_get_functiondef('${signature}'::regprocedure);`).stdout;
  const correctionDefaultDefinition=functionDefinition('public.canary_apply_social_correction(uuid,text,uuid,text,integer,text)').replace('p_idempotency_key text','p_idempotency_key text DEFAULT \'default-key\'::text');
  const ingestionDefaultDefinition=functionDefinition('public.canary_ingest_social_thread(jsonb)').replace('p_thread jsonb','p_thread jsonb DEFAULT \'{}\'::jsonb');
@@ -150,6 +193,7 @@ try{
  psql(forward);psql(forward);const officialBefore=n1.official_report_set_md5;
  const n=parseJson(psql(`set canary.expected_social_state='N';set canary.expected_social_rows='6';set canary.expected_social_exclusions='1';${verify}`).stdout);
  assert.deepEqual(n.status_counts,{active:5,excluded:1});assert.equal(n.official_report_set_md5,officialBefore);assert.equal(n.migration_state_identity,'task5-n');
+ duplicateDatabase('complete_n',archiveAndRecreate,['table','apply','ingest'],'N');
  verifyMutationFails(correctionDefaultDefinition,'N');
  verifyMutationFails(ingestionDefaultDefinition,'N');
  verifyMutationFails('alter table public.social_correction_requests disable row level security','N');
@@ -228,5 +272,5 @@ try{
  const restoredRows=parseJson(psql(`select jsonb_agg(jsonb_build_object('id',id::text,'district_id',district_id,'relationship_type',relationship_type,'visibility_status',visibility_status,'review_version',review_version,'reviewed_at',case when reviewed_at is null then null else to_char(reviewed_at at time zone 'UTC','YYYY-MM-DD"T"HH24:MI:SS.US"Z"') end,'reviewed_by',reviewed_by::text,'created_at',to_char(created_at at time zone 'UTC','YYYY-MM-DD"T"HH24:MI:SS.US"Z"'),'updated_at',to_char(updated_at at time zone 'UTC','YYYY-MM-DD"T"HH24:MI:SS.US"Z"')) order by id) from public.social_threads where created_at<='2026-08-05T12:00:00Z';`).stdout);
  assert.deepEqual(restoredRows,backup.rows.map(({canonical_checksum_sha256,...row})=>row));
  assert.equal(psql(`begin;select (public.canary_review_social_thread('aaaaaaaa-aaaa-aaaa-aaaa-aaaaaaaaaaaa','50000000-0000-0000-0000-000000000001','approve',0)).visibility_status;rollback;`).stdout.trim(),'approved');
- console.log('Social visibility migration PostgreSQL test passed: exact N-1 contracts, injection-safe evidence, source-bound pre-watermark correction restoration, retained checksum recomputation, audit preservation, exact restore, and fail-closed post-watermark replay.');
+ console.log('Social visibility migration PostgreSQL test passed: exact N-1/N Task 4 duplicate rejection, injection-safe evidence, source-bound pre-watermark correction restoration, retained checksum recomputation, audit preservation, exact restore, and fail-closed post-watermark replay.');
 }finally{if(started)spawnSync('docker',['rm','--force',container],{encoding:'utf8'});assert.equal(spawnSync('docker',['ps','-a','--filter',`name=^/${container}$`,'--format','{{.Names}}'],{encoding:'utf8'}).stdout.trim(),'');}

@@ -17,10 +17,54 @@ declare
   task4_table oid := to_regclass('public.social_correction_requests');
   task4_apply oid := to_regprocedure('public.canary_apply_social_correction(uuid,text,uuid,text,integer,text)');
   task4_ingest oid := to_regprocedure('public.canary_ingest_social_thread(jsonb)');
+  task4_table_candidate_count bigint;
+  task4_table_candidate oid;
+  task4_apply_candidate_count bigint;
+  task4_apply_candidate oid;
+  task4_ingest_candidate_count bigint;
+  task4_ingest_candidate oid;
   task4_complete boolean;
 begin
   if to_regclass('public.social_threads') is null then raise exception 'social_threads is absent'; end if;
+  -- Names are intentionally excluded from candidate discovery. A renamed Task 4 object must
+  -- not become invisible when a migration rerun creates a fresh canonical replacement.
+  select count(*),min(c.oid::bigint)::oid into task4_table_candidate_count,task4_table_candidate
+  from pg_class c join pg_namespace n on n.oid=c.relnamespace
+  where n.nspname='public' and c.relkind='r'
+    and (select count(*) from pg_attribute a left join pg_attrdef d on d.adrelid=a.attrelid and d.adnum=a.attnum
+      where a.attrelid=c.oid and a.attnum>0 and not a.attisdropped and a.atttypmod=-1
+        and a.attidentity='' and a.attgenerated='' and (
+          (a.attname='actor_user_id' and a.atttypid='uuid'::regtype and a.attnotnull and d.oid is null)
+          or (a.attname='idempotency_key' and a.atttypid='text'::regtype and a.attnotnull and d.oid is null)
+          or (a.attname='request_payload' and a.atttypid='jsonb'::regtype and a.attnotnull and d.oid is null)
+          or (a.attname='result_row' and a.atttypid='jsonb'::regtype and not a.attnotnull and d.oid is null)
+          or (a.attname='created_at' and a.atttypid='timestamptz'::regtype and a.attnotnull and pg_get_expr(d.adbin,d.adrelid)='now()')
+          or (a.attname='completed_at' and a.atttypid='timestamptz'::regtype and not a.attnotnull and d.oid is null)
+        ))=6;
+
+  select count(*),min(p.oid::bigint)::oid into task4_apply_candidate_count,task4_apply_candidate
+  from pg_proc p join pg_namespace n on n.oid=p.pronamespace join pg_language l on l.oid=p.prolang
+  where n.nspname='public' and md5(p.prosrc)='2159589b09d094e5a9052fd399a1d3cf'
+    and oidvectortypes(p.proargtypes)='uuid, text, uuid, text, integer, text'
+    and p.proargnames=ARRAY['p_actor_user_id','p_expected_district_id','p_social_thread_id','p_action','p_expected_version','p_idempotency_key']
+    and p.prorettype='public.social_threads'::regtype and l.lanname='plpgsql' and p.prokind='f'
+    and p.prosecdef and not p.proisstrict and pg_get_userbyid(p.proowner)='postgres'
+    and p.provolatile='v' and p.proparallel='u' and p.pronargdefaults=0 and p.proargdefaults is null
+    and p.proconfig=ARRAY['search_path=pg_catalog, public'];
+
+  select count(*),min(p.oid::bigint)::oid into task4_ingest_candidate_count,task4_ingest_candidate
+  from pg_proc p join pg_namespace n on n.oid=p.pronamespace join pg_language l on l.oid=p.prolang
+  where n.nspname='public' and md5(p.prosrc)='89d2d1ef8f7a3ff7c26e74aeb450bd5c'
+    and oidvectortypes(p.proargtypes)='jsonb' and p.proargnames=ARRAY['p_thread']
+    and p.prorettype='public.social_threads'::regtype and l.lanname='plpgsql' and p.prokind='f'
+    and p.prosecdef and not p.proisstrict and pg_get_userbyid(p.proowner)='postgres'
+    and p.provolatile='v' and p.proparallel='u' and p.pronargdefaults=0 and p.proargdefaults is null
+    and p.proconfig=ARRAY['search_path=pg_catalog, public'];
+
   task4_complete := task4_table is not null and task4_apply is not null and task4_ingest is not null
+    and task4_table_candidate_count=1 and task4_table_candidate=task4_table
+    and task4_apply_candidate_count=1 and task4_apply_candidate=task4_apply
+    and task4_ingest_candidate_count=1 and task4_ingest_candidate=task4_ingest
     and coalesce((
       select c.relkind='r' and pg_get_userbyid(c.relowner)='postgres' and c.relrowsecurity and not c.relforcerowsecurity
         and (select count(*) from pg_attribute a where a.attrelid=c.oid and a.attnum>0 and not a.attisdropped)=6
