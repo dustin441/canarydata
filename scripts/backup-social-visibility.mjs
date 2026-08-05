@@ -73,6 +73,7 @@ let expectedRowCount;
 let schemaContractArtifactSha256;
 let migrationStateIdentity;
 let verificationMode;
+let task4ObjectOids;
 const unsafeDevelopmentMode = argv.includes('--unsafe-dev-schema-assertions');
 if (get('schema-contract')) {
   const schemaArtifact = JSON.parse(await readFile(get('schema-contract'), 'utf8'));
@@ -98,6 +99,9 @@ if (get('schema-contract')) {
   expectedRowCount = contractRowCount;
   schemaContractArtifactSha256 = claimedSchemaHash;
   migrationStateIdentity = schemaArtifact.migrationStateIdentity;
+  task4ObjectOids = schemaArtifact.contract?.task4_object_oids;
+  assert.deepEqual(Object.keys(task4ObjectOids || {}).sort(), ['canary_apply_social_correction','canary_ingest_social_thread','social_correction_requests']);
+  for (const oid of Object.values(task4ObjectOids)) assert.ok(Number.isSafeInteger(oid) && oid > 0, 'Schema contract Task 4 OIDs are invalid');
   verificationMode = 'production-sealed-schema-contract';
 }
 const explicitExpectedRowCount = get('expected-row-count');
@@ -122,7 +126,7 @@ assert.match(schemaFingerprint || '', /^[a-f0-9]{32}$/, 'A verified schema finge
 const aggregateChecksum = sha256(rows.map((row) => `${row.id}:${row.canonical_checksum_sha256}`).join('\n'));
 const artifact = {
   format: 'canary-social-visibility-backup/v1',
-  manifest: { watermark: source.watermark, rowCount: rows.length, expectedRowCount, aggregateChecksumSha256: aggregateChecksum, schemaIdentity, migrationStateIdentity: migrationStateIdentity || null, schemaFingerprintMd5: schemaFingerprint, schemaContractArtifactSha256: schemaContractArtifactSha256 || null, verificationMode, artifactSha256: null },
+  manifest: { watermark: source.watermark, rowCount: rows.length, expectedRowCount, aggregateChecksumSha256: aggregateChecksum, schemaIdentity, migrationStateIdentity: migrationStateIdentity || null, schemaFingerprintMd5: schemaFingerprint, schemaContractArtifactSha256: schemaContractArtifactSha256 || null, task4ObjectOids: task4ObjectOids || null, verificationMode, artifactSha256: null },
   rows,
 };
 artifact.manifest.artifactSha256 = sha256(canonicalJson(artifact));

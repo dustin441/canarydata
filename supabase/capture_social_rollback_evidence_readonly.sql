@@ -92,6 +92,11 @@ with settings as (
 select jsonb_build_object(
   'watermark', to_char(settings.watermark at time zone 'UTC','YYYY-MM-DD"T"HH24:MI:SS.US"Z"'),
   'capturedAt', to_char(transaction_timestamp() at time zone 'UTC','YYYY-MM-DD"T"HH24:MI:SS.US"Z"'),
+  'task4ObjectOids', jsonb_build_object(
+    'social_correction_requests', 'public.social_correction_requests'::regclass::oid::bigint,
+    'canary_apply_social_correction', 'public.canary_apply_social_correction(uuid,text,uuid,text,integer,text)'::regprocedure::oid::bigint,
+    'canary_ingest_social_thread', 'public.canary_ingest_social_thread(jsonb)'::regprocedure::oid::bigint
+  ),
   'correctionRequests', correction_rows.rows,
   'postWatermarkRows', post_rows.rows,
   'audit', audit_counts.value

@@ -23,8 +23,8 @@ let started=false;
 try{
  run('docker',['run','--detach','--rm','--name',container,'-e','POSTGRES_PASSWORD=test-only',image]);started=true;
  for(let i=0;i<60;i+=1){const ready=spawnSync('docker',['exec',container,'psql','-X','-qAt','-U','postgres','-d','postgres','-c','select 1'],{encoding:'utf8'});if(ready.status===0)break;await new Promise((resolve)=>setTimeout(resolve,250));if(i===59)throw new Error(`PostgreSQL not ready: ${ready.stderr}`);}
- const [fixture,capturedN1,task4,forward,down,verify,captureEvidenceSql]=await Promise.all([
-  file('scripts/fixtures/social-n1.sql'),file('scripts/fixtures/social-n1-production-captured.sql'),file('supabase/migrations/20260804193000_social_visibility_lifecycle.sql'),file('supabase/migrations/20260805120000_social_visibility_active.sql'),file('supabase/rollbacks/20260805120000_social_visibility_active_down.sql'),file('supabase/verify_social_visibility_contract.sql'),file('supabase/capture_social_rollback_evidence_readonly.sql')]);
+ const [fixture,capturedN1,task4,forward,down,verify,verifyRestored,captureEvidenceSql]=await Promise.all([
+  file('scripts/fixtures/social-n1.sql'),file('scripts/fixtures/social-n1-production-captured.sql'),file('supabase/migrations/20260804193000_social_visibility_lifecycle.sql'),file('supabase/migrations/20260805120000_social_visibility_active.sql'),file('supabase/rollbacks/20260805120000_social_visibility_active_down.sql'),file('supabase/verify_social_visibility_contract.sql'),file('supabase/verify_social_restored_n1.sql'),file('supabase/capture_social_rollback_evidence_readonly.sql')]);
  psql(fixture);psql(capturedN1);
  const expectedFunctionMd5={canary_assert_social_reviewer:'f8acecd019a7182f9394ca2ce1d78a67',canary_bulk_review_social_threads:'8bd52d87cc68594f993f0e8f4b7c29bb',canary_review_social_thread:'c4f851bf607f11545d47ef2b04b29740',prevent_social_review_audit_mutation:'7f325916f94da40cbf15014e320345d6',touch_social_updated_at:'feff1b4a6c026311cd0a6164d5f96a65'};
  const functionMd5=()=>parseJson(psql(`select jsonb_object_agg(proname,definition_md5 order by proname) from (select p.proname,md5(pg_get_functiondef(p.oid)) definition_md5 from pg_proc p join pg_namespace n on n.oid=p.pronamespace where n.nspname='public' and p.proname=any(array['canary_assert_social_reviewer','canary_bulk_review_social_threads','canary_review_social_thread','prevent_social_review_audit_mutation','touch_social_updated_at'])) x;`).stdout);
@@ -36,11 +36,13 @@ try{
  ('50000000-0000-0000-0000-000000000004','district-a',null,'meta','facebook','a-excluded-ambient','https://x/4','ambient','2026-08-01Z','excluded',3,null,null,'2026-08-01Z','2026-08-01Z'),
  ('50000000-0000-0000-0000-000000000005','district-b','22222222-2222-2222-2222-222222222222','meta','facebook','b-review-owned','https://x/5','owned','2026-08-01Z','review',4,null,null,'2026-08-01Z','2026-08-01Z'),
  ('50000000-0000-0000-0000-000000000006','district-b',null,'meta','facebook','b-review-ambient','https://x/6','ambient','2026-08-01Z','review',0,null,null,'2026-08-01Z','2026-08-01Z');`);
- const pureN1Raw=psql(`set canary.expected_social_state='N-1';set canary.expected_social_rows='6';set canary.expected_social_exclusions='1';${verify}`).stdout;
- const pureN1=parseJson(pureN1Raw);
- assert.equal(pureN1.migration_state_identity,'task5-restored-n-1');
- await writeFile(join(temp,'pure-n1.csv'),csv('social_visibility_contract',pureN1));
- node('scripts/capture-social-schema-contract.mjs',['--input',join(temp,'pure-n1.csv'),'--output',join(temp,'pure-n1-contract.json')]);
+ const pureSeal=psql(`set canary.expected_social_state='N-1';${verify}`,false);
+ assert.match(pureSeal.stderr,/requires complete exact Task 4 additive objects/i);
+ const pureN1=parseJson(psql(verifyRestored).stdout);
+ assert.equal(pureN1.verification_identity,'exact-restored-pure-n-1-non-sealing');
+ assert.equal(pureN1.sealable,false);
+ await writeFile(join(temp,'pure-n1.csv'),csv('social_restored_n1_verification',pureN1));
+ node('scripts/verify-social-restored-n1.mjs',['--capture-baseline-input',join(temp,'pure-n1.csv'),'--output',join(temp,'pure-n1-baseline.json')]);
  psql(forward,false);psql(task4);
  const n1Raw=psql(`set canary.expected_social_state='N-1';set canary.expected_social_rows='6';set canary.expected_social_exclusions='1';${verify}`).stdout;
  const n1=parseJson(n1Raw);
@@ -49,9 +51,17 @@ try{
  assert.ok(n1.objects.some(({kind,name})=>kind==='column'&&name==='social_correction_requests.actor_user_id'));
  assert.ok(n1.objects.some(({kind,name})=>kind==='function'&&name==='canary_apply_social_correction(uuid,text,uuid,text,integer,text)'));
  assert.ok(n1.objects.some(({kind,name})=>kind==='function'&&name==='canary_ingest_social_thread(jsonb)'));
+ assert.ok(Number.isSafeInteger(n1.task4_object_oids.social_correction_requests));
+ await writeFile(join(temp,'n1-raw.txt'),n1Raw);
+ await writeFile(join(temp,'n1.csv'),csv('social_visibility_contract',n1));
+ node('scripts/capture-social-schema-contract.mjs',['--input',join(temp,'n1.csv'),'--output',join(temp,'n1-contract.json')]);
+ const contract=JSON.parse(await readFile(join(temp,'n1-contract.json'),'utf8'));
+ assert.equal(contract.toolVersion,'2.1.0');assert.equal(contract.migrationStateIdentity,'task5-n-1');assert.equal(contract.contract.schema_fingerprint_md5,n1.schema_fingerprint_md5);
+ node('scripts/verify-social-restored-n1.mjs',['--baseline-artifact',join(temp,'pure-n1-baseline.json'),'--additive-contract',join(temp,'n1-contract.json'),'--sql-output',join(temp,'verify-restored.sql')]);
+ const boundRestoredVerify=await readFile(join(temp,'verify-restored.sql'),'utf8');
  const verifyMutationFails=(mutation,state='N-1')=>{
   const result=psql(`begin;${mutation};set canary.expected_social_state='${state}';set canary.expected_social_rows='6';set canary.expected_social_exclusions='1';${verify}`,false);
-  assert.match(result.stderr,new RegExp(`Social ${state} contract verification failed`));
+  assert.match(result.stderr,new RegExp(`Social ${state} contract verification failed|requires complete exact Task 4 additive objects`));
  };
  const functionDefinition=(signature)=>psql(`select pg_get_functiondef('${signature}'::regprocedure);`).stdout;
  const correctionDefaultDefinition=functionDefinition('public.canary_apply_social_correction(uuid,text,uuid,text,integer,text)').replace('p_idempotency_key text','p_idempotency_key text DEFAULT \'default-key\'::text');
@@ -109,20 +119,26 @@ try{
    alter table public.social_correction_requests_missing_column add column remnant_marker text;
    drop function public.canary_apply_social_correction(uuid,text,uuid,text,integer,text);
    drop function public.canary_ingest_social_thread(jsonb)`);
- verifyMutationFails(`create table public.social_correction_requests_shadow
-   (like public.social_correction_requests including all);
-   alter table public.social_correction_requests_shadow add column remnant_marker text`);
+ const latestBypass=`alter table public.social_correction_requests rename to arbitrary_archive;
+   alter table public.arbitrary_archive rename column actor_user_id to archived_actor;
+   alter table public.arbitrary_archive rename column idempotency_key to archived_key;
+   alter table public.arbitrary_archive rename column request_payload to archived_payload;
+   alter table public.arbitrary_archive rename column result_row to archived_result;
+   alter table public.arbitrary_archive drop constraint social_correction_requests_key_check;
+   alter table public.arbitrary_archive drop constraint social_correction_requests_completion_check;
+   alter table public.arbitrary_archive alter column archived_result type json using archived_result::json;
+   alter function public.canary_apply_social_correction(uuid,text,uuid,text,integer,text) rename to arbitrary_apply_archive;
+   drop function public.canary_ingest_social_thread(jsonb)`;
+ verifyMutationFails(latestBypass);
+ const restoredBypass=psql(`begin;${latestBypass};${boundRestoredVerify}`,false);
+ assert.match(restoredBypass.stderr,/Captured Task 4 object OIDs still exist/i);
  const unscopedMalformed=psql(`begin;alter table public.social_correction_requests drop constraint social_correction_requests_completion_check;${verify}`,false);
- assert.match(unscopedMalformed.stderr,/Social Task 4 structural contract verification failed/);
- await writeFile(join(temp,'n1-raw.txt'),n1Raw);
- await writeFile(join(temp,'n1.csv'),csv('social_visibility_contract',n1));
- node('scripts/capture-social-schema-contract.mjs',['--input',join(temp,'n1.csv'),'--output',join(temp,'n1-contract.json')]);
- const contract=JSON.parse(await readFile(join(temp,'n1-contract.json'),'utf8'));
- assert.equal(contract.toolVersion,'2.0.0');assert.equal(contract.migrationStateIdentity,'task5-n-1');assert.equal(contract.contract.schema_fingerprint_md5,n1.schema_fingerprint_md5);
+ assert.match(unscopedMalformed.stderr,/requires complete exact Task 4 additive objects/);
+
  const rows=parseJson(psql(`select jsonb_build_object('watermark','2026-08-05T12:00:00.000000Z','rows',jsonb_agg(jsonb_build_object('id',id::text,'district_id',district_id,'relationship_type',relationship_type,'visibility_status',visibility_status,'review_version',review_version,'reviewed_at',case when reviewed_at is null then null else to_char(reviewed_at at time zone 'UTC','YYYY-MM-DD"T"HH24:MI:SS.US"Z"') end,'reviewed_by',reviewed_by::text,'created_at',to_char(created_at at time zone 'UTC','YYYY-MM-DD"T"HH24:MI:SS.US"Z"'),'updated_at',to_char(updated_at at time zone 'UTC','YYYY-MM-DD"T"HH24:MI:SS.US"Z"')) order by id)) from public.social_threads;`).stdout);
  await writeFile(join(temp,'rows.csv'),csv('social_visibility_backup',rows));
- const pureBackup=node('scripts/backup-social-visibility.mjs',['--input',join(temp,'rows.csv'),'--schema-contract',join(temp,'pure-n1-contract.json'),'--output',join(temp,'pure-n1-backup.json')],false);
- assert.match(pureBackup.stderr,/task5-n-1/i);
+ const pureBackup=node('scripts/backup-social-visibility.mjs',['--input',join(temp,'rows.csv'),'--schema-contract',join(temp,'pure-n1-baseline.json'),'--output',join(temp,'pure-n1-backup.json')],false);
+ assert.match(pureBackup.stderr,/schema contract|unsupported/i);
  node('scripts/backup-social-visibility.mjs',['--input',join(temp,'rows.csv'),'--schema-contract',join(temp,'n1-contract.json'),'--output',join(temp,'backup.json')]);
  const backup=JSON.parse(await readFile(join(temp,'backup.json'),'utf8'));
  assert.equal(backup.manifest.verificationMode,'production-sealed-schema-contract');assert.equal(backup.manifest.schemaContractArtifactSha256,contract.artifactSha256);assert.equal(backup.manifest.rowCount,6);assert.equal(backup.manifest.expectedRowCount,6);
@@ -174,6 +190,14 @@ try{
  const unbacked=psql(down,false);assert.match(unbacked.stderr,/prepare-social-rollback/i);assert.equal(psql('select count(*) from public.social_correction_requests;').stdout.trim(),'2');
  node('scripts/prepare-social-rollback.mjs',['--evidence-artifact',join(temp,'rollback-evidence.json'),'--sql-output',join(temp,'down.sql')]);
  const generatedDown=await readFile(join(temp,'down.sql'),'utf8');
+ const replacementDown=psql(`begin;alter table public.social_correction_requests rename to captured_task4_table;
+   alter function public.canary_apply_social_correction(uuid,text,uuid,text,integer,text) rename to captured_task4_apply;
+   alter function public.canary_ingest_social_thread(jsonb) rename to captured_task4_ingest;
+   create table public.social_correction_requests (like public.captured_task4_table including all);
+   create function public.canary_apply_social_correction(uuid,text,uuid,text,integer,text) returns public.social_threads language sql as 'select null::public.social_threads';
+   create function public.canary_ingest_social_thread(jsonb) returns public.social_threads language sql as 'select null::public.social_threads';
+   ${generatedDown}`,false);
+ assert.match(replacementDown.stderr,/replacements, not the exact captured OIDs/i);
  const missingAudit=psql(`begin; alter table public.social_review_events rename to social_review_events_missing; ${generatedDown}`,false);
  assert.match(missingAudit.stderr,/audit tables|social_review_events/i);assert.equal(psql("select to_regclass('public.social_review_events') is not null;").stdout.trim(),'t');
  const auditBefore=psql("select jsonb_build_object('b',(select count(*) from social_review_batches),'e',(select count(*) from social_review_events),'l',(select string_agg(id::text||':'||batch_id::text||':'||social_thread_id::text,',' order by id) from social_review_events));").stdout.trim();
@@ -188,9 +212,15 @@ try{
  const changed=psql(`begin; update social_threads set body='tampered' where id='${activeId}'; ${restoreSql}`,false);assert.match(changed.stderr,/changed|evidence|checksum/i);
  psql(`insert into public.social_threads(district_id,provider,platform,external_thread_id,canonical_url,relationship_type,published_at,created_at,updated_at) values('district-b','meta','facebook','phantom-before-watermark','https://x/phantom','ambient','2026-08-05T11:00:00Z','2026-08-05T11:00:00Z','2026-08-05T11:00:00Z');`);
  psql(restoreSql,false);psql("delete from public.social_threads where external_thread_id='phantom-before-watermark';");psql(restoreSql);
- const restored=parseJson(psql(`set canary.expected_social_state='N-1';set canary.expected_social_rows='9';set canary.expected_social_exclusions='2';${verify}`).stdout);
- assert.equal(restored.migration_state_identity,'task5-restored-n-1');
- assert.equal(restored.schema_fingerprint_md5,pureN1.schema_fingerprint_md5);assert.notEqual(restored.schema_fingerprint_md5,n1.schema_fingerprint_md5);assert.deepEqual(functionMd5(),expectedFunctionMd5);
+ const restoredSeal=psql(`set canary.expected_social_state='N-1';${verify}`,false);
+ assert.match(restoredSeal.stderr,/requires complete exact Task 4 additive objects/i);
+ const restored=parseJson(psql(boundRestoredVerify).stdout);
+ assert.equal(restored.verification_identity,'exact-restored-pure-n-1-non-sealing');
+ assert.equal(restored.sealable,false);
+ assert.equal(restored.pure_n1_schema_fingerprint_md5,pureN1.pure_n1_schema_fingerprint_md5);assert.deepEqual(functionMd5(),expectedFunctionMd5);
+ await writeFile(join(temp,'restored.csv'),csv('social_restored_n1_verification',restored));
+ node('scripts/verify-social-restored-n1.mjs',['--input',join(temp,'restored.csv'),'--baseline-artifact',join(temp,'pure-n1-baseline.json'),'--additive-contract',join(temp,'n1-contract.json'),'--output',join(temp,'restored-evidence.json')]);
+ assert.equal(JSON.parse(await readFile(join(temp,'restored-evidence.json'),'utf8')).sealable,false);
  assert.equal(psql(`select visibility_status from social_threads where id='${activeId}';`).stdout.trim(),'review');
  assert.equal(psql(`select visibility_status from social_threads where id='${excludedId}';`).stdout.trim(),'excluded');
  assert.equal(psql(`select visibility_status from social_threads where id='${qaId}';`).stdout.trim(),'review');

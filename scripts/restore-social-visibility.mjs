@@ -76,6 +76,7 @@ evidence.manifest.artifactSha256 = null;
 assert.equal(sha256(canonicalJson(evidence)), claimedEvidenceHash, 'Rollback evidence artifact SHA-256 mismatch');
 evidence.manifest.artifactSha256 = claimedEvidenceHash;
 assert.equal(evidence.manifest.visibilityBackupArtifactSha256, claimedArtifactHash, 'Rollback evidence belongs to a different visibility backup');
+assert.deepEqual(evidence.manifest.task4ObjectOids, artifact.manifest.task4ObjectOids, 'Rollback evidence is bound to different Task 4 object OIDs');
 assert.equal(evidence.manifest.watermark, artifact.manifest.watermark, 'Rollback evidence watermark mismatch');
 assert.ok(Array.isArray(evidence.postWatermarkRows), 'Rollback evidence must contain postWatermarkRows[]');
 assert.equal(evidence.postWatermarkRows.length, evidence.manifest.postWatermarkRowCount);

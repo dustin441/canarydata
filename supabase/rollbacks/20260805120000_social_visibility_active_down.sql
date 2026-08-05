@@ -33,6 +33,11 @@ begin
   execute 'lock table public.social_review_batches in share mode';
   execute 'lock table public.social_review_events in share mode';
   select * into strict expected from pg_temp._social_rollback_evidence_ack;
+  if 'public.social_correction_requests'::regclass::oid <> expected.task4_table_oid
+     or 'public.canary_apply_social_correction(uuid,text,uuid,text,integer,text)'::regprocedure::oid <> expected.task4_apply_oid
+     or 'public.canary_ingest_social_thread(jsonb)'::regprocedure::oid <> expected.task4_ingest_oid then
+    raise exception 'Named Task 4 objects are replacements, not the exact captured OIDs; reversal blocked';
+  end if;
   select count(*), encode(digest(convert_to(coalesce(string_agg(
     actor_user_id::text || ':' || idempotency_key || ':' || encode(digest(convert_to(concat_ws('|',
       octet_length(r.actor_user_id::text)::text || ':' || r.actor_user_id::text,

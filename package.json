@@ -19,6 +19,7 @@
     "test:social-db": "node scripts/test-social-lifecycle.mjs && node scripts/test-social-exclusion-replay.mjs && node scripts/test-social-race-interleavings.mjs",
     "test:social-migration": "node scripts/test-social-visibility-migration.mjs",
     "social:schema:capture": "node scripts/capture-social-schema-contract.mjs",
+    "social:schema:verify-restored": "node scripts/verify-social-restored-n1.mjs",
     "social:visibility:backup": "node scripts/backup-social-visibility.mjs",
     "social:rollback:evidence": "node scripts/capture-social-rollback-evidence.mjs",
     "social:rollback:prepare": "node scripts/prepare-social-rollback.mjs",

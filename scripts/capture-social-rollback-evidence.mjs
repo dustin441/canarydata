@@ -43,6 +43,7 @@ visibility.manifest.artifactSha256 = null;
 assert.equal(sha256(canonicalJson(visibility)), visibilityHash, 'Visibility backup artifact SHA-256 mismatch');
 visibility.manifest.artifactSha256 = visibilityHash;
 assert.equal(source.watermark, visibility.manifest.watermark, 'Rollback evidence watermark must match the visibility backup');
+assert.deepEqual(source.task4ObjectOids, visibility.manifest.task4ObjectOids, 'Rollback evidence Task 4 OIDs must match the sealed additive contract');
 assert.match(source.capturedAt || '', /^\d{4}-\d\d-\d\dT\d\d:\d\d:\d\d\.\d{6}Z$/);
 assert.ok(Array.isArray(source.correctionRequests));
 assert.ok(Array.isArray(source.postWatermarkRows));
@@ -124,6 +125,7 @@ const artifact = {
     watermark: source.watermark,
     capturedAt: source.capturedAt,
     visibilityBackupArtifactSha256: visibilityHash,
+    task4ObjectOids: visibility.manifest.task4ObjectOids,
     correctionRequestCount: source.correctionRequests.length,
     correctionAggregateChecksumSha256,
     postWatermarkRowCount: postWatermarkRows.length,

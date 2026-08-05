@@ -34,6 +34,9 @@ for (const [value, label] of [
   [artifact.manifest.audit?.batchCount, 'Audit batch count'],
   [artifact.manifest.audit?.eventCount, 'Audit event count'],
 ]) assertCount(value, label);
+const task4ObjectOids=artifact.manifest.task4ObjectOids;
+assert.deepEqual(Object.keys(task4ObjectOids||{}).sort(),['canary_apply_social_correction','canary_ingest_social_thread','social_correction_requests']);
+for(const [name,value] of Object.entries(task4ObjectOids)) assert.ok(Number.isSafeInteger(value)&&value>0,`Task 4 ${name} OID must be a positive safe integer`);
 assert.equal(artifact.correctionRequests.length, artifact.manifest.correctionRequestCount);
 assert.equal(artifact.postWatermarkRows.length, artifact.manifest.postWatermarkRowCount);
 assert.equal(artifact.postWatermarkRows.length, artifact.manifest.replayRowCount, 'Every post-watermark row must be replayed');
@@ -69,6 +72,9 @@ create temp table _social_rollback_evidence_ack (
   audit_batch_count bigint not null,
   audit_event_count bigint not null,
   audit_linkage_checksum_sha256 text not null,
+  task4_table_oid oid not null,
+  task4_apply_oid oid not null,
+  task4_ingest_oid oid not null,
   correction_requests jsonb not null
 ) on commit drop;
 insert into _social_rollback_evidence_ack values (
@@ -78,6 +84,9 @@ insert into _social_rollback_evidence_ack values (
   ${artifact.manifest.audit.batchCount},
   ${artifact.manifest.audit.eventCount},
   '${artifact.manifest.audit.linkageChecksumSha256}',
+  ${task4ObjectOids.social_correction_requests},
+  ${task4ObjectOids.canary_apply_social_correction},
+  ${task4ObjectOids.canary_ingest_social_thread},
   convert_from(decode('${correctionPayload}', 'base64'), 'UTF8')::jsonb
 );
 `;

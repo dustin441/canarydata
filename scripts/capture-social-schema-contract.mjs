@@ -5,7 +5,7 @@ import { readFile, writeFile } from 'node:fs/promises';
 import { spawnSync } from 'node:child_process';
 import { parseSqlEditorExport, unwrapSingleSqlEditorValue } from './lib/sql-editor-input.mjs';
 
-const TOOL_VERSION = '2.0.0';
+const TOOL_VERSION = '2.1.0';
 
 const args = Object.fromEntries(process.argv.slice(2).map((value, index, all) => value.startsWith('--') ? [value.slice(2), all[index + 1]?.startsWith('--') ? true : all[index + 1]] : [Symbol(), value]));
 const sqlPath = new URL('../supabase/verify_social_visibility_contract.sql', import.meta.url);
@@ -32,10 +32,13 @@ function parseContract(text) {
   const parsed = unwrapSingleSqlEditorValue(exported, 'social_visibility_contract');
   assert.equal(parsed.schema_identity, 'canary-social-visibility-v2');
   assert.match(parsed.schema_fingerprint_md5, /^[a-f0-9]{32}$/);
-  assert.ok(
-    ['task5-n', 'task5-n-1', 'task5-restored-n-1'].includes(parsed.migration_state_identity),
-    'Contract migration-state identity is missing or unknown',
-  );
+  assert.ok(['task5-n', 'task5-n-1'].includes(parsed.migration_state_identity), 'Production contract is not sealable');
+  assert.deepEqual(Object.keys(parsed.task4_object_oids || {}).sort(), [
+    'canary_apply_social_correction', 'canary_ingest_social_thread', 'social_correction_requests',
+  ]);
+  for (const oid of Object.values(parsed.task4_object_oids)) {
+    assert.ok(Number.isSafeInteger(oid) && oid > 0, 'Task 4 object OIDs must be positive safe integers');
+  }
   return parsed;
 }
 
