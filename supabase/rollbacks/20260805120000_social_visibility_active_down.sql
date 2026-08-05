@@ -1,6 +1,6 @@
--- Task 5 reverse schema migration. This restores the captured N-1 object contract only.
--- Exact pre-cutover row states must subsequently be restored with restore-social-visibility.mjs.
--- Run manually in the verified Canary production Supabase SQL Editor.
+-- Task 5 reverse schema migration. Do not run this file standalone.
+-- prepare-social-rollback.mjs embeds a verified, transaction-bound evidence acknowledgement;
+-- exact pre-cutover rows and post-watermark inverse replay follow via restore-social-visibility.mjs.
 begin;
 set local lock_timeout = '10s';
 set local statement_timeout = '5min';
@@ -11,12 +11,50 @@ do $preflight$
 declare
   current_default text;
   current_constraint text;
+  expected record;
+  actual_correction_count bigint;
+  actual_correction_checksum text;
+  actual_audit_batch_count bigint;
+  actual_audit_event_count bigint;
+  actual_audit_checksum text;
 begin
   if to_regclass('public.social_threads') is null
      or to_regclass('public.social_correction_requests') is null
+     or to_regclass('public.social_review_batches') is null
+     or to_regclass('public.social_review_events') is null
      or to_regprocedure('public.canary_apply_social_correction(uuid,text,uuid,text,integer,text)') is null
      or to_regprocedure('public.canary_ingest_social_thread(jsonb)') is null then
-    raise exception 'A complete Task 4/Task 5 N state is required for schema reversal';
+    raise exception 'A complete Task 4/Task 5 N state, including captured audit tables, is required for schema reversal';
+  end if;
+  if to_regclass('pg_temp._social_rollback_evidence_ack') is null then
+    raise exception 'Use prepare-social-rollback.mjs with a verified rollback-evidence artifact; standalone reversal is blocked';
+  end if;
+  execute 'lock table public.social_correction_requests in share row exclusive mode';
+  execute 'lock table public.social_review_batches in share mode';
+  execute 'lock table public.social_review_events in share mode';
+  select * into strict expected from pg_temp._social_rollback_evidence_ack;
+  select count(*), encode(digest(convert_to(coalesce(string_agg(
+    actor_user_id::text || ':' || idempotency_key || ':' || encode(digest(convert_to(to_jsonb(r)::text, 'UTF8'), 'sha256'), 'hex'),
+    E'\n' order by actor_user_id, idempotency_key), ''), 'UTF8'), 'sha256'), 'hex')
+    into actual_correction_count, actual_correction_checksum from public.social_correction_requests r;
+  select count(*) into actual_audit_batch_count from public.social_review_batches;
+  select count(*), encode(digest(convert_to(coalesce(string_agg(
+    id::text || ':' || batch_id::text || ':' || social_thread_id::text,
+    E'\n' order by id), ''), 'UTF8'), 'sha256'), 'hex')
+    into actual_audit_event_count, actual_audit_checksum from public.social_review_events;
+  if expected.artifact_sha256 !~ '^[a-f0-9]{64}$'
+     or actual_correction_count <> expected.correction_request_count
+     or actual_correction_checksum <> expected.correction_aggregate_checksum_sha256
+     or actual_audit_batch_count <> expected.audit_batch_count
+     or actual_audit_event_count <> expected.audit_event_count
+     or actual_audit_checksum <> expected.audit_linkage_checksum_sha256 then
+    raise exception 'Rollback evidence no longer matches correction requests or immutable audit linkage';
+  end if;
+  if not exists (select 1 from pg_trigger where tgrelid='public.social_review_batches'::regclass and tgname='social_review_batches_immutable' and tgenabled='O')
+     or not exists (select 1 from pg_trigger where tgrelid='public.social_review_events'::regclass and tgname='social_review_events_immutable' and tgenabled='O')
+     or not exists (select 1 from pg_constraint where conrelid='public.social_review_events'::regclass and contype='f' and confrelid='public.social_review_batches'::regclass and convalidated)
+     or not exists (select 1 from pg_constraint where conrelid='public.social_review_events'::regclass and contype='f' and confrelid='public.social_threads'::regclass and convalidated) then
+    raise exception 'Captured immutable audit table contract or linkage is absent';
   end if;
   if exists (select 1 from public.social_threads where visibility_status not in ('active', 'excluded')) then
     raise exception 'Unexpected Social status in N state';
@@ -48,14 +86,12 @@ begin
 end
 $preflight$;
 
--- Remove only Task 4 objects. Existing Social rows and audit history are never deleted.
+-- Remove only Task 4 runtime objects. Correction rows may be dropped only after the
+-- transaction-bound evidence acknowledgement above proves their retained artifact.
 drop function public.canary_apply_social_correction(uuid, text, uuid, text, integer, text);
 drop function public.canary_ingest_social_thread(jsonb);
 drop table public.social_correction_requests;
 
-alter table public.social_threads
-  add column if not exists reviewer_note text,
-  add column if not exists review_version integer not null default 0;
 alter table public.social_threads alter column visibility_status set default 'review';
 
 alter table public.social_threads
@@ -72,57 +108,6 @@ alter table public.social_threads
   check (reviewer_note is null or char_length(reviewer_note) <= 2000) not valid;
 alter table public.social_threads validate constraint social_threads_reviewer_note_length_check;
 
-create table if not exists public.social_review_batches (
-  id uuid primary key default gen_random_uuid(),
-  district_id text not null references public.districts(id) on delete restrict,
-  action text not null check (action in ('approve', 'exclude', 'restore', 'classification', 'note', 'bulk_approve_official', 'promote')),
-  actor_user_id uuid not null,
-  item_count integer not null check (item_count > 0),
-  criteria jsonb not null default '{}'::jsonb,
-  created_at timestamptz not null default now()
-);
-
-create table if not exists public.social_review_events (
-  id uuid primary key default gen_random_uuid(),
-  batch_id uuid not null references public.social_review_batches(id) on delete restrict,
-  district_id text not null references public.districts(id) on delete restrict,
-  social_thread_id uuid not null references public.social_threads(id) on delete restrict,
-  actor_user_id uuid not null,
-  action text not null check (action in ('approve', 'exclude', 'restore', 'classification', 'note', 'promote')),
-  before_state jsonb not null,
-  after_state jsonb not null,
-  resulting_version integer not null check (resulting_version > 0),
-  created_at timestamptz not null default now()
-);
-
-create index if not exists social_review_batches_district_created_idx
-  on public.social_review_batches (district_id, created_at desc);
-create index if not exists social_review_events_district_created_idx
-  on public.social_review_events (district_id, created_at desc);
-create index if not exists social_review_events_thread_created_idx
-  on public.social_review_events (social_thread_id, created_at desc);
-
-alter table public.social_review_batches enable row level security;
-alter table public.social_review_events enable row level security;
-
-create or replace function public.prevent_social_review_audit_mutation()
-returns trigger
-language plpgsql
-as $$
-begin
-  raise exception 'Social review audit records are immutable';
-end;
-$$;
-
-drop trigger if exists social_review_batches_immutable on public.social_review_batches;
-create trigger social_review_batches_immutable
-before update or delete on public.social_review_batches
-for each row execute function public.prevent_social_review_audit_mutation();
-
-drop trigger if exists social_review_events_immutable on public.social_review_events;
-create trigger social_review_events_immutable
-before update or delete on public.social_review_events
-for each row execute function public.prevent_social_review_audit_mutation();
 
 create or replace function public.canary_assert_social_reviewer(p_actor_user_id uuid)
 returns void

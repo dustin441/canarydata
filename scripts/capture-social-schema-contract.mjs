@@ -3,6 +3,9 @@ import assert from 'node:assert/strict';
 import { createHash } from 'node:crypto';
 import { readFile, writeFile } from 'node:fs/promises';
 import { spawnSync } from 'node:child_process';
+import { parseSqlEditorExport, unwrapSingleSqlEditorValue } from './lib/sql-editor-input.mjs';
+
+const TOOL_VERSION = '2.0.0';
 
 const args = Object.fromEntries(process.argv.slice(2).map((value, index, all) => value.startsWith('--') ? [value.slice(2), all[index + 1]?.startsWith('--') ? true : all[index + 1]] : [Symbol(), value]));
 const sqlPath = new URL('../supabase/verify_social_visibility_contract.sql', import.meta.url);
@@ -25,12 +28,11 @@ function psqlEnvironment(databaseUrl) {
 }
 
 function parseContract(text) {
-  const start = text.indexOf('{');
-  const end = text.lastIndexOf('}');
-  assert.ok(start >= 0 && end >= start, 'Input did not contain a contract JSON object');
-  const parsed = JSON.parse(text.slice(start, end + 1));
+  const exported = parseSqlEditorExport(text, 'social_visibility_contract');
+  const parsed = unwrapSingleSqlEditorValue(exported, 'social_visibility_contract');
   assert.equal(parsed.schema_identity, 'canary-social-visibility-v2');
   assert.match(parsed.schema_fingerprint_md5, /^[a-f0-9]{32}$/);
+  assert.match(parsed.migration_state_identity || '', /^task5-n(?:-1)?$/, 'Contract migration-state identity is missing or unknown');
   return parsed;
 }
 
@@ -48,7 +50,7 @@ function parseArtifact(text, label) {
 }
 
 if (args['sql-output']) {
-  await writeFile(args['sql-output'], sql);
+  await writeFile(args['sql-output'], sql, { mode: 0o600, flag: 'wx' });
   console.log(`Wrote read-only Social contract SQL: ${args['sql-output']}`);
   process.exit(0);
 }
@@ -80,9 +82,11 @@ const contract = parseContract(raw);
 const artifact = {
   format: 'canary-social-schema-contract/v1',
   capturedBy: 'scripts/capture-social-schema-contract.mjs',
+  toolVersion: TOOL_VERSION,
+  migrationStateIdentity: contract.migration_state_identity,
   contract,
 };
 artifact.artifactSha256 = sha256(canonicalJson({ ...artifact, artifactSha256: null }));
 const output = args.output || `social-schema-contract-${Date.now()}.json`;
-await writeFile(output, `${JSON.stringify(artifact, null, 2)}\n`, { mode: 0o600 });
+await writeFile(output, `${JSON.stringify(artifact, null, 2)}\n`, { mode: 0o600, flag: 'wx' });
 console.log(`Wrote Social schema contract (${artifact.artifactSha256}): ${output}`);

@@ -20,6 +20,8 @@
     "test:social-migration": "node scripts/test-social-visibility-migration.mjs",
     "social:schema:capture": "node scripts/capture-social-schema-contract.mjs",
     "social:visibility:backup": "node scripts/backup-social-visibility.mjs",
+    "social:rollback:evidence": "node scripts/capture-social-rollback-evidence.mjs",
+    "social:rollback:prepare": "node scripts/prepare-social-rollback.mjs",
     "social:visibility:restore": "node scripts/restore-social-visibility.mjs",
     "test:strategic-governance": "node scripts/test-strategic-governance.mjs",
     "test:melodi": "node scripts/test-melodi.mjs",

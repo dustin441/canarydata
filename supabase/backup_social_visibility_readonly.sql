@@ -1,8 +1,9 @@
 -- Canary Social pre-migration visibility backup
 -- READ ONLY. Run in the Canary production Supabase SQL Editor.
--- Save/copy the single result cell as JSON, then pass it directly to the command below.
--- The helper accepts the raw object, {"social_visibility_backup": {...}}, or the
--- one-row JSON export [{"social_visibility_backup": {...}}].
+-- Downloading the normal Supabase CSV result is supported, including its quoted,
+-- doubled-quote one-cell JSON representation. Raw/copy JSON remains supported.
+-- The helper accepts the raw object, {"social_visibility_backup": {...}}, the
+-- one-row JSON export [{"social_visibility_backup": {...}}], or that CSV download.
 -- node scripts/backup-social-visibility.mjs --input <saved.json> \
 --   --schema-contract <verified-contract.json> --output <protected-new-path.json>
 

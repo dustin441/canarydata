@@ -120,6 +120,13 @@ with affected_relations as (
 select jsonb_pretty(jsonb_build_object(
   'captured_at_utc',timezone('utc',now()),'server_version',current_setting('server_version'),
   'schema_identity','canary-social-visibility-v2','schema_fingerprint_md5',object_rows.fingerprint,
+  'migration_state_identity',case
+    when to_regclass('public.social_correction_requests') is not null
+      and to_regprocedure('public.canary_apply_social_correction(uuid,text,uuid,text,integer,text)') is not null
+      and to_regprocedure('public.canary_review_social_thread(uuid,uuid,text,integer,text,text)') is null then 'task5-n'
+    when to_regclass('public.social_correction_requests') is null
+      and to_regprocedure('public.canary_review_social_thread(uuid,uuid,text,integer,text,text)') is not null then 'task5-n-1'
+    else 'unknown' end,
   'objects',object_rows.objects,'row_count',(select count(*) from public.social_threads),
   'exclusion_count',(select count(*) from public.social_threads where visibility_status='excluded'),
   'status_counts',status_counts.value,'status_relationship_counts',relationship_counts.value,

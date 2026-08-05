@@ -3,6 +3,7 @@ import assert from 'node:assert/strict';
 import { createHash } from 'node:crypto';
 import { readFile, writeFile } from 'node:fs/promises';
 import { spawnSync } from 'node:child_process';
+import { parseSqlEditorExport, unwrapSingleSqlEditorValue } from './lib/sql-editor-input.mjs';
 
 const argv = process.argv.slice(2);
 const get = (name) => { const i = argv.indexOf(`--${name}`); return i < 0 ? undefined : argv[i + 1]; };
@@ -15,15 +16,7 @@ const canonicalRowText = (row) => fields.map((field) => {
 }).join('|');
 const rowChecksum = (row) => sha256(canonicalRowText(row));
 
-function normalizeSqlEditorInput(value) {
-  let normalized = value;
-  if (Array.isArray(normalized) && normalized.length === 1) normalized = normalized[0];
-  if (normalized && typeof normalized === 'object' && Object.hasOwn(normalized, 'social_visibility_backup')) {
-    normalized = normalized.social_visibility_backup;
-  }
-  if (typeof normalized === 'string') normalized = JSON.parse(normalized);
-  return normalized;
-}
+const normalizeSqlEditorInput = (value) => unwrapSingleSqlEditorValue(value, 'social_visibility_backup');
 
 function psqlEnvironment(databaseUrl) {
   const parsed = new URL(databaseUrl);
@@ -47,13 +40,13 @@ select jsonb_build_object(
 commit;`;
 
 if (get('sql-output')) {
-  await writeFile(get('sql-output'), exportSql);
+  await writeFile(get('sql-output'), exportSql, { mode: 0o600, flag: 'wx' });
   console.log(`Wrote read-only Social visibility export SQL: ${get('sql-output')}`);
   process.exit(0);
 }
 
 let source;
-if (get('input')) source = normalizeSqlEditorInput(JSON.parse(await readFile(get('input'), 'utf8')));
+if (get('input')) source = normalizeSqlEditorInput(parseSqlEditorExport(await readFile(get('input'), 'utf8'), 'social_visibility_backup'));
 else {
   const databaseUrl = get('database-url') || process.env.DATABASE_URL;
   assert.ok(databaseUrl, 'Provide --input from SQL Editor, --database-url, DATABASE_URL, or --sql-output');
@@ -77,6 +70,9 @@ const rows = source.rows.map((row) => {
 let schemaIdentity = get('schema-identity');
 let schemaFingerprint = get('schema-fingerprint');
 let expectedRowCount;
+let schemaContractArtifactSha256;
+let verificationMode;
+const unsafeDevelopmentMode = argv.includes('--unsafe-dev-schema-assertions');
 if (get('schema-contract')) {
   const schemaArtifact = JSON.parse(await readFile(get('schema-contract'), 'utf8'));
   assert.equal(schemaArtifact.format, 'canary-social-schema-contract/v1', 'Unsupported schema contract artifact');
@@ -93,9 +89,12 @@ if (get('schema-contract')) {
   assert.ok(Number.isSafeInteger(contractRowCount) && contractRowCount >= 0, 'Schema contract row count is invalid');
   assert.equal(rows.length, contractRowCount, 'Backup rows do not match schema contract row count');
   expectedRowCount = contractRowCount;
+  schemaContractArtifactSha256 = claimedSchemaHash;
+  verificationMode = 'production-sealed-schema-contract';
 }
 const explicitExpectedRowCount = get('expected-row-count');
 if (explicitExpectedRowCount !== undefined) {
+  assert.ok(unsafeDevelopmentMode, '--expected-row-count is unsafe and requires --unsafe-dev-schema-assertions');
   assert.match(explicitExpectedRowCount, /^(0|[1-9]\d*)$/, '--expected-row-count must be a non-negative integer');
   const parsedExpectedRowCount = Number(explicitExpectedRowCount);
   assert.ok(Number.isSafeInteger(parsedExpectedRowCount), '--expected-row-count exceeds the safe integer range');
@@ -105,17 +104,21 @@ if (explicitExpectedRowCount !== undefined) {
   }
   expectedRowCount = parsedExpectedRowCount;
 }
+if (!get('schema-contract')) {
+  assert.ok(unsafeDevelopmentMode, 'Production backups require --schema-contract; use --unsafe-dev-schema-assertions only for disposable development fixtures');
+  verificationMode = 'unsafe-development-only';
+}
 assert.notEqual(expectedRowCount, undefined, 'Provide --schema-contract or --expected-row-count to prove backup completeness');
 assert.equal(schemaIdentity, 'canary-social-visibility-v2', 'A verified Social schema identity is required');
 assert.match(schemaFingerprint || '', /^[a-f0-9]{32}$/, 'A verified schema fingerprint is required');
 const aggregateChecksum = sha256(rows.map((row) => `${row.id}:${row.canonical_checksum_sha256}`).join('\n'));
 const artifact = {
   format: 'canary-social-visibility-backup/v1',
-  manifest: { watermark: source.watermark, rowCount: rows.length, expectedRowCount, aggregateChecksumSha256: aggregateChecksum, schemaIdentity, schemaFingerprintMd5: schemaFingerprint, artifactSha256: null },
+  manifest: { watermark: source.watermark, rowCount: rows.length, expectedRowCount, aggregateChecksumSha256: aggregateChecksum, schemaIdentity, schemaFingerprintMd5: schemaFingerprint, schemaContractArtifactSha256: schemaContractArtifactSha256 || null, verificationMode, artifactSha256: null },
   rows,
 };
 artifact.manifest.artifactSha256 = sha256(canonicalJson(artifact));
 const output = get('output');
 assert.ok(output, '--output is required (choose a protected caller-controlled path)');
 await writeFile(output, `${JSON.stringify(artifact, null, 2)}\n`, { mode: 0o600, flag: 'wx' });
-console.log(`Wrote ${rows.length} Social visibility rows; watermark=${source.watermark}; aggregate=${aggregateChecksum}; artifact=${artifact.manifest.artifactSha256}; output=${output}`);
+console.log(`Wrote ${rows.length} Social visibility rows; verification=${verificationMode}; watermark=${source.watermark}; aggregate=${aggregateChecksum}; artifact=${artifact.manifest.artifactSha256}; output=${output}`);
