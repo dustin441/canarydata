@@ -75,10 +75,10 @@ with contract as (
     pg_catalog.pg_get_constraintdef(con.oid, true)
   from pg_catalog.pg_constraint con
   where con.conrelid in (
-    coalesce(to_regclass('public.social_threads'), 0),
-    coalesce(to_regclass('public.social_review_batches'), 0),
-    coalesce(to_regclass('public.social_review_events'), 0),
-    coalesce(to_regclass('public.social_correction_requests'), 0)
+    select c.oid from pg_catalog.pg_class c
+    join pg_catalog.pg_namespace n on n.oid = c.relnamespace
+    where n.nspname = 'public'
+      and c.relname in ('social_threads', 'social_review_batches', 'social_review_events', 'social_correction_requests')
   )
 
   union all
@@ -109,10 +109,10 @@ with contract as (
   from pg_catalog.pg_trigger t
   where not t.tgisinternal
     and t.tgrelid in (
-      coalesce(to_regclass('public.social_threads'), 0),
-      coalesce(to_regclass('public.social_review_batches'), 0),
-      coalesce(to_regclass('public.social_review_events'), 0),
-      coalesce(to_regclass('public.social_correction_requests'), 0)
+      select c.oid from pg_catalog.pg_class c
+      join pg_catalog.pg_namespace n on n.oid = c.relnamespace
+      where n.nspname = 'public'
+        and c.relname in ('social_threads', 'social_review_batches', 'social_review_events', 'social_correction_requests')
     )
 
   union all
