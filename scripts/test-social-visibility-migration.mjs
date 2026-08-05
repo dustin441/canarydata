@@ -50,6 +50,14 @@ try{
   const result=psql(`begin;${mutation};set canary.expected_social_state='${state}';set canary.expected_social_rows='6';set canary.expected_social_exclusions='1';${verify}`,false);
   assert.match(result.stderr,new RegExp(`Social ${state} contract verification failed`));
  };
+ const functionDefinition=(signature)=>psql(`select pg_get_functiondef('${signature}'::regprocedure);`).stdout;
+ const correctionDefaultDefinition=functionDefinition('public.canary_apply_social_correction(uuid,text,uuid,text,integer,text)').replace('p_idempotency_key text','p_idempotency_key text DEFAULT \'default-key\'::text');
+ const ingestionDefaultDefinition=functionDefinition('public.canary_ingest_social_thread(jsonb)').replace('p_thread jsonb','p_thread jsonb DEFAULT \'{}\'::jsonb');
+ assert.match(correctionDefaultDefinition,/p_idempotency_key text DEFAULT/);
+ assert.match(ingestionDefaultDefinition,/p_thread jsonb DEFAULT/);
+ verifyMutationFails(correctionDefaultDefinition);
+ verifyMutationFails(ingestionDefaultDefinition);
+ verifyMutationFails(`create function public.canary_ingest_social_thread(p_thread text default 'malformed') returns public.social_threads language plpgsql security definer set search_path=pg_catalog,public as $malformed$ begin raise exception 'malformed'; end $malformed$`);
  verifyMutationFails('drop function public.canary_ingest_social_thread(jsonb)');
  assert.equal(psql("select to_regprocedure('public.canary_ingest_social_thread(jsonb)') is not null;").stdout.trim(),'t');
  verifyMutationFails('alter table public.social_correction_requests drop constraint social_correction_requests_completion_check');
@@ -90,6 +98,8 @@ try{
  psql(forward);psql(forward);const officialBefore=n1.official_report_set_md5;
  const n=parseJson(psql(`set canary.expected_social_state='N';set canary.expected_social_rows='6';set canary.expected_social_exclusions='1';${verify}`).stdout);
  assert.deepEqual(n.status_counts,{active:5,excluded:1});assert.equal(n.official_report_set_md5,officialBefore);assert.equal(n.migration_state_identity,'task5-n');
+ verifyMutationFails(correctionDefaultDefinition,'N');
+ verifyMutationFails(ingestionDefaultDefinition,'N');
  verifyMutationFails('alter table public.social_correction_requests disable row level security','N');
  verifyMutationFails('revoke execute on function public.canary_ingest_social_thread(jsonb) from service_role','N');
  verifyMutationFails(`create or replace function public.canary_apply_social_correction(p_actor_user_id uuid,p_expected_district_id text,p_social_thread_id uuid,p_action text,p_expected_version integer,p_idempotency_key text) returns public.social_threads language plpgsql security definer set search_path=pg_catalog,public as $malformed$ begin raise exception 'malformed'; end $malformed$`,'N');

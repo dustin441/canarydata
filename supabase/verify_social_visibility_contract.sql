@@ -74,6 +74,9 @@ begin
       select bool_and(
         l.lanname='plpgsql' and p.prokind='f' and p.prosecdef and not p.proisstrict
         and p.provolatile='v' and p.proparallel='u'
+        -- Task 4 defines every input as required. Check both catalog representations so
+        -- CREATE OR REPLACE cannot preserve the exact signature/body while adding defaults.
+        and p.pronargdefaults=0 and p.proargdefaults is null
         and p.prorettype='public.social_threads'::regtype
         and p.proconfig=ARRAY['search_path=pg_catalog, public']
         and (
