@@ -14,8 +14,96 @@ declare
   expected_exclusions bigint := nullif(current_setting('canary.expected_social_exclusions', true), '')::bigint;
   actual_default text;
   actual_check text;
+  task4_any boolean;
+  task4_complete boolean;
 begin
   if to_regclass('public.social_threads') is null then raise exception 'social_threads is absent'; end if;
+  select
+    exists (
+      select 1 from pg_class c join pg_namespace n on n.oid=c.relnamespace
+      where n.nspname='public' and c.relname='social_correction_requests'
+    ) or exists (
+      select 1 from pg_proc p join pg_namespace n on n.oid=p.pronamespace
+      where n.nspname='public' and p.proname in ('canary_apply_social_correction','canary_ingest_social_thread')
+    ),
+    coalesce((
+      select
+        c.relkind='r'
+        and c.relrowsecurity
+        and not c.relforcerowsecurity
+        and (select count(*) from pg_attribute a where a.attrelid=c.oid and a.attnum>0 and not a.attisdropped)=6
+        and not exists (
+          select 1
+          from pg_attribute a left join pg_attrdef d on d.adrelid=a.attrelid and d.adnum=a.attnum
+          where a.attrelid=c.oid and a.attnum>0 and not a.attisdropped
+            and not coalesce((
+              a.atttypmod=-1 and a.attidentity='' and a.attgenerated='' and (
+                (a.attname='actor_user_id' and a.atttypid='uuid'::regtype and a.attnotnull and d.oid is null)
+                or (a.attname='idempotency_key' and a.atttypid='text'::regtype and a.attnotnull and d.oid is null)
+                or (a.attname='request_payload' and a.atttypid='jsonb'::regtype and a.attnotnull and d.oid is null)
+                or (a.attname='result_row' and a.atttypid='jsonb'::regtype and not a.attnotnull and d.oid is null)
+                or (a.attname='created_at' and a.atttypid='timestamptz'::regtype and a.attnotnull and pg_get_expr(d.adbin,d.adrelid)='now()')
+                or (a.attname='completed_at' and a.atttypid='timestamptz'::regtype and not a.attnotnull and d.oid is null)
+              )
+            ),false)
+        )
+        and (select count(*) from pg_constraint con where con.conrelid=c.oid)=3
+        and not exists (
+          select 1 from pg_constraint con where con.conrelid=c.oid and not (
+            (con.conname='social_correction_requests_pkey' and con.contype='p' and con.convalidated
+              and pg_get_constraintdef(con.oid,true)='PRIMARY KEY (actor_user_id, idempotency_key)')
+            or (con.conname='social_correction_requests_key_check' and con.contype='c' and con.convalidated
+              and pg_get_constraintdef(con.oid,true)='CHECK (idempotency_key ~ ''^[A-Za-z0-9][A-Za-z0-9._:-]{7,127}$''::text)')
+            or (con.conname='social_correction_requests_completion_check' and con.contype='c' and con.convalidated
+              and pg_get_constraintdef(con.oid,true)='CHECK (completed_at IS NULL AND result_row IS NULL OR completed_at IS NOT NULL AND result_row IS NOT NULL)')
+          )
+        )
+        and not exists (select 1 from pg_policy pol where pol.polrelid=c.oid)
+        and not exists (
+          select 1 from aclexplode(coalesce(c.relacl,acldefault('r',c.relowner))) acl
+          where acl.grantee<>c.relowner
+            and (acl.grantee=0 or pg_get_userbyid(acl.grantee)<>'service_role' or acl.is_grantable)
+        )
+      from pg_class c join pg_namespace n on n.oid=c.relnamespace
+      where n.nspname='public' and c.relname='social_correction_requests'
+    ),false)
+    and (select count(*) from pg_proc p join pg_namespace n on n.oid=p.pronamespace
+         where n.nspname='public' and p.proname in ('canary_apply_social_correction','canary_ingest_social_thread'))=2
+    -- Bind both RPC bodies to Task 4's migration source; catalog properties and ACLs are checked separately.
+    and coalesce((
+      select bool_and(
+        l.lanname='plpgsql' and p.prokind='f' and p.prosecdef and not p.proisstrict
+        and p.provolatile='v' and p.proparallel='u'
+        and p.prorettype='public.social_threads'::regtype
+        and p.proconfig=ARRAY['search_path=pg_catalog, public']
+        and (
+          (p.proname='canary_apply_social_correction'
+            and oidvectortypes(p.proargtypes)='uuid, text, uuid, text, integer, text'
+            and p.proargnames=ARRAY['p_actor_user_id','p_expected_district_id','p_social_thread_id','p_action','p_expected_version','p_idempotency_key']
+            and md5(p.prosrc)='2159589b09d094e5a9052fd399a1d3cf')
+          or (p.proname='canary_ingest_social_thread'
+            and oidvectortypes(p.proargtypes)='jsonb'
+            and p.proargnames=ARRAY['p_thread']
+            and md5(p.prosrc)='89d2d1ef8f7a3ff7c26e74aeb450bd5c')
+        )
+        and (select count(*) from aclexplode(coalesce(p.proacl,acldefault('f',p.proowner))) acl
+             where acl.grantee<>p.proowner)=1
+        and exists (
+          select 1 from aclexplode(coalesce(p.proacl,acldefault('f',p.proowner))) acl
+          where acl.grantee<>p.proowner and acl.grantee<>0
+            and pg_get_userbyid(acl.grantee)='service_role'
+            and acl.privilege_type='EXECUTE' and not acl.is_grantable
+        )
+      )
+      from pg_proc p join pg_namespace n on n.oid=p.pronamespace join pg_language l on l.oid=p.prolang
+      where n.nspname='public' and p.proname in ('canary_apply_social_correction','canary_ingest_social_thread')
+    ),false)
+  into task4_any,task4_complete;
+  perform set_config('canary.verified_task4_any',task4_any::text,true);
+  perform set_config('canary.verified_task4_complete',task4_complete::text,true);
+  if expected_state is null and task4_any and not task4_complete then
+    raise exception 'Social Task 4 structural contract verification failed';
+  end if;
   select pg_get_expr(d.adbin, d.adrelid) into actual_default
   from pg_attribute a join pg_attrdef d on d.adrelid=a.attrelid and d.adnum=a.attnum
   where a.attrelid='public.social_threads'::regclass and a.attname='visibility_status';
@@ -25,9 +113,7 @@ begin
     if actual_default is null or actual_default not in ('''active''::text','''active''')
        or actual_check is distinct from 'CHECK (visibility_status = ANY (ARRAY[''active''::text, ''excluded''::text]))'
        or exists(select 1 from public.social_threads where visibility_status not in ('active','excluded'))
-       or to_regclass('public.social_correction_requests') is null
-       or to_regprocedure('public.canary_apply_social_correction(uuid,text,uuid,text,integer,text)') is null
-       or to_regprocedure('public.canary_ingest_social_thread(jsonb)') is null
+       or not task4_complete
        or to_regprocedure('public.canary_review_social_thread(uuid,uuid,text,integer,text,text)') is not null
        or to_regprocedure('public.canary_bulk_review_social_threads(uuid,text,uuid[],text)') is not null then
       raise exception 'Social N contract verification failed';
@@ -37,17 +123,7 @@ begin
        or actual_check is distinct from 'CHECK (visibility_status = ANY (ARRAY[''review''::text, ''approved''::text, ''active''::text, ''excluded''::text]))'
        or to_regprocedure('public.canary_review_social_thread(uuid,uuid,text,integer,text,text)') is null
        or to_regprocedure('public.canary_bulk_review_social_threads(uuid,text,uuid[],text)') is null
-       or not (
-         (
-           to_regclass('public.social_correction_requests') is null
-           and to_regprocedure('public.canary_apply_social_correction(uuid,text,uuid,text,integer,text)') is null
-           and to_regprocedure('public.canary_ingest_social_thread(jsonb)') is null
-         ) or (
-           to_regclass('public.social_correction_requests') is not null
-           and to_regprocedure('public.canary_apply_social_correction(uuid,text,uuid,text,integer,text)') is not null
-           and to_regprocedure('public.canary_ingest_social_thread(jsonb)') is not null
-         )
-       ) then
+       or (task4_any and not task4_complete) then
       raise exception 'Social N-1 contract verification failed';
     end if;
   elsif expected_state is not null then raise exception 'Expected state must be N or N-1'; end if;
@@ -128,9 +204,8 @@ with affected_relations as (
     (select pg_get_constraintdef(c.oid,true)
      from pg_constraint c
      where c.conrelid='public.social_threads'::regclass and c.conname='social_threads_visibility_status_check') visibility_check,
-    to_regclass('public.social_correction_requests') is not null task4_table_present,
-    to_regprocedure('public.canary_apply_social_correction(uuid,text,uuid,text,integer,text)') is not null task4_apply_present,
-    to_regprocedure('public.canary_ingest_social_thread(jsonb)') is not null task4_ingest_present,
+    current_setting('canary.verified_task4_any')::boolean task4_any,
+    current_setting('canary.verified_task4_complete')::boolean task4_complete,
     to_regprocedure('public.canary_review_social_thread(uuid,uuid,text,integer,text,text)') is not null legacy_review_present,
     to_regprocedure('public.canary_bulk_review_social_threads(uuid,text,uuid[],text)') is not null legacy_bulk_review_present
 ), object_rows as (
@@ -144,26 +219,14 @@ select jsonb_pretty(jsonb_build_object(
   'migration_state_identity',case
     when schema_state.visibility_default in ('''active''::text','''active''')
       and schema_state.visibility_check = 'CHECK (visibility_status = ANY (ARRAY[''active''::text, ''excluded''::text]))'
-      and schema_state.task4_table_present
-      and schema_state.task4_apply_present
-      and schema_state.task4_ingest_present
+      and schema_state.task4_complete
       and not schema_state.legacy_review_present
       and not schema_state.legacy_bulk_review_present then 'task5-n'
     when schema_state.visibility_default in ('''review''::text','''review''')
       and schema_state.visibility_check = 'CHECK (visibility_status = ANY (ARRAY[''review''::text, ''approved''::text, ''active''::text, ''excluded''::text]))'
       and schema_state.legacy_review_present
       and schema_state.legacy_bulk_review_present
-      and (
-        (
-          not schema_state.task4_table_present
-          and not schema_state.task4_apply_present
-          and not schema_state.task4_ingest_present
-        ) or (
-          schema_state.task4_table_present
-          and schema_state.task4_apply_present
-          and schema_state.task4_ingest_present
-        )
-      ) then 'task5-n-1'
+      and (not schema_state.task4_any or schema_state.task4_complete) then 'task5-n-1'
     else 'unknown' end,
   'objects',object_rows.objects,'row_count',(select count(*) from public.social_threads),
   'exclusion_count',(select count(*) from public.social_threads where visibility_status='excluded'),
