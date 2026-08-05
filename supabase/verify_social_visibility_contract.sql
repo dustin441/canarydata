@@ -16,25 +16,48 @@ declare
   actual_check text;
   task4_any boolean;
   task4_complete boolean;
+  task4_unexpected_relation boolean;
 begin
   if to_regclass('public.social_threads') is null then raise exception 'social_threads is absent'; end if;
-  select
-    exists (
-      select 1 from pg_class c join pg_namespace n on n.oid=c.relnamespace
-      where n.nspname='public' and (
-        c.relname='social_correction_requests'
-        or (
-          c.relkind='r'
-          and (select count(*) from pg_attribute a where a.attrelid=c.oid and a.attnum>0 and not a.attisdropped)=6
-          and (select count(*) from pg_attribute a where a.attrelid=c.oid and a.attnum>0 and not a.attisdropped
-               and (a.attname,a.atttypid) in (
-                 ('actor_user_id','uuid'::regtype),('idempotency_key','text'::regtype),
-                 ('request_payload','jsonb'::regtype),('result_row','jsonb'::regtype),
-                 ('created_at','timestamptz'::regtype),('completed_at','timestamptz'::regtype)
-               ))=6
-        )
+  with task4_relation_candidates as (
+    select c.oid, c.relname
+    from pg_class c join pg_namespace n on n.oid=c.relnamespace
+    where n.nspname='public' and c.relkind in ('r','p') and (
+      c.relname='social_correction_requests' or (
+      -- A full named/type subset remains conclusive after a relation rename or added columns.
+      -- The name score catches a mutated required column; the type/constraint score catches
+      -- a renamed required column without depending on relation, column, or constraint names.
+      (select count(*) from pg_attribute a
+       where a.attrelid=c.oid and a.attnum>0 and not a.attisdropped
+         and (a.attname,a.atttypid) in (
+           ('actor_user_id','uuid'::regtype),('idempotency_key','text'::regtype),
+           ('request_payload','jsonb'::regtype),('result_row','jsonb'::regtype),
+           ('created_at','timestamptz'::regtype),('completed_at','timestamptz'::regtype)
+         ))=6
+      or (select count(*) from pg_attribute a
+          where a.attrelid=c.oid and a.attnum>0 and not a.attisdropped
+            and a.attname in ('actor_user_id','idempotency_key','request_payload','result_row','created_at','completed_at'))>=5
+      or (
+        (select count(*) from pg_attribute a where a.attrelid=c.oid and a.attnum>0 and not a.attisdropped and a.atttypid='uuid'::regtype)>=1
+        and (select count(*) from pg_attribute a where a.attrelid=c.oid and a.attnum>0 and not a.attisdropped and a.atttypid='text'::regtype)>=1
+        and (select count(*) from pg_attribute a where a.attrelid=c.oid and a.attnum>0 and not a.attisdropped and a.atttypid='jsonb'::regtype)>=2
+        and (select count(*) from pg_attribute a where a.attrelid=c.oid and a.attnum>0 and not a.attisdropped and a.atttypid='timestamptz'::regtype)>=2
+        and exists (select 1 from pg_constraint con where con.conrelid=c.oid and con.contype='p' and cardinality(con.conkey)=2)
+        and (select count(*) from pg_constraint con where con.conrelid=c.oid and con.contype='c')>=2
       )
-    ) or exists (
+      or (
+        exists (select 1 from pg_constraint con where con.conrelid=c.oid and con.contype='p' and cardinality(con.conkey)=2)
+        and exists (select 1 from pg_constraint con where con.conrelid=c.oid and con.contype='c'
+                    and pg_get_constraintdef(con.oid,true) like '%^[A-Za-z0-9][A-Za-z0-9._:-]{7,127}$%')
+        and exists (select 1 from pg_constraint con where con.conrelid=c.oid and con.contype='c'
+                    and lower(pg_get_constraintdef(con.oid,true)) like '%is null%'
+                    and lower(pg_get_constraintdef(con.oid,true)) like '%is not null%')
+      )
+    )
+    )
+  )
+  select
+    exists (select 1 from task4_relation_candidates) or exists (
       select 1 from pg_proc p join pg_namespace n on n.oid=p.pronamespace
       where n.nspname='public' and (
         p.proname in ('canary_apply_social_correction','canary_ingest_social_thread')
@@ -119,11 +142,12 @@ begin
       )
       from pg_proc p join pg_namespace n on n.oid=p.pronamespace join pg_language l on l.oid=p.prolang
       where n.nspname='public' and p.proname in ('canary_apply_social_correction','canary_ingest_social_thread')
-    ),false)
-  into task4_any,task4_complete;
+    ),false),
+    exists (select 1 from task4_relation_candidates where relname<>'social_correction_requests')
+  into task4_any,task4_complete,task4_unexpected_relation;
   perform set_config('canary.verified_task4_any',task4_any::text,true);
   perform set_config('canary.verified_task4_complete',task4_complete::text,true);
-  if expected_state is null and task4_any and not task4_complete then
+  if expected_state is null and ((task4_any and not task4_complete) or task4_unexpected_relation) then
     raise exception 'Social Task 4 structural contract verification failed';
   end if;
   select pg_get_expr(d.adbin, d.adrelid) into actual_default
@@ -136,6 +160,7 @@ begin
        or actual_check is distinct from 'CHECK (visibility_status = ANY (ARRAY[''active''::text, ''excluded''::text]))'
        or exists(select 1 from public.social_threads where visibility_status not in ('active','excluded'))
        or not task4_complete
+       or task4_unexpected_relation
        or to_regprocedure('public.canary_review_social_thread(uuid,uuid,text,integer,text,text)') is not null
        or to_regprocedure('public.canary_bulk_review_social_threads(uuid,text,uuid[],text)') is not null then
       raise exception 'Social N contract verification failed';
@@ -145,7 +170,8 @@ begin
        or actual_check is distinct from 'CHECK (visibility_status = ANY (ARRAY[''review''::text, ''approved''::text, ''active''::text, ''excluded''::text]))'
        or to_regprocedure('public.canary_review_social_thread(uuid,uuid,text,integer,text,text)') is null
        or to_regprocedure('public.canary_bulk_review_social_threads(uuid,text,uuid[],text)') is null
-       or (task4_any and not task4_complete) then
+       or (task4_any and not task4_complete)
+       or task4_unexpected_relation then
       raise exception 'Social N-1 contract verification failed';
     end if;
   elsif expected_state is not null then raise exception 'Expected state must be N or N-1'; end if;
@@ -163,21 +189,43 @@ begin
 end
 $verify$;
 
-with affected_relations as (
+with task4_relation_candidates as (
+  select c.oid
+  from pg_class c join pg_namespace n on n.oid=c.relnamespace
+  where n.nspname='public' and c.relkind in ('r','p') and (
+    c.relname='social_correction_requests' or (
+    (select count(*) from pg_attribute a where a.attrelid=c.oid and a.attnum>0 and not a.attisdropped
+     and (a.attname,a.atttypid) in (
+       ('actor_user_id','uuid'::regtype),('idempotency_key','text'::regtype),
+       ('request_payload','jsonb'::regtype),('result_row','jsonb'::regtype),
+       ('created_at','timestamptz'::regtype),('completed_at','timestamptz'::regtype)
+     ))=6
+    or (select count(*) from pg_attribute a where a.attrelid=c.oid and a.attnum>0 and not a.attisdropped
+        and a.attname in ('actor_user_id','idempotency_key','request_payload','result_row','created_at','completed_at'))>=5
+    or (
+      (select count(*) from pg_attribute a where a.attrelid=c.oid and a.attnum>0 and not a.attisdropped and a.atttypid='uuid'::regtype)>=1
+      and (select count(*) from pg_attribute a where a.attrelid=c.oid and a.attnum>0 and not a.attisdropped and a.atttypid='text'::regtype)>=1
+      and (select count(*) from pg_attribute a where a.attrelid=c.oid and a.attnum>0 and not a.attisdropped and a.atttypid='jsonb'::regtype)>=2
+      and (select count(*) from pg_attribute a where a.attrelid=c.oid and a.attnum>0 and not a.attisdropped and a.atttypid='timestamptz'::regtype)>=2
+      and exists (select 1 from pg_constraint con where con.conrelid=c.oid and con.contype='p' and cardinality(con.conkey)=2)
+      and (select count(*) from pg_constraint con where con.conrelid=c.oid and con.contype='c')>=2
+    )
+    or (
+      exists (select 1 from pg_constraint con where con.conrelid=c.oid and con.contype='p' and cardinality(con.conkey)=2)
+      and exists (select 1 from pg_constraint con where con.conrelid=c.oid and con.contype='c'
+                  and pg_get_constraintdef(con.oid,true) like '%^[A-Za-z0-9][A-Za-z0-9._:-]{7,127}$%')
+      and exists (select 1 from pg_constraint con where con.conrelid=c.oid and con.contype='c'
+                  and lower(pg_get_constraintdef(con.oid,true)) like '%is null%'
+                  and lower(pg_get_constraintdef(con.oid,true)) like '%is not null%')
+    )
+  )
+  )
+), affected_relations as (
   select c.oid, c.relname, c.relrowsecurity, c.relforcerowsecurity
   from pg_class c join pg_namespace n on n.oid=c.relnamespace
   where n.nspname='public' and (
     c.relname in ('social_threads','social_review_batches','social_review_events','social_correction_requests')
-    or (
-      c.relkind='r'
-      and (select count(*) from pg_attribute a where a.attrelid=c.oid and a.attnum>0 and not a.attisdropped)=6
-      and (select count(*) from pg_attribute a where a.attrelid=c.oid and a.attnum>0 and not a.attisdropped
-           and (a.attname,a.atttypid) in (
-             ('actor_user_id','uuid'::regtype),('idempotency_key','text'::regtype),
-             ('request_payload','jsonb'::regtype),('result_row','jsonb'::regtype),
-             ('created_at','timestamptz'::regtype),('completed_at','timestamptz'::regtype)
-           ))=6
-    )
+    or c.oid in (select oid from task4_relation_candidates)
   )
 ), contract as (
   select 'column'::text kind, c.table_name||'.'||c.column_name name,
