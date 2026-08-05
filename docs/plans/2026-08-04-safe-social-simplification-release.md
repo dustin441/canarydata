@@ -42,8 +42,8 @@ The inverse policy is not a lossy status substitution. On rollback, every row pr
 
 1. Capture every created or changed row in a post-watermark change set before rollback, with IDs, tenant, source, ownership, payload checksum, status, `review_version`, audit IDs, and timestamps.
 2. Preserve real content. Replay it through the N-1 writer contract using its source identity and idempotency key, mapping N-created `active` content to the N-1 creation status and retaining `excluded` as excluded. Reconcile IDs and checksums after replay.
-3. Delete a post-watermark row only when its ID is in the retained controlled-QA fixture manifest and its fixture marker, tenant, and checksum all match. Never discard or silently omit real content.
-4. Retain the pre-cutover backup, post-watermark change set, replay results, and unresolved reconciliation failures. Any unresolved real row blocks exact N-1 and keeps writers quiesced.
+3. Do not delete post-watermark rows during generic rollback, including rows labeled as QA fixtures. Replay every row through the N-1 writer contract from sealed source identity and audit evidence; any row that cannot be replayed blocks exact rollback.
+4. Retain the pre-cutover backup, post-watermark change set, replay results, and unresolved reconciliation failures. Any unresolved row blocks exact N-1 and keeps writers quiesced.
 
 ### Task 1: Rebuild the feature from the stable production baseline
 
@@ -168,7 +168,7 @@ The inverse policy is not a lossy status substitution. On rollback, every row pr
 4. Make the forward migration map valid existing `review` and `approved` rows to `active`, retain `active`, retain `excluded`, and change only the approved default/contracts. It must not infer official eligibility from status.
 5. Make the reverse migration restore the complete exact N-1 schema, including reversal of Task 4 lifecycle/RPC objects and Task 5 defaults/data-contract objects, plus exact N-1 defaults, constraints, function definitions, triggers, indexes, and grants. It must also support the exact-row restore script and the post-watermark inverse policy defined above.
 6. Run forward migration against a disposable N-1 copy. Execute `supabase/verify_social_visibility_contract.sql` and the Node capture script to compare expected N fingerprints, status-by-ownership counts, row checksums, exclusion counts, official-report sets, and lifecycle behavior.
-7. Capture post-watermark rows, run the reverse migration, restore preexisting rows, replay real post-watermark content through N-1, remove only checksum-verified QA fixtures, and execute the verification SQL/script again.
+7. Capture post-watermark rows, run the reverse migration, restore preexisting rows, replay every post-watermark row through N-1 from sealed source identity and audit evidence, fail closed on any unreplayable row, and execute the verification SQL/script again.
 8. Require exact N-1 fingerprints and restoration checks for column defaults, constraints, functions, triggers, indexes, grants, migration state, row counts, per-row checksums, aggregate checksums, statuses, versions, and audit linkage.
 
 **Gate:** Forward and reverse SQL run through the approved channel in a disposable environment and produce machine-readable N-1, N, and restored-N-1 evidence. Any missing schema object, grant mismatch, row/checksum mismatch, unresolved post-watermark row, or unavailable approved DB channel blocks implementation and release.
@@ -257,7 +257,7 @@ N is the Social v2 application, lifecycle/schema/data contract, and atomic write
 2. Capture the post-watermark change set and current N fingerprints/checksums.
 3. Restore prior writer definitions while inactive.
 4. Point traffic to the verified N-1 deployment only as the rehearsed bridge permits; otherwise keep N serving or enter maintenance until schema compatibility is safe.
-5. Run `supabase/rollbacks/<timestamp>_social_visibility_active_down.sql`, restore exact preexisting rows, replay real post-watermark rows through N-1, and remove only manifest-verified QA fixtures.
+5. Run `supabase/rollbacks/<timestamp>_social_visibility_active_down.sql`, restore exact preexisting rows, and replay every post-watermark row through N-1. Any unreplayable row blocks rollback; no generic or manifest-based deletion is allowed.
 6. Verify exact N-1 schema fingerprints, grants, row checksums, statuses, versions, audits, report sets, and migration state with the SQL and Node schema-contract tools.
 7. Restore/confirm the prior Vercel deployment ID and Git SHA.
 8. Reinstate prior writer active states one bounded source at a time, after all schema/data/app checks pass. Verify exactly one trigger and no duplicates.
@@ -278,7 +278,7 @@ N is the Social v2 application, lifecycle/schema/data contract, and atomic write
 6. Promote the reviewed N application. Run signed admin and client production smoke tests, including tenant denial, active-only client reads, hide/restore, audit/version outcomes, and MELODI.
 7. Only after signed role smoke tests pass, activate one replacement writer for one bounded source/district, confirm its corresponding old trigger is inactive, run a bounded canary, and verify exact atomic outcomes and no duplicates. Repeat one source/district at a time.
 8. Verify exactly one schedule/webhook per source/district, then resume normal schedules. Attach final deployment, schema, data, writer version/state, execution, and checksum read-backs.
-9. If any check fails, keep or return all writers to quiesced state and execute Task 7 rollback in exact order: capture post-watermark changes; restore writer definitions inactive; use the app bridge only when verified; reverse schema; restore preexisting rows; replay real new rows/remove only QA fixtures; verify exact N-1 schema/data; restore N-1 app; then reactivate prior writers one bounded source at a time.
+9. If any check fails, keep or return all writers to quiesced state and execute Task 7 rollback in exact order: capture post-watermark changes; restore writer definitions inactive; use the app bridge only when verified; reverse schema; restore preexisting rows; replay every new row through N-1 and fail closed on any unreplayable row; verify exact N-1 schema/data; restore N-1 app; then reactivate prior writers one bounded source at a time.
 10. Only after all checks pass, update ClickUp as live and ask Lesley to verify.
 
 **Gate:** Production is complete only after signed role evidence, exact N schema/data fingerprints, bounded canary evidence, exactly-one-trigger evidence, and deployment/writer read-back are attached. Rollback is complete only after exact N-1 schema restoration, exact preexisting-row restoration, reconciled post-watermark content, signed N-1 smoke evidence, and safe prior-writer reactivation are attached.
