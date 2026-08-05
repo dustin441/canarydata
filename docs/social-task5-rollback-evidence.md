@@ -13,7 +13,7 @@ Normal one-column Supabase SQL Editor CSV downloads are supported by both schema
 
 ## Handoff sequence
 
-1. Generate/run the read-only contract SQL and create the hashed `task5-n-1` contract artifact before the forward migration.
+1. After Task 4 is present and before Task 5, run the read-only contract SQL with `canary.expected_social_state='N-1'` and `canary.expected_social_rows='1032'`, then create the hashed `task5-n-1` contract artifact. The captured fingerprint must include the Task 4 correction/ingestion objects; the N-1 identity describes the pre-Task-5 visibility contract, not their absence.
 2. Confirm the retained visibility backup is production-sealed and its watermark is authoritative.
 3. Set `canary.social_backup_watermark` to that exact watermark and run `supabase/capture_social_rollback_evidence_readonly.sql` read-only. Save the single result cell as JSON or CSV.
 4. Create the evidence artifact with `npm run social:rollback:evidence -- --input <export> --visibility-backup <backup> --output <new-evidence-path>`. Every post-watermark row must carry the sealed source and audit evidence required for N-1 replay.

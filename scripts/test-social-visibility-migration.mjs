@@ -36,25 +36,35 @@ try{
  ('50000000-0000-0000-0000-000000000004','district-a',null,'meta','facebook','a-excluded-ambient','https://x/4','ambient','2026-08-01Z','excluded',3,null,null,'2026-08-01Z','2026-08-01Z'),
  ('50000000-0000-0000-0000-000000000005','district-b','22222222-2222-2222-2222-222222222222','meta','facebook','b-review-owned','https://x/5','owned','2026-08-01Z','review',4,null,null,'2026-08-01Z','2026-08-01Z'),
  ('50000000-0000-0000-0000-000000000006','district-b',null,'meta','facebook','b-review-ambient','https://x/6','ambient','2026-08-01Z','review',0,null,null,'2026-08-01Z','2026-08-01Z');`);
+ const pureN1=parseJson(psql(`set canary.expected_social_state='N-1';set canary.expected_social_rows='6';set canary.expected_social_exclusions='1';${verify}`).stdout);
+ assert.equal(pureN1.migration_state_identity,'task5-n-1');
+ psql(forward,false);psql(task4);
  const n1Raw=psql(`set canary.expected_social_state='N-1';set canary.expected_social_rows='6';set canary.expected_social_exclusions='1';${verify}`).stdout;
  const n1=parseJson(n1Raw);
  assert.equal(n1.migration_state_identity,'task5-n-1');
+ assert.notEqual(n1.schema_fingerprint_md5,pureN1.schema_fingerprint_md5);
+ assert.ok(n1.objects.some(({kind,name})=>kind==='column'&&name==='social_correction_requests.actor_user_id'));
+ assert.ok(n1.objects.some(({kind,name})=>kind==='function'&&name==='canary_apply_social_correction(uuid,text,uuid,text,integer,text)'));
+ assert.ok(n1.objects.some(({kind,name})=>kind==='function'&&name==='canary_ingest_social_thread(jsonb)'));
+ const partialTask4=psql(`begin;drop function public.canary_ingest_social_thread(jsonb);set canary.expected_social_state='N-1';set canary.expected_social_rows='6';set canary.expected_social_exclusions='1';${verify}`,false);
+ assert.match(partialTask4.stderr,/Social N-1 contract verification failed/);
+ assert.equal(psql("select to_regprocedure('public.canary_ingest_social_thread(jsonb)') is not null;").stdout.trim(),'t');
  await writeFile(join(temp,'n1-raw.txt'),n1Raw);
  await writeFile(join(temp,'n1.csv'),csv('social_visibility_contract',n1));
  node('scripts/capture-social-schema-contract.mjs',['--input',join(temp,'n1.csv'),'--output',join(temp,'n1-contract.json')]);
  const contract=JSON.parse(await readFile(join(temp,'n1-contract.json'),'utf8'));
- assert.equal(contract.toolVersion,'2.0.0');assert.equal(contract.migrationStateIdentity,'task5-n-1');
+ assert.equal(contract.toolVersion,'2.0.0');assert.equal(contract.migrationStateIdentity,'task5-n-1');assert.equal(contract.contract.schema_fingerprint_md5,n1.schema_fingerprint_md5);
  const rows=parseJson(psql(`select jsonb_build_object('watermark','2026-08-05T12:00:00.000000Z','rows',jsonb_agg(jsonb_build_object('id',id::text,'district_id',district_id,'relationship_type',relationship_type,'visibility_status',visibility_status,'review_version',review_version,'reviewed_at',case when reviewed_at is null then null else to_char(reviewed_at at time zone 'UTC','YYYY-MM-DD"T"HH24:MI:SS.US"Z"') end,'reviewed_by',reviewed_by::text,'created_at',to_char(created_at at time zone 'UTC','YYYY-MM-DD"T"HH24:MI:SS.US"Z"'),'updated_at',to_char(updated_at at time zone 'UTC','YYYY-MM-DD"T"HH24:MI:SS.US"Z"')) order by id)) from public.social_threads;`).stdout);
  await writeFile(join(temp,'rows.csv'),csv('social_visibility_backup',rows));
  node('scripts/backup-social-visibility.mjs',['--input',join(temp,'rows.csv'),'--schema-contract',join(temp,'n1-contract.json'),'--output',join(temp,'backup.json')]);
  const backup=JSON.parse(await readFile(join(temp,'backup.json'),'utf8'));
- assert.equal(backup.manifest.verificationMode,'production-sealed-schema-contract');assert.equal(backup.manifest.schemaContractArtifactSha256,contract.artifactSha256);
+ assert.equal(backup.manifest.verificationMode,'production-sealed-schema-contract');assert.equal(backup.manifest.schemaContractArtifactSha256,contract.artifactSha256);assert.equal(backup.manifest.rowCount,6);assert.equal(backup.manifest.expectedRowCount,6);
  assert.equal((await stat(join(temp,'backup.json'))).mode&0o777,0o600);
  const unsafe=node('scripts/backup-social-visibility.mjs',['--input',join(temp,'rows.csv'),'--schema-identity',n1.schema_identity,'--schema-fingerprint',n1.schema_fingerprint_md5,'--expected-row-count','6','--output',join(temp,'unsafe.json')],false);
  assert.match(unsafe.stderr,/unsafe-dev-schema-assertions/i);
  node('scripts/backup-social-visibility.mjs',['--input',join(temp,'rows.csv'),'--schema-identity',n1.schema_identity,'--schema-fingerprint',n1.schema_fingerprint_md5,'--expected-row-count','6','--unsafe-dev-schema-assertions','--output',join(temp,'unsafe.json')]);
  assert.equal(JSON.parse(await readFile(join(temp,'unsafe.json'),'utf8')).manifest.verificationMode,'unsafe-development-only');
- psql(forward,false);psql(task4);const officialBefore=n1.official_report_set_md5;psql(forward);psql(forward);
+ psql(forward);psql(forward);const officialBefore=n1.official_report_set_md5;
  const n=parseJson(psql(`set canary.expected_social_state='N';set canary.expected_social_rows='6';set canary.expected_social_exclusions='1';${verify}`).stdout);
  assert.deepEqual(n.status_counts,{active:5,excluded:1});assert.equal(n.official_report_set_md5,officialBefore);assert.equal(n.migration_state_identity,'task5-n');
  await writeFile(join(temp,'n-contract-input.csv'),csv('social_visibility_contract',n));
@@ -103,7 +113,7 @@ try{
  psql(`insert into public.social_threads(district_id,provider,platform,external_thread_id,canonical_url,relationship_type,published_at,created_at,updated_at) values('district-b','meta','facebook','phantom-before-watermark','https://x/phantom','ambient','2026-08-05T11:00:00Z','2026-08-05T11:00:00Z','2026-08-05T11:00:00Z');`);
  psql(restoreSql,false);psql("delete from public.social_threads where external_thread_id='phantom-before-watermark';");psql(restoreSql);
  const restored=parseJson(psql(`set canary.expected_social_state='N-1';set canary.expected_social_rows='9';set canary.expected_social_exclusions='2';${verify}`).stdout);
- assert.equal(restored.schema_fingerprint_md5,n1.schema_fingerprint_md5);assert.deepEqual(functionMd5(),expectedFunctionMd5);
+ assert.equal(restored.schema_fingerprint_md5,pureN1.schema_fingerprint_md5);assert.notEqual(restored.schema_fingerprint_md5,n1.schema_fingerprint_md5);assert.deepEqual(functionMd5(),expectedFunctionMd5);
  assert.equal(psql(`select visibility_status from social_threads where id='${activeId}';`).stdout.trim(),'review');
  assert.equal(psql(`select visibility_status from social_threads where id='${excludedId}';`).stdout.trim(),'excluded');
  assert.equal(psql(`select visibility_status from social_threads where id='${qaId}';`).stdout.trim(),'review');

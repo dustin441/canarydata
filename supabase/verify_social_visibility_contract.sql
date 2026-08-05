@@ -1,7 +1,7 @@
 -- Read-only Social N-1/N contract verifier. Safe for the verified Canary SQL Editor.
 -- Optional inputs before running:
---   set canary.expected_social_state = 'N'; -- N or N-1
---   set canary.expected_social_rows = '1031';
+--   set canary.expected_social_state = 'N-1'; -- N or N-1
+--   set canary.expected_social_rows = '1032';
 --   set canary.expected_social_exclusions = '20';
 begin transaction read only;
 set local statement_timeout = '60s';
@@ -22,8 +22,8 @@ begin
   select pg_get_constraintdef(c.oid, true) into actual_check from pg_constraint c
   where c.conrelid='public.social_threads'::regclass and c.conname='social_threads_visibility_status_check';
   if expected_state = 'N' then
-    if actual_default not in ('''active''::text','''active''')
-       or actual_check like '%review%' or actual_check like '%approved%'
+    if actual_default is null or actual_default not in ('''active''::text','''active''')
+       or actual_check is distinct from 'CHECK (visibility_status = ANY (ARRAY[''active''::text, ''excluded''::text]))'
        or exists(select 1 from public.social_threads where visibility_status not in ('active','excluded'))
        or to_regclass('public.social_correction_requests') is null
        or to_regprocedure('public.canary_apply_social_correction(uuid,text,uuid,text,integer,text)') is null
@@ -33,13 +33,21 @@ begin
       raise exception 'Social N contract verification failed';
     end if;
   elsif expected_state = 'N-1' then
-    if actual_default not in ('''review''::text','''review''')
-       or actual_check not like '%review%approved%active%excluded%'
-       or to_regclass('public.social_correction_requests') is not null
-       or to_regprocedure('public.canary_apply_social_correction(uuid,text,uuid,text,integer,text)') is not null
-       or to_regprocedure('public.canary_ingest_social_thread(jsonb)') is not null
+    if actual_default is null or actual_default not in ('''review''::text','''review''')
+       or actual_check is distinct from 'CHECK (visibility_status = ANY (ARRAY[''review''::text, ''approved''::text, ''active''::text, ''excluded''::text]))'
        or to_regprocedure('public.canary_review_social_thread(uuid,uuid,text,integer,text,text)') is null
-       or to_regprocedure('public.canary_bulk_review_social_threads(uuid,text,uuid[],text)') is null then
+       or to_regprocedure('public.canary_bulk_review_social_threads(uuid,text,uuid[],text)') is null
+       or not (
+         (
+           to_regclass('public.social_correction_requests') is null
+           and to_regprocedure('public.canary_apply_social_correction(uuid,text,uuid,text,integer,text)') is null
+           and to_regprocedure('public.canary_ingest_social_thread(jsonb)') is null
+         ) or (
+           to_regclass('public.social_correction_requests') is not null
+           and to_regprocedure('public.canary_apply_social_correction(uuid,text,uuid,text,integer,text)') is not null
+           and to_regprocedure('public.canary_ingest_social_thread(jsonb)') is not null
+         )
+       ) then
       raise exception 'Social N-1 contract verification failed';
     end if;
   elsif expected_state is not null then raise exception 'Expected state must be N or N-1'; end if;
@@ -112,6 +120,19 @@ with affected_relations as (
   select t.id from public.social_threads t join public.social_accounts a on a.id=t.social_account_id
   where t.relationship_type='owned' and a.district_id=t.district_id and a.platform=t.platform and a.active
     and (nullif(btrim(a.handle),'') is not null or nullif(btrim(a.profile_url),'') is not null)
+), schema_state as (
+  select
+    (select pg_get_expr(d.adbin,d.adrelid)
+     from pg_attribute a join pg_attrdef d on d.adrelid=a.attrelid and d.adnum=a.attnum
+     where a.attrelid='public.social_threads'::regclass and a.attname='visibility_status') visibility_default,
+    (select pg_get_constraintdef(c.oid,true)
+     from pg_constraint c
+     where c.conrelid='public.social_threads'::regclass and c.conname='social_threads_visibility_status_check') visibility_check,
+    to_regclass('public.social_correction_requests') is not null task4_table_present,
+    to_regprocedure('public.canary_apply_social_correction(uuid,text,uuid,text,integer,text)') is not null task4_apply_present,
+    to_regprocedure('public.canary_ingest_social_thread(jsonb)') is not null task4_ingest_present,
+    to_regprocedure('public.canary_review_social_thread(uuid,uuid,text,integer,text,text)') is not null legacy_review_present,
+    to_regprocedure('public.canary_bulk_review_social_threads(uuid,text,uuid[],text)') is not null legacy_bulk_review_present
 ), object_rows as (
   select jsonb_agg(jsonb_build_object('kind',kind,'name',name,'md5',md5(definition)) order by kind,name) objects,
          md5(string_agg(kind||E'\x1f'||name||E'\x1f'||definition,E'\x1e' order by kind,name)) fingerprint
@@ -121,11 +142,28 @@ select jsonb_pretty(jsonb_build_object(
   'captured_at_utc',timezone('utc',now()),'server_version',current_setting('server_version'),
   'schema_identity','canary-social-visibility-v2','schema_fingerprint_md5',object_rows.fingerprint,
   'migration_state_identity',case
-    when to_regclass('public.social_correction_requests') is not null
-      and to_regprocedure('public.canary_apply_social_correction(uuid,text,uuid,text,integer,text)') is not null
-      and to_regprocedure('public.canary_review_social_thread(uuid,uuid,text,integer,text,text)') is null then 'task5-n'
-    when to_regclass('public.social_correction_requests') is null
-      and to_regprocedure('public.canary_review_social_thread(uuid,uuid,text,integer,text,text)') is not null then 'task5-n-1'
+    when schema_state.visibility_default in ('''active''::text','''active''')
+      and schema_state.visibility_check = 'CHECK (visibility_status = ANY (ARRAY[''active''::text, ''excluded''::text]))'
+      and schema_state.task4_table_present
+      and schema_state.task4_apply_present
+      and schema_state.task4_ingest_present
+      and not schema_state.legacy_review_present
+      and not schema_state.legacy_bulk_review_present then 'task5-n'
+    when schema_state.visibility_default in ('''review''::text','''review''')
+      and schema_state.visibility_check = 'CHECK (visibility_status = ANY (ARRAY[''review''::text, ''approved''::text, ''active''::text, ''excluded''::text]))'
+      and schema_state.legacy_review_present
+      and schema_state.legacy_bulk_review_present
+      and (
+        (
+          not schema_state.task4_table_present
+          and not schema_state.task4_apply_present
+          and not schema_state.task4_ingest_present
+        ) or (
+          schema_state.task4_table_present
+          and schema_state.task4_apply_present
+          and schema_state.task4_ingest_present
+        )
+      ) then 'task5-n-1'
     else 'unknown' end,
   'objects',object_rows.objects,'row_count',(select count(*) from public.social_threads),
   'exclusion_count',(select count(*) from public.social_threads where visibility_status='excluded'),
@@ -136,5 +174,5 @@ select jsonb_pretty(jsonb_build_object(
   'review_version_max',(select max(review_version) from public.social_threads),
   'review_version_nulls',(select count(*) from public.social_threads where review_version is null)
 )) as social_visibility_contract
-from object_rows,status_counts,relationship_counts;
+from object_rows,status_counts,relationship_counts,schema_state;
 rollback;
