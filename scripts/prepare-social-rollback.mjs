@@ -19,17 +19,19 @@ const artifactPath = get('evidence-artifact');
 const output = get('sql-output');
 assert.ok(artifactPath && output, '--evidence-artifact and --sql-output are required');
 const artifact = JSON.parse(await readFile(artifactPath, 'utf8'));
-assert.equal(artifact.format, 'canary-social-rollback-evidence/v1');
+assert.equal(artifact.format, 'canary-social-rollback-evidence/v2');
 const claimedHash = artifact.manifest?.artifactSha256;
 assertHash(claimedHash, 'Artifact hash');
 artifact.manifest.artifactSha256 = null;
 assert.equal(sha256(canonicalJson(artifact)), claimedHash, 'Rollback evidence artifact SHA-256 mismatch');
 artifact.manifest.artifactSha256 = claimedHash;
 assert.ok(Array.isArray(artifact.correctionRequests));
-assert.ok(Array.isArray(artifact.postWatermarkRows));
+assert.ok(Array.isArray(artifact.changedRows));
 for (const [value, label] of [
   [artifact.manifest.correctionRequestCount, 'Correction request count'],
-  [artifact.manifest.postWatermarkRowCount, 'Post-watermark row count'],
+  [artifact.manifest.changedRowCount, 'Changed row count'],
+  [artifact.manifest.createdRowCount, 'Created row count'],
+  [artifact.manifest.refreshedPreexistingRowCount, 'Refreshed preexisting row count'],
   [artifact.manifest.replayRowCount, 'Replay row count'],
   [artifact.manifest.audit?.batchCount, 'Audit batch count'],
   [artifact.manifest.audit?.eventCount, 'Audit event count'],
@@ -38,10 +40,13 @@ const task4ObjectOids=artifact.manifest.task4ObjectOids;
 assert.deepEqual(Object.keys(task4ObjectOids||{}).sort(),['canary_apply_social_correction','canary_ingest_social_thread','social_correction_requests']);
 for(const [name,value] of Object.entries(task4ObjectOids)) assert.ok(Number.isSafeInteger(value)&&value>0,`Task 4 ${name} OID must be a positive safe integer`);
 assert.equal(artifact.correctionRequests.length, artifact.manifest.correctionRequestCount);
-assert.equal(artifact.postWatermarkRows.length, artifact.manifest.postWatermarkRowCount);
-assert.equal(artifact.postWatermarkRows.length, artifact.manifest.replayRowCount, 'Every post-watermark row must be replayed');
+assert.equal(artifact.changedRows.length, artifact.manifest.changedRowCount);
+assert.equal(artifact.changedRows.length, artifact.manifest.replayRowCount, 'Every changed row must be replayed');
+assert.equal(artifact.manifest.createdRowCount + artifact.manifest.refreshedPreexistingRowCount, artifact.manifest.changedRowCount);
 assertHash(artifact.manifest.correctionAggregateChecksumSha256, 'Correction aggregate checksum');
 assertHash(artifact.manifest.audit?.linkageChecksumSha256, 'Audit linkage checksum');
+assertHash(artifact.manifest.audit?.batchRowsChecksumSha256, 'Audit batch full-row checksum');
+assertHash(artifact.manifest.audit?.eventRowsChecksumSha256, 'Audit event full-row checksum');
 for (const row of artifact.correctionRequests) {
   assert.match(row.actorUserId || '', /^[a-f0-9-]{36}$/);
   assert.match(row.idempotencyKey || '', /^[A-Za-z0-9][A-Za-z0-9._:-]{7,127}$/);
@@ -55,10 +60,14 @@ assert.equal(
   artifact.manifest.correctionAggregateChecksumSha256,
   'Correction aggregate checksum mismatch',
 );
-for (const row of artifact.postWatermarkRows) {
+for (const row of artifact.changedRows) {
   assert.equal(row.disposition, 'replay', 'Generic rollback cannot delete post-watermark rows');
   assert.deepEqual(JSON.parse(row.rowCanonicalJson), row.row, `Canonical post-watermark row changed for ${row.id}`);
   assert.equal(row.currentChecksumSha256, sha256(row.rowCanonicalJson), `Post-watermark checksum mismatch for ${row.id}`);
+  assert.ok(['created-after-watermark', 'preexisting-at-watermark'].includes(row.watermarkState), `Invalid watermark state for ${row.id}`);
+  assert.equal(row.id, row.row?.id);
+  assert.equal(row.tenant, row.row?.district_id);
+  assert.deepEqual(row.sourceIdentity, { district_id: row.row.district_id, provider: row.row.provider, platform: row.row.platform, external_thread_id: row.row.external_thread_id });
 }
 const correctionPayload = Buffer.from(JSON.stringify(artifact.correctionRequests), 'utf8').toString('base64');
 
@@ -72,6 +81,8 @@ create temp table _social_rollback_evidence_ack (
   audit_batch_count bigint not null,
   audit_event_count bigint not null,
   audit_linkage_checksum_sha256 text not null,
+  audit_batch_rows_checksum_sha256 text not null,
+  audit_event_rows_checksum_sha256 text not null,
   task4_table_oid oid not null,
   task4_apply_oid oid not null,
   task4_ingest_oid oid not null,
@@ -84,6 +95,8 @@ insert into _social_rollback_evidence_ack values (
   ${artifact.manifest.audit.batchCount},
   ${artifact.manifest.audit.eventCount},
   '${artifact.manifest.audit.linkageChecksumSha256}',
+  '${artifact.manifest.audit.batchRowsChecksumSha256}',
+  '${artifact.manifest.audit.eventRowsChecksumSha256}',
   ${task4ObjectOids.social_correction_requests},
   ${task4ObjectOids.canary_apply_social_correction},
   ${task4ObjectOids.canary_ingest_social_thread},

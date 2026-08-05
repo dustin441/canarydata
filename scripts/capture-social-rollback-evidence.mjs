@@ -4,7 +4,7 @@ import { createHash } from 'node:crypto';
 import { readFile, writeFile } from 'node:fs/promises';
 import { parseSqlEditorExport, unwrapSingleSqlEditorValue } from './lib/sql-editor-input.mjs';
 
-const TOOL_VERSION = '2.0.0';
+const TOOL_VERSION = '3.0.0';
 const argv = process.argv.slice(2);
 const get = (name) => { const index = argv.indexOf(`--${name}`); return index < 0 ? undefined : argv[index + 1]; };
 const sha256 = (value) => createHash('sha256').update(value).digest('hex');
@@ -46,10 +46,12 @@ assert.equal(source.watermark, visibility.manifest.watermark, 'Rollback evidence
 assert.deepEqual(source.task4ObjectOids, visibility.manifest.task4ObjectOids, 'Rollback evidence Task 4 OIDs must match the sealed additive contract');
 assert.match(source.capturedAt || '', /^\d{4}-\d\d-\d\dT\d\d:\d\d:\d\d\.\d{6}Z$/);
 assert.ok(Array.isArray(source.correctionRequests));
-assert.ok(Array.isArray(source.postWatermarkRows));
+assert.ok(Array.isArray(source.changedRows));
 assert.ok(source.audit && Number.isSafeInteger(source.audit.batchCount) && source.audit.batchCount >= 0);
 assert.ok(Number.isSafeInteger(source.audit.eventCount) && source.audit.eventCount >= 0);
 assert.match(source.audit.linkageChecksumSha256 || '', /^[a-f0-9]{64}$/);
+assert.match(source.audit.batchRowsChecksumSha256 || '', /^[a-f0-9]{64}$/);
+assert.match(source.audit.eventRowsChecksumSha256 || '', /^[a-f0-9]{64}$/);
 
 const correctionKeys = new Set();
 for (const request of source.correctionRequests) {
@@ -94,9 +96,9 @@ for (const request of source.correctionRequests) {
 
 assert.equal(get('qa-fixture-manifest'), undefined, 'Generic production rollback does not accept QA deletion manifests');
 const rowIds = new Set();
-const postWatermarkRows = source.postWatermarkRows.map((entry) => {
-  for (const field of ['id', 'tenant', 'sourceIdentity', 'idempotencyKey', 'row', 'rowCanonicalJson', 'currentChecksumSha256', 'auditEventIds', 'auditBatchIds']) {
-    assert.ok(Object.hasOwn(entry, field), `Post-watermark row is missing ${field}`);
+const changedRows = source.changedRows.map((entry) => {
+  for (const field of ['id', 'tenant', 'sourceIdentity', 'idempotencyKey', 'row', 'rowCanonicalJson', 'currentChecksumSha256', 'auditEventIds', 'auditBatchIds', 'watermarkState']) {
+    assert.ok(Object.hasOwn(entry, field), `Changed row is missing ${field}`);
   }
   assert.ok(!rowIds.has(entry.id), `Duplicate post-watermark row ${entry.id}`);
   rowIds.add(entry.id);
@@ -112,6 +114,12 @@ const postWatermarkRows = source.postWatermarkRows.map((entry) => {
   assert.deepEqual(JSON.parse(entry.rowCanonicalJson), entry.row, `Post-watermark canonical row changed for ${entry.id}`);
   assert.equal(entry.currentChecksumSha256, sha256(entry.rowCanonicalJson), `Post-watermark retained row checksum mismatch for ${entry.id}`);
   assert.ok(Array.isArray(entry.auditEventIds) && Array.isArray(entry.auditBatchIds));
+  assert.ok(['created-after-watermark', 'preexisting-at-watermark'].includes(entry.watermarkState), `Changed row ${entry.id} has invalid watermark state`);
+  if (entry.watermarkState === 'created-after-watermark') assert.ok(entry.row.created_at > source.watermark, `Created row ${entry.id} is not after the watermark`);
+  else {
+    assert.ok(entry.row.created_at <= source.watermark, `Preexisting row ${entry.id} was not present at the watermark`);
+    assert.ok(entry.row.updated_at > source.watermark, `Preexisting row ${entry.id} was not refreshed after the watermark`);
+  }
   return { ...entry, disposition: 'replay' };
 });
 
@@ -119,7 +127,7 @@ const correctionAggregateChecksumSha256 = sha256(source.correctionRequests
   .map((row) => `${row.actorUserId}:${row.idempotencyKey}:${row.currentChecksumSha256}`)
   .sort().join('\n'));
 const artifact = {
-  format: 'canary-social-rollback-evidence/v1',
+  format: 'canary-social-rollback-evidence/v2',
   tool: { name: 'capture-social-rollback-evidence.mjs', version: TOOL_VERSION },
   manifest: {
     watermark: source.watermark,
@@ -128,15 +136,17 @@ const artifact = {
     task4ObjectOids: visibility.manifest.task4ObjectOids,
     correctionRequestCount: source.correctionRequests.length,
     correctionAggregateChecksumSha256,
-    postWatermarkRowCount: postWatermarkRows.length,
-    replayRowCount: postWatermarkRows.filter((row) => row.disposition === 'replay').length,
+    changedRowCount: changedRows.length,
+    createdRowCount: changedRows.filter((row) => row.watermarkState === 'created-after-watermark').length,
+    refreshedPreexistingRowCount: changedRows.filter((row) => row.watermarkState === 'preexisting-at-watermark').length,
+    replayRowCount: changedRows.filter((row) => row.disposition === 'replay').length,
 
     audit: source.audit,
     artifactSha256: null,
   },
   correctionRequests: source.correctionRequests,
-  postWatermarkRows,
+  changedRows,
 };
 artifact.manifest.artifactSha256 = sha256(canonicalJson(artifact));
 await writeFile(output, `${JSON.stringify(artifact, null, 2)}\n`, { mode: 0o600, flag: 'wx' });
-console.log(`Wrote rollback evidence: corrections=${artifact.manifest.correctionRequestCount}; post-watermark=${artifact.manifest.postWatermarkRowCount}; artifact=${artifact.manifest.artifactSha256}; output=${output}`);
+console.log(`Wrote rollback evidence: corrections=${artifact.manifest.correctionRequestCount}; changed=${artifact.manifest.changedRowCount}; refreshed-preexisting=${artifact.manifest.refreshedPreexistingRowCount}; artifact=${artifact.manifest.artifactSha256}; output=${output}`);

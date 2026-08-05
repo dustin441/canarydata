@@ -240,6 +240,10 @@ try{
  const wrongIdentity=node('scripts/backup-social-visibility.mjs',['--input',join(temp,'rows.csv'),'--schema-contract',join(temp,'n-contract.json'),'--output',join(temp,'n-backup.json')],false);
  assert.match(wrongIdentity.stderr,/task5-n-1/i);
  psql("select (public.canary_apply_social_correction('aaaaaaaa-aaaa-aaaa-aaaa-aaaaaaaaaaaa','district-a','50000000-0000-0000-0000-000000000001','exclude',0,'pre-watermark-correction-01')).id;");
+ psql(`select (public.canary_ingest_social_thread(to_jsonb(t) || jsonb_build_object(
+   'headline','refreshed backed headline','body','refreshed backed body','comment_count',42,
+   'provider_metadata',jsonb_build_object('refresh','task5-routine')))).id
+   from public.social_threads t where t.id='50000000-0000-0000-0000-000000000002';`);
  const activeId=psql("insert into public.social_threads(district_id,provider,platform,external_thread_id,canonical_url,relationship_type,published_at,created_at,updated_at) values('district-b','meta','facebook','real-active','https://x/new','ambient','2026-08-05T13:00:00Z','2026-08-05T13:00:00Z','2026-08-05T13:00:00Z') returning id;").stdout.trim();
  const excludedId=psql("insert into public.social_threads(district_id,provider,platform,external_thread_id,canonical_url,relationship_type,published_at,created_at,updated_at) values('district-b','meta','facebook','real-excluded','https://x/excluded','ambient','2026-08-05T13:01:00Z','2026-08-05T13:01:00Z','2026-08-05T13:01:00Z') returning id;").stdout.trim();
  psql(`select (public.canary_apply_social_correction('aaaaaaaa-aaaa-aaaa-aaaa-aaaaaaaaaaaa','district-b','${excludedId}','exclude',0,'rollback-proof-01')).id;`);
@@ -248,7 +252,7 @@ try{
  const evidenceSource=parseJson(evidenceRaw);
  assert.equal(evidenceSource.correctionRequests.length,2);assert.ok(evidenceSource.correctionRequests[0].requestPayload);assert.ok(evidenceSource.correctionRequests[0].resultRow);
  await writeFile(join(temp,'evidence-input.csv'),csv('social_rollback_evidence',evidenceSource));
- const qa=evidenceSource.postWatermarkRows.find((row)=>row.id===qaId);
+ const qa=evidenceSource.changedRows.find((row)=>row.id===qaId);
  await writeFile(join(temp,'qa-manifest.json'),JSON.stringify({fixtures:[{id:qa.id,tenant:qa.tenant,fixtureMarker:'controlled-qa:test-1',currentChecksumSha256:qa.currentChecksumSha256}]}));
  const forgedQa=node('scripts/capture-social-rollback-evidence.mjs',['--input',join(temp,'evidence-input.csv'),'--visibility-backup',join(temp,'backup.json'),'--qa-fixture-manifest',join(temp,'qa-manifest.json'),'--output',join(temp,'forged-qa-evidence.json')],false);
  assert.match(forgedQa.stderr,/does not accept QA deletion manifests/i);
@@ -258,7 +262,7 @@ try{
  assert.match(stale.stderr,/retained checksum mismatch/i);
  node('scripts/capture-social-rollback-evidence.mjs',['--input',join(temp,'evidence-input.csv'),'--visibility-backup',join(temp,'backup.json'),'--output',join(temp,'rollback-evidence.json')]);
  const evidence=JSON.parse(await readFile(join(temp,'rollback-evidence.json'),'utf8'));
- assert.equal(evidence.manifest.correctionRequestCount,2);assert.equal(evidence.manifest.replayRowCount,3);assert.equal(evidence.manifest.qaFixtureDeleteCount,undefined);
+ assert.equal(evidence.manifest.correctionRequestCount,2);assert.equal(evidence.manifest.replayRowCount,5);assert.equal(evidence.manifest.createdRowCount,3);assert.equal(evidence.manifest.refreshedPreexistingRowCount,2);assert.equal(evidence.manifest.qaFixtureDeleteCount,undefined);
  assert.equal((await stat(join(temp,'rollback-evidence.json'))).mode&0o777,0o600);
  const injected=structuredClone(evidence);injected.manifest.audit.batchCount="0); drop table public.social_threads; --";reseal(injected);await writeFile(join(temp,'injected-evidence.json'),JSON.stringify(injected));
  const injection=node('scripts/prepare-social-rollback.mjs',['--evidence-artifact',join(temp,'injected-evidence.json'),'--sql-output',join(temp,'injected-down.sql')],false);
@@ -266,6 +270,23 @@ try{
  const unbacked=psql(down,false);assert.match(unbacked.stderr,/prepare-social-rollback/i);assert.equal(psql('select count(*) from public.social_correction_requests;').stdout.trim(),'2');
  node('scripts/prepare-social-rollback.mjs',['--evidence-artifact',join(temp,'rollback-evidence.json'),'--sql-output',join(temp,'down.sql')]);
  const generatedDown=await readFile(join(temp,'down.sql'),'utf8');
+ const auditTamperCases=[
+  ['batch criteria',`alter table public.social_review_batches disable trigger social_review_batches_immutable;update public.social_review_batches set criteria=criteria||'{"tampered":true}'::jsonb where id=(select id from public.social_review_batches order by id limit 1);alter table public.social_review_batches enable trigger social_review_batches_immutable`],
+  ['batch action',`alter table public.social_review_batches disable trigger social_review_batches_immutable;update public.social_review_batches set action='restore' where id=(select id from public.social_review_batches order by id limit 1);alter table public.social_review_batches enable trigger social_review_batches_immutable`],
+  ['batch actor',`alter table public.social_review_batches disable trigger social_review_batches_immutable;update public.social_review_batches set actor_user_id='cccccccc-cccc-cccc-cccc-cccccccccccc' where id=(select id from public.social_review_batches order by id limit 1);alter table public.social_review_batches enable trigger social_review_batches_immutable`],
+  ['batch count',`alter table public.social_review_batches disable trigger social_review_batches_immutable;update public.social_review_batches set item_count=item_count+1 where id=(select id from public.social_review_batches order by id limit 1);alter table public.social_review_batches enable trigger social_review_batches_immutable`],
+  ['batch timestamp',`alter table public.social_review_batches disable trigger social_review_batches_immutable;update public.social_review_batches set created_at=created_at+interval '1 microsecond' where id=(select id from public.social_review_batches order by id limit 1);alter table public.social_review_batches enable trigger social_review_batches_immutable`],
+  ['event before state',`alter table public.social_review_events disable trigger social_review_events_immutable;update public.social_review_events set before_state=before_state||'{"tampered":true}'::jsonb where id=(select id from public.social_review_events order by id limit 1);alter table public.social_review_events enable trigger social_review_events_immutable`],
+  ['event after state',`alter table public.social_review_events disable trigger social_review_events_immutable;update public.social_review_events set after_state=after_state||'{"tampered":true}'::jsonb where id=(select id from public.social_review_events order by id limit 1);alter table public.social_review_events enable trigger social_review_events_immutable`],
+  ['event action',`alter table public.social_review_events disable trigger social_review_events_immutable;update public.social_review_events set action='restore' where id=(select id from public.social_review_events order by id limit 1);alter table public.social_review_events enable trigger social_review_events_immutable`],
+  ['event actor',`alter table public.social_review_events disable trigger social_review_events_immutable;update public.social_review_events set actor_user_id='cccccccc-cccc-cccc-cccc-cccccccccccc' where id=(select id from public.social_review_events order by id limit 1);alter table public.social_review_events enable trigger social_review_events_immutable`],
+  ['event version',`alter table public.social_review_events disable trigger social_review_events_immutable;update public.social_review_events set resulting_version=resulting_version+1 where id=(select id from public.social_review_events order by id limit 1);alter table public.social_review_events enable trigger social_review_events_immutable`],
+  ['event timestamp',`alter table public.social_review_events disable trigger social_review_events_immutable;update public.social_review_events set created_at=created_at+interval '1 microsecond' where id=(select id from public.social_review_events order by id limit 1);alter table public.social_review_events enable trigger social_review_events_immutable`],
+ ];
+ for(const [label,mutation] of auditTamperCases){
+  const tampered=psql(`begin;${mutation};${generatedDown}`,false);
+  assert.match(tampered.stderr,/complete immutable audit rows|audit proof is invalid/i,`${label} tampering must fail closed`);
+ }
  const replacementDown=psql(`begin;alter table public.social_correction_requests rename to captured_task4_table;
    alter function public.canary_apply_social_correction(uuid,text,uuid,text,integer,text) rename to captured_task4_apply;
    alter function public.canary_ingest_social_thread(jsonb) rename to captured_task4_ingest;
@@ -284,6 +305,10 @@ try{
  node('scripts/restore-social-visibility.mjs',['--artifact',join(temp,'unsafe.json'),'--rollback-evidence',join(temp,'rollback-evidence.json'),'--sql-output',join(temp,'unsafe-restore.sql')],false);
  node('scripts/restore-social-visibility.mjs',['--artifact',join(temp,'backup.json'),'--rollback-evidence',join(temp,'rollback-evidence.json'),'--sql-output',join(temp,'restore.sql')]);
  const restoreSql=await readFile(join(temp,'restore.sql'),'utf8');
+ for(const [label,mutation] of [auditTamperCases[0],auditTamperCases[5]]){
+  const tamperedRestore=psql(`begin;${mutation};${restoreSql}`,false);
+  assert.match(tamperedRestore.stderr,/Immutable Social audit rows|audit.*differ/i,`${label} tampering must also block restoration`);
+ }
  const wrongRetainedIdentity=psql(`begin;alter table social_threads alter column visibility_status set default 'active';${restoreSql}`,false);assert.match(wrongRetainedIdentity.stderr,/N-1 migration-state identity/i);
  const changed=psql(`begin; update social_threads set body='tampered' where id='${activeId}'; ${restoreSql}`,false);assert.match(changed.stderr,/changed|evidence|checksum/i);
  psql(`insert into public.social_threads(district_id,provider,platform,external_thread_id,canonical_url,relationship_type,published_at,created_at,updated_at) values('district-b','meta','facebook','phantom-before-watermark','https://x/phantom','ambient','2026-08-05T11:00:00Z','2026-08-05T11:00:00Z','2026-08-05T11:00:00Z');`);
@@ -308,7 +333,10 @@ try{
  assert.equal(psql(`select visibility_status from social_threads where id='${qaId}';`).stdout.trim(),'review');
  assert.equal(psql("select jsonb_build_object('b',(select count(*) from social_review_batches),'e',(select count(*) from social_review_events),'l',(select string_agg(id::text||':'||batch_id::text||':'||social_thread_id::text,',' order by id) from social_review_events));").stdout.trim(),auditBefore);
  const restoredRows=parseJson(psql(`select jsonb_agg(jsonb_build_object('id',id::text,'district_id',district_id,'relationship_type',relationship_type,'visibility_status',visibility_status,'review_version',review_version,'reviewed_at',case when reviewed_at is null then null else to_char(reviewed_at at time zone 'UTC','YYYY-MM-DD"T"HH24:MI:SS.US"Z"') end,'reviewed_by',reviewed_by::text,'created_at',to_char(created_at at time zone 'UTC','YYYY-MM-DD"T"HH24:MI:SS.US"Z"'),'updated_at',to_char(updated_at at time zone 'UTC','YYYY-MM-DD"T"HH24:MI:SS.US"Z"')) order by id) from public.social_threads where created_at<='2026-08-05T12:00:00Z';`).stdout);
- assert.deepEqual(restoredRows,backup.rows.map(({canonical_checksum_sha256,...row})=>row));
+ const expectedRestoredRows=backup.rows.map(({canonical_checksum_sha256,...row})=>row.id==='50000000-0000-0000-0000-000000000002'?{...row,updated_at:evidence.changedRows.find((entry)=>entry.id===row.id).row.updated_at.replace('+00:00','Z')}:row);
+ assert.deepEqual(restoredRows,expectedRestoredRows);
+ const refreshedRestored=parseJson(psql(`select jsonb_build_object('headline',headline,'body',body,'comment_count',comment_count,'provider_metadata',provider_metadata,'visibility_status',visibility_status,'review_version',review_version,'reviewed_at',to_char(reviewed_at at time zone 'UTC','YYYY-MM-DD"T"HH24:MI:SS.US"Z"'),'reviewed_by',reviewed_by::text) from public.social_threads where id='50000000-0000-0000-0000-000000000002';`).stdout);
+ assert.deepEqual(refreshedRestored,{headline:'refreshed backed headline',body:'refreshed backed body',comment_count:42,provider_metadata:{refresh:'task5-routine'},visibility_status:'approved',review_version:1,reviewed_at:'2026-08-02T00:00:00.000000Z',reviewed_by:'aaaaaaaa-aaaa-aaaa-aaaa-aaaaaaaaaaaa'});
  assert.equal(psql(`begin;select (public.canary_review_social_thread('aaaaaaaa-aaaa-aaaa-aaaa-aaaaaaaaaaaa','50000000-0000-0000-0000-000000000001','approve',0)).visibility_status;rollback;`).stdout.trim(),'approved');
  console.log('Social visibility migration PostgreSQL test passed: exact N-1/N Task 4 duplicate rejection, injection-safe evidence, source-bound pre-watermark correction restoration, retained checksum recomputation, audit preservation, exact restore, and fail-closed post-watermark replay.');
 }finally{if(started)spawnSync('docker',['rm','--force',container],{encoding:'utf8'});assert.equal(spawnSync('docker',['ps','-a','--filter',`name=^/${container}$`,'--format','{{.Names}}'],{encoding:'utf8'}).stdout.trim(),'');}

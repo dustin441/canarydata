@@ -65,7 +65,7 @@ with settings as (
     'created_at', to_char(r.created_at at time zone 'UTC','YYYY-MM-DD"T"HH24:MI:SS.US"Z"'),
     'completed_at', case when r.completed_at is null then null else to_char(r.completed_at at time zone 'UTC','YYYY-MM-DD"T"HH24:MI:SS.US"Z"') end
   ) value) content
-), post_rows as (
+), changed_rows as (
   select coalesce(jsonb_agg(jsonb_build_object(
     'id', t.id::text,
     'tenant', t.district_id,
@@ -79,14 +79,18 @@ with settings as (
     'currentChecksumSha256', encode(digest(convert_to(to_jsonb(t)::text, 'UTF8'), 'sha256'), 'hex'),
     'auditEventIds', coalesce((select jsonb_agg(e.id::text order by e.id) from public.social_review_events e where e.social_thread_id=t.id), '[]'::jsonb),
     'auditBatchIds', coalesce((select jsonb_agg(distinct e.batch_id::text order by e.batch_id::text) from public.social_review_events e where e.social_thread_id=t.id), '[]'::jsonb),
+    'watermarkState', case when t.created_at > s.watermark then 'created-after-watermark' else 'preexisting-at-watermark' end,
     'disposition', 'replay'
   ) order by t.id), '[]'::jsonb) rows
-  from public.social_threads t, settings s where t.created_at > s.watermark
+  from public.social_threads t, settings s
+  where t.created_at > s.watermark or t.updated_at > s.watermark
 ), audit_counts as (
   select jsonb_build_object(
     'batchCount', (select count(*) from public.social_review_batches),
     'eventCount', (select count(*) from public.social_review_events),
-    'linkageChecksumSha256', encode(digest(convert_to(coalesce((select string_agg(e.id::text || ':' || e.batch_id::text || ':' || e.social_thread_id::text, E'\n' order by e.id) from public.social_review_events e), ''), 'UTF8'), 'sha256'), 'hex')
+    'linkageChecksumSha256', encode(digest(convert_to(coalesce((select string_agg(e.id::text || ':' || e.batch_id::text || ':' || e.social_thread_id::text, E'\n' order by e.id) from public.social_review_events e), ''), 'UTF8'), 'sha256'), 'hex'),
+    'batchRowsChecksumSha256', encode(digest(convert_to(coalesce((select string_agg(octet_length(to_jsonb(b)::text)::text || ':' || to_jsonb(b)::text, E'\n' order by b.id) from public.social_review_batches b), ''), 'UTF8'), 'sha256'), 'hex'),
+    'eventRowsChecksumSha256', encode(digest(convert_to(coalesce((select string_agg(octet_length(to_jsonb(e)::text)::text || ':' || to_jsonb(e)::text, E'\n' order by e.id) from public.social_review_events e), ''), 'UTF8'), 'sha256'), 'hex')
   ) value
 )
 select jsonb_build_object(
@@ -98,8 +102,8 @@ select jsonb_build_object(
     'canary_ingest_social_thread', 'public.canary_ingest_social_thread(jsonb)'::regprocedure::oid::bigint
   ),
   'correctionRequests', correction_rows.rows,
-  'postWatermarkRows', post_rows.rows,
+  'changedRows', changed_rows.rows,
   'audit', audit_counts.value
 ) as social_rollback_evidence
-from settings, correction_rows, post_rows, audit_counts;
+from settings, correction_rows, changed_rows, audit_counts;
 rollback;

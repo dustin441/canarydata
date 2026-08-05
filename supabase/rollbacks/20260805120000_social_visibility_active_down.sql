@@ -17,6 +17,8 @@ declare
   actual_audit_batch_count bigint;
   actual_audit_event_count bigint;
   actual_audit_checksum text;
+  actual_audit_batch_rows_checksum text;
+  actual_audit_event_rows_checksum text;
 begin
   if to_regclass('public.social_threads') is null
      or to_regclass('public.social_correction_requests') is null
@@ -54,13 +56,23 @@ begin
     id::text || ':' || batch_id::text || ':' || social_thread_id::text,
     E'\n' order by id), ''), 'UTF8'), 'sha256'), 'hex')
     into actual_audit_event_count, actual_audit_checksum from public.social_review_events;
+  select encode(digest(convert_to(coalesce(string_agg(
+    octet_length(to_jsonb(b)::text)::text || ':' || to_jsonb(b)::text,
+    E'\n' order by b.id), ''), 'UTF8'), 'sha256'), 'hex')
+    into actual_audit_batch_rows_checksum from public.social_review_batches b;
+  select encode(digest(convert_to(coalesce(string_agg(
+    octet_length(to_jsonb(e)::text)::text || ':' || to_jsonb(e)::text,
+    E'\n' order by e.id), ''), 'UTF8'), 'sha256'), 'hex')
+    into actual_audit_event_rows_checksum from public.social_review_events e;
   if expected.artifact_sha256 !~ '^[a-f0-9]{64}$'
      or actual_correction_count <> expected.correction_request_count
      or actual_correction_checksum <> expected.correction_aggregate_checksum_sha256
      or actual_audit_batch_count <> expected.audit_batch_count
      or actual_audit_event_count <> expected.audit_event_count
-     or actual_audit_checksum <> expected.audit_linkage_checksum_sha256 then
-    raise exception 'Rollback evidence no longer matches correction requests or immutable audit linkage';
+     or actual_audit_checksum <> expected.audit_linkage_checksum_sha256
+     or actual_audit_batch_rows_checksum <> expected.audit_batch_rows_checksum_sha256
+     or actual_audit_event_rows_checksum <> expected.audit_event_rows_checksum_sha256 then
+    raise exception 'Rollback evidence no longer matches correction requests or complete immutable audit rows/linkage';
   end if;
   if jsonb_typeof(expected.correction_requests) <> 'array'
      or jsonb_array_length(expected.correction_requests) <> expected.correction_request_count

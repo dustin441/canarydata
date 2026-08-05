@@ -69,7 +69,7 @@ assert.equal(
 const evidencePath = get('rollback-evidence');
 assert.ok(evidencePath, '--rollback-evidence is required');
 const evidence = JSON.parse(await readFile(evidencePath, 'utf8'));
-assert.equal(evidence.format, 'canary-social-rollback-evidence/v1');
+assert.equal(evidence.format, 'canary-social-rollback-evidence/v2');
 const claimedEvidenceHash = evidence.manifest?.artifactSha256;
 assert.match(claimedEvidenceHash || '', /^[a-f0-9]{64}$/);
 evidence.manifest.artifactSha256 = null;
@@ -78,11 +78,13 @@ evidence.manifest.artifactSha256 = claimedEvidenceHash;
 assert.equal(evidence.manifest.visibilityBackupArtifactSha256, claimedArtifactHash, 'Rollback evidence belongs to a different visibility backup');
 assert.deepEqual(evidence.manifest.task4ObjectOids, artifact.manifest.task4ObjectOids, 'Rollback evidence is bound to different Task 4 object OIDs');
 assert.equal(evidence.manifest.watermark, artifact.manifest.watermark, 'Rollback evidence watermark mismatch');
-assert.ok(Array.isArray(evidence.postWatermarkRows), 'Rollback evidence must contain postWatermarkRows[]');
-assert.equal(evidence.postWatermarkRows.length, evidence.manifest.postWatermarkRowCount);
+assert.ok(Array.isArray(evidence.changedRows), 'Rollback evidence must contain changedRows[]');
+assert.equal(evidence.changedRows.length, evidence.manifest.changedRowCount);
 assert.ok(Number.isSafeInteger(evidence.manifest.audit?.batchCount) && evidence.manifest.audit.batchCount >= 0);
 assert.ok(Number.isSafeInteger(evidence.manifest.audit?.eventCount) && evidence.manifest.audit.eventCount >= 0);
 assert.match(evidence.manifest.audit?.linkageChecksumSha256 || '', /^[a-f0-9]{64}$/);
+assert.match(evidence.manifest.audit?.batchRowsChecksumSha256 || '', /^[a-f0-9]{64}$/);
+assert.match(evidence.manifest.audit?.eventRowsChecksumSha256 || '', /^[a-f0-9]{64}$/);
 assert.ok(Array.isArray(evidence.correctionRequests));
 assert.equal(evidence.correctionRequests.length, evidence.manifest.correctionRequestCount);
 const correctionKeys = new Set();
@@ -101,7 +103,7 @@ assert.equal(
   'Correction aggregate checksum mismatch',
 );
 const reconciledIds = new Set();
-for (const row of evidence.postWatermarkRows) {
+for (const row of evidence.changedRows) {
   assert.equal(row.disposition, 'replay', 'Every post-watermark row must be replayed through N-1');
   assert.deepEqual(JSON.parse(row.rowCanonicalJson), row.row, `Canonical post-watermark row changed for ${row.id}`);
   assert.equal(row.currentChecksumSha256, sha256(row.rowCanonicalJson), `Post-watermark checksum mismatch for ${row.id}`);
@@ -115,9 +117,10 @@ for (const row of evidence.postWatermarkRows) {
     external_thread_id: row.row.external_thread_id,
   });
   assert.ok(Array.isArray(row.auditEventIds) && Array.isArray(row.auditBatchIds));
+  assert.ok(['created-after-watermark', 'preexisting-at-watermark'].includes(row.watermarkState));
 
   assert.ok(!reconciledIds.has(row.id), `Duplicate reconciled row ${row.id}`);
-  assert.ok(!backupIds.has(row.id), `Reconciled row ${row.id} is already in the backup`);
+  assert.equal(backupIds.has(row.id), row.watermarkState === 'preexisting-at-watermark', `Changed row ${row.id} backup membership contradicts its watermark state`);
   reconciledIds.add(row.id);
 }
 const restoreRows = artifact.rows.map((row) => ({
@@ -148,7 +151,7 @@ select * from jsonb_to_recordset((select doc->'rows' from _social_restore_payloa
 );
 create temp table _social_reconciled(entry jsonb) on commit drop;
 insert into _social_reconciled
-select value from jsonb_array_elements((select doc->'evidence'->'postWatermarkRows' from _social_restore_payload));
+select value from jsonb_array_elements((select doc->'evidence'->'changedRows' from _social_restore_payload));
 
 create function pg_temp.social_row_checksum(t public.social_threads)
 returns text language sql stable as $fn$
@@ -169,6 +172,7 @@ create temp table _social_replay_results(id uuid primary key, idempotency_key te
 create function pg_temp.canary_replay_social_thread_n1(p_entry jsonb)
 returns uuid language plpgsql as $writer$
 declare current_row public.social_threads%rowtype;
+declare replay_row public.social_threads%rowtype;
 begin
   if p_entry->>'disposition' <> 'replay'
      or p_entry->>'idempotencyKey' !~ '^rollback-replay:[a-f0-9-]{36}$' then
@@ -181,18 +185,51 @@ begin
     and external_thread_id=p_entry->'sourceIdentity'->>'external_thread_id'
   for update;
   if current_row.id::text <> p_entry->>'id'
-     or to_jsonb(current_row) <> p_entry->'row'
-     or to_jsonb(current_row)::text <> p_entry->>'rowCanonicalJson'
-     or encode(digest(convert_to(to_jsonb(current_row)::text, 'UTF8'), 'sha256'), 'hex') <> p_entry->>'currentChecksumSha256'
-     or current_row.visibility_status not in ('active','excluded') then
-    raise exception 'Post-watermark replay source identity or checksum changed';
+     or p_entry->>'watermarkState' not in ('created-after-watermark','preexisting-at-watermark') then
+    raise exception 'Changed-row replay source identity changed';
   end if;
   update public.social_threads
-  set visibility_status=case when current_row.visibility_status='active' then 'review' else 'excluded' end
-  where id=current_row.id;
+  set social_account_id = (p_entry->'row'->>'social_account_id')::uuid,
+      canonical_url = p_entry->'row'->>'canonical_url',
+      author_name = p_entry->'row'->>'author_name',
+      author_handle = p_entry->'row'->>'author_handle',
+      headline = p_entry->'row'->>'headline',
+      body = p_entry->'row'->>'body',
+      summary = p_entry->'row'->>'summary',
+      recommendation = p_entry->'row'->>'recommendation',
+      published_at = (p_entry->'row'->>'published_at')::timestamptz,
+      last_seen_at = (p_entry->'row'->>'last_seen_at')::timestamptz,
+      comment_count = (p_entry->'row'->>'comment_count')::integer,
+      reply_count = (p_entry->'row'->>'reply_count')::integer,
+      reaction_count = (p_entry->'row'->>'reaction_count')::integer,
+      share_count = (p_entry->'row'->>'share_count')::integer,
+      view_count = (p_entry->'row'->>'view_count')::bigint,
+      engagement_total = (p_entry->'row'->>'engagement_total')::integer,
+      sentiment = p_entry->'row'->>'sentiment',
+      risk_level = p_entry->'row'->>'risk_level',
+      canary_score = (p_entry->'row'->>'canary_score')::numeric,
+      tags = p_entry->'row'->'tags',
+      strategic_alignment = p_entry->'row'->'strategic_alignment',
+      matched_terms = p_entry->'row'->'matched_terms',
+      match_reason = p_entry->'row'->>'match_reason',
+      identity_confidence = (p_entry->'row'->>'identity_confidence')::numeric,
+      provider_metadata = p_entry->'row'->'provider_metadata',
+      updated_at = case
+        when p_entry->>'watermarkState'='preexisting-at-watermark' and exists (
+          select 1 from jsonb_array_elements((select doc->'evidence'->'correctionRequests' from _social_restore_payload)) correction
+          where correction->>'completedAt' is not null and correction->'resultRow'=p_entry->'row'
+        ) then current_row.updated_at
+        else (p_entry->'row'->>'updated_at')::timestamptz
+      end,
+      visibility_status = case
+        when p_entry->>'watermarkState'='created-after-watermark' and p_entry->'row'->>'visibility_status'='active' then 'review'
+        when p_entry->>'watermarkState'='created-after-watermark' then 'excluded'
+        else current_row.visibility_status
+      end
+  where id=current_row.id returning * into replay_row;
   insert into _social_replay_results values (
     current_row.id, p_entry->>'idempotencyKey',
-    case when current_row.visibility_status='active' then 'review' else 'excluded' end
+    replay_row.visibility_status
   );
   return current_row.id;
 end
@@ -279,6 +316,15 @@ begin
               and batch.criteria->>'idempotency_key'=correction->>'idempotencyKey'
           )
       )
+      and not exists (
+        select 1 from _social_reconciled changed
+        where changed.entry->>'id'=t.id::text
+          and changed.entry->>'watermarkState'='preexisting-at-watermark'
+          and changed.entry->>'tenant'=t.district_id
+          and to_jsonb(t)=changed.entry->'row'
+          and to_jsonb(t)::text=changed.entry->>'rowCanonicalJson'
+          and encode(digest(convert_to(to_jsonb(t)::text,'UTF8'),'sha256'),'hex')=changed.entry->>'currentChecksumSha256'
+      )
     )
   ) then
     raise exception 'Pre-watermark Social rows are missing or changed without latest source-bound correction/audit evidence';
@@ -302,7 +348,10 @@ begin
     select 1 from _social_reconciled r
     left join public.social_threads t on t.id::text = r.entry->>'id'
     left join _social_restore_rows b on b.id::text = r.entry->>'id'
-    where t.id is null or b.id is not null or t.created_at <= watermark
+    where t.id is null
+      or r.entry->>'watermarkState' not in ('created-after-watermark','preexisting-at-watermark')
+      or (r.entry->>'watermarkState'='created-after-watermark' and (b.id is not null or t.created_at <= watermark))
+      or (r.entry->>'watermarkState'='preexisting-at-watermark' and (b.id is null or t.created_at > watermark or t.updated_at <= watermark))
       or t.district_id <> r.entry->>'tenant'
       or to_jsonb(t) <> r.entry->'row'
       or to_jsonb(t)::text <> r.entry->>'rowCanonicalJson'
@@ -315,7 +364,11 @@ begin
   if (select count(*) from public.social_review_batches) <> (select (doc->'evidence'->'manifest'->'audit'->>'batchCount')::bigint from _social_restore_payload)
      or (select count(*) from public.social_review_events) <> (select (doc->'evidence'->'manifest'->'audit'->>'eventCount')::bigint from _social_restore_payload)
      or (select encode(digest(convert_to(coalesce(string_agg(e.id::text||':'||e.batch_id::text||':'||e.social_thread_id::text,E'\n' order by e.id),''),'UTF8'),'sha256'),'hex') from public.social_review_events e)
-        <> (select doc->'evidence'->'manifest'->'audit'->>'linkageChecksumSha256' from _social_restore_payload) then
+        <> (select doc->'evidence'->'manifest'->'audit'->>'linkageChecksumSha256' from _social_restore_payload)
+     or (select encode(digest(convert_to(coalesce(string_agg(octet_length(to_jsonb(b)::text)::text||':'||to_jsonb(b)::text,E'\n' order by b.id),''),'UTF8'),'sha256'),'hex') from public.social_review_batches b)
+        <> (select doc->'evidence'->'manifest'->'audit'->>'batchRowsChecksumSha256' from _social_restore_payload)
+     or (select encode(digest(convert_to(coalesce(string_agg(octet_length(to_jsonb(e)::text)::text||':'||to_jsonb(e)::text,E'\n' order by e.id),''),'UTF8'),'sha256'),'hex') from public.social_review_events e)
+        <> (select doc->'evidence'->'manifest'->'audit'->>'eventRowsChecksumSha256' from _social_restore_payload) then
     raise exception 'Immutable Social audit rows/linkage differ from rollback evidence';
   end if;
   if exists (
@@ -334,15 +387,6 @@ begin
 end
 $trigger$;
 
-do $inverse$
-declare item jsonb;
-begin
-  for item in select entry from _social_reconciled where entry->>'disposition'='replay' order by entry->>'id' loop
-    perform pg_temp.canary_replay_social_thread_n1(item);
-  end loop;
-end
-$inverse$;
-
 update public.social_threads t
 set relationship_type = b.relationship_type,
     visibility_status = b.visibility_status,
@@ -353,6 +397,15 @@ set relationship_type = b.relationship_type,
 from _social_restore_rows b
 where t.id = b.id;
 
+do $inverse$
+declare item jsonb;
+begin
+  for item in select entry from _social_reconciled where entry->>'disposition'='replay' order by entry->>'id' loop
+    perform pg_temp.canary_replay_social_thread_n1(item);
+  end loop;
+end
+$inverse$;
+
 alter table public.social_threads enable trigger social_threads_touch_updated_at;
 
 do $verify$
@@ -360,21 +413,49 @@ begin
   if exists (
     select 1 from _social_restore_rows b
     join public.social_threads t on t.id = b.id
-    where pg_temp.social_row_checksum(t) <> b.canonical_checksum_sha256
+    left join _social_reconciled r on r.entry->>'id'=t.id::text and r.entry->>'watermarkState'='preexisting-at-watermark'
+    where (r.entry is null and pg_temp.social_row_checksum(t) <> b.canonical_checksum_sha256)
+       or (r.entry is not null and exists (
+         select 1 from jsonb_array_elements((select doc->'evidence'->'correctionRequests' from _social_restore_payload)) correction
+         where correction->>'completedAt' is not null and correction->'resultRow'=r.entry->'row'
+       ) and pg_temp.social_row_checksum(t) <> b.canonical_checksum_sha256)
+       or (r.entry is not null and not exists (
+         select 1 from jsonb_array_elements((select doc->'evidence'->'correctionRequests' from _social_restore_payload)) correction
+         where correction->>'completedAt' is not null and correction->'resultRow'=r.entry->'row'
+       ) and (
+         t.relationship_type <> b.relationship_type
+         or t.visibility_status <> b.visibility_status
+         or t.review_version <> b.review_version
+         or t.reviewed_at is distinct from b.reviewed_at::timestamptz
+         or t.reviewed_by is distinct from b.reviewed_by
+         or t.created_at <> b.created_at::timestamptz
+         or to_jsonb(t) - array['relationship_type','visibility_status','review_version','reviewed_at','reviewed_by','created_at']
+            <> (r.entry->'row') - array['relationship_type','visibility_status','review_version','reviewed_at','reviewed_by','created_at']
+       ))
   ) then
-    raise exception 'Exact Social row restoration checksum failed';
+    raise exception 'Exact Social backup restoration or source-bound refresh replay checksum failed';
   end if;
   if (select count(*) from _social_replay_results) <> (select count(*) from _social_reconciled where entry->>'disposition'='replay')
      or exists (
        select 1 from _social_reconciled r join public.social_threads t on t.id::text=r.entry->>'id'
-       where r.entry->>'disposition'='replay'
-         and t.visibility_status <> case when r.entry->'row'->>'visibility_status'='active' then 'review' else 'excluded' end
+       where r.entry->>'disposition'='replay' and (
+         t.visibility_status <> case
+           when r.entry->>'watermarkState'='created-after-watermark' and r.entry->'row'->>'visibility_status'='active' then 'review'
+           when r.entry->>'watermarkState'='created-after-watermark' then 'excluded'
+           else t.visibility_status
+         end
+         or (r.entry->>'watermarkState'='created-after-watermark' and to_jsonb(t)-'visibility_status' <> (r.entry->'row')-'visibility_status')
+       )
      ) then
-    raise exception 'N-1 post-watermark replay verification failed';
+    raise exception 'N-1 changed-row replay verification failed';
   end if;
   if (select count(*) from public.social_review_batches) <> (select (doc->'evidence'->'manifest'->'audit'->>'batchCount')::bigint from _social_restore_payload)
-     or (select count(*) from public.social_review_events) <> (select (doc->'evidence'->'manifest'->'audit'->>'eventCount')::bigint from _social_restore_payload) then
-    raise exception 'Social audit history changed during restoration';
+     or (select count(*) from public.social_review_events) <> (select (doc->'evidence'->'manifest'->'audit'->>'eventCount')::bigint from _social_restore_payload)
+     or (select encode(digest(convert_to(coalesce(string_agg(octet_length(to_jsonb(b)::text)::text||':'||to_jsonb(b)::text,E'\n' order by b.id),''),'UTF8'),'sha256'),'hex') from public.social_review_batches b)
+        <> (select doc->'evidence'->'manifest'->'audit'->>'batchRowsChecksumSha256' from _social_restore_payload)
+     or (select encode(digest(convert_to(coalesce(string_agg(octet_length(to_jsonb(e)::text)::text||':'||to_jsonb(e)::text,E'\n' order by e.id),''),'UTF8'),'sha256'),'hex') from public.social_review_events e)
+        <> (select doc->'evidence'->'manifest'->'audit'->>'eventRowsChecksumSha256' from _social_restore_payload) then
+    raise exception 'Complete Social audit history changed during restoration';
   end if;
 end
 $verify$;
