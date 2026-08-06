@@ -130,7 +130,7 @@ export async function runCompatibilityMatrix({ mode = 'compatibility' } = {}) {
   };
 
   try {
-    record('matrix fixture format', matrix.format, 'canary-social-compatibility-matrix/v1');
+    record('matrix fixture format', matrix.format, 'canary-social-compatibility-contract-matrix/v2');
     record('four required combinations declared', matrix.combinations.length, 4);
     record('all combinations unique', new Set(matrix.combinations.map(({ id }) => id)).size, 4);
     record('two tenants declared', matrix.tenants.length >= 2, true);
@@ -170,6 +170,16 @@ export async function runCompatibilityMatrix({ mode = 'compatibility' } = {}) {
     const nBrowserEvidence = JSON.parse(externalEvidence.nApplicationBrowserEvidence.content);
     const n1BrowserEvidence = JSON.parse(externalEvidence.n1ApplicationBrowserEvidence.content);
     record('Task 6 runtime boundary passed', runtimeBoundary.status, 'PASS');
+    const checksumVerification = spawn('sha256sum', ['--check', 'SHA256SUMS'], { cwd: dirname(matrix.artifacts.task6WriterEvidence) });
+    record('all Task 6 evidence checksums verified', !/FAILED|WARNING/i.test(checksumVerification.stdout + checksumVerification.stderr), true);
+    for (const writerId of [...matrix.writers.original, ...matrix.writers.staged]) {
+      record(`Task 6 evidence includes writer ${writerId}`, externalEvidence.task6WriterEvidence.content.includes(writerId), true);
+    }
+    const boundaryOriginalIds = runtimeBoundary.workflowState.filter(({ kind }) => kind === 'original').map(({ id }) => id).sort();
+    const boundaryStagedIds = runtimeBoundary.workflowState.filter(({ kind }) => kind === 'staged').map(({ id }) => id).sort();
+    record('runtime boundary original writer set exact', canonicalJson(boundaryOriginalIds), canonicalJson([...matrix.writers.original].sort()));
+    record('runtime boundary staged writer set exact', canonicalJson(boundaryStagedIds), canonicalJson([...matrix.writers.staged].sort()));
+    record('runtime boundary writer cardinality exact', runtimeBoundary.workflowState.length, matrix.writers.original.length + matrix.writers.staged.length);
     record('all original and staged writers inactive', runtimeBoundary.workflowState.every(({ active }) => active === false), true);
     record('staged writers have no schedules', runtimeBoundary.workflowState.filter(({ kind }) => kind === 'staged').every(({ scheduleNodes }) => scheduleNodes === 0), true);
     record('production Social executions quiesced', runtimeBoundary.runningSocialExecutions, 0);
@@ -243,8 +253,8 @@ export async function runCompatibilityMatrix({ mode = 'compatibility' } = {}) {
         select (public.canary_apply_social_correction('${matrix.actors.admin}','district-a','70000000-0000-0000-0000-000000000005','restore',6,'task7-combo1-restore')).visibility_status;
         insert into social_threads(district_id,provider,platform,external_thread_id,canonical_url,relationship_type,published_at) values('district-a','meta','facebook','combo1-old-writer','https://fixture.invalid/combo1','ambient','2026-08-05T11:00:00Z') returning visibility_status;
         rollback;`).stdout.trim().split(/\s+/);
-      record('combo1 N app admin loads both tenants', Number(psql('select count(*) from social_threads;').stdout.trim()), 16);
-      record('combo1 signed client tenant scope', Number(psql("select count(*) from social_threads where district_id='district-a';").stdout.trim()), 8);
+      record('combo1 N data contract sees both tenants', Number(psql('select count(*) from social_threads;').stdout.trim()), 16);
+      record('combo1 district-scoped query returns one tenant', Number(psql("select count(*) from social_threads where district_id='district-a';").stdout.trim()), 8);
       record('combo1 old writer receives N-1 default', transaction.at(-1), 'review');
       record('combo1 hide and restore outcomes', transaction.slice(0, 2).join(','), 'excluded,active');
       record('combo1 transaction leaves audit immutable', Number(psql('select count(*) from social_review_events;').stdout.trim()), beforeAudit);
@@ -284,7 +294,7 @@ export async function runCompatibilityMatrix({ mode = 'compatibility' } = {}) {
         record(`${label} cross-tenant mutation denied`, /district does not match/i.test(crossTenant.stderr), true);
         record(`${label} other tenant unchanged`, psql(`select md5(coalesce(string_agg(to_jsonb(t)::text,'' order by id),'')) from social_threads t where district_id='${otherDistrict}';`).stdout.trim(), crossTenantSnapshot);
       }
-      combinations.push({ ...combo, executed: true, assertions: assertions.filter(({ name }) => name.startsWith('combo1')).map(({ name, passed }) => ({ name, passed })) });
+      combinations.push({ ...combo, contractExecuted: true, applicationRevisionExecuted: false, assertions: assertions.filter(({ name }) => name.startsWith('combo1')).map(({ name, passed }) => ({ name, passed })) });
     });
 
     await phase('forward_migration', async () => {
@@ -303,7 +313,7 @@ export async function runCompatibilityMatrix({ mode = 'compatibility' } = {}) {
       psql(`update social_threads set body='old-writer-adversarial-replay' where id='${excludedId}';`);
       record('combo2 old writer replay preserves exclusion', psql(`select visibility_status from social_threads where id='${excludedId}';`).stdout.trim(), 'excluded');
       record('combo2 reports remain verified-owned only', Number(psql("select count(*) from social_threads where visibility_status='active' and relationship_type='owned' and social_account_id is not null;").stdout.trim()), 6);
-      combinations.push({ ...combo, executed: true, artifactIds: [oldWriterId], assertions: assertions.filter(({ name }) => name.startsWith('combo2')).map(({ name, passed }) => ({ name, passed })) });
+      combinations.push({ ...combo, contractExecuted: true, applicationRevisionExecuted: false, artifactIds: [oldWriterId], assertions: assertions.filter(({ name }) => name.startsWith('combo2')).map(({ name, passed }) => ({ name, passed })) });
     });
 
     await phase('combination_3', async () => {
@@ -340,16 +350,16 @@ export async function runCompatibilityMatrix({ mode = 'compatibility' } = {}) {
       const adversarial = psql(`select (public.canary_ingest_social_thread(to_jsonb(t) || jsonb_build_object('visibility_status','active','body','new-writer-adversarial-replay'))).visibility_status from social_threads t where id='${excludedId}';`).stdout.trim();
       record('combo3 authoritative ingestion preserves excluded', adversarial, 'excluded');
       record('combo3 excluded row version unchanged by replay', Number(psql(`select review_version from social_threads where id='${excludedId}';`).stdout.trim()), 7);
-      combinations.push({ ...combo, executed: true, artifactIds: [newWriterId], assertions: assertions.filter(({ name }) => name.startsWith('combo3')).map(({ name, passed }) => ({ name, passed })) });
+      combinations.push({ ...combo, contractExecuted: true, applicationRevisionExecuted: false, artifactIds: [newWriterId], assertions: assertions.filter(({ name }) => name.startsWith('combo3')).map(({ name, passed }) => ({ name, passed })) });
     });
 
     await phase('combination_4_bridge', async () => {
       const combo = matrix.combinations[3];
-      record('combo4 N-1 app bridge loads N rows', Number(psql("select count(*) from social_threads where visibility_status in ('active','excluded');").stdout.trim()), 18);
-      record('combo4 N-1 app bridge client remains tenant scoped', Number(psql("select count(*) from social_threads where district_id='district-a' and visibility_status='active';").stdout.trim()), 7);
-      record('combo4 N-1 app legacy visibility has no hidden exposure', Number(psql("select count(*) from social_threads where district_id='district-a' and visibility_status<>'excluded';").stdout.trim()), 7);
+      record('combo4 N-1 query contract reads N rows', Number(psql("select count(*) from social_threads where visibility_status in ('active','excluded');").stdout.trim()), 18);
+      record('combo4 N-1 district-scoped query returns one tenant', Number(psql("select count(*) from social_threads where district_id='district-a' and visibility_status='active';").stdout.trim()), 7);
+      record('combo4 N-1 visibility contract has no hidden exposure', Number(psql("select count(*) from social_threads where district_id='district-a' and visibility_status<>'excluded';").stdout.trim()), 7);
       record('combo4 bridge mutation contract available', psql("select to_regprocedure('public.canary_apply_social_correction(uuid,text,uuid,text,integer,text)') is not null;").stdout.trim(), 't');
-      combinations.push({ ...combo, executed: true, assertions: assertions.filter(({ name }) => name.startsWith('combo4')).map(({ name, passed }) => ({ name, passed })) });
+      combinations.push({ ...combo, contractExecuted: true, applicationRevisionExecuted: false, assertions: assertions.filter(({ name }) => name.startsWith('combo4')).map(({ name, passed }) => ({ name, passed })) });
     });
 
     const rollbackTimer = process.hrtime.bigint();
@@ -435,12 +445,12 @@ export async function runCompatibilityMatrix({ mode = 'compatibility' } = {}) {
     });
 
     record('no compatibility combination skipped', combinations.length, 4);
-    record('all compatibility combinations executed', combinations.every(({ executed }) => executed), true);
+    record('all compatibility contract combinations executed', combinations.every(({ contractExecuted }) => contractExecuted), true);
     record('all assertions passed before cleanup', assertions.every(({ passed }) => passed), true);
 
     const artifactFingerprints = Object.fromEntries(Object.entries(matrix.artifacts).filter(([, path]) => !path.startsWith('/')).map(([name]) => [name, sha256(files[name])]));
     evidence = {
-      format: 'canary-social-task7-evidence/v1', mode, releaseId: matrix.releaseId, runId,
+      format: 'canary-social-task7-contract-evidence/v2', mode, releaseId: matrix.releaseId, runId,
       startedAt: startedAt.toISOString(), completedAt: new Date().toISOString(),
       runtime: { target: 'disposable-postgresql-docker-only', image: IMAGE, container },
       fingerprints: {
@@ -451,6 +461,14 @@ export async function runCompatibilityMatrix({ mode = 'compatibility' } = {}) {
       },
       counts: { beforeRollback: preRollbackCounts, afterRollback: postRollbackCounts, combinations: combinations.length, assertions: assertions.length, replayRows: rollbackArtifact.manifest.replayRowCount },
       checksums: { officialReportN1Md5: n1Contract.official_report_set_md5, officialReportNMd5: nContract.official_report_set_md5, baselineRowsSha256: backup.manifest.aggregateChecksumSha256, restoredReconciledRowsSha256: restoredRowsChecksum },
+      evidenceScope: 'database, writer, compiled-action, concurrency, rollback, and separate signed-browser evidence',
+      applicationEvidence: {
+        browserEvidencePassed: true,
+        compiledCurrentActionHarnessPassed: true,
+        provenanceBoundPerCombination: false,
+        combinationBoundApplicationExecution: false,
+        limitation: 'Declared combinations execute contract layers against disposable schema/data. They do not execute each full application revision against each declared schema/writer combination.',
+      },
       combinations, assertions, rollback: { phaseDurationsMs, totalRecoveryTimeMs: phaseDurationsMs.total_recovery_time, recoveryObjectiveSeconds: matrix.recoveryObjectiveSeconds, exactN1Verified: true },
       cleanup, unresolvedItems,
     };
@@ -458,7 +476,7 @@ export async function runCompatibilityMatrix({ mode = 'compatibility' } = {}) {
     unresolvedItems.push({ type: 'execution-failure', message: error.message });
     assertions.push({ name: 'unhandled execution failure', passed: false, actual: error.message, expected: null });
     evidence = evidence || {
-      format: 'canary-social-task7-evidence/v1', mode, releaseId: matrix.releaseId, runId,
+      format: 'canary-social-task7-contract-evidence/v2', mode, releaseId: matrix.releaseId, runId,
       startedAt: startedAt.toISOString(), completedAt: new Date().toISOString(),
       runtime: { target: 'disposable-postgresql-docker-only', image: IMAGE, container },
       fingerprints: {}, counts: { combinations: combinations.length, assertions: assertions.length }, checksums: {},

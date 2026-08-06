@@ -8,14 +8,15 @@ Promote the reviewed Social v2 application and staged atomic-RPC writers without
 
 All conditions must be true immediately before promotion:
 
-1. Task 7 compatibility evidence reports `passed: true`, all four N/N-1 combinations executed, cleanup passed, zero unresolved items, and exact N-1 restoration verified.
+1. Task 7 contract evidence reports `passed: true`, all four declared database/writer/application-contract combinations executed, cleanup passed, zero unresolved items, and exact N-1 restoration verified. This evidence must not be represented as four full application-revision executions.
 2. Task 7 rollback drill reports `passed: true`, zero unresolved replay items, checksum verification passed, and a measured recovery time within the release window.
 3. `npm run test:social`, `npm run test:social-migration`, `npm run test:social-db`, `npm run test:quality`, `npm run lint`, `npm run build`, `git diff --check`, and `node scripts/preflight-production-auth.mjs` pass on the exact candidate SHA.
 4. Independent review has no unresolved blocking or important findings.
-5. The pull request is approved and the candidate is integrated onto current `origin/main` without removing newer production work.
-6. The main Canary news ingestion workflow `dVIf6KnZklHYzQvi` is active and has a verified successful post-recovery execution with downstream Supabase writes.
-7. All original and staged Social writers are inactive, no Social execution is running, and there is exactly one planned writer for each bounded source/district activation.
-8. The production Social row count, excluded count, official-account identity set, schema fingerprint, and rollback artifact checksums match the sealed pre-promotion manifest.
+5. Provenance-bound application evidence records the exact application SHA/build, schema fingerprint, writer revision, and signed admin/client outcomes for every full application combination required by the release plan. The current separate browser and compiled-action evidence is complementary and does not satisfy this gate by itself.
+6. The pull request is approved and the candidate is integrated onto current `origin/main` without removing newer production work.
+7. The main Canary news ingestion workflow `dVIf6KnZklHYzQvi` is active and has a verified successful post-recovery execution with downstream Supabase writes.
+8. All original and staged Social writers are inactive, no Social execution is running, and there is exactly one planned writer for each bounded source/district activation.
+9. The production Social row count, excluded count, official-account identity set, schema fingerprint, and rollback artifact checksums match the sealed pre-promotion manifest.
 
 Any failed precondition stops promotion.
 

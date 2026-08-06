@@ -1,5 +1,5 @@
 {
-  "format": "canary-social-compatibility-matrix/v1",
+  "format": "canary-social-compatibility-contract-matrix/v2",
   "releaseId": "safe-social-simplification-2026-08-04-task7",
   "stableApplicationSha": "6fa872818bf729b0979d30ecfa8aaba44836bd09",
   "watermark": "2026-08-05T12:00:00.000000Z",
@@ -16,6 +16,24 @@
     "runtimeBoundary": "/opt/data/backups/canary/social-task7-browser/runtime-boundary.json",
     "nApplicationBrowserEvidence": "/opt/data/backups/canary/social-task7-browser/local-current/signed-role-browser-summary.json",
     "n1ApplicationBrowserEvidence": "/opt/data/backups/canary/social-task7-browser/production-n1-bridge/signed-role-browser-summary.json"
+  },
+  "writers": {
+    "original": [
+      "q4kQbkBNt74rjxFZ",
+      "ahyNaIeDA5NecJ0h",
+      "Wfnzq4tbkYUqb3CQ",
+      "cp60akEmtVY8GJMp",
+      "LhYW2M5c6u6BxVfh",
+      "Dz0F0PGyZaWppZY9"
+    ],
+    "staged": [
+      "wtdqOREu9rx9A90x",
+      "AX0RTKjCIJt4v6Pv",
+      "nrj9IFwl2CGdqVin",
+      "Tx9TwAipVAFfbODj",
+      "WcTnqYT3lEVxfzdB",
+      "SLZABQRPOmXstYV7"
+    ]
   },
   "applications": {
     "N-1": [
@@ -41,10 +59,10 @@
     ]
   },
   "combinations": [
-    { "id": "N-app_N-1-schema_N-1-writer", "application": "N", "schemaData": "N-1", "writer": "N-1", "safeStop": "preview-only" },
-    { "id": "N-app_N-schema_N-1-writer", "application": "N", "schemaData": "N", "writer": "N-1", "safeStop": "migration-verification" },
-    { "id": "N-app_N-schema_N-writer", "application": "N", "schemaData": "N", "writer": "N", "safeStop": "fully-upgraded" },
-    { "id": "N-1-app_N-schema_N-writer", "application": "N-1", "schemaData": "N", "writer": "N", "safeStop": "rollback-bridge" }
+    { "id": "N-contract_N-1-schema_N-1-writer", "applicationContract": "N", "schemaData": "N-1", "writerContract": "N-1", "safeStop": "preview-only" },
+    { "id": "N-contract_N-schema_N-1-writer", "applicationContract": "N", "schemaData": "N", "writerContract": "N-1", "safeStop": "migration-verification" },
+    { "id": "N-contract_N-schema_N-writer", "applicationContract": "N", "schemaData": "N", "writerContract": "N", "safeStop": "fully-upgraded" },
+    { "id": "N-1-contract_N-schema_N-writer", "applicationContract": "N-1", "schemaData": "N", "writerContract": "N", "safeStop": "rollback-bridge" }
   ],
   "tenants": [
     { "id": "district-a", "ownedAccountId": "11111111-1111-1111-1111-111111111111" },
