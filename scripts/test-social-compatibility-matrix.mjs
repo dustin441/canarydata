@@ -159,16 +159,46 @@ export async function runCompatibilityMatrix({ mode = 'compatibility' } = {}) {
       files[name] = await readFile(join(ROOT, path), 'utf8');
     }));
 
+    const externalEvidence = {};
+    for (const name of ['task6WriterEvidence', 'runtimeBoundary', 'nApplicationBrowserEvidence', 'n1ApplicationBrowserEvidence']) {
+      const path = matrix.artifacts[name];
+      const content = await readFile(path, 'utf8');
+      externalEvidence[name] = { path, content, sha256: sha256(content) };
+      record(`${name} evidence mounted`, content.length > 0, true);
+    }
+    const runtimeBoundary = JSON.parse(externalEvidence.runtimeBoundary.content);
+    const nBrowserEvidence = JSON.parse(externalEvidence.nApplicationBrowserEvidence.content);
+    const n1BrowserEvidence = JSON.parse(externalEvidence.n1ApplicationBrowserEvidence.content);
+    record('Task 6 runtime boundary passed', runtimeBoundary.status, 'PASS');
+    record('all original and staged writers inactive', runtimeBoundary.workflowState.every(({ active }) => active === false), true);
+    record('staged writers have no schedules', runtimeBoundary.workflowState.filter(({ kind }) => kind === 'staged').every(({ scheduleNodes }) => scheduleNodes === 0), true);
+    record('production Social executions quiesced', runtimeBoundary.runningSocialExecutions, 0);
+    record('N application signed browser evidence passed', nBrowserEvidence.status, 'PASS');
+    record('N application signed admin and client coverage', canonicalJson([...new Set(nBrowserEvidence.results.map(({ role }) => role))].sort()), canonicalJson(['admin', 'client']));
+    record('N application browser cases passed', nBrowserEvidence.results.every(({ status }) => status === 'PASS'), true);
+    record('N-1 application bridge browser evidence passed', n1BrowserEvidence.status, 'PASS');
+    record('N-1 application signed admin and client coverage', canonicalJson([...new Set(n1BrowserEvidence.results.map(({ role }) => role))].sort()), canonicalJson(['admin', 'client']));
+    record('N-1 application browser cases passed', n1BrowserEvidence.results.every(({ status }) => status === 'PASS'), true);
+
+    const runtimeHarness = spawn(process.execPath, [join(ROOT, 'scripts/test-social-runtime.mjs')]);
+    record('compiled N application action and writer harness passed', /Offline Social runtime wiring tests passed/.test(runtimeHarness.stdout), true);
+    const raceHarness = spawn(process.execPath, [join(ROOT, 'scripts/test-social-race-interleavings.mjs')]);
+    record('concurrency and race interleavings passed', /passed/i.test(raceHarness.stdout), true);
+
     const applicationFingerprints = {
       'N-1': await artifactFingerprint(matrix.applications['N-1'], 'stable-git'),
       N: await artifactFingerprint(matrix.applications.N),
     };
-    const localTask6Evidence = matrix.artifacts.task6WriterEvidence;
-    let task6Fingerprint = null;
-    try { task6Fingerprint = sha256(await readFile(localTask6Evidence)); } catch { /* Portable runs use repository artifacts only. */ }
+    const normalApplicationSources = await Promise.all([
+      'src/app/actions.js', 'src/app/dashboard/page.js', 'src/app/dashboard/DashboardClient.js', 'src/lib/data.js',
+    ].map(async (path) => [path, await readFile(join(ROOT, path), 'utf8')]));
+    const normalApplicationText = normalApplicationSources.map(([path, content]) => `${path}\n${content}`).join('\n');
+    record('N application has no legacy review RPC dependency', /canary_(?:bulk_)?review_social_thread/.test(normalApplicationText), false);
+    record('N application has no review or approved visibility branch', /['"](?:review|approved)['"]/.test(normalApplicationText), false);
+    const task6Fingerprint = externalEvidence.task6WriterEvidence.sha256;
     const writerFingerprints = {
       'N-1': await artifactFingerprint(['src/lib/socialIngestion.mjs'], 'stable-git'),
-      N: sha256(`${sha256(files.task4Migration)}:${task6Fingerprint || 'task6-evidence-not-mounted'}`),
+      N: sha256(`${sha256(files.task4Migration)}:${task6Fingerprint}`),
       task6Evidence: task6Fingerprint,
     };
 
@@ -218,6 +248,42 @@ export async function runCompatibilityMatrix({ mode = 'compatibility' } = {}) {
       record('combo1 old writer receives N-1 default', transaction.at(-1), 'review');
       record('combo1 hide and restore outcomes', transaction.slice(0, 2).join(','), 'excluded,active');
       record('combo1 transaction leaves audit immutable', Number(psql('select count(*) from social_review_events;').stdout.trim()), beforeAudit);
+      const transitionRows = JSON.parse(psql(`select jsonb_agg(jsonb_build_object(
+        'id',id::text,'district_id',district_id,'status',visibility_status,'version',review_version,
+        'ownership',provider_metadata->>'ownership_class') order by id) from social_threads;`).stdout.trim());
+      for (const row of transitionRows) {
+        const firstAction = row.status === 'excluded' ? 'restore' : 'exclude';
+        const inverseAction = row.status === 'excluded' ? 'exclude' : 'restore';
+        const firstStatus = firstAction === 'exclude' ? 'excluded' : 'active';
+        const inverseStatus = inverseAction === 'exclude' ? 'excluded' : 'active';
+        const key = `task7-cross-${row.district_id}-${row.status}-${row.ownership}`;
+        const transitionOutput = psql(`begin;
+          select to_jsonb(public.canary_apply_social_correction('${matrix.actors.admin}','${row.district_id}','${row.id}','${firstAction}',${row.version},'${key}-first'));
+          select to_jsonb(public.canary_apply_social_correction('${matrix.actors.admin}','${row.district_id}','${row.id}','${firstAction}',${row.version},'${key}-first'));
+          select to_jsonb(public.canary_apply_social_correction('${matrix.actors.admin}','${row.district_id}','${row.id}','${inverseAction}',${row.version + 1},'${key}-inverse'));
+          select count(*) from social_review_events e join social_review_batches b on b.id=e.batch_id where b.criteria->>'idempotency_key' like '${key}-%';
+          rollback;`).stdout.trim().split('\n');
+        const transition = {
+          first: JSON.parse(transitionOutput[0]),
+          duplicate: JSON.parse(transitionOutput[1]),
+          inverse: JSON.parse(transitionOutput[2]),
+          audit_count: Number(transitionOutput[3]),
+        };
+        const label = `combo1 ${row.district_id} ${row.status} ${row.ownership}`;
+        record(`${label} first transition`, transition.first.visibility_status, firstStatus);
+        record(`${label} first version increment`, transition.first.review_version, row.version + 1);
+        record(`${label} idempotent duplicate snapshot`, canonicalJson(transition.duplicate), canonicalJson(transition.first));
+        record(`${label} inverse transition`, transition.inverse.visibility_status, inverseStatus);
+        record(`${label} inverse version increment`, transition.inverse.review_version, row.version + 2);
+        record(`${label} exact audit cardinality`, Number(transition.audit_count), 2);
+        const stale = psql(`select public.canary_apply_social_correction('${matrix.actors.admin}','${row.district_id}','${row.id}','${firstAction}',${row.version - 1},'${key}-stale');`, false);
+        record(`${label} stale version denied`, /changed; refresh/i.test(stale.stderr), true);
+        const otherDistrict = row.district_id === 'district-a' ? 'district-b' : 'district-a';
+        const crossTenantSnapshot = psql(`select md5(coalesce(string_agg(to_jsonb(t)::text,'' order by id),'')) from social_threads t where district_id='${otherDistrict}';`).stdout.trim();
+        const crossTenant = psql(`select public.canary_apply_social_correction('${matrix.actors.admin}','${otherDistrict}','${row.id}','${firstAction}',${row.version},'${key}-cross');`, false);
+        record(`${label} cross-tenant mutation denied`, /district does not match/i.test(crossTenant.stderr), true);
+        record(`${label} other tenant unchanged`, psql(`select md5(coalesce(string_agg(to_jsonb(t)::text,'' order by id),'')) from social_threads t where district_id='${otherDistrict}';`).stdout.trim(), crossTenantSnapshot);
+      }
       combinations.push({ ...combo, executed: true, assertions: assertions.filter(({ name }) => name.startsWith('combo1')).map(({ name, passed }) => ({ name, passed })) });
     });
 
@@ -288,10 +354,8 @@ export async function runCompatibilityMatrix({ mode = 'compatibility' } = {}) {
 
     const rollbackTimer = process.hrtime.bigint();
     await phase('quiesce_writers', async () => {
-      const before = psql("select count(*),max(updated_at) from social_threads;").stdout.trim();
-      await new Promise((resolve) => setTimeout(resolve, 25));
-      const after = psql("select count(*),max(updated_at) from social_threads;").stdout.trim();
-      record('writer quiescence proves no continuing writes', after, before);
+      record('sealed runtime boundary has zero running Social executions', runtimeBoundary.runningSocialExecutions, 0);
+      record('sealed runtime boundary has all Social writers inactive', runtimeBoundary.workflowState.every(({ active }) => active === false), true);
     });
     await phase('capture_post_watermark', async () => {
       preRollbackCounts = parseJsonOutput(psql("select jsonb_build_object('rows',count(*),'excluded',count(*) filter(where visibility_status='excluded'),'auditEvents',(select count(*) from social_review_events),'corrections',(select count(*) from social_correction_requests)) from social_threads;").stdout);
@@ -365,6 +429,10 @@ export async function runCompatibilityMatrix({ mode = 'compatibility' } = {}) {
       record('N-1 cross-tenant rows unchanged', psql("select md5(coalesce(string_agg(to_jsonb(t)::text,'' order by id),'')) from social_threads t where district_id='district-b';").stdout.trim(), crossTenantSnapshot);
     });
     phaseDurationsMs.total_recovery_time = Number(elapsedMs(rollbackTimer).toFixed(3));
+    record('rollback recovery objective met', phaseDurationsMs.total_recovery_time <= matrix.recoveryObjectiveSeconds * 1000, true, {
+      recoveryObjectiveSeconds: matrix.recoveryObjectiveSeconds,
+      totalRecoveryTimeMs: phaseDurationsMs.total_recovery_time,
+    });
 
     record('no compatibility combination skipped', combinations.length, 4);
     record('all compatibility combinations executed', combinations.every(({ executed }) => executed), true);
@@ -379,10 +447,11 @@ export async function runCompatibilityMatrix({ mode = 'compatibility' } = {}) {
         schema: { pureN1: pureN1.pure_n1_schema_fingerprint_md5, task5N1: n1Contract.schema_fingerprint_md5, N: nContract.schema_fingerprint_md5, restoredPureN1: restored.pure_n1_schema_fingerprint_md5 },
         data: { n1BackupSha256: backup.manifest.artifactSha256, n1RowsSha256: backup.manifest.aggregateChecksumSha256, rollbackEvidenceSha256: rollbackArtifact.manifest.artifactSha256 },
         application: applicationFingerprints, writers: writerFingerprints, artifacts: artifactFingerprints,
+        externalEvidence: Object.fromEntries(Object.entries(externalEvidence).map(([name, value]) => [name, value.sha256])),
       },
       counts: { beforeRollback: preRollbackCounts, afterRollback: postRollbackCounts, combinations: combinations.length, assertions: assertions.length, replayRows: rollbackArtifact.manifest.replayRowCount },
       checksums: { officialReportN1Md5: n1Contract.official_report_set_md5, officialReportNMd5: nContract.official_report_set_md5, baselineRowsSha256: backup.manifest.aggregateChecksumSha256, restoredReconciledRowsSha256: restoredRowsChecksum },
-      combinations, assertions, rollback: { phaseDurationsMs, totalRecoveryTimeMs: phaseDurationsMs.total_recovery_time, exactN1Verified: true },
+      combinations, assertions, rollback: { phaseDurationsMs, totalRecoveryTimeMs: phaseDurationsMs.total_recovery_time, recoveryObjectiveSeconds: matrix.recoveryObjectiveSeconds, exactN1Verified: true },
       cleanup, unresolvedItems,
     };
   } catch (error) {

@@ -250,9 +250,7 @@ export async function runSocialPilot({
       const threadPayload = {
         ...thread,
         social_account_id: trustedAccountId,
-        visibility_status: thread.relationship_type === 'owned' && trustedAccountId
-          ? 'active'
-          : (thread.visibility_status === 'excluded' ? 'excluded' : 'review'),
+        visibility_status: thread.visibility_status === 'excluded' ? 'excluded' : 'active',
         last_seen_at: completedAt(),
         provider_metadata: { ...thread.provider_metadata, pilot_ingestion: true },
       };
@@ -265,14 +263,12 @@ export async function runSocialPilot({
     }
 
     const activeThreads = stored.filter((thread) => thread.visibility_status === 'active').length;
-    const reviewThreads = stored.filter((thread) => thread.visibility_status === 'review').length;
     const excludedThreads = stored.filter((thread) => thread.visibility_status === 'excluded').length;
     const diagnostics = {
       pilot: true,
       writer: 'atomic RPC, lifecycle-preserving',
-      visibility_policy: 'verified matching owned posts auto-active; excluded input remains excluded; other public records remain review-only',
+      visibility_policy: 'eligible records are active; excluded input remains excluded; verified ownership is identity-based',
       active_threads: activeThreads,
-      review_threads: reviewThreads,
       excluded_threads: excludedThreads,
       rejected: batch.rejected,
       stored_thread_ids: stored.map((thread) => thread.id),

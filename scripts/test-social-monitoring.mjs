@@ -259,7 +259,7 @@ assert.equal(batch.threads.length, 1);
 assert.equal(batch.rejected.length, 1);
 assert.equal(batch.threads[0].provider, 'meta');
 assert.equal(batch.threads[0].district_id, 'alabaster-city-schools');
-assert.equal(batch.threads[0].visibility_status, 'review', 'non-owned public content must remain review-only by default');
+assert.equal(batch.threads[0].visibility_status, 'active', 'eligible public content must default to the N active state');
 const ownedBatch = normalizeProviderBatch({
   provider: 'meta',
   districtId: 'alabaster-city-schools',
@@ -272,7 +272,7 @@ const ownedBatch = normalizeProviderBatch({
     body: 'Official district post.',
   }],
 });
-assert.equal(ownedBatch.threads[0].visibility_status, 'review', 'normalization alone cannot verify an official account');
+assert.equal(ownedBatch.threads[0].visibility_status, 'active', 'eligible owned content must use the N active state while ownership remains identity-based');
 assert.deepEqual(batch.threads[0].provider_metadata.metric_availability, {
   reactions: false, comments: false, shares: false, views: false,
 });
@@ -305,7 +305,7 @@ assert.match(dashboardSource, /social-report-card-meta[\s\S]{0,300}social-platfo
 assert.match(dashboardSource, /<h2>Complete Post Evidence<\/h2>[\s\S]{0,300}<SocialReportTable results=\{allPosts\}/, 'the Social PDF must contain the complete eligible post table');
 assert.doesNotMatch(dashboardSource, /kindergarten registration and staff back-to-school preparation/, 'seasonally incompatible briefing guidance must not return');
 assert.match(dashboardSource, /function BoardReportView\(/);
-assert.match(dashboardSource, /result\.visibilityStatus === 'active'/, 'Board Report must exclude review-only canonical Social records');
+assert.match(dashboardSource, /result\.visibilityStatus === 'active'/, 'Board Report must exclude non-active canonical Social records');
 assert.match(dashboardSource, /Board Report PDF/);
 assert.match(dashboardSource, /current === label \? 'All' : label/, 'Strategic Alignment chart clicks must toggle the active filter off');
 assert.match(dashboardSource, /className="active-filter-chip"/);

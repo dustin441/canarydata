@@ -12,17 +12,28 @@
     "contractVerifier": "supabase/verify_social_visibility_contract.sql",
     "restoredN1Verifier": "supabase/verify_social_restored_n1.sql",
     "rollbackCapture": "supabase/capture_social_rollback_evidence_readonly.sql",
-    "task6WriterEvidence": "/opt/data/backups/n8n/canary-social-task6/20260805T160000Z-staged/SHA256SUMS"
+    "task6WriterEvidence": "/opt/data/backups/n8n/canary-social-task6/20260805T160000Z-staged/SHA256SUMS",
+    "runtimeBoundary": "/opt/data/backups/canary/social-task7-browser/runtime-boundary.json",
+    "nApplicationBrowserEvidence": "/opt/data/backups/canary/social-task7-browser/local-current/signed-role-browser-summary.json",
+    "n1ApplicationBrowserEvidence": "/opt/data/backups/canary/social-task7-browser/production-n1-bridge/signed-role-browser-summary.json"
   },
   "applications": {
     "N-1": [
       "src/app/api/social-media/route.js",
+      "src/app/actions.js",
+      "src/app/dashboard/page.js",
+      "src/app/dashboard/DashboardClient.js",
+      "src/lib/data.js",
       "src/lib/social.mjs",
       "src/lib/socialIngestion.mjs",
       "src/lib/socialReport.mjs"
     ],
     "N": [
       "src/app/api/social-media/route.js",
+      "src/app/actions.js",
+      "src/app/dashboard/page.js",
+      "src/app/dashboard/DashboardClient.js",
+      "src/lib/data.js",
       "src/lib/social.mjs",
       "src/lib/socialIngestion.mjs",
       "src/lib/socialLifecycle.mjs",
@@ -45,5 +56,6 @@
     "admin": "aaaaaaaa-aaaa-aaaa-aaaa-aaaaaaaaaaaa",
     "client": "cccccccc-cccc-cccc-cccc-cccccccccccc"
   },
-  "fixtureMarker": "controlled-qa:task7-compatibility-matrix"
+  "fixtureMarker": "controlled-qa:task7-compatibility-matrix",
+  "recoveryObjectiveSeconds": 30
 }

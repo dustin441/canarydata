@@ -47,8 +47,11 @@ function normalizeProviderItem({ provider, districtId, item }) {
   if (!body && !suppliedHeadline) throw new Error('missing_content');
   const headline = suppliedHeadline || body;
 
-  const visibilityStatus = String(item?.visibility_status || 'review').toLowerCase();
-  if (!['review', 'active', 'excluded'].includes(visibilityStatus)) throw new Error('invalid_visibility_status');
+  const requestedVisibilityStatus = String(item?.visibility_status || 'active').toLowerCase();
+  if (!['review', 'approved', 'active', 'excluded'].includes(requestedVisibilityStatus)) {
+    throw new Error('invalid_visibility_status');
+  }
+  const visibilityStatus = requestedVisibilityStatus === 'excluded' ? 'excluded' : 'active';
 
   const commentCount = nonNegativeNumber(item?.comment_count);
   const replyCount = nonNegativeNumber(item?.reply_count);

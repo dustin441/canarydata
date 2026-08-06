@@ -350,7 +350,7 @@ const untrustedRun = await runCommittedPilot({
 await untrustedRun.promise;
 const untrustedRpc = untrustedRun.mock.calls.find((call) => call.url.endsWith('/rest/v1/rpc/canary_ingest_social_thread'));
 assert.equal(untrustedRpc.body.p_thread.social_account_id, null);
-assert.equal(untrustedRpc.body.p_thread.visibility_status, 'review');
+assert.equal(untrustedRpc.body.p_thread.visibility_status, 'active');
 const accountLookup = untrustedRun.mock.calls.find((call) => call.url.includes('/social_accounts?'));
 assert.match(accountLookup.url, /active=eq\.true/);
 assert.match(accountLookup.url, /select=id,provider,platform,handle,profile_url,active/);
@@ -371,7 +371,7 @@ const publicRun = await runCommittedPilot({
 await publicRun.promise;
 const publicRpc = publicRun.mock.calls.find((call) => call.url.endsWith('/rest/v1/rpc/canary_ingest_social_thread'));
 assert.equal(publicRpc.body.p_thread.social_account_id, null);
-assert.equal(publicRpc.body.p_thread.visibility_status, 'review');
+assert.equal(publicRpc.body.p_thread.visibility_status, 'active');
 
 const lifecyclePreservedRun = await runCommittedPilot({
   items: [baseItem],
