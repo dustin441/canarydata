@@ -171,21 +171,13 @@ await assert.rejects(
 assert.equal(nonAdminHarness.calls.rpcs.length, 0, 'A non-admin cross-district caller must not reach an RPC.');
 assert.equal(nonAdminHarness.calls.tables.length, 0, 'Reviewer denial must precede cross-district thread access.');
 
-const approveThread = {
-  id: THREAD_ID, district_id: DISTRICT_ID, social_account_id: 'account-1', platform: 'facebook',
-  relationship_type: 'owned', visibility_status: 'review', review_version: 7,
-};
-const approveHarness = await compileActionsHarness({ thread: approveThread, rpcData: { id: THREAD_ID, visibility_status: 'active' } });
-await approveHarness.reviewSocialThread({ socialThreadId: THREAD_ID, action: 'approve' });
-assert.equal(approveHarness.calls.rpcs[0].name, 'canary_review_social_thread', 'Approve must retain the N-1 legacy RPC.');
-assert.deepEqual(approveHarness.calls.rpcs[0].args, {
-  p_actor_user_id: ACTOR_ID,
-  p_social_thread_id: THREAD_ID,
-  p_action: 'approve',
-  p_expected_version: 7,
-  p_classification: null,
-  p_reviewer_note: null,
-});
+const unsupportedApprovalHarness = await compileActionsHarness();
+await assert.rejects(
+  unsupportedApprovalHarness.reviewSocialThread({ socialThreadId: THREAD_ID, action: 'approve', expectedVersion: 7 }),
+  /Unsupported social correction action/,
+);
+assert.equal(unsupportedApprovalHarness.calls.rpcs.length, 0, 'The N application must not call the legacy approval RPC.');
+assert.equal(unsupportedApprovalHarness.calls.tables.length, 0, 'Unsupported legacy actions must fail before thread access.');
 
 const baseItem = {
   platform: 'facebook',

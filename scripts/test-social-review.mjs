@@ -629,12 +629,11 @@ assert.match(sql, /revoke all on function public\.canary_bulk_review_social_thre
 
 assert.match(actions, /function assertCanaryReviewer/);
 assert.match(actions, /if \(!actor\.isAdmin\)/);
-assert.match(actions, /Selection contains missing or cross-district social results/);
-assert.match(actions, /Bulk approval is limited to verified official district posts awaiting client approval/);
-assert.match(actions, /runReviewAction\('promote', current\.review_version\)/);
-assert.match(actions, /runBulkAction\('promote', promotionIds\)/);
-assert.match(actions, /\.select\('visibility_status, review_version'\)/);
-assert.match(actions, /expectedCurrentVersion/);
+assert.match(actions, /SOCIAL_CORRECTION_ACTIONS = new Set\(\['exclude', 'restore'\]\)/);
+assert.match(actions, /Unsupported social correction action/);
+assert.match(actions, /supabase\.rpc\('canary_apply_social_correction'/);
+assert.doesNotMatch(actions, /canary_review_social_thread|canary_bulk_review_social_threads/);
+assert.doesNotMatch(actions, /approve_official|runReviewAction|runBulkAction|expectedCurrentVersion/);
 assert.match(sql, /p_action not in \('approve', 'promote'/);
 assert.match(sql, /p_action not in \('approve_official', 'promote'\)/);
 assert.doesNotMatch(actions, /Only approved results can be promoted/);
@@ -805,8 +804,9 @@ assert.match(styles, /\.birdseye-evidence-table thead[\s\S]*display: table-heade
 assert.match(styles, /\.birdseye-evidence-table \.headline-text,[\s\S]*-webkit-line-clamp: unset !important/);
 assert.match(styles, /\.board-report-social \.social-report-media-image[\s\S]*object-fit: contain/);
 assert.match(dashboard, /!listCompact && \(/);
-assert.match(data, /includeReview \? \['active', 'approved', 'review', 'excluded'\] : \['active'\]/);
+assert.match(data, /includeReview \? \['active', 'excluded'\] : \['active'\]/);
 assert.match(data, /export async function getSocialReviewEvents/);
-assert.match(melodi, /isAdmin \? \['active', 'approved', 'review'\] : \['active'\]/);
+assert.match(melodi, /\.eq\('visibility_status', 'active'\)/);
+assert.doesNotMatch(melodi, /const socialVisibility|\.in\('visibility_status', socialVisibility\)/);
 
 console.log('Social review workflow tests passed.');

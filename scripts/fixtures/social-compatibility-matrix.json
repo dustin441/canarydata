@@ -1,0 +1,49 @@
+{
+  "format": "canary-social-compatibility-matrix/v1",
+  "releaseId": "safe-social-simplification-2026-08-04-task7",
+  "stableApplicationSha": "6fa872818bf729b0979d30ecfa8aaba44836bd09",
+  "watermark": "2026-08-05T12:00:00.000000Z",
+  "artifacts": {
+    "n1Fixture": "scripts/fixtures/social-n1.sql",
+    "capturedN1": "scripts/fixtures/social-n1-production-captured.sql",
+    "task4Migration": "supabase/migrations/20260804193000_social_visibility_lifecycle.sql",
+    "task5Migration": "supabase/migrations/20260805120000_social_visibility_active.sql",
+    "task5Rollback": "supabase/rollbacks/20260805120000_social_visibility_active_down.sql",
+    "contractVerifier": "supabase/verify_social_visibility_contract.sql",
+    "restoredN1Verifier": "supabase/verify_social_restored_n1.sql",
+    "rollbackCapture": "supabase/capture_social_rollback_evidence_readonly.sql",
+    "task6WriterEvidence": "/opt/data/backups/n8n/canary-social-task6/20260805T160000Z-staged/SHA256SUMS"
+  },
+  "applications": {
+    "N-1": [
+      "src/app/api/social-media/route.js",
+      "src/lib/social.mjs",
+      "src/lib/socialIngestion.mjs",
+      "src/lib/socialReport.mjs"
+    ],
+    "N": [
+      "src/app/api/social-media/route.js",
+      "src/lib/social.mjs",
+      "src/lib/socialIngestion.mjs",
+      "src/lib/socialLifecycle.mjs",
+      "src/lib/socialReport.mjs"
+    ]
+  },
+  "combinations": [
+    { "id": "N-app_N-1-schema_N-1-writer", "application": "N", "schemaData": "N-1", "writer": "N-1", "safeStop": "preview-only" },
+    { "id": "N-app_N-schema_N-1-writer", "application": "N", "schemaData": "N", "writer": "N-1", "safeStop": "migration-verification" },
+    { "id": "N-app_N-schema_N-writer", "application": "N", "schemaData": "N", "writer": "N", "safeStop": "fully-upgraded" },
+    { "id": "N-1-app_N-schema_N-writer", "application": "N-1", "schemaData": "N", "writer": "N", "safeStop": "rollback-bridge" }
+  ],
+  "tenants": [
+    { "id": "district-a", "ownedAccountId": "11111111-1111-1111-1111-111111111111" },
+    { "id": "district-b", "ownedAccountId": "22222222-2222-2222-2222-222222222222" }
+  ],
+  "statuses": ["review", "approved", "active", "excluded"],
+  "ownershipClasses": ["verified-owned", "public"],
+  "actors": {
+    "admin": "aaaaaaaa-aaaa-aaaa-aaaa-aaaaaaaaaaaa",
+    "client": "cccccccc-cccc-cccc-cccc-cccccccccccc"
+  },
+  "fixtureMarker": "controlled-qa:task7-compatibility-matrix"
+}

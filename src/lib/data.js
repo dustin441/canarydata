@@ -125,7 +125,7 @@ export async function getSocialThreads(districtId = null, includeReview = false)
     let query = supabase
       .from('social_threads')
       .select(SOCIAL_THREAD_COLUMNS)
-      .in('visibility_status', includeReview ? ['active', 'approved', 'review', 'excluded'] : ['active'])
+      .in('visibility_status', includeReview ? ['active', 'excluded'] : ['active'])
       .order('published_at', { ascending: false })
       .order('id', { ascending: true })
       .range(from, from + SOCIAL_THREAD_PAGE_SIZE - 1);

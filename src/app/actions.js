@@ -38,18 +38,11 @@ function assertCanaryReviewer(actor) {
   if (!actor.isAdmin) throw new Error('Canary reviewer access is required.');
 }
 
-const SOCIAL_REVIEW_ACTIONS = new Set(['approve', 'exclude', 'restore', 'classification', 'note']);
-const SOCIAL_CLASSIFICATIONS = new Set(['owned', 'direct_tag', 'direct_mention', 'ambient']);
+const SOCIAL_CORRECTION_ACTIONS = new Set(['exclude', 'restore']);
 
 function customerSearchQuerySlotId(districtId, slotIndex) {
   const hex = createHash('sha256').update(`canary-search-query-slot:${districtId}:${slotIndex}`).digest('hex').slice(0, 32);
   return `${hex.slice(0, 8)}-${hex.slice(8, 12)}-${hex.slice(12, 16)}-${hex.slice(16, 20)}-${hex.slice(20)}`;
-}
-
-function cleanSocialReviewerNote(value) {
-  const note = String(value || '').trim();
-  if (note.length > 2000) throw new Error('Reviewer note must be 2000 characters or fewer.');
-  return note;
 }
 
 async function requireSocialThreadForReview(supabase, actor, socialThreadId) {
@@ -783,149 +776,22 @@ export async function restoreStory({ storyId, exclusionEventId, reason, expected
   return data;
 }
 
-export async function reviewSocialThread({ socialThreadId, action, expectedVersion, classification = null, reviewerNote = null }) {
+export async function reviewSocialThread({ socialThreadId, action, expectedVersion }) {
   const { actor, admin: supabase } = await requireCanaryActor();
   assertCanaryReviewer(actor);
-  if (!SOCIAL_REVIEW_ACTIONS.has(action)) throw new Error('Unsupported social review action.');
-  if (action === 'classification' && !SOCIAL_CLASSIFICATIONS.has(classification)) {
-    throw new Error('Choose a valid social classification.');
-  }
-  const lifecycleVersion = ['exclude', 'restore'].includes(action)
-    ? requireSocialCorrectionExpectedVersion(expectedVersion)
-    : null;
+  if (!SOCIAL_CORRECTION_ACTIONS.has(action)) throw new Error('Unsupported social correction action.');
+  const lifecycleVersion = requireSocialCorrectionExpectedVersion(expectedVersion);
   const thread = await requireSocialThreadForReview(supabase, actor, socialThreadId);
-  if (action === 'approve') {
-    const { data: officialAccount, error: accountError } = await supabase
-      .from('social_accounts')
-      .select('id, district_id, platform, handle, profile_url, active')
-      .eq('id', thread.social_account_id)
-      .maybeSingle();
-    if (accountError) throw accountError;
-    const isVerifiedOfficial = thread.relationship_type === 'owned'
-      && ['review', 'approved'].includes(thread.visibility_status)
-      && officialAccount?.active
-      && officialAccount.district_id === thread.district_id
-      && officialAccount.platform === thread.platform
-      && Boolean(String(officialAccount.handle || '').trim() || String(officialAccount.profile_url || '').trim());
-    if (!isVerifiedOfficial) throw new Error('Approval is limited to verified official district posts awaiting client approval.');
-  }
-  if (lifecycleVersion !== null) {
-    const { data, error } = await supabase.rpc('canary_apply_social_correction', buildSocialCorrectionRpcArgs({
-      actorId: actor.id,
-      districtId: thread.district_id,
-      socialThreadId: thread.id,
-      action,
-      expectedVersion: lifecycleVersion,
-    }));
-    if (error) throw error;
-    revalidatePath('/dashboard');
-    return data;
-  }
-
-  const version = Number.isInteger(expectedVersion) ? expectedVersion : thread.review_version;
-  const runReviewAction = (reviewAction, reviewVersion) => supabase.rpc('canary_review_social_thread', {
-    p_actor_user_id: actor.id,
-    p_social_thread_id: thread.id,
-    p_action: reviewAction,
-    p_expected_version: reviewVersion,
-    p_classification: reviewAction === 'classification' ? classification : null,
-    p_reviewer_note: reviewAction === 'note' ? cleanSocialReviewerNote(reviewerNote) : null,
-  });
-
-  let result;
-  if (action === 'approve') {
-    if (thread.visibility_status === 'review') {
-      const approval = await runReviewAction('approve', version);
-      if (approval.error) throw approval.error;
-      result = approval.data;
-    }
-    const { data: current, error: currentError } = await supabase
-      .from('social_threads')
-      .select('visibility_status, review_version')
-      .eq('id', thread.id)
-      .single();
-    if (currentError) throw currentError;
-    const expectedCurrentVersion = thread.visibility_status === 'review' ? version + 1 : version;
-    if (current.review_version !== expectedCurrentVersion) throw new Error('Social result changed; refresh and try again.');
-    if (current.visibility_status !== 'active') {
-      if (current.visibility_status !== 'approved') throw new Error('Official post could not be made client-visible.');
-      const promotion = await runReviewAction('promote', current.review_version);
-      if (promotion.error) throw promotion.error;
-      result = promotion.data;
-    }
-  } else {
-    const response = await runReviewAction(action, version);
-    if (response.error) throw response.error;
-    result = response.data;
-  }
+  const { data, error } = await supabase.rpc('canary_apply_social_correction', buildSocialCorrectionRpcArgs({
+    actorId: actor.id,
+    districtId: thread.district_id,
+    socialThreadId: thread.id,
+    action,
+    expectedVersion: lifecycleVersion,
+  }));
+  if (error) throw error;
   revalidatePath('/dashboard');
-  return result;
-}
-
-export async function bulkReviewSocialThreads({ districtId, socialThreadIds, action }) {
-  const { actor, admin: supabase } = await requireCanaryActor();
-  assertCanaryReviewer(actor);
-  assertDistrictAccess(actor, districtId);
-  if (action !== 'approve_official') throw new Error('Unsupported bulk social review action.');
-  const ids = [...new Set((Array.isArray(socialThreadIds) ? socialThreadIds : []).map(String).filter(Boolean))];
-  if (ids.length < 1 || ids.length > 250) throw new Error('Select between 1 and 250 social results.');
-
-  const { data: rows, error: rowsError } = await supabase
-    .from('social_threads')
-    .select('id, district_id, social_account_id, platform, relationship_type, visibility_status, review_version')
-    .in('id', ids);
-  if (rowsError) throw rowsError;
-  if ((rows ?? []).length !== ids.length || rows.some((row) => row.district_id !== districtId)) {
-    throw new Error('Selection contains missing or cross-district social results.');
-  }
-  const accountIds = [...new Set(rows.map((row) => row.social_account_id).filter(Boolean))];
-  const { data: officialAccounts, error: accountError } = accountIds.length > 0
-    ? await supabase.from('social_accounts').select('id, district_id, platform, handle, profile_url, active').in('id', accountIds)
-    : { data: [], error: null };
-  if (accountError) throw accountError;
-  const officialAccountKeys = new Set((officialAccounts ?? [])
-    .filter((account) => account.active && (String(account.handle || '').trim() || String(account.profile_url || '').trim()))
-    .map((account) => `${account.id}:${account.district_id}:${account.platform}`));
-  const allEligible = rows.every((row) => row.relationship_type === 'owned' && ['review', 'approved'].includes(row.visibility_status)
-    && officialAccountKeys.has(`${row.social_account_id}:${row.district_id}:${row.platform}`));
-  if (!allEligible) throw new Error('Bulk approval is limited to verified official district posts awaiting client approval.');
-
-  const runBulkAction = (bulkAction, bulkIds) => supabase.rpc('canary_bulk_review_social_threads', {
-    p_actor_user_id: actor.id,
-    p_district_id: districtId,
-    p_social_thread_ids: bulkIds,
-    p_action: bulkAction,
-  });
-
-  let result;
-  const reviewIds = rows.filter((row) => row.visibility_status === 'review').map((row) => row.id);
-  if (reviewIds.length > 0) {
-    const approval = await runBulkAction('approve_official', reviewIds);
-    if (approval.error) throw approval.error;
-    result = approval.data;
-  }
-  const { data: currentRows, error: currentRowsError } = await supabase
-    .from('social_threads')
-    .select('id, visibility_status, review_version')
-    .in('id', ids);
-  if (currentRowsError) throw currentRowsError;
-  const originalById = new Map(rows.map((row) => [row.id, row]));
-  if ((currentRows ?? []).some((row) => {
-    const original = originalById.get(row.id);
-    const expectedVersion = original.visibility_status === 'review' ? original.review_version + 1 : original.review_version;
-    return row.review_version !== expectedVersion;
-  })) throw new Error('Social results changed; refresh and try again.');
-  const promotionIds = (currentRows ?? []).filter((row) => row.visibility_status !== 'active').map((row) => row.id);
-  if (promotionIds.length > 0) {
-    if ((currentRows ?? []).some((row) => promotionIds.includes(row.id) && row.visibility_status !== 'approved')) {
-      throw new Error('Official posts could not be made client-visible.');
-    }
-    const promotion = await runBulkAction('promote', promotionIds);
-    if (promotion.error) throw promotion.error;
-    result = promotion.data;
-  }
-  revalidatePath('/dashboard');
-  return Array.isArray(result) ? result[0] : result;
+  return data;
 }
 
 const SEARCH_QUERY_RETURN_COLUMNS = 'id, query_text, district_id, district_name, geo_city, geo_state, geo_zip, channels, active, created_at';
