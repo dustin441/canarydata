@@ -3393,7 +3393,7 @@ export function SocialView({ socialResults, legacySocialResults = [], socialSour
 
       {isAdmin && (
         <details className="social-audit-history">
-          <summary><span><strong>Correction history</strong><small>Immutable correction history retains every recorded event type, including historical approvals, classifications, notes, exclusions, and restorations.</small></span><em>{scopedReviewEvents.length} event{scopedReviewEvents.length === 1 ? '' : 's'}</em></summary>
+          <summary><span><strong>Correction history</strong><small>Immutable correction history retains recorded exclusions and restorations.</small></span><em>{scopedReviewEvents.length} event{scopedReviewEvents.length === 1 ? '' : 's'}</em></summary>
           <div className="social-audit-list">
             {scopedReviewEvents.length === 0 ? <p>No social correction events yet.</p> : visibleReviewEvents.map((event) => (
               <article key={event.id}>
