@@ -2961,7 +2961,7 @@ function MonthlySocialPerformance({
   );
 }
 
-export function SocialView({ socialResults, socialSources, socialReviewEvents = [], districtFilter, districts, campaignSearch, setCampaignSearch, isAdmin = false }) {
+export function SocialView({ socialResults, legacySocialResults = [], socialSources, socialReviewEvents = [], districtFilter, districts, campaignSearch, setCampaignSearch, isAdmin = false }) {
   const [socialPageTab, setSocialPageTab] = useState('overview');
   const [relationshipFilter, setRelationshipFilter] = useState('all');
   const socialSearch = campaignSearch;
@@ -3110,10 +3110,7 @@ export function SocialView({ socialResults, socialSources, socialReviewEvents = 
       && verifiedOfficialSourceKeys.has(`${result.socialAccountId}:${result.districtId}:${result.platform}`)),
     [monthlyReportCandidates, comparisonPostsWindow, verifiedOfficialSourceKeys],
   );
-  const archivedLegacyResults = useMemo(
-    () => results.filter((result) => !result.socialAccountId && !result.externalThreadId),
-    [results],
-  );
+
   const reportDistrictName = districtFilter === 'All'
     ? 'All Districts'
     : districts.find((district) => district.id === districtFilter)?.name || formatDistrictName(districtFilter);
@@ -3217,18 +3214,18 @@ export function SocialView({ socialResults, socialSources, socialReviewEvents = 
         onExportCsv={exportSocialCsv}
       />
       {socialMessage && <p className="social-review-error" role="alert">{socialMessage}</p>}
-      {archivedLegacyResults.length > 0 && (
+      {isAdmin && legacySocialResults.length > 0 && (
         <details className="social-legacy-evidence">
           <summary>
-            <strong>Archived social evidence ({archivedLegacyResults.length})</strong>
-            <span>Historical social rows remain searchable here but are not included in verified official performance totals.</span>
+            <strong>Legacy import reference ({legacySocialResults.length})</strong>
+            <span>Older pre-migration rows retained for admin audit. They are not hidden posts and are excluded from client Social totals, feeds, and reports.</span>
           </summary>
           <div className="social-monthly-table-wrap">
             <table>
               <thead><tr><th>Date</th><th>Platform</th><th>Post</th><th>Source</th></tr></thead>
-              <tbody>{archivedLegacyResults.map((result) => {
+              <tbody>{legacySocialResults.map((result) => {
                 const resultUrl = safeSocialUrl(result.url);
-                return <tr key={`legacy-social-${result.id}`}><td>{formatDate(result.date)}</td><td>{formatSourceLabel(result.platform)}</td><td>{result.headline || result.summary || 'Archived social record'}</td><td>{resultUrl ? <a href={resultUrl} target="_blank" rel="noopener noreferrer">Open source ↗</a> : 'Unavailable'}</td></tr>;
+                return <tr key={`legacy-social-${result.id}`}><td>{formatDate(result.date)}</td><td>{formatSourceLabel(result.platform)}</td><td>{result.headline || result.summary || 'Legacy social record'}</td><td>{resultUrl ? <a href={resultUrl} target="_blank" rel="noopener noreferrer">Open source ↗</a> : 'Unavailable'}</td></tr>;
               })}</tbody>
             </table>
           </div>
@@ -3458,9 +3455,9 @@ export function SocialView({ socialResults, socialSources, socialReviewEvents = 
   );
 }
 
-export default function DashboardClient({ articles, districts, queries: initialQueries, clients = [], userDistrictId, paymentNotice = null, billingInfo = null, excludedStories = [], correctionEvents = [], socialSources = [], socialThreads = [], socialReviewEvents = [], strategicProfiles = [], strategicPriorities = [], collectionHealth = [], isAdmin = false, melodiEnabled = false, metaIntegrationEnabled = false, demoMode = false }) {
-  const defaultDistrictFilter = userDistrictId ?? districts[0]?.id ?? 'All';
-  const [currentView, setCurrentView] = useState('dashboard');
+export default function DashboardClient({ articles, districts, queries: initialQueries, clients = [], userDistrictId, initialDistrictId = null, initialView = 'dashboard', paymentNotice = null, billingInfo = null, excludedStories = [], correctionEvents = [], socialSources = [], socialThreads = [], socialReviewEvents = [], strategicProfiles = [], strategicPriorities = [], collectionHealth = [], dataWarnings = [], isAdmin = false, melodiEnabled = false, metaIntegrationEnabled = false, demoMode = false }) {
+  const defaultDistrictFilter = userDistrictId ?? initialDistrictId ?? districts[0]?.id ?? 'All';
+  const [currentView, setCurrentView] = useState(initialView);
   const [search, setSearch] = useState('');
   const [campaignSearch, setCampaignSearch] = useState('');
   const [sourceFilter, setSourceFilter] = useState('All');
@@ -3691,8 +3688,8 @@ export default function DashboardClient({ articles, districts, queries: initialQ
     [articles, noteOverrides],
   );
   const reportingDataset = useMemo(
-    () => buildReportingDataset({ articles: reportingArticles, socialThreads }),
-    [reportingArticles, socialThreads],
+    () => buildReportingDataset({ articles: reportingArticles, socialThreads, socialSources }),
+    [reportingArticles, socialThreads, socialSources],
   );
   const districtReportingDataset = useMemo(
     () => filterReportingDataset(reportingDataset, { districtId: districtFilter }),
@@ -3705,6 +3702,7 @@ export default function DashboardClient({ articles, districts, queries: initialQ
   const scopedArticlesForCounts = districtReportingDataset.mediaArticles;
   const campaignArticles = campaignReportingDataset.mediaArticles;
   const campaignSocialResults = campaignReportingDataset.socialResults;
+  const campaignSuppressedLegacySocialResults = campaignReportingDataset.suppressedLegacySocialResults;
   const queryCount = initialQueries.filter((query) => districtFilter === 'All' || query.district_id === districtFilter).length;
   const correctionCount = excludedStories.filter((story) => districtFilter === 'All' || story.district_id === districtFilter).length;
   const socialResultCount = campaignSocialResults.length;
@@ -3803,6 +3801,13 @@ export default function DashboardClient({ articles, districts, queries: initialQ
   }
 
   function handleDistrictSelect(districtId) {
+    if (!userDistrictId && !demoMode) {
+      const params = new URLSearchParams(window.location.search);
+      params.set('district', districtId);
+      params.set('view', currentView);
+      window.location.assign(`/dashboard?${params.toString()}`);
+      return;
+    }
     setDistrictFilter(districtId);
     setSearch('');
     setCampaignSearch('');
@@ -4210,6 +4215,12 @@ export default function DashboardClient({ articles, districts, queries: initialQ
               <button type="button" onClick={() => handleNavSelect('settings')} style={{ color: 'var(--brand-primary)', fontWeight: 700, background: 'none', border: 'none', padding: 0, cursor: 'pointer', textDecoration: 'underline' }}>Review Billing</button>
             </div>
           )}
+          {dataWarnings.length > 0 && (
+            <div className="demo-mode-banner" role="alert">
+              <strong>Some dashboard data could not load.</strong> Refresh the page once. If the message remains, contact Canary support before relying on the displayed totals.
+              {isAdmin && <span className="sr-only"> Affected reads: {dataWarnings.join(', ')}.</span>}
+            </div>
+          )}
           {demoMode && currentView === 'dashboard' && (
             <section className="demo-testimonials" aria-label="Early district feedback">
               <div className="demo-testimonials-header">
@@ -4241,6 +4252,7 @@ export default function DashboardClient({ articles, districts, queries: initialQ
             <SocialView
               key={districtFilter}
               socialResults={campaignSocialResults}
+              legacySocialResults={campaignSuppressedLegacySocialResults}
               socialSources={socialSources}
               socialReviewEvents={socialReviewEvents}
               districtFilter={districtFilter}
@@ -4553,7 +4565,7 @@ export default function DashboardClient({ articles, districts, queries: initialQ
                   {allTags.map((t) => <option key={t}>{t}</option>)}
                 </select>
                 {!demoMode && districtFilter !== 'All' && (
-                  <button className="btn btn-secondary btn-sm" onClick={() => setDistrictFilter('All')}>
+                  <button className="btn btn-secondary btn-sm" onClick={() => handleDistrictSelect('All')}>
                     {formatDistrictName(districtFilter)} ✕
                   </button>
                 )}

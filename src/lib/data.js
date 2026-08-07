@@ -140,17 +140,24 @@ export async function getSocialThreads(districtId = null, includeReview = false)
   if (threads.length === 0) return threads;
 
   const comments = [];
-  for (let start = 0; start < threads.length; start += 100) {
-    const threadIds = threads.slice(start, start + 100).map((thread) => thread.id);
-    const { data: commentPage, error: commentError } = await supabase
-      .from('social_comments')
-      .select('id, social_thread_id, author_name, body, published_at, reaction_count, is_representative')
-      .in('social_thread_id', threadIds)
-      .eq('is_representative', true)
-      .order('published_at', { ascending: false })
-      .limit(1000);
-    if (commentError) throw commentError;
-    comments.push(...(commentPage ?? []));
+  // Keep representative-comment reads bounded without serializing one request
+  // for every 100 Social rows on the global admin dashboard.
+  for (let groupStart = 0; groupStart < threads.length; groupStart += 400) {
+    const pages = await Promise.all(Array.from({ length: 4 }, async (_, index) => {
+      const start = groupStart + (index * 100);
+      const threadIds = threads.slice(start, start + 100).map((thread) => thread.id);
+      if (threadIds.length === 0) return [];
+      const { data: commentPage, error: commentError } = await supabase
+        .from('social_comments')
+        .select('id, social_thread_id, author_name, body, published_at, reaction_count, is_representative')
+        .in('social_thread_id', threadIds)
+        .eq('is_representative', true)
+        .order('published_at', { ascending: false })
+        .limit(1000);
+      if (commentError) throw commentError;
+      return commentPage ?? [];
+    }));
+    comments.push(...pages.flat());
   }
 
   const commentsByThread = new Map();
@@ -187,6 +194,20 @@ export async function readAllSocialReviewEvents(supabase, districtId = null) {
 
 export async function getSocialReviewEvents(districtId = null) {
   return readAllSocialReviewEvents(createAdminClient(), districtId);
+}
+
+export async function getRecentSocialReviewEvents(districtId = null) {
+  const supabase = createAdminClient();
+  let query = supabase
+    .from('social_review_events')
+    .select(SOCIAL_REVIEW_EVENT_COLUMNS)
+    .order('created_at', { ascending: false })
+    .order('id', { ascending: false })
+    .limit(500);
+  if (districtId) query = query.eq('district_id', districtId);
+  const { data, error } = await query;
+  if (error) throw error;
+  return data ?? [];
 }
 
 export async function updateArticleNote(id, notes) {

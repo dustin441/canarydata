@@ -47,7 +47,17 @@ function socialRecordKey(result) {
   return `${result?.districtId || 'unscoped'}:${result?.id || result?.url || result?.date || ''}`;
 }
 
-export function buildReportingDataset({ articles = [], socialThreads = [] } = {}) {
+function normalizeSocialPlatform(value) {
+  const platform = String(value || '').trim().toLowerCase();
+  if (platform === 'twitter') return 'x';
+  return platform;
+}
+
+function socialLaneKey(districtId, platform) {
+  return `${districtId || 'unscoped'}:${normalizeSocialPlatform(platform)}`;
+}
+
+export function buildReportingDataset({ articles = [], socialThreads = [], socialSources = [] } = {}) {
   const seenMediaIds = new Set();
   const mediaArticles = articles.filter(isNewsMediaArticle).filter((article) => {
     const key = mediaRecordKey(article);
@@ -56,14 +66,44 @@ export function buildReportingDataset({ articles = [], socialThreads = [] } = {}
     return true;
   });
   const legacySocialArticles = articles.filter((article) => !isNewsMediaArticle(article));
+  const configuredLaneKeys = new Set();
+  for (const source of socialSources) {
+    if (source?.active === false) continue;
+    const platform = normalizeSocialPlatform(source?.platform || source?.source_type);
+    if (platform) configuredLaneKeys.add(socialLaneKey(source?.district_id, platform));
+  }
+  for (const thread of socialThreads) {
+    const platform = normalizeSocialPlatform(thread?.platform);
+    if (platform) configuredLaneKeys.add(socialLaneKey(thread?.district_id, platform));
+  }
+  const fallbackLegacyArticles = legacySocialArticles.filter((article) => (
+    !configuredLaneKeys.has(socialLaneKey(article?.district_id, article?.source_type))
+  ));
+  const suppressedLegacyArticles = legacySocialArticles.filter((article) => (
+    configuredLaneKeys.has(socialLaneKey(article?.district_id, article?.source_type))
+  ));
+
   const socialInputsByDistrict = new Map();
-  for (const record of [...socialThreads, ...legacySocialArticles]) {
+  for (const record of [...socialThreads, ...fallbackLegacyArticles]) {
     const districtId = record?.district_id || 'unscoped';
     if (!socialInputsByDistrict.has(districtId)) socialInputsByDistrict.set(districtId, []);
     socialInputsByDistrict.get(districtId).push(record);
   }
   const socialResults = Array.from(socialInputsByDistrict.values())
     .flatMap((recordsForDistrict) => buildSocialResults(recordsForDistrict));
+
+  // Preserve only legacy rows suppressed by a configured canonical district/platform
+  // lane as admin reference data. Unmigrated lanes retain their legacy fallback.
+  const legacyInputsByDistrict = new Map();
+  for (const record of [...socialThreads, ...suppressedLegacyArticles]) {
+    const districtId = record?.district_id || 'unscoped';
+    if (!legacyInputsByDistrict.has(districtId)) legacyInputsByDistrict.set(districtId, []);
+    legacyInputsByDistrict.get(districtId).push(record);
+  }
+  const suppressedLegacySocialResults = Array.from(legacyInputsByDistrict.values())
+    .flatMap((recordsForDistrict) => buildSocialResults(recordsForDistrict))
+    .filter((result) => !result.socialAccountId && !result.externalThreadId);
+
   const records = [
     ...mediaArticles.map((article) => ({
       kind: 'media',
@@ -82,7 +122,7 @@ export function buildReportingDataset({ articles = [], socialThreads = [] } = {}
       raw: result,
     })),
   ];
-  return { records, mediaArticles, socialResults };
+  return { records, mediaArticles, socialResults, suppressedLegacySocialResults };
 }
 
 export function filterReportingDataset(dataset, { districtId = 'All', campaignSearch = '' } = {}) {
@@ -93,10 +133,13 @@ export function filterReportingDataset(dataset, { districtId = 'All', campaignSe
   const socialResults = (dataset?.socialResults || []).filter((result) => (
     districtMatches(result.districtId) && socialResultMatchesCampaign(result, campaignSearch)
   ));
+  const suppressedLegacySocialResults = (dataset?.suppressedLegacySocialResults || []).filter((result) => (
+    districtMatches(result.districtId) && socialResultMatchesCampaign(result, campaignSearch)
+  ));
   const mediaIds = new Set(mediaArticles.map(mediaRecordKey));
   const socialIds = new Set(socialResults.map(socialRecordKey));
   const records = (dataset?.records || []).filter((record) => (
     record.kind === 'media' ? mediaIds.has(record.id) : socialIds.has(record.id)
   ));
-  return { records, mediaArticles, socialResults };
+  return { records, mediaArticles, socialResults, suppressedLegacySocialResults };
 }
