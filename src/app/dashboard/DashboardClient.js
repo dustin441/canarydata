@@ -392,7 +392,7 @@ const BIRD_EYE_CSV_COLUMNS = ALL_COLUMNS.filter((column) =>
 );
 
 const SOCIAL_CSV_HEADERS = [
-  'Date', 'Platform', 'Relationship', 'Author', 'Post', 'Source URL', 'Media type',
+  'Date', 'District', 'Platform', 'Classification', 'Account', 'Post', 'Source URL', 'Media type',
   'Reactions', 'Comments / Replies', 'Shares', 'Views', 'Total public interactions', 'Engagement rate (complete interaction metrics only)',
   'Review state', 'Strategic priorities', 'Recommended action',
 ];
@@ -408,6 +408,7 @@ function socialCsvRow(result, source) {
   const metricValue = (metric) => socialReportMetricValue(result, metric) ?? 'N/A';
   return [
     result.date || '',
+    result.districtId || '',
     formatSourceLabel(result.platform),
     result.relationshipLabel || result.relationshipType || '',
     result.authorName || result.authorHandle || '',
@@ -2963,7 +2964,7 @@ function MonthlySocialPerformance({
 
 export function SocialView({ socialResults, legacySocialResults = [], socialSources, socialReviewEvents = [], districtFilter, districts, campaignSearch, setCampaignSearch, isAdmin = false }) {
   const [socialPageTab, setSocialPageTab] = useState('overview');
-  const [relationshipFilter, setRelationshipFilter] = useState('all');
+  const [relationshipFilter, setRelationshipFilter] = useState('public');
   const socialSearch = campaignSearch;
   const setSocialSearch = setCampaignSearch;
   const [socialResultLimit, setSocialResultLimit] = useState(12);
@@ -2975,7 +2976,7 @@ export function SocialView({ socialResults, legacySocialResults = [], socialSour
   const [socialDateStart, setSocialDateStart] = useState('');
   const [socialDateEnd, setSocialDateEnd] = useState('');
   const [socialSort, setSocialSort] = useState('newest');
-  const [compactListMode, setCompactListMode] = useState(true);
+  const [socialFeedViewMode, setSocialFeedViewMode] = useState('table');
   const [socialMessage, setSocialMessage] = useState('');
   const [sourcesOpen, setSourcesOpen] = useState(false);
   const [socialReportMode, setSocialReportMode] = useState(false);
@@ -3023,26 +3024,6 @@ export function SocialView({ socialResults, legacySocialResults = [], socialSour
     }
     return next;
   });
-  const topPlatformGroups = useMemo(() => {
-    const preferredOrder = ['facebook', 'instagram'];
-    const recentOwnedResults = results.filter((result) => {
-      const timestamp = new Date(result.date).getTime();
-      return result.relationshipType === 'owned'
-        && result.visibilityStatus !== 'excluded'
-        && timestamp >= topPostsWindow.start.getTime()
-        && timestamp <= topPostsWindow.end.getTime();
-    });
-    const platforms = [...new Set(recentOwnedResults.map((result) => result.platform))]
-      .sort((a, b) => {
-        const aIndex = preferredOrder.indexOf(a);
-        const bIndex = preferredOrder.indexOf(b);
-        if (aIndex >= 0 || bIndex >= 0) return (aIndex < 0 ? preferredOrder.length : aIndex) - (bIndex < 0 ? preferredOrder.length : bIndex);
-        return a.localeCompare(b);
-      });
-    return platforms
-      .map((platform) => ({ platform, posts: rankTopSocialResults(recentOwnedResults.filter((result) => result.platform === platform), 3) }))
-      .filter((group) => group.posts.length > 0);
-  }, [results, topPostsWindow]);
   const scopedSources = useMemo(
     () => socialSources.filter((source) => districtFilter === 'All' || source.district_id === districtFilter),
     [socialSources, districtFilter],
@@ -3125,7 +3106,7 @@ export function SocialView({ socialResults, legacySocialResults = [], socialSour
     setSocialResultLimit(12);
   };
   const resetSocialFilters = () => {
-    setRelationshipFilter('all');
+    setRelationshipFilter('public');
     setPlatformFilter('all');
     setMediaFilter('all');
     setPerformanceFilter('all');
@@ -3137,13 +3118,13 @@ export function SocialView({ socialResults, legacySocialResults = [], socialSour
     setSocialSort('newest');
     setSocialResultLimit(12);
   };
-  const hasActiveSocialFilters = relationshipFilter !== 'all' || platformFilter !== 'all' || mediaFilter !== 'all'
+  const hasActiveSocialFilters = relationshipFilter !== 'public' || platformFilter !== 'all' || mediaFilter !== 'all'
     || performanceFilter !== 'all' || minimumEngagementRate !== '' || maximumEngagementRate !== '' || socialDateStart !== '' || socialDateEnd !== '' || socialSearch !== '' || socialSort !== 'newest';
   const scopedReviewEvents = socialReviewEvents.filter((event) => districtFilter === 'All' || event.district_id === districtFilter);
   const correctionHistoryLimit = correctionHistoryPage.districtFilter === districtFilter ? correctionHistoryPage.limit : 100;
   const visibleReviewEvents = scopedReviewEvents.slice(0, correctionHistoryLimit);
 
-  function exportSocialCsv() {
+  function exportOfficialSocialCsv() {
     downloadCsv(
       `canary-social-performance-${districtFilter === 'All' ? 'all-districts' : districtFilter}-${topPostsWindow.startInput}-to-${topPostsWindow.endInput}.csv`,
       SOCIAL_CSV_HEADERS,
@@ -3151,6 +3132,14 @@ export function SocialView({ socialResults, legacySocialResults = [], socialSour
         result,
         sourceForResult(result),
       )),
+    );
+  }
+
+  function exportPublicConversationCsv() {
+    downloadCsv(
+      `canary-public-conversation-${districtFilter === 'All' ? 'all-districts' : districtFilter}-${socialDateStart || 'all-dates'}-to-${socialDateEnd || 'latest'}.csv`,
+      SOCIAL_CSV_HEADERS,
+      visibleResults.map((result) => socialCsvRow(result, sourceForResult(result))),
     );
   }
 
@@ -3187,10 +3176,10 @@ export function SocialView({ socialResults, legacySocialResults = [], socialSour
       )}
       <nav className="social-page-tabs" aria-label="Social page sections">
         <button type="button" className={socialPageTab === 'overview' ? 'active' : ''} aria-pressed={socialPageTab === 'overview'} onClick={() => setSocialPageTab('overview')}>
-          <strong>Overview</strong><span>Official performance and reports</span>
+          <strong>Our Social</strong><span>What we are saying about ourselves</span>
         </button>
         <button type="button" className={socialPageTab === 'feed' ? 'active' : ''} aria-pressed={socialPageTab === 'feed'} onClick={() => setSocialPageTab('feed')}>
-          <strong>Posts & mentions</strong><span>Official posts and public conversation</span>
+          <strong>Public conversation</strong><span>What the world is saying about us</span>
         </button>
       </nav>
       {socialPageTab === 'overview' && <>
@@ -3211,7 +3200,7 @@ export function SocialView({ socialResults, legacySocialResults = [], socialSour
         campaignSearch={socialSearch}
         setCampaignSearch={(value) => changeSocialFilter(setSocialSearch, value)}
         onExportPdf={exportSocialPdf}
-        onExportCsv={exportSocialCsv}
+        onExportCsv={exportOfficialSocialCsv}
       />
       {socialMessage && <p className="social-review-error" role="alert">{socialMessage}</p>}
       {isAdmin && legacySocialResults.length > 0 && (
@@ -3235,9 +3224,9 @@ export function SocialView({ socialResults, legacySocialResults = [], socialSour
       {socialPageTab === 'feed' && <>
       <section className="social-monitor-hero">
         <div>
-          <span className="social-eyebrow">Posts and public monitoring</span>
-          <h2>Posts and public mentions</h2>
-          <p>Browse official district posts, direct tags, and public conversation. Administrative corrections do not change the underlying collection or reporting rules.</p>
+          <span className="social-eyebrow">Public listening</span>
+          <h2>What the world is saying about us</h2>
+          <p>Review public posts that tag, mention, or discuss the district. Official district publishing remains available under Our Social.</p>
         </div>
         <div className="social-coverage-note">
           <strong>Coverage boundary</strong>
@@ -3247,10 +3236,13 @@ export function SocialView({ socialResults, legacySocialResults = [], socialSour
 
       <section className="social-review-scope" aria-label="Social review scope">
         <div className="social-navigation-heading">
-          <div><strong>Choose what to see</strong><span>Content type and platform filters work together.</span></div>
+          <div><strong>Choose what to see</strong><span>Public conversation is the default. Classification and platform filters work together.</span></div>
           <em>{summary.total} collected results</em>
         </div>
         <div className="social-summary-grid" aria-label="Social result summary">
+          <button type="button" aria-pressed={relationshipFilter === 'public'} className={relationshipFilter === 'public' ? 'active' : ''} onClick={() => changeSocialFilter(setRelationshipFilter, 'public')}>
+            <span>Public conversation</span><strong>{summary.direct + summary.ambient}</strong>
+          </button>
           <button type="button" aria-pressed={relationshipFilter === 'all'} className={relationshipFilter === 'all' ? 'active' : ''} onClick={() => changeSocialFilter(setRelationshipFilter, 'all')}>
             <span>All results</span><strong>{summary.total}</strong>
           </button>
@@ -3278,68 +3270,17 @@ export function SocialView({ socialResults, legacySocialResults = [], socialSour
       </section>
 
 
-      <section className="social-top-section" id="social-top-posts">
-        <div className="social-section-heading">
-          <div>
-            <h3>Top district posts by platform</h3>
-            <p>Up to three owned posts per platform for {topPostsWindow.label.toLowerCase()}, ranked by public engagement. This reference stays fixed while you filter the posts and mentions feed below. Engagement rate uses public interactions divided by public followers.</p>
-          </div>
-          <div className="social-top-period-controls">
-            <label>
-              <span>Top posts period</span>
-              <select value={topPostsPeriod} onChange={(event) => setTopPostsPeriod(event.target.value)}>
-                <option value="last-30-days">Last 30 days</option>
-                <option value="this-month">This month</option>
-                <option value="previous-month">Previous month</option>
-                <option value="school-year">Current school year</option>
-                <option value="calendar-year">Current calendar year</option>
-                <option value="custom">Custom range</option>
-              </select>
-            </label>
-            <span>{topPlatformGroups.reduce((total, group) => total + group.posts.length, 0)} ranked posts</span>
-          </div>
-        </div>
-        {topPostsPeriod === 'custom' && (
-          <div className="social-top-custom-range" aria-label="Custom top posts date range">
-            <label><span>From</span><input type="date" value={topPostsCustomStart} max={topPostsCustomEnd || topPostsWindow.endInput} onChange={(event) => setTopPostsCustomStart(event.target.value)} /></label>
-            <label><span>To</span><input type="date" value={topPostsCustomEnd} min={topPostsCustomStart || undefined} max={dateInputValue(new Date(topPostsAsOf))} onChange={(event) => setTopPostsCustomEnd(event.target.value)} /></label>
-          </div>
-        )}
-        {topPlatformGroups.length === 0 ? (
-          <div className="social-empty-inline">No owned posts are available for {topPostsWindow.label.toLowerCase()} yet.</div>
-        ) : (
-          <div className="social-top-groups">
-            {topPlatformGroups.map((group) => (
-              <div className="social-top-group" key={group.platform}>
-                <h4><span className={`social-platform-dot ${group.platform}`} aria-hidden="true" />{formatSourceLabel(group.platform)}</h4>
-                <div className="social-top-grid">
-                  {group.posts.map((result, index) => (
-                    <SocialPostPreviewCard
-                      key={`top-${result.platform}-${result.id}`}
-                      result={result}
-                      source={sourceForResult(result)}
-                      rank={index + 1}
-                      compact
-                    />
-                  ))}
-                </div>
-              </div>
-            ))}
-          </div>
-        )}
-      </section>
-
       <section className="social-results-section" id="social-results">
         <div className="social-section-heading">
           <div>
-            <h3>All social posts and conversations</h3>
-            <p>Official district posts and public mentions remain clearly labeled. Metrics show N/A when the source did not provide that field.</p>
+            <h3>Public conversation table</h3>
+            <p>Public tags, mentions, and broader conversation remain clearly classified. Metrics show N/A when the source did not provide that field.</p>
           </div>
           <div className="social-results-heading-controls">
             <span>{visibleResults.length} result{visibleResults.length === 1 ? '' : 's'}</span>
-            <button type="button" className="social-view-mode" onClick={exportSocialCsv}>Export CSV</button>
-            <button type="button" className="social-view-mode export-pdf-btn" onClick={exportSocialPdf}>Export PDF</button>
-            <button type="button" className="social-view-mode" aria-pressed={compactListMode} onClick={() => setCompactListMode((current) => !current)}>{compactListMode ? 'Scorecard mode' : 'Compact list'}</button>
+            <button type="button" className="social-view-mode" onClick={exportPublicConversationCsv} disabled={visibleResults.length === 0}>Export filtered CSV</button>
+            <button type="button" className="social-view-mode" aria-pressed={socialFeedViewMode === 'table'} onClick={() => setSocialFeedViewMode('table')}>Table</button>
+            <button type="button" className="social-view-mode" aria-pressed={socialFeedViewMode === 'cards'} onClick={() => setSocialFeedViewMode('cards')}>Cards</button>
             <input className="filter-input" value={socialSearch} onChange={(event) => changeSocialFilter(setSocialSearch, event.target.value)} placeholder="Search social results…" />
           </div>
         </div>
@@ -3366,23 +3307,37 @@ export function SocialView({ socialResults, legacySocialResults = [], socialSour
           <div className="empty-state"><div className="empty-state-icon">💬</div><h3>No social results found</h3><p>Try another filter, or check back after the next collection.</p></div>
         ) : (
           <>
-            <div className={`social-scorecard-grid${compactListMode ? ' compact-list' : ''}`}>
-              {pagedResults.map((result) => (
-                <SocialPostPreviewCard
-                  key={`${result.platform}-${result.id}`}
-                  result={result}
-                  source={sourceForResult(result)}
-                  showContext
-                  compact={compactListMode}
-                  listCompact={compactListMode}
-                  correctionEnabled={isAdmin && Boolean(result.provider && result.externalThreadId)}
-                />
-              ))}
-            </div>
-            {pagedResults.length < visibleResults.length && (
+            {socialFeedViewMode === 'table' ? (
+              <div className="social-monthly-table-wrap social-monthly-post-table-wrap social-public-conversation-table">
+                <table aria-label="Filtered public conversation">
+                  <thead><tr><th>Date</th><th>Platform</th><th>Classification</th><th>Account</th><th>Post</th><th>Interactions</th><th>Source</th></tr></thead>
+                  <tbody>{visibleResults.map((result) => {
+                    const resultUrl = safeSocialUrl(result.url);
+                    const interactions = socialReportInteractionTotal(result);
+                    const strategicContext = (result.actionIntelligence?.strategicPriorityLabels || []).join('; ');
+                    return <tr key={`conversation-row-${result.platform}-${result.id}`}><td>{formatDate(result.date)}</td><td>{formatSourceLabel(result.platform)}</td><td>{result.relationshipLabel || result.relationshipType || 'Public mention'}</td><td>{result.authorName || result.authorHandle || 'Public account'}</td><td className="social-monthly-post-copy"><strong>{result.headline || result.summary || 'Untitled post'}</strong>{strategicContext && <small>Strategic context: {strategicContext}</small>}</td><td>{interactions === null ? 'N/A' : formatSocialMetric(interactions)}</td><td>{resultUrl ? <a href={resultUrl} target="_blank" rel="noopener noreferrer">Open post ↗</a> : 'Unavailable'}</td></tr>;
+                  })}</tbody>
+                </table>
+              </div>
+            ) : (
+              <div className="social-scorecard-grid">
+                {pagedResults.map((result) => (
+                  <SocialPostPreviewCard
+                    key={`${result.platform}-${result.id}`}
+                    result={result}
+                    source={sourceForResult(result)}
+                    showContext
+                    compact={false}
+                    listCompact={false}
+                    correctionEnabled={isAdmin && Boolean(result.provider && result.externalThreadId)}
+                  />
+                ))}
+              </div>
+            )}
+            {socialFeedViewMode === 'cards' && pagedResults.length < visibleResults.length && (
               <div className="social-load-more">
                 <button type="button" className="btn btn-secondary" onClick={() => setSocialResultLimit((current) => current + 12)}>
-                  Load 12 more scorecards
+                  Load 12 more results
                 </button>
                 <span>Showing {pagedResults.length} of {visibleResults.length}</span>
               </div>

@@ -552,8 +552,8 @@ const socialProps = {
   isAdmin: true,
 };
 let socialTree = renderer.render(SocialView, socialProps);
-let overviewButton = findButton(socialTree, 'Overview');
-let feedButton = findButton(socialTree, 'Posts & mentions');
+let overviewButton = findButton(socialTree, 'Our Social');
+let feedButton = findButton(socialTree, 'Public conversation');
 assert.equal(overviewButton.props['aria-pressed'], true);
 assert.equal(feedButton.props['aria-pressed'], false);
 assert.match(nodeText(socialTree), /Actionable official post/);
@@ -561,12 +561,18 @@ assert.doesNotMatch(nodeText(socialTree), /Public mention should stay out of off
 
 feedButton.props.onClick();
 socialTree = renderer.render(SocialView, socialProps);
-overviewButton = findButton(socialTree, 'Overview');
-feedButton = findButton(socialTree, 'Posts & mentions');
+overviewButton = findButton(socialTree, 'Our Social');
+feedButton = findButton(socialTree, 'Public conversation');
 assert.equal(overviewButton.props['aria-pressed'], false);
 assert.equal(feedButton.props['aria-pressed'], true);
-assert.match(nodeText(socialTree), /Posts and public mentions/);
+assert.match(nodeText(socialTree), /What the world is saying about us/);
 assert.match(nodeText(socialTree), /Public mention should stay out of official reporting/);
+assert.doesNotMatch(nodeText(socialTree), /Actionable official post/);
+assert.match(nodeText(socialTree), /Public conversation table/);
+findButton(socialTree, 'All results').props.onClick();
+socialTree = renderer.render(SocialView, socialProps);
+findButton(socialTree, 'Cards').props.onClick();
+socialTree = renderer.render(SocialView, socialProps);
 
 const actionableCard = findNodes(socialTree, (node) => node.type === 'article' && nodeText(node).includes('Actionable official post'))
   .find((node) => findNodes(node, (child) => child.type === 'button' && nodeText(child) === 'Hide as irrelevant').length === 1);
@@ -592,7 +598,11 @@ assert.equal(excludedSocialResult.externalThreadId, 'provider-thread-99');
 
 const nonAdminHarness = await compileSocialViewForInteractionTest(dashboard, async () => assert.fail('A non-admin must never invoke reviewSocialThread.'));
 let nonAdminTree = nonAdminHarness.renderer.render(nonAdminHarness.SocialView, { ...socialProps, isAdmin: false });
-findButton(nonAdminTree, 'Posts & mentions').props.onClick();
+findButton(nonAdminTree, 'Public conversation').props.onClick();
+nonAdminTree = nonAdminHarness.renderer.render(nonAdminHarness.SocialView, { ...socialProps, isAdmin: false });
+findButton(nonAdminTree, 'All results').props.onClick();
+nonAdminTree = nonAdminHarness.renderer.render(nonAdminHarness.SocialView, { ...socialProps, isAdmin: false });
+findButton(nonAdminTree, 'Cards').props.onClick();
 nonAdminTree = nonAdminHarness.renderer.render(nonAdminHarness.SocialView, { ...socialProps, isAdmin: false });
 assert.equal(findNodes(nonAdminTree, (node) => node.props?.['aria-label'] === 'Social correction controls').length, 0);
 assert.equal(findNodes(nonAdminTree, (node) => node.type === 'button' && ['Hide as irrelevant', 'Restore'].includes(nodeText(node))).length, 0);
@@ -637,7 +647,7 @@ assert.doesNotMatch(actions, /approve_official|runReviewAction|runBulkAction|exp
 assert.match(sql, /p_action not in \('approve', 'promote'/);
 assert.match(sql, /p_action not in \('approve_official', 'promote'\)/);
 assert.doesNotMatch(actions, /Only approved results can be promoted/);
-for (const marker of ['Overview', 'Posts & mentions', 'Hide as irrelevant', 'Correction history', 'Compact list', 'Official district post', 'Public mention']) {
+for (const marker of ['Our Social', 'Public conversation', 'Hide as irrelevant', 'Correction history', 'Table', 'Cards', 'Official district post', 'Public mention']) {
   assert.ok(dashboard.includes(marker), `Dashboard must include ${marker}`);
 }
 assert.match(dashboard, /export function SocialView\(/);
@@ -648,7 +658,7 @@ assert.match(dashboard, /Showing \{visibleReviewEvents\.length\} of \{scopedRevi
 assert.match(dashboard, /Load 100 more correction events/);
 assert.doesNotMatch(dashboard, /scopedReviewEvents\.slice\(0, 100\)/);
 assert.match(dashboard, /const \[socialPageTab, setSocialPageTab\] = useState\('overview'\)/);
-assert.match(dashboard, /const \[compactListMode, setCompactListMode\] = useState\(true\)/);
+assert.match(dashboard, /const \[socialFeedViewMode, setSocialFeedViewMode\] = useState\('table'\)/);
 assert.match(dashboard, /aria-label="Social page sections"/);
 assert.match(dashboard, /correctionEnabled=\{isAdmin && Boolean\(result\.provider && result\.externalThreadId\)\}/);
 assert.match(dashboard, /applyReviewAction\('exclude'\)[\s\S]*Hide as irrelevant/);
@@ -766,6 +776,15 @@ assert.match(dashboard, /isAdmin && legacySocialResults\.length > 0/);
 assert.match(dashboard, /Legacy import reference/);
 assert.match(dashboard, /excluded from client Social totals, feeds, and reports/);
 assert.doesNotMatch(dashboard, /Archived social evidence/);
+for (const marker of ['Our Social', 'What we are saying about ourselves', 'Public conversation', 'What the world is saying about us', 'Export filtered CSV', 'Filtered public conversation']) {
+  assert.ok(dashboard.includes(marker), `Social information hierarchy must include ${marker}`);
+}
+assert.match(dashboard, /useState\('public'\)/);
+assert.match(dashboard, /useState\('table'\)/);
+assert.match(dashboard, /visibleResults\.map\(\(result\) => socialCsvRow/);
+assert.match(dashboard, /<tbody>\{visibleResults\.map/);
+assert.match(dashboard, /socialFeedViewMode === 'cards' && pagedResults\.length < visibleResults\.length/);
+assert.doesNotMatch(dashboard, /Top district posts by platform/);
 assert.match(dashboard, /scoreFilterIsDefault/);
 assert.match(dashboard, /scoreCount: 0/);
 assert.match(dashboard, /w\.scoreSum \/ w\.scoreCount/);

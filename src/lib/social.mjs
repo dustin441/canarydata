@@ -24,7 +24,7 @@ function conciseText(value, maxLength) {
 export function safeSocialUrl(value) {
   try {
     const url = new URL(String(value || ''));
-    if (!['http:', 'https:'].includes(url.protocol)) return null;
+    if (url.protocol !== 'https:' || url.username || url.password) return null;
     return url.toString();
   } catch {
     return null;
@@ -101,7 +101,9 @@ export function socialRelationshipLabel(value) {
 export function socialRelationshipFilterMatches(item = {}, filter = 'all') {
   const selected = String(filter || 'all').toLowerCase();
   if (selected === 'all') return true;
-  return normalizeRelationship(item.relationshipType || item.relationship_type) === selected;
+  const relationship = normalizeRelationship(item.relationshipType || item.relationship_type);
+  if (selected === 'public') return relationship === 'direct' || relationship === 'ambient';
+  return relationship === selected;
 }
 
 export function socialActionLabel(value) {

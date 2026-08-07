@@ -1290,6 +1290,14 @@ a:hover {
 .social-monthly-post-copy strong { color: var(--text-primary); line-height: 1.35; }
 .social-monthly-post-copy small { margin-top: 4px; color: var(--text-tertiary); font-weight: 500; }
 .social-monthly-post-table-wrap a { color: var(--brand-primary); font-weight: 800; text-decoration: none; }
+.social-public-conversation-table table { min-width: 820px; table-layout: fixed; }
+.social-public-conversation-table th:nth-child(1), .social-public-conversation-table td:nth-child(1) { width: 92px; }
+.social-public-conversation-table th:nth-child(2), .social-public-conversation-table td:nth-child(2) { width: 80px; }
+.social-public-conversation-table th:nth-child(3), .social-public-conversation-table td:nth-child(3) { width: 130px; }
+.social-public-conversation-table th:nth-child(4), .social-public-conversation-table td:nth-child(4) { width: 210px; white-space: normal; overflow-wrap: anywhere; }
+.social-public-conversation-table th:nth-child(5), .social-public-conversation-table td:nth-child(5) { width: auto; min-width: 260px; white-space: normal; overflow-wrap: anywhere; }
+.social-public-conversation-table th:nth-child(6), .social-public-conversation-table td:nth-child(6) { width: 95px; }
+.social-public-conversation-table th:nth-child(7), .social-public-conversation-table td:nth-child(7) { width: 100px; }
 .social-platform-label { display: inline-flex; align-items: center; padding: 4px 8px; border-radius: 999px; background: var(--bg-card); color: var(--text-primary); font-size: 0.7rem; font-weight: 800; }
 .social-platform-label .social-platform-dot { width: 7px; height: 7px; margin-right: 5px; }
 .social-report-card-meta { display: flex; align-items: center; justify-content: space-between; gap: 8px; flex-wrap: wrap; }

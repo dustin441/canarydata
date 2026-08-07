@@ -7,6 +7,7 @@ import {
   rankTopSocialResults,
   resolveSocialFollowerCount,
   safeSocialMediaUrl,
+  safeSocialUrl,
   socialActionFilterMatches,
   socialDateFilterMatches,
   socialRelationshipFilterMatches,
@@ -19,6 +20,10 @@ import { formatDisplayDate } from '../src/lib/date.mjs';
 assert.equal(formatDisplayDate('2026-06-09'), 'Jun 9, 2026');
 assert.equal(formatDisplayDate('2026-06-09T12:00:00Z'), 'Jun 9, 2026');
 assert.equal(formatDisplayDate('not-a-date'), 'Date unavailable');
+assert.equal(safeSocialUrl('https://www.facebook.com/example'), 'https://www.facebook.com/example');
+assert.equal(safeSocialUrl('http://www.facebook.com/example'), null);
+assert.equal(safeSocialUrl('https://user:password@www.facebook.com/example'), null);
+assert.equal(safeSocialUrl('javascript:alert(1)'), null);
 
 const legacyArticle = {
   id: 'legacy-1',
@@ -108,8 +113,10 @@ const directTag = normalizeSocialResult({ ...canonicalThread, id: 'tagged', plat
 assert.equal(directTag.relationshipType, 'direct');
 assert.equal(directTag.relationshipLabel, 'Tagged post');
 assert.equal(socialRelationshipFilterMatches(directTag, 'direct'), true);
+assert.equal(socialRelationshipFilterMatches(directTag, 'public'), true);
 assert.equal(socialRelationshipFilterMatches(directTag, 'owned'), false);
 assert.equal(socialRelationshipFilterMatches(canonical, 'owned'), true);
+assert.equal(socialRelationshipFilterMatches(canonical, 'public'), false);
 assert.equal(directTag.authorProfileUrl, 'https://www.instagram.com/community.partner/');
 
 const enrichedAction = normalizeSocialResult({
@@ -298,7 +305,8 @@ for (const period of ['last-30-days', 'this-month', 'previous-month', 'school-ye
   assert.match(dashboardSource, new RegExp(`value="${period}"`), `Top Posts period ${period} must remain available`);
 }
 assert.match(dashboardSource, /SOCIAL_CSV_HEADERS/);
-assert.match(dashboardSource, /function exportSocialCsv\(\)/);
+assert.match(dashboardSource, /function exportOfficialSocialCsv\(\)/);
+assert.match(dashboardSource, /function exportPublicConversationCsv\(\)/);
 assert.match(dashboardSource, /function exportSocialPdf\(\)/);
 assert.match(dashboardSource, /useState\('this-month'\)/, 'Social reporting must default to the current month to date');
 assert.match(dashboardSource, /social-report-card-meta[\s\S]{0,300}social-platform-label/, 'Top Post cards must show a platform chip');
