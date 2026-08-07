@@ -27,6 +27,7 @@ for (const label of [
   assert.match(page, new RegExp(`loadDashboardDataset\\('${label.replace(/[.*+?^${}()|[\]\\]/g, '\\$&')}'`));
 }
 assert.match(page, /dataWarnings=\{dataWarnings\}/);
+assert.match(page, /if \(isAdmin && !requestedDistrictId && districts\[0\]\?\.id\)[\s\S]*redirect\(`\/dashboard\?district=/);
 assert.match(page, /const dataDistrictId = userDistrictId \|\| \(initialDistrictId === 'All' \? null : initialDistrictId\)/);
 assert.match(page, /getArticles\(dataDistrictId\)/);
 assert.match(page, /initialDistrictId=\{initialDistrictId\}/);

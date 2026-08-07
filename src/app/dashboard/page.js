@@ -59,6 +59,9 @@ export default async function DashboardPage({ searchParams }) {
   const requestedDistrictId = String(requested?.district || '');
   const requestedView = String(requested?.view || 'dashboard');
   const initialView = DASHBOARD_VIEWS.has(requestedView) ? requestedView : 'dashboard';
+  if (isAdmin && !requestedDistrictId && districts[0]?.id) {
+    redirect(`/dashboard?district=${encodeURIComponent(districts[0].id)}&view=${encodeURIComponent(initialView)}`);
+  }
   const validRequestedDistrictId = districts.some((district) => district.id === requestedDistrictId)
     ? requestedDistrictId
     : null;
