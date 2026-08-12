@@ -32,6 +32,24 @@ const testimonials = [
     name: 'Shayla Canaday, PhD',
     role: 'School communicator, Florida',
   },
+  {
+    quote: 'Canary Data gives district leaders an objective, data driven way to see how communication is actually supporting board priorities and strategic goals.',
+    detail: 'Avis highlighted the value of objective evidence for board conversations, leadership evaluations, accreditation, and communications accountability.',
+    name: 'Dr. Avis Williams',
+    role: 'Founder and CEO, Joyful Collaborative, LLC',
+  },
+  {
+    quote: 'Canary Data doesn’t just tell you what you want to hear. It gives you advice that will guide you to the right decisions.',
+    detail: 'Kenon emphasized that communications teams need more than monitoring numbers. They need practical guidance that helps turn data into stronger audience relationships.',
+    name: 'Kenon A. Brown, Ph.D.',
+    role: 'Professor and Director of Research and Creative Enterprises, The University of Alabama',
+  },
+  {
+    quote: 'Canary Data is incredibly powerful. It gives school leaders an easy, effective way to see how well they’re communicating what matters most, how their dollars are following those priorities—and to show their board how that work aligns with the district’s goals.',
+    detail: 'Terry highlighted Canary Data’s ability to connect communications activity, resource alignment, district priorities, and board-ready evidence.',
+    name: 'Terry Roller',
+    role: 'Former Superintendent & Assistant State Superintendent (Alabama)',
+  },
 ];
 
 export default function Home() {
