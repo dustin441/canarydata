@@ -131,8 +131,8 @@ begin
   end if;
 
   select * into v_account from public.social_accounts
-  where id = p_social_account_id and district_id = p_district_id and active = true;
-  if not found then raise exception 'Active Social account not found for this district'; end if;
+  where id = p_social_account_id and district_id = p_district_id;
+  if not found then raise exception 'Social account not found for this district'; end if;
   if v_account.platform_account_id is null and nullif(lower(regexp_replace(coalesce(v_account.handle, ''), '^@+', '')), '') is null then
     raise exception 'Social account lacks an exact provider account ID or normalized handle';
   end if;

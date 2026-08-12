@@ -821,10 +821,9 @@ export async function claimSocialAffiliate(input = {}) {
     .select('id, district_id, active, platform_account_id, handle')
     .eq('id', socialAccountId)
     .eq('district_id', districtId)
-    .eq('active', true)
     .maybeSingle();
   if (accountError) throw accountError;
-  if (!account) throw new Error('Active Social account not found for this district.');
+  if (!account) throw new Error('Social account not found for this district.');
   if (!account.platform_account_id && !String(account.handle || '').replace(/^@+/, '').trim()) throw new Error('Social account lacks an exact provider account ID or handle.');
   const { data, error } = await supabase.rpc('canary_claim_social_affiliate', {
     p_actor_user_id: actor.id,

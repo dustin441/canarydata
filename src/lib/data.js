@@ -126,6 +126,19 @@ export async function getSocialAffiliateClaims(districtId) {
   return data ?? [];
 }
 
+export async function getSocialAffiliateAccounts(districtId) {
+  if (!districtId || districtId === 'All') throw new Error('A specific district is required.');
+  const supabase = createAdminClient();
+  const { data, error } = await supabase
+    .from('social_accounts')
+    .select('id, district_id, provider, platform, platform_account_id, display_name, profile_url, handle, active, authorization_mode, connection_status, metadata, last_successful_sync_at, created_at')
+    .eq('district_id', districtId)
+    .order('active', { ascending: false })
+    .order('platform');
+  if (error) throw error;
+  return data ?? [];
+}
+
 const SOCIAL_THREAD_COLUMNS = 'id, district_id, social_account_id, provider, platform, external_thread_id, canonical_url, relationship_type, author_name, author_handle, headline, body, summary, recommendation, published_at, comment_count, reply_count, reaction_count, share_count, view_count, engagement_total, sentiment, risk_level, canary_score, tags, strategic_alignment, matched_terms, match_reason, identity_confidence, visibility_status, reviewer_note, review_version, reviewed_at, reviewed_by, provider_metadata, created_at, updated_at';
 const SOCIAL_THREAD_PAGE_SIZE = 1000;
 const SOCIAL_REVIEW_EVENT_COLUMNS = 'id, batch_id, district_id, social_thread_id, actor_user_id, action, before_state, after_state, resulting_version, created_at';

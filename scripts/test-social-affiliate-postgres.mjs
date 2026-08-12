@@ -27,6 +27,8 @@ try{
  const duplicate=query(`select id from public.canary_claim_social_affiliate('${admin}','district-a','${account}','athletics','Duplicate','canary_admin',null,'claim-test-002');`,true);assert.notEqual(duplicate.status,0);assert.match(duplicate.stderr,/active affiliate claim already exists/i);
  const crossDistrict=query(`select id from public.canary_claim_social_affiliate('${admin}','district-a','22222222-2222-2222-2222-222222222222','school','Wrong district','canary_admin',null,'claim-test-003');`,true);assert.notEqual(crossDistrict.status,0);assert.match(crossDistrict.stderr,/not found for this district/i);
  const unauthorized=query(`select id from public.canary_claim_social_affiliate('${client}','district-a','${account}','athletics','Unauthorized','district',null,'claim-test-004');`,true);assert.notEqual(unauthorized.status,0);assert.match(unauthorized.stderr,/reviewer access/i);
+ const registryOnlyId=query(`select id from public.canary_claim_social_affiliate('${admin}','district-a','33333333-3333-3333-3333-333333333333','athletics','Registry-only athletics','official_website','Registry only, collection remains disabled','claim-test-registry-only');`).stdout.trim();assert.match(registryOnlyId,/^[0-9a-f-]{36}$/);
+ assert.equal(query("select active from public.social_accounts where id='33333333-3333-3333-3333-333333333333';").stdout.trim(),'f');
  assert.equal(query(`with inserted as (insert into public.social_threads(district_id,relationship_type,affiliate_claim_id) values('district-a','ambient','${id}') returning relationship_type) select relationship_type from inserted;`).stdout.trim(),'ambient');
  const wrongThread=query(`insert into public.social_threads(district_id,relationship_type,affiliate_claim_id) values('district-b','ambient','${id}');`,true);assert.notEqual(wrongThread.status,0);
  const stale=query(`select id from public.canary_revoke_social_affiliate('${admin}','district-a','${id}',99,'No longer verified','revoke-test-001');`,true);assert.notEqual(stale.status,0);assert.match(stale.stderr,/changed; refresh/i);
@@ -38,6 +40,7 @@ try{
  assert.equal(query(`select id from public.canary_revoke_social_affiliate('${admin}','district-a','${id}',1,'No longer verified','revoke-test-002');`).stdout.trim(),id);
  const tamper=query("update public.social_affiliate_claim_events set action='revoke';",true);assert.notEqual(tamper.status,0);assert.match(tamper.stderr,/immutable/i);
  assert.equal(query(`select id from public.canary_revoke_social_affiliate('${admin}','district-b','${delimiterFirst}',1,'Fixture cleanup','revoke-test-delimiter-cleanup');`).stdout.trim(),delimiterFirst);
+ assert.equal(query(`select id from public.canary_revoke_social_affiliate('${admin}','district-a','${registryOnlyId}',1,'Fixture cleanup','revoke-test-registry-cleanup');`).stdout.trim(),registryOnlyId);
  await sql(new URL('../supabase/rollbacks/20260812013000_social_claimed_affiliates_down.sql',import.meta.url));
  assert.equal(query("select to_regclass('public.social_affiliate_claims') is null;").stdout.trim(),'t');
  console.log('Claimed-affiliate PostgreSQL integration checks passed.');

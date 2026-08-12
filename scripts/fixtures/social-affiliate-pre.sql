@@ -28,3 +28,5 @@ insert into auth.users(id,raw_app_meta_data) values
 insert into public.social_accounts(id,district_id,platform,platform_account_id,handle,display_name,profile_url) values
  ('11111111-1111-1111-1111-111111111111','district-a','facebook','page-123','DistrictAthletics','District Athletics','https://facebook.com/DistrictAthletics'),
  ('22222222-2222-2222-2222-222222222222','district-b','facebook','page-456','OtherDistrict','Other District','https://facebook.com/OtherDistrict');
+insert into public.social_accounts(id,district_id,platform,platform_account_id,handle,display_name,profile_url,active) values
+ ('33333333-3333-3333-3333-333333333333','district-a','instagram','profile-789','RegistryOnlyAthletics','Registry Only Athletics','https://instagram.com/RegistryOnlyAthletics',false);
