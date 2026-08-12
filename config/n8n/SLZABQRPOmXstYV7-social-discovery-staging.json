@@ -461,6 +461,7 @@
         "rawContentType": "application/json",
         "sendBody": true,
         "sendHeaders": true,
+        "specifyBody": "json",
         "url": "https://fehdonfrlsrrkzaemkxp.supabase.co/rest/v1/rpc/canary_stage_social_discovery"
       },
       "position": [
@@ -604,7 +605,7 @@
       "id": "74c0d6cb-71ee-414e-9db2-8ce7a823e879",
       "name": "Prepare Social Candidate RPC",
       "parameters": {
-        "jsCode": "const workflowId=$workflow.id;const executionId=$execution.id;return $input.all().map((item,index)=>({json:{p_candidate:{...item.json,source_workflow_id:workflowId,source_execution_id:executionId}},pairedItem:{item:index}}));"
+        "jsCode": "const workflowId=$workflow.id;const executionId=$execution.id;return $input.all().map((item,index)=>{const candidate=item.json?.district_id?item.json:item.json?.body;if(!candidate?.district_id)throw new Error('Candidate payload with district_id is required');return{json:{p_candidate:{...candidate,source_workflow_id:workflowId,source_execution_id:executionId}},pairedItem:{item:index}};});"
       },
       "position": [
         1040,

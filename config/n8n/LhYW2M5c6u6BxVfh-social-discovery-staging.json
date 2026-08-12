@@ -215,6 +215,17 @@
         [
           {
             "index": 0,
+            "node": "Prepare Social Candidate RPC",
+            "type": "main"
+          }
+        ]
+      ]
+    },
+    "Prepare Social Candidate RPC": {
+      "main": [
+        [
+          {
+            "index": 0,
             "node": "Stage Review Discovery Candidates",
             "type": "main"
           }
@@ -1438,7 +1449,7 @@
       "onError": "continueRegularOutput",
       "parameters": {
         "authentication": "predefinedCredentialType",
-        "body": "={{ JSON.stringify({ p_candidate: { ...$json, source_workflow_id: $workflow.id, source_execution_id: $execution.id } }) }}",
+        "body": "={{ JSON.stringify($json) }}",
         "contentType": "raw",
         "headerParameters": {
           "parameters": [
@@ -2343,6 +2354,19 @@
         1040
       ],
       "type": "n8n-nodes-base.if",
+      "typeVersion": 2
+    },
+    {
+      "id": "57165ff9836c95792ee1575c35514145",
+      "name": "Prepare Social Candidate RPC",
+      "parameters": {
+        "jsCode": "const workflowId=$workflow.id;const executionId=$execution.id;return $input.all().map((item,index)=>{const candidate=item.json?.district_id?item.json:item.json?.body;if(!candidate?.district_id)throw new Error('Candidate payload with district_id is required');return{json:{p_candidate:{...candidate,source_workflow_id:workflowId,source_execution_id:executionId}},pairedItem:{item:index}};});"
+      },
+      "position": [
+        -60,
+        -120
+      ],
+      "type": "n8n-nodes-base.code",
       "typeVersion": 2
     }
   ],
