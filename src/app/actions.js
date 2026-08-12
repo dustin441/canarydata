@@ -806,6 +806,41 @@ export async function reviewSocialThread({ socialThreadId, action, expectedVersi
   return data;
 }
 
+export async function reviewSocialDiscoveryCandidate(input = {}) {
+  const { actor, admin: supabase } = await requireCanaryActor();
+  assertCanaryReviewer(actor);
+  const districtId = cleanAffiliateText(input.districtId, 'District', 200, true);
+  const candidateId = cleanAffiliateText(input.candidateId, 'Candidate', 100, true);
+  const action = String(input.action || '').trim().toLowerCase();
+  const expectedVersion = Number(input.expectedVersion);
+  if (!['approve', 'reject'].includes(action)) throw new Error('Unsupported Social discovery action.');
+  if (!Number.isInteger(expectedVersion) || expectedVersion < 0) throw new Error('Candidate version is required.');
+  assertDistrictAccess(actor, districtId);
+  const { data: candidate, error: candidateError } = await supabase
+    .from('social_discovery_candidates')
+    .select('id,district_id,status,review_version')
+    .eq('id', candidateId)
+    .eq('district_id', districtId)
+    .maybeSingle();
+  if (candidateError) throw candidateError;
+  if (!candidate) throw new Error('Social discovery candidate not found.');
+  if (candidate.status !== 'pending') throw new Error('Only pending Social discovery candidates can be reviewed.');
+  if (candidate.review_version !== expectedVersion) throw new Error('Social discovery candidate changed; refresh and try again.');
+  const { data, error } = await supabase.rpc('canary_review_social_discovery', {
+    p_actor_user_id: actor.id,
+    p_expected_district_id: districtId,
+    p_candidate_id: candidateId,
+    p_action: action,
+    p_expected_version: expectedVersion,
+    p_reviewer_note: cleanAffiliateText(input.reviewerNote, 'Reviewer note', 2000, true),
+    p_idempotency_key: cleanAffiliateText(input.idempotencyKey || randomUUID(), 'Idempotency key', 128, true),
+  });
+  if (error) throw new Error(error.message || 'Unable to review Social discovery candidate.');
+  revalidatePath('/dashboard/affiliates');
+  revalidatePath('/dashboard');
+  return Array.isArray(data) ? data[0] : data;
+}
+
 export async function claimSocialAffiliate(input = {}) {
   const { actor, admin: supabase } = await requireCanaryActor();
   assertCanaryReviewer(actor);

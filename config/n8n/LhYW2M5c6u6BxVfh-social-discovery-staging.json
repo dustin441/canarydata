@@ -1,0 +1,2465 @@
+{
+  "active": false,
+  "connections": {
+    "Accept Facebook Creek View": {
+      "main": [
+        [
+          {
+            "index": 3,
+            "node": "Merge Accepted Discovery",
+            "type": "main"
+          }
+        ]
+      ]
+    },
+    "Accept Facebook District Name": {
+      "main": [
+        [
+          {
+            "index": 4,
+            "node": "Merge Accepted Discovery",
+            "type": "main"
+          }
+        ]
+      ]
+    },
+    "Accept Facebook Meadow View": {
+      "main": [
+        [
+          {
+            "index": 6,
+            "node": "Merge Accepted Discovery",
+            "type": "main"
+          }
+        ]
+      ]
+    },
+    "Accept Facebook Thompson High": {
+      "main": [
+        [
+          {
+            "index": 1,
+            "node": "Merge Accepted Discovery",
+            "type": "main"
+          }
+        ]
+      ]
+    },
+    "Accept Facebook Thompson Intermediate": {
+      "main": [
+        [
+          {
+            "index": 5,
+            "node": "Merge Accepted Discovery",
+            "type": "main"
+          }
+        ]
+      ]
+    },
+    "Accept Facebook Thompson Middle": {
+      "main": [
+        [
+          {
+            "index": 2,
+            "node": "Merge Accepted Discovery",
+            "type": "main"
+          }
+        ]
+      ]
+    },
+    "Accept Instagram Structured Tag": {
+      "main": [
+        [
+          {
+            "index": 0,
+            "node": "Merge Accepted Discovery",
+            "type": "main"
+          }
+        ]
+      ]
+    },
+    "Aggregate Discovery Threads": {
+      "main": [
+        [
+          {
+            "index": 0,
+            "node": "Build Discovery Run Record",
+            "type": "main"
+          }
+        ]
+      ]
+    },
+    "Build Discovery Run Record": {
+      "main": [
+        [
+          {
+            "index": 0,
+            "node": "Complete Discovery Run",
+            "type": "main"
+          }
+        ]
+      ]
+    },
+    "Build Stage Failure Record": {
+      "main": [
+        [
+          {
+            "index": 0,
+            "node": "Fail Discovery Run",
+            "type": "main"
+          }
+        ]
+      ]
+    },
+    "Daily 5 AM Arizona": {
+      "main": [
+        [
+          {
+            "index": 0,
+            "node": "Start Discovery Run",
+            "type": "main"
+          }
+        ]
+      ]
+    },
+    "Discovery Webhook": {
+      "main": [
+        [
+          {
+            "index": 0,
+            "node": "Start Discovery Run",
+            "type": "main"
+          }
+        ]
+      ]
+    },
+    "Manual Trigger": {
+      "main": [
+        [
+          {
+            "index": 0,
+            "node": "Start Discovery Run",
+            "type": "main"
+          }
+        ]
+      ]
+    },
+    "Map Facebook Creek View": {
+      "main": [
+        [
+          {
+            "index": 0,
+            "node": "Accept Facebook Creek View",
+            "type": "main"
+          }
+        ]
+      ]
+    },
+    "Map Facebook District Name": {
+      "main": [
+        [
+          {
+            "index": 0,
+            "node": "Accept Facebook District Name",
+            "type": "main"
+          }
+        ]
+      ]
+    },
+    "Map Facebook Meadow View": {
+      "main": [
+        [
+          {
+            "index": 0,
+            "node": "Accept Facebook Meadow View",
+            "type": "main"
+          }
+        ]
+      ]
+    },
+    "Map Facebook Thompson High": {
+      "main": [
+        [
+          {
+            "index": 0,
+            "node": "Accept Facebook Thompson High",
+            "type": "main"
+          }
+        ]
+      ]
+    },
+    "Map Facebook Thompson Intermediate": {
+      "main": [
+        [
+          {
+            "index": 0,
+            "node": "Accept Facebook Thompson Intermediate",
+            "type": "main"
+          }
+        ]
+      ]
+    },
+    "Map Facebook Thompson Middle": {
+      "main": [
+        [
+          {
+            "index": 0,
+            "node": "Accept Facebook Thompson Middle",
+            "type": "main"
+          }
+        ]
+      ]
+    },
+    "Map Instagram Tagged Posts": {
+      "main": [
+        [
+          {
+            "index": 0,
+            "node": "Accept Instagram Structured Tag",
+            "type": "main"
+          }
+        ]
+      ]
+    },
+    "Merge Accepted Discovery": {
+      "main": [
+        [
+          {
+            "index": 0,
+            "node": "Stage Review Discovery Candidates",
+            "type": "main"
+          }
+        ]
+      ]
+    },
+    "Run Facebook Creek View": {
+      "main": [
+        [
+          {
+            "index": 0,
+            "node": "Map Facebook Creek View",
+            "type": "main"
+          }
+        ]
+      ]
+    },
+    "Run Facebook District Name": {
+      "main": [
+        [
+          {
+            "index": 0,
+            "node": "Map Facebook District Name",
+            "type": "main"
+          }
+        ]
+      ]
+    },
+    "Run Facebook Meadow View": {
+      "main": [
+        [
+          {
+            "index": 0,
+            "node": "Map Facebook Meadow View",
+            "type": "main"
+          }
+        ]
+      ]
+    },
+    "Run Facebook Thompson High": {
+      "main": [
+        [
+          {
+            "index": 0,
+            "node": "Map Facebook Thompson High",
+            "type": "main"
+          }
+        ]
+      ]
+    },
+    "Run Facebook Thompson Intermediate": {
+      "main": [
+        [
+          {
+            "index": 0,
+            "node": "Map Facebook Thompson Intermediate",
+            "type": "main"
+          }
+        ]
+      ]
+    },
+    "Run Facebook Thompson Middle": {
+      "main": [
+        [
+          {
+            "index": 0,
+            "node": "Map Facebook Thompson Middle",
+            "type": "main"
+          }
+        ]
+      ]
+    },
+    "Run Instagram Tagged Posts": {
+      "main": [
+        [
+          {
+            "index": 0,
+            "node": "Map Instagram Tagged Posts",
+            "type": "main"
+          }
+        ]
+      ]
+    },
+    "Stage Review Discovery Candidates": {
+      "main": [
+        [
+          {
+            "index": 0,
+            "node": "Aggregate Discovery Threads",
+            "type": "main"
+          }
+        ],
+        [
+          {
+            "index": 0,
+            "node": "Build Stage Failure Record",
+            "type": "main"
+          }
+        ]
+      ]
+    },
+    "Start Discovery Run": {
+      "main": [
+        [
+          {
+            "index": 0,
+            "node": "Run Instagram Tagged Posts",
+            "type": "main"
+          },
+          {
+            "index": 0,
+            "node": "Run Facebook Thompson High",
+            "type": "main"
+          },
+          {
+            "index": 0,
+            "node": "Run Facebook Thompson Middle",
+            "type": "main"
+          },
+          {
+            "index": 0,
+            "node": "Run Facebook Creek View",
+            "type": "main"
+          },
+          {
+            "index": 0,
+            "node": "Run Facebook District Name",
+            "type": "main"
+          },
+          {
+            "index": 0,
+            "node": "Run Facebook Thompson Intermediate",
+            "type": "main"
+          },
+          {
+            "index": 0,
+            "node": "Run Facebook Meadow View",
+            "type": "main"
+          }
+        ]
+      ]
+    }
+  },
+  "id": "LhYW2M5c6u6BxVfh",
+  "name": "Canary Data - Public Social Discovery POC (Apify)",
+  "nodes": [
+    {
+      "id": "20b0be5b-24eb-48e8-9e97-38f8a29b0160",
+      "name": "Manual Trigger",
+      "parameters": {},
+      "position": [
+        -1180,
+        -440
+      ],
+      "type": "n8n-nodes-base.manualTrigger",
+      "typeVersion": 1
+    },
+    {
+      "id": "6ea6381c-4ccf-458e-adb4-f9149da0e0e7",
+      "name": "Daily 5 AM Arizona",
+      "parameters": {
+        "rule": {
+          "interval": [
+            {
+              "expression": "0 5 * * *",
+              "field": "cronExpression"
+            }
+          ]
+        }
+      },
+      "position": [
+        -1180,
+        -260
+      ],
+      "type": "n8n-nodes-base.scheduleTrigger",
+      "typeVersion": 1.2
+    },
+    {
+      "id": "5d2d91f7-8c4a-4480-8e65-d0519ab8d77f",
+      "name": "Discovery Webhook",
+      "parameters": {
+        "httpMethod": "POST",
+        "options": {},
+        "path": "canary-apify-social-discovery-e8a3e721a882e711",
+        "responseMode": "onReceived"
+      },
+      "position": [
+        -1180,
+        -80
+      ],
+      "type": "n8n-nodes-base.webhook",
+      "typeVersion": 2.1,
+      "webhookId": "f1b62128-e8e4-4c32-8e42-a0973b3ad7bc"
+    },
+    {
+      "credentials": {
+        "supabaseApi": {
+          "id": "UCjtxc1jIM6CBLXV",
+          "name": "Canary Data Supabase Production 2026-08"
+        }
+      },
+      "id": "2dadce91-1849-4b55-b692-d4df426e1390",
+      "name": "Start Discovery Run",
+      "parameters": {
+        "authentication": "predefinedCredentialType",
+        "headerParameters": {
+          "parameters": [
+            {
+              "name": "Content-Type",
+              "value": "application/json"
+            },
+            {
+              "name": "Prefer",
+              "value": "return=representation"
+            }
+          ]
+        },
+        "jsonBody": "={{ { district_id: 'alabaster-city-schools', provider: 'apify', run_type: 'public_search', status: 'running', diagnostics: { pilot: 'alabaster', lane: 'apify_public_discovery', review_only: true, execution_id: $execution.id, workflow_id: $workflow.id } } }}",
+        "method": "POST",
+        "nodeCredentialType": "supabaseApi",
+        "options": {
+          "timeout": 120000
+        },
+        "sendBody": true,
+        "sendHeaders": true,
+        "specifyBody": "json",
+        "url": "https://fehdonfrlsrrkzaemkxp.supabase.co/rest/v1/social_collection_runs"
+      },
+      "position": [
+        -1000,
+        -260
+      ],
+      "type": "n8n-nodes-base.httpRequest",
+      "typeVersion": 4.2
+    },
+    {
+      "credentials": {
+        "httpHeaderAuth": {
+          "id": "NDX7NB0u0n6VDSEd",
+          "name": "Canary Data - Apify API 2026-08"
+        }
+      },
+      "id": "6a19a8b4-0176-441d-a55e-35dbe3ebd7b6",
+      "name": "Run Instagram Tagged Posts",
+      "parameters": {
+        "authentication": "genericCredentialType",
+        "genericAuthType": "httpHeaderAuth",
+        "method": "POST",
+        "options": {
+          "timeout": 360000
+        },
+        "url": "https://api.apify.com/v2/actor-tasks/RhrSX0O9ONbcVIqsI/run-sync-get-dataset-items?timeout=300&memory=1024&clean=true"
+      },
+      "position": [
+        -800,
+        -520
+      ],
+      "type": "n8n-nodes-base.httpRequest",
+      "typeVersion": 4.2
+    },
+    {
+      "id": "7b562a39-64aa-4479-a998-1aeda8705bb8",
+      "name": "Map Instagram Tagged Posts",
+      "parameters": {
+        "assignments": {
+          "assignments": [
+            {
+              "id": "b1b5129b-f88f-4cc6-bf97-247fc9ef5094",
+              "name": "district_id",
+              "type": "string",
+              "value": "alabaster-city-schools"
+            },
+            {
+              "id": "325c2e5d-d55a-4129-97bf-e2acf327647a",
+              "name": "provider",
+              "type": "string",
+              "value": "apify"
+            },
+            {
+              "id": "67102383-a02e-4632-92d8-12a905f3e628",
+              "name": "relationship_type",
+              "type": "string",
+              "value": "direct_tag"
+            },
+            {
+              "id": "4db336ff-5136-48f5-9a0b-f698ab319c3e",
+              "name": "reply_count",
+              "type": "number",
+              "value": 0
+            },
+            {
+              "id": "21e69485-d06e-440c-8e7d-e91b533f7b10",
+              "name": "tags",
+              "type": "array",
+              "value": []
+            },
+            {
+              "id": "5a3f12b6-ed27-4ff4-acf8-126dc7f7ff8b",
+              "name": "strategic_alignment",
+              "type": "array",
+              "value": []
+            },
+            {
+              "id": "2179ce93-5305-43bb-8076-72fe331e42eb",
+              "name": "matched_terms",
+              "type": "array",
+              "value": []
+            },
+            {
+              "id": "981995e9-627a-4633-8530-e32e9104cf6f",
+              "name": "identity_confidence",
+              "type": "number",
+              "value": 0.96
+            },
+            {
+              "id": "ee679dcf-c8e8-4de3-8581-adb82c555c5b",
+              "name": "visibility_status",
+              "type": "string",
+              "value": "review"
+            },
+            {
+              "id": "b23eb7d7-13a5-41a8-a73b-5276342a9e10",
+              "name": "last_seen_at",
+              "type": "string",
+              "value": "={{ $now.toISO() }}"
+            },
+            {
+              "id": "c13b706f-62ba-4e9f-b01c-e004fc5b6c07",
+              "name": "social_account_id",
+              "type": "string",
+              "value": "7cf4956f-a382-40c9-96fe-7121633dfac7"
+            },
+            {
+              "id": "b4192d21-97ff-432e-bbaa-1e72440c426d",
+              "name": "platform",
+              "type": "string",
+              "value": "instagram"
+            },
+            {
+              "id": "242358cd-b434-47a1-8cf3-5bd6136bba6b",
+              "name": "external_thread_id",
+              "type": "string",
+              "value": "={{ String($json.shortCode || $json.id || $json.url || \"\") }}"
+            },
+            {
+              "id": "3b1d375e-2950-4f0e-92f7-eb67e3619dd4",
+              "name": "canonical_url",
+              "type": "string",
+              "value": "={{ $json.url }}"
+            },
+            {
+              "id": "7fc3aa32-ec1c-4413-9a83-e44cbe4e55ec",
+              "name": "author_name",
+              "type": "string",
+              "value": "={{ $json.ownerFullName || $json.ownerUsername || \"Instagram account\" }}"
+            },
+            {
+              "id": "dc35612b-ba9b-4dff-90b2-b1cd2e664df8",
+              "name": "author_handle",
+              "type": "string",
+              "value": "={{ $json.ownerUsername || null }}"
+            },
+            {
+              "id": "fd9ad3eb-98e2-4b60-93c7-ee60a9c14e70",
+              "name": "headline",
+              "type": "string",
+              "value": "={{ ($json.caption || \"Tagged Instagram post\").slice(0,240) }}"
+            },
+            {
+              "id": "c5e03d05-c0dd-40c3-8966-d3dcd6dafeb2",
+              "name": "body",
+              "type": "string",
+              "value": "={{ $json.caption || \"Tagged Instagram post\" }}"
+            },
+            {
+              "id": "6d291cbc-71ac-4fe3-bb24-4a774b8e5e47",
+              "name": "published_at",
+              "type": "string",
+              "value": "={{ $json.timestamp }}"
+            },
+            {
+              "id": "bf06f3b4-84cf-4ce6-b795-55409c6b9c41",
+              "name": "comment_count",
+              "type": "number",
+              "value": "={{ Math.max(0, Number($json.commentsCount || 0)) }}"
+            },
+            {
+              "id": "2ac268b5-1c97-4acb-a7aa-c9b2a9ca27ae",
+              "name": "reaction_count",
+              "type": "number",
+              "value": "={{ Math.max(0, Number($json.likesCount || 0)) }}"
+            },
+            {
+              "id": "2a87157a-55a6-46f6-a350-7e536c03c88a",
+              "name": "share_count",
+              "type": "number",
+              "value": "={{ Math.max(0, Number($json.sharesCount || 0)) }}"
+            },
+            {
+              "id": "25c5dd2f-fe3c-4832-b213-6071b3b41132",
+              "name": "view_count",
+              "type": "number",
+              "value": "={{ Math.max(0, Number($json.videoPlayCount || $json.videoViewCount || 0)) }}"
+            },
+            {
+              "id": "27526a57-414f-4179-8948-ce103c4bcab3",
+              "name": "engagement_total",
+              "type": "number",
+              "value": "={{ Math.max(0, Number($json.commentsCount || 0)) + Math.max(0, Number($json.likesCount || 0)) + Math.max(0, Number($json.sharesCount || 0)) }}"
+            },
+            {
+              "id": "27a1a4fb-1b64-483b-bd6d-98f4f654deef",
+              "name": "matched_terms",
+              "type": "array",
+              "value": [
+                "@alabastercityschools"
+              ]
+            },
+            {
+              "id": "6201dce5-925a-4d6e-9583-f2e50586c81c",
+              "name": "match_reason",
+              "type": "string",
+              "value": "The district was explicitly tagged in this Instagram post."
+            },
+            {
+              "id": "16039fd2-95d6-4b0e-acc3-7f9a86618508",
+              "name": "provider_metadata",
+              "type": "object",
+              "value": "={{ { collected_via: \"apify_public_discovery\", discovery_type: \"instagram_structured_tag\", input_url: $json.inputUrl || null, structured_tag_match: Array.isArray($json.taggedUsers) && $json.taggedUsers.some(u => String(u.username || \"\").toLowerCase() === \"alabastercityschools\"), tagged_usernames: Array.isArray($json.taggedUsers) ? $json.taggedUsers.map(u => u.username).filter(Boolean) : [], media_url: $json.displayUrl || $json.images?.[0] || null, video_url: $json.videoUrl || null, profile_picture_url: $json.ownerProfilePicUrl || null, media_type: String($json.type || \"\").toLowerCase().includes(\"video\") ? \"video\" : (($json.displayUrl || $json.images?.[0]) ? \"image\" : \"text\"), is_text_only: !($json.displayUrl || $json.images?.[0] || $json.videoUrl), metric_availability: { reactions: typeof $json.likesCount === \"number\", comments: typeof $json.commentsCount === \"number\", shares: typeof $json.sharesCount === \"number\", views: typeof $json.videoPlayCount === \"number\" || typeof $json.videoViewCount === \"number\" }, pilot: \"alabaster\", review_only: true } }}"
+            }
+          ]
+        },
+        "includeOtherFields": false,
+        "options": {}
+      },
+      "position": [
+        -590,
+        -520
+      ],
+      "type": "n8n-nodes-base.set",
+      "typeVersion": 3.4
+    },
+    {
+      "id": "218627ca-2696-4f52-8e1a-f5a13a70aedd",
+      "name": "Accept Instagram Structured Tag",
+      "parameters": {
+        "conditions": {
+          "combinator": "and",
+          "conditions": [
+            {
+              "id": "cc0bbe21-a522-4f95-b64e-0cd742f6a386",
+              "leftValue": "={{ $json.provider_metadata.structured_tag_match === true && String($json.author_handle || \"\").toLowerCase() !== \"alabastercityschools\" }}",
+              "operator": {
+                "operation": "true",
+                "singleValue": true,
+                "type": "boolean"
+              },
+              "rightValue": ""
+            }
+          ],
+          "options": {
+            "caseSensitive": true,
+            "typeValidation": "strict",
+            "version": 2
+          }
+        },
+        "options": {}
+      },
+      "position": [
+        -360,
+        -520
+      ],
+      "type": "n8n-nodes-base.if",
+      "typeVersion": 2
+    },
+    {
+      "credentials": {
+        "httpHeaderAuth": {
+          "id": "NDX7NB0u0n6VDSEd",
+          "name": "Canary Data - Apify API 2026-08"
+        }
+      },
+      "id": "253dafda-141b-4ca2-8a89-d926ba479507",
+      "name": "Run Facebook Thompson High",
+      "parameters": {
+        "authentication": "genericCredentialType",
+        "genericAuthType": "httpHeaderAuth",
+        "jsonBody": "={{ { query: 'Thompson High School Alabaster', recent_posts: true, start_date: $now.minus({days: 30}).toFormat('yyyy-MM-dd'), end_date: $now.toFormat('yyyy-MM-dd'), maxResults: 10 } }}",
+        "method": "POST",
+        "options": {
+          "timeout": 360000
+        },
+        "sendBody": true,
+        "specifyBody": "json",
+        "url": "https://api.apify.com/v2/actor-tasks/PxaBNTeiXpEgi8Jfq/run-sync-get-dataset-items?timeout=300&memory=1024&clean=true"
+      },
+      "position": [
+        -800,
+        -260
+      ],
+      "type": "n8n-nodes-base.httpRequest",
+      "typeVersion": 4.2
+    },
+    {
+      "id": "691dfc9f-2afe-4d1b-a730-5987c24e98b6",
+      "name": "Map Facebook Thompson High",
+      "parameters": {
+        "assignments": {
+          "assignments": [
+            {
+              "id": "77eb79a7-5497-48b9-b9b3-01eb87b0df7c",
+              "name": "district_id",
+              "type": "string",
+              "value": "alabaster-city-schools"
+            },
+            {
+              "id": "9811e9ca-7953-4352-94ed-7414b4ce16d6",
+              "name": "provider",
+              "type": "string",
+              "value": "apify"
+            },
+            {
+              "id": "6f56ca31-0b1c-4e67-bbec-8e2ad9af735c",
+              "name": "relationship_type",
+              "type": "string",
+              "value": "ambient"
+            },
+            {
+              "id": "64f26114-082c-4bb8-b53b-1706276fd911",
+              "name": "reply_count",
+              "type": "number",
+              "value": 0
+            },
+            {
+              "id": "be678589-438a-45dd-8b47-e9f928a543d5",
+              "name": "tags",
+              "type": "array",
+              "value": []
+            },
+            {
+              "id": "5dca2893-7081-4958-9cc4-cfdb83572b30",
+              "name": "strategic_alignment",
+              "type": "array",
+              "value": []
+            },
+            {
+              "id": "54c8317c-bae1-431a-942d-1c268da66ee4",
+              "name": "matched_terms",
+              "type": "array",
+              "value": []
+            },
+            {
+              "id": "f1d5a897-de87-4e38-bc8a-da4aaa1708cd",
+              "name": "identity_confidence",
+              "type": "number",
+              "value": 0.96
+            },
+            {
+              "id": "a2495b8a-c597-493f-a852-8a49e7fcd113",
+              "name": "visibility_status",
+              "type": "string",
+              "value": "review"
+            },
+            {
+              "id": "b372c925-5baf-4455-9cc0-2af4aeecac78",
+              "name": "last_seen_at",
+              "type": "string",
+              "value": "={{ $now.toISO() }}"
+            },
+            {
+              "id": "2c59eaa6-59df-4926-8c18-1cfba1c11257",
+              "name": "social_account_id",
+              "type": "string",
+              "value": "60f18942-c8f6-4481-b7c1-c92392b60b5b"
+            },
+            {
+              "id": "820ffa42-c43d-46dc-a338-da79e406751f",
+              "name": "platform",
+              "type": "string",
+              "value": "facebook"
+            },
+            {
+              "id": "7c13f332-25b4-4ae1-ab81-3d368599b7ae",
+              "name": "external_thread_id",
+              "type": "string",
+              "value": "={{ String($json.post_id || $json.id || $json.url || \"\") }}"
+            },
+            {
+              "id": "65b8a066-2672-4f37-a746-f5b2c55ae2fa",
+              "name": "canonical_url",
+              "type": "string",
+              "value": "={{ $json.url }}"
+            },
+            {
+              "id": "b7225b84-38f6-4512-9c6b-dc5e9c45663f",
+              "name": "author_name",
+              "type": "string",
+              "value": "={{ $json.author?.name || \"Facebook account\" }}"
+            },
+            {
+              "id": "c23dbef3-b583-41a2-b2b5-22968401a82a",
+              "name": "author_handle",
+              "type": "string",
+              "value": "={{ $json.author?.url || null }}"
+            },
+            {
+              "id": "2e6b718b-82ad-4c41-a74d-58e069e3a9aa",
+              "name": "headline",
+              "type": "string",
+              "value": "={{ ($json.message || \"Public Facebook post\").slice(0,240) }}"
+            },
+            {
+              "id": "93508a7c-2278-49a5-b766-a964be61ac7d",
+              "name": "body",
+              "type": "string",
+              "value": "={{ $json.message || \"Public Facebook post\" }}"
+            },
+            {
+              "id": "b164b055-bb93-4b83-91f9-548b53481596",
+              "name": "published_at",
+              "type": "string",
+              "value": "={{ new Date(Number($json.timestamp) * 1000).toISOString() }}"
+            },
+            {
+              "id": "eca97f4c-94c6-4614-98e2-b4d4bf3a2077",
+              "name": "comment_count",
+              "type": "number",
+              "value": "={{ Math.max(0, Number($json.comments_count || 0)) }}"
+            },
+            {
+              "id": "aae07a69-f3d8-4674-8314-ace9edad271d",
+              "name": "reaction_count",
+              "type": "number",
+              "value": "={{ Math.max(0, Number($json.reactions_count || 0)) }}"
+            },
+            {
+              "id": "eda492c5-a59f-45d3-8d53-27e2a794ce5f",
+              "name": "share_count",
+              "type": "number",
+              "value": "={{ Math.max(0, Number($json.reshare_count || 0)) }}"
+            },
+            {
+              "id": "22ed6255-e7b4-4452-ac1f-59ddca9eb725",
+              "name": "view_count",
+              "type": "number",
+              "value": "={{ Math.max(0, Number($json.video_view_count || 0)) }}"
+            },
+            {
+              "id": "b9077a52-8b3f-4082-9002-c439c05aed7d",
+              "name": "engagement_total",
+              "type": "number",
+              "value": "={{ Math.max(0, Number($json.comments_count || 0)) + Math.max(0, Number($json.reactions_count || 0)) + Math.max(0, Number($json.reshare_count || 0)) }}"
+            },
+            {
+              "id": "b4408790-07a2-4a3d-9ddc-b4ad269b50ad",
+              "name": "matched_terms",
+              "type": "array",
+              "value": [
+                "Thompson High School Alabaster"
+              ]
+            },
+            {
+              "id": "5c1789fa-4582-44e4-aad2-f93bc4ec1d0f",
+              "name": "match_reason",
+              "type": "string",
+              "value": "Public Facebook post matched Thompson High School + Alabaster."
+            },
+            {
+              "id": "f4bc733e-6656-4759-ba14-dce0991e0427",
+              "name": "provider_metadata",
+              "type": "object",
+              "value": "={{ { collected_via: \"apify_public_discovery\", discovery_type: \"facebook_keyword_search\", provider_actor: \"powerai/facebook-post-search-scraper\", query: \"Thompson High School Alabaster\", author_id: String($json.author?.id || \"\"), author_profile_url: $json.author?.url || null, profile_picture_url: $json.author?.profile_picture_url || null, is_owned_author: String($json.author?.id || \"\") === \"100063475723470\", media_url: $json.image?.uri || $json.video_thumbnail || (Array.isArray($json.album_preview) ? $json.album_preview[0]?.uri : null) || null, video_url: Array.isArray($json.video_files) ? ($json.video_files.find(v => v?.url)?.url || null) : ($json.video?.url || null), media_type: ($json.video || $json.video_thumbnail || (Array.isArray($json.video_files) && $json.video_files.length)) ? \"video\" : (($json.image?.uri || (Array.isArray($json.album_preview) && $json.album_preview.length)) ? \"image\" : \"text\"), carousel_count: Array.isArray($json.album_preview) ? $json.album_preview.length : 0, is_text_only: !($json.image?.uri || $json.video || $json.video_thumbnail || (Array.isArray($json.album_preview) && $json.album_preview.length)), metric_availability: { reactions: typeof $json.reactions_count === \"number\", comments: typeof $json.comments_count === \"number\", shares: typeof $json.reshare_count === \"number\", views: typeof $json.video_view_count === \"number\" }, pilot: \"alabaster\", review_only: true } }}"
+            }
+          ]
+        },
+        "includeOtherFields": false,
+        "options": {}
+      },
+      "position": [
+        -590,
+        -260
+      ],
+      "type": "n8n-nodes-base.set",
+      "typeVersion": 3.4
+    },
+    {
+      "id": "d1ccf3fa-0c77-4257-8d82-ac074b9aeb3e",
+      "name": "Accept Facebook Thompson High",
+      "parameters": {
+        "conditions": {
+          "combinator": "and",
+          "conditions": [
+            {
+              "id": "137f7cc6-bac8-4097-a833-f5c0e2a2eda7",
+              "leftValue": "={{ (() => { const t=String($json.body || \"\").toLowerCase(); const commercial=/(zoned for|move-in ready|for sale|realtor|listing|bedroom|bathroom|walker springs|dogs got out|lost dog|missing dog|found dog|price adjustment|come buy this home|acre property|nannying job|babysit|cuido ni\u00f1os|mini sessions|nothing bundt cakes|website design)/.test(t); const incidentalVenue=/(american legion|baseball post \\d+|state tournament)/.test(t) && /(game|games|tournament|baseball field|move on to regionals)/.test(t); const published=Date.parse(String($json.published_at || \"\")); const recent=Number.isFinite(published) && published >= Date.parse($now.minus({ days: 30 }).startOf(\"day\").toISO()) && published <= Date.now() + 3600000; return recent && !$json.provider_metadata.is_owned_author && !commercial && !incidentalVenue && t.length > 20 && (t.includes(\"thompson high school\") || (t.includes(\"thompson\") && t.includes(\"alabaster\"))); })() }}",
+              "operator": {
+                "operation": "true",
+                "singleValue": true,
+                "type": "boolean"
+              },
+              "rightValue": ""
+            }
+          ],
+          "options": {
+            "caseSensitive": true,
+            "typeValidation": "strict",
+            "version": 2
+          }
+        },
+        "options": {}
+      },
+      "position": [
+        -360,
+        -260
+      ],
+      "type": "n8n-nodes-base.if",
+      "typeVersion": 2
+    },
+    {
+      "credentials": {
+        "httpHeaderAuth": {
+          "id": "NDX7NB0u0n6VDSEd",
+          "name": "Canary Data - Apify API 2026-08"
+        }
+      },
+      "id": "513cc54c-f020-4418-89ec-0408fb960d0b",
+      "name": "Run Facebook Thompson Middle",
+      "parameters": {
+        "authentication": "genericCredentialType",
+        "genericAuthType": "httpHeaderAuth",
+        "jsonBody": "={{ { query: 'Thompson Middle School Alabaster', recent_posts: true, start_date: $now.minus({days: 30}).toFormat('yyyy-MM-dd'), end_date: $now.toFormat('yyyy-MM-dd'), maxResults: 10 } }}",
+        "method": "POST",
+        "options": {
+          "timeout": 360000
+        },
+        "sendBody": true,
+        "specifyBody": "json",
+        "url": "https://api.apify.com/v2/actor-tasks/6Xa4LSpfrBCzH5nDf/run-sync-get-dataset-items?timeout=300&memory=1024&clean=true"
+      },
+      "position": [
+        -800,
+        0
+      ],
+      "type": "n8n-nodes-base.httpRequest",
+      "typeVersion": 4.2
+    },
+    {
+      "id": "0d7a8a96-e630-456a-9652-dc8b0462ad5a",
+      "name": "Map Facebook Thompson Middle",
+      "parameters": {
+        "assignments": {
+          "assignments": [
+            {
+              "id": "7fe91b5f-7dea-4ac4-888c-6e43025075b6",
+              "name": "district_id",
+              "type": "string",
+              "value": "alabaster-city-schools"
+            },
+            {
+              "id": "f488ec23-8ba7-4080-9b14-68a98ff30b1b",
+              "name": "provider",
+              "type": "string",
+              "value": "apify"
+            },
+            {
+              "id": "8ccac095-e24b-484c-8403-1bfb365572f8",
+              "name": "relationship_type",
+              "type": "string",
+              "value": "ambient"
+            },
+            {
+              "id": "9dab5cd2-9bcc-4fd7-873e-1116a0af49f5",
+              "name": "reply_count",
+              "type": "number",
+              "value": 0
+            },
+            {
+              "id": "d7f21a20-f7ee-4adb-93fa-dc4f2f9c2d0f",
+              "name": "tags",
+              "type": "array",
+              "value": []
+            },
+            {
+              "id": "9cda4ff9-fccb-4982-bf18-a2fb9321567d",
+              "name": "strategic_alignment",
+              "type": "array",
+              "value": []
+            },
+            {
+              "id": "21c87377-ad5d-472d-937d-7dd67f6ddd3d",
+              "name": "matched_terms",
+              "type": "array",
+              "value": []
+            },
+            {
+              "id": "ba855b14-0824-4274-bc5e-ed4b38eee340",
+              "name": "identity_confidence",
+              "type": "number",
+              "value": 0.96
+            },
+            {
+              "id": "7eeec919-502f-47d4-85c9-6dcd2ceaa5c4",
+              "name": "visibility_status",
+              "type": "string",
+              "value": "review"
+            },
+            {
+              "id": "8144d427-5d30-4198-96d5-bf742c5c8821",
+              "name": "last_seen_at",
+              "type": "string",
+              "value": "={{ $now.toISO() }}"
+            },
+            {
+              "id": "ea89a611-9dd4-47cc-999c-7d5b9a1d1701",
+              "name": "social_account_id",
+              "type": "string",
+              "value": "60f18942-c8f6-4481-b7c1-c92392b60b5b"
+            },
+            {
+              "id": "941046c4-f13b-4646-83a0-e1493460a2dc",
+              "name": "platform",
+              "type": "string",
+              "value": "facebook"
+            },
+            {
+              "id": "44a851af-12a9-4e66-97c5-1316e2b2cc28",
+              "name": "external_thread_id",
+              "type": "string",
+              "value": "={{ String($json.post_id || $json.id || $json.url || \"\") }}"
+            },
+            {
+              "id": "b14847f0-f1df-48fb-9e9d-30a6fe716600",
+              "name": "canonical_url",
+              "type": "string",
+              "value": "={{ $json.url }}"
+            },
+            {
+              "id": "6dbf16a0-7d00-44c1-8c61-7629879d4ebd",
+              "name": "author_name",
+              "type": "string",
+              "value": "={{ $json.author?.name || \"Facebook account\" }}"
+            },
+            {
+              "id": "4c3c34e6-7f79-4f1d-8197-41fcf8e35a88",
+              "name": "author_handle",
+              "type": "string",
+              "value": "={{ $json.author?.url || null }}"
+            },
+            {
+              "id": "924272cd-076d-4cd6-aef6-131963fce1a1",
+              "name": "headline",
+              "type": "string",
+              "value": "={{ ($json.message || \"Public Facebook post\").slice(0,240) }}"
+            },
+            {
+              "id": "5e957ab9-540b-4a90-8211-58afa166a8cc",
+              "name": "body",
+              "type": "string",
+              "value": "={{ $json.message || \"Public Facebook post\" }}"
+            },
+            {
+              "id": "e667b252-7cea-4aae-9dbc-6f1c537775d9",
+              "name": "published_at",
+              "type": "string",
+              "value": "={{ new Date(Number($json.timestamp) * 1000).toISOString() }}"
+            },
+            {
+              "id": "71640a12-882a-4aab-8097-7dfafc2282e9",
+              "name": "comment_count",
+              "type": "number",
+              "value": "={{ Math.max(0, Number($json.comments_count || 0)) }}"
+            },
+            {
+              "id": "10f88d7a-442e-44b5-8497-95a80c9faa9c",
+              "name": "reaction_count",
+              "type": "number",
+              "value": "={{ Math.max(0, Number($json.reactions_count || 0)) }}"
+            },
+            {
+              "id": "3648219c-de47-4d84-a89e-ca7310c02c52",
+              "name": "share_count",
+              "type": "number",
+              "value": "={{ Math.max(0, Number($json.reshare_count || 0)) }}"
+            },
+            {
+              "id": "4ed089a7-ac65-474e-92f9-691211e8f55b",
+              "name": "view_count",
+              "type": "number",
+              "value": "={{ Math.max(0, Number($json.video_view_count || 0)) }}"
+            },
+            {
+              "id": "5e667862-4b20-4804-931b-994620d5d1af",
+              "name": "engagement_total",
+              "type": "number",
+              "value": "={{ Math.max(0, Number($json.comments_count || 0)) + Math.max(0, Number($json.reactions_count || 0)) + Math.max(0, Number($json.reshare_count || 0)) }}"
+            },
+            {
+              "id": "e27d00db-295b-4319-9731-63d3e9ba03d7",
+              "name": "matched_terms",
+              "type": "array",
+              "value": [
+                "Thompson Middle School Alabaster"
+              ]
+            },
+            {
+              "id": "dae4bca5-2c4c-4beb-a067-6cf6c7430f7c",
+              "name": "match_reason",
+              "type": "string",
+              "value": "Public Facebook post matched Thompson Middle School + Alabaster."
+            },
+            {
+              "id": "767b8185-7ff6-439a-a6b2-4aed0554867e",
+              "name": "provider_metadata",
+              "type": "object",
+              "value": "={{ { collected_via: \"apify_public_discovery\", discovery_type: \"facebook_keyword_search\", provider_actor: \"powerai/facebook-post-search-scraper\", query: \"Thompson Middle School Alabaster\", author_id: String($json.author?.id || \"\"), author_profile_url: $json.author?.url || null, profile_picture_url: $json.author?.profile_picture_url || null, is_owned_author: String($json.author?.id || \"\") === \"100063475723470\", media_url: $json.image?.uri || $json.video_thumbnail || (Array.isArray($json.album_preview) ? $json.album_preview[0]?.uri : null) || null, video_url: Array.isArray($json.video_files) ? ($json.video_files.find(v => v?.url)?.url || null) : ($json.video?.url || null), media_type: ($json.video || $json.video_thumbnail || (Array.isArray($json.video_files) && $json.video_files.length)) ? \"video\" : (($json.image?.uri || (Array.isArray($json.album_preview) && $json.album_preview.length)) ? \"image\" : \"text\"), carousel_count: Array.isArray($json.album_preview) ? $json.album_preview.length : 0, is_text_only: !($json.image?.uri || $json.video || $json.video_thumbnail || (Array.isArray($json.album_preview) && $json.album_preview.length)), metric_availability: { reactions: typeof $json.reactions_count === \"number\", comments: typeof $json.comments_count === \"number\", shares: typeof $json.reshare_count === \"number\", views: typeof $json.video_view_count === \"number\" }, pilot: \"alabaster\", review_only: true } }}"
+            }
+          ]
+        },
+        "includeOtherFields": false,
+        "options": {}
+      },
+      "position": [
+        -590,
+        0
+      ],
+      "type": "n8n-nodes-base.set",
+      "typeVersion": 3.4
+    },
+    {
+      "id": "eb002e40-ade1-4ca4-83ce-20e442561957",
+      "name": "Accept Facebook Thompson Middle",
+      "parameters": {
+        "conditions": {
+          "combinator": "and",
+          "conditions": [
+            {
+              "id": "5ae59c44-9d8d-41b9-92c6-0ceb78652070",
+              "leftValue": "={{ (() => { const t=String($json.body || \"\").toLowerCase(); const commercial=/(zoned for|move-in ready|for sale|realtor|listing|bedroom|bathroom|walker springs|dogs got out|lost dog|missing dog|found dog|price adjustment|come buy this home|acre property|nannying job|babysit|cuido ni\u00f1os|mini sessions|nothing bundt cakes|website design)/.test(t); const published=Date.parse(String($json.published_at || \"\")); const recent=Number.isFinite(published) && published >= Date.parse($now.minus({ days: 30 }).startOf(\"day\").toISO()) && published <= Date.now() + 3600000; return recent && !$json.provider_metadata.is_owned_author && !commercial && t.length > 20 && (t.includes(\"thompson middle school\") || (t.includes(\"thompson\") && (t.includes(\"middle school\") || t.includes(\"6th grade\")))); })() }}",
+              "operator": {
+                "operation": "true",
+                "singleValue": true,
+                "type": "boolean"
+              },
+              "rightValue": ""
+            }
+          ],
+          "options": {
+            "caseSensitive": true,
+            "typeValidation": "strict",
+            "version": 2
+          }
+        },
+        "options": {}
+      },
+      "position": [
+        -360,
+        0
+      ],
+      "type": "n8n-nodes-base.if",
+      "typeVersion": 2
+    },
+    {
+      "credentials": {
+        "httpHeaderAuth": {
+          "id": "NDX7NB0u0n6VDSEd",
+          "name": "Canary Data - Apify API 2026-08"
+        }
+      },
+      "id": "ab7b2258-9419-4b2c-831d-b59a02a0f521",
+      "name": "Run Facebook Creek View",
+      "parameters": {
+        "authentication": "genericCredentialType",
+        "genericAuthType": "httpHeaderAuth",
+        "jsonBody": "={{ { query: 'Creek View Elementary School Alabaster', recent_posts: true, start_date: $now.minus({days: 30}).toFormat('yyyy-MM-dd'), end_date: $now.toFormat('yyyy-MM-dd'), maxResults: 10 } }}",
+        "method": "POST",
+        "options": {
+          "timeout": 360000
+        },
+        "sendBody": true,
+        "specifyBody": "json",
+        "url": "https://api.apify.com/v2/actor-tasks/KuReofEkQ8a23M4aN/run-sync-get-dataset-items?timeout=300&memory=1024&clean=true"
+      },
+      "position": [
+        -800,
+        260
+      ],
+      "type": "n8n-nodes-base.httpRequest",
+      "typeVersion": 4.2
+    },
+    {
+      "id": "ee31111f-99aa-4b55-aad2-360d89eb0de7",
+      "name": "Map Facebook Creek View",
+      "parameters": {
+        "assignments": {
+          "assignments": [
+            {
+              "id": "0b55f880-a004-4500-a211-7ccdcbc39d41",
+              "name": "district_id",
+              "type": "string",
+              "value": "alabaster-city-schools"
+            },
+            {
+              "id": "6a096b41-8710-48b5-9a55-9f1bb133e443",
+              "name": "provider",
+              "type": "string",
+              "value": "apify"
+            },
+            {
+              "id": "7b83afdb-c384-479a-8f20-c7ed9dd8b68d",
+              "name": "relationship_type",
+              "type": "string",
+              "value": "ambient"
+            },
+            {
+              "id": "ccc44d5d-3754-4de9-a76e-ec69ba9380d3",
+              "name": "reply_count",
+              "type": "number",
+              "value": 0
+            },
+            {
+              "id": "c3a5c193-8ce3-43b7-b448-f514e7abcf70",
+              "name": "tags",
+              "type": "array",
+              "value": []
+            },
+            {
+              "id": "c3f5ec77-8c64-40f5-b6e9-7dd6eedb027e",
+              "name": "strategic_alignment",
+              "type": "array",
+              "value": []
+            },
+            {
+              "id": "0f0e796b-8980-4e49-b866-5ac833a733b5",
+              "name": "matched_terms",
+              "type": "array",
+              "value": []
+            },
+            {
+              "id": "25481fe2-ea6d-47f0-be3a-b8a2206d81bc",
+              "name": "identity_confidence",
+              "type": "number",
+              "value": 0.96
+            },
+            {
+              "id": "c9925be9-dee1-44fc-8b74-0d1b9865ca15",
+              "name": "visibility_status",
+              "type": "string",
+              "value": "review"
+            },
+            {
+              "id": "c96a21f3-79a7-45c6-b4dd-ee6319e2df8f",
+              "name": "last_seen_at",
+              "type": "string",
+              "value": "={{ $now.toISO() }}"
+            },
+            {
+              "id": "a6d8795f-d0f1-4ab5-a8c4-8de0d929f92b",
+              "name": "social_account_id",
+              "type": "string",
+              "value": "60f18942-c8f6-4481-b7c1-c92392b60b5b"
+            },
+            {
+              "id": "abcc0954-bc56-4568-9daa-305a85df6126",
+              "name": "platform",
+              "type": "string",
+              "value": "facebook"
+            },
+            {
+              "id": "0f4f6b44-468d-46c3-838e-737c99855e90",
+              "name": "external_thread_id",
+              "type": "string",
+              "value": "={{ String($json.post_id || $json.id || $json.url || \"\") }}"
+            },
+            {
+              "id": "ddf10ede-b44c-456b-b439-b5a601f22d5c",
+              "name": "canonical_url",
+              "type": "string",
+              "value": "={{ $json.url }}"
+            },
+            {
+              "id": "1be89ffd-30d4-458f-9017-fc3e852384b0",
+              "name": "author_name",
+              "type": "string",
+              "value": "={{ $json.author?.name || \"Facebook account\" }}"
+            },
+            {
+              "id": "e843b095-2fdc-4c71-a578-e6a418382b3c",
+              "name": "author_handle",
+              "type": "string",
+              "value": "={{ $json.author?.url || null }}"
+            },
+            {
+              "id": "56888980-5e03-4b2a-9571-488e0fb76428",
+              "name": "headline",
+              "type": "string",
+              "value": "={{ ($json.message || \"Public Facebook post\").slice(0,240) }}"
+            },
+            {
+              "id": "afa6b31d-4e77-4cd1-9bc2-62c5c7bff903",
+              "name": "body",
+              "type": "string",
+              "value": "={{ $json.message || \"Public Facebook post\" }}"
+            },
+            {
+              "id": "0f7f92b8-ba86-48c3-bde7-7d33b49d9145",
+              "name": "published_at",
+              "type": "string",
+              "value": "={{ new Date(Number($json.timestamp) * 1000).toISOString() }}"
+            },
+            {
+              "id": "00e3cdad-b2c6-4a00-a468-07a0f1585bd8",
+              "name": "comment_count",
+              "type": "number",
+              "value": "={{ Math.max(0, Number($json.comments_count || 0)) }}"
+            },
+            {
+              "id": "c1424abc-f4af-41e3-bcd2-12e953a45893",
+              "name": "reaction_count",
+              "type": "number",
+              "value": "={{ Math.max(0, Number($json.reactions_count || 0)) }}"
+            },
+            {
+              "id": "4766b0d1-7a4e-41cd-a933-bf073cb6e871",
+              "name": "share_count",
+              "type": "number",
+              "value": "={{ Math.max(0, Number($json.reshare_count || 0)) }}"
+            },
+            {
+              "id": "860287a8-93bc-4a2b-ba82-7d980b79e716",
+              "name": "view_count",
+              "type": "number",
+              "value": "={{ Math.max(0, Number($json.video_view_count || 0)) }}"
+            },
+            {
+              "id": "60f35595-b3ba-4991-b29e-b079d810385f",
+              "name": "engagement_total",
+              "type": "number",
+              "value": "={{ Math.max(0, Number($json.comments_count || 0)) + Math.max(0, Number($json.reactions_count || 0)) + Math.max(0, Number($json.reshare_count || 0)) }}"
+            },
+            {
+              "id": "8923c09e-a60f-4098-8d4a-154191104a64",
+              "name": "matched_terms",
+              "type": "array",
+              "value": [
+                "Creek View Elementary School Alabaster"
+              ]
+            },
+            {
+              "id": "72f450bb-a15a-462c-870e-a31d933be8a7",
+              "name": "match_reason",
+              "type": "string",
+              "value": "Public Facebook post matched Creek View Elementary School + Alabaster."
+            },
+            {
+              "id": "2bd5e741-b1df-42b0-a743-279efd0ba9bc",
+              "name": "provider_metadata",
+              "type": "object",
+              "value": "={{ { collected_via: \"apify_public_discovery\", discovery_type: \"facebook_keyword_search\", provider_actor: \"powerai/facebook-post-search-scraper\", query: \"Creek View Elementary School Alabaster\", author_id: String($json.author?.id || \"\"), author_profile_url: $json.author?.url || null, profile_picture_url: $json.author?.profile_picture_url || null, is_owned_author: String($json.author?.id || \"\") === \"100063475723470\", media_url: $json.image?.uri || $json.video_thumbnail || (Array.isArray($json.album_preview) ? $json.album_preview[0]?.uri : null) || null, video_url: Array.isArray($json.video_files) ? ($json.video_files.find(v => v?.url)?.url || null) : ($json.video?.url || null), media_type: ($json.video || $json.video_thumbnail || (Array.isArray($json.video_files) && $json.video_files.length)) ? \"video\" : (($json.image?.uri || (Array.isArray($json.album_preview) && $json.album_preview.length)) ? \"image\" : \"text\"), carousel_count: Array.isArray($json.album_preview) ? $json.album_preview.length : 0, is_text_only: !($json.image?.uri || $json.video || $json.video_thumbnail || (Array.isArray($json.album_preview) && $json.album_preview.length)), metric_availability: { reactions: typeof $json.reactions_count === \"number\", comments: typeof $json.comments_count === \"number\", shares: typeof $json.reshare_count === \"number\", views: typeof $json.video_view_count === \"number\" }, pilot: \"alabaster\", review_only: true } }}"
+            }
+          ]
+        },
+        "includeOtherFields": false,
+        "options": {}
+      },
+      "position": [
+        -590,
+        260
+      ],
+      "type": "n8n-nodes-base.set",
+      "typeVersion": 3.4
+    },
+    {
+      "id": "d2d6444d-3c8f-402b-a5ef-78accf6aaf51",
+      "name": "Accept Facebook Creek View",
+      "parameters": {
+        "conditions": {
+          "combinator": "and",
+          "conditions": [
+            {
+              "id": "e5392022-b69c-4707-aa29-7d50c61fdba0",
+              "leftValue": "={{ (() => { const t=String($json.body || \"\").toLowerCase(); const commercial=/(zoned for|move-in ready|for sale|realtor|listing|bedroom|bathroom|walker springs|dogs got out|lost dog|missing dog|found dog|price adjustment|come buy this home|acre property|nannying job|babysit|cuido ni\u00f1os|mini sessions|nothing bundt cakes|website design)/.test(t); const published=Date.parse(String($json.published_at || \"\")); const recent=Number.isFinite(published) && published >= Date.parse($now.minus({ days: 30 }).startOf(\"day\").toISO()) && published <= Date.now() + 3600000; return recent && !$json.provider_metadata.is_owned_author && !commercial && t.length > 20 && (t.includes(\"creek view elementary\") || t.includes(\"cves\")); })() }}",
+              "operator": {
+                "operation": "true",
+                "singleValue": true,
+                "type": "boolean"
+              },
+              "rightValue": ""
+            }
+          ],
+          "options": {
+            "caseSensitive": true,
+            "typeValidation": "strict",
+            "version": 2
+          }
+        },
+        "options": {}
+      },
+      "position": [
+        -360,
+        260
+      ],
+      "type": "n8n-nodes-base.if",
+      "typeVersion": 2
+    },
+    {
+      "id": "9998daff-b305-465e-95a5-ba615ec4dffe",
+      "name": "Merge Accepted Discovery",
+      "parameters": {
+        "mode": "append",
+        "numberInputs": 7
+      },
+      "position": [
+        -80,
+        -120
+      ],
+      "type": "n8n-nodes-base.merge",
+      "typeVersion": 3.2
+    },
+    {
+      "credentials": {
+        "supabaseApi": {
+          "id": "UCjtxc1jIM6CBLXV",
+          "name": "Canary Data Supabase Production 2026-08"
+        }
+      },
+      "id": "3be9c034-fd76-476f-a028-93088ed97ef9",
+      "name": "Stage Review Discovery Candidates",
+      "onError": "continueErrorOutput",
+      "parameters": {
+        "authentication": "predefinedCredentialType",
+        "body": "={{ JSON.stringify({ p_candidate: { ...$json, source_workflow_id: $workflow.id, source_execution_id: $execution.id } }) }}",
+        "contentType": "raw",
+        "headerParameters": {
+          "parameters": [
+            {
+              "name": "Content-Type",
+              "value": "application/json"
+            },
+            {
+              "name": "Prefer",
+              "value": "resolution=merge-duplicates,return=representation"
+            }
+          ]
+        },
+        "method": "POST",
+        "nodeCredentialType": "supabaseApi",
+        "options": {
+          "timeout": 120000
+        },
+        "rawContentType": "application/json",
+        "sendBody": true,
+        "sendHeaders": true,
+        "specifyBody": "json",
+        "url": "https://fehdonfrlsrrkzaemkxp.supabase.co/rest/v1/rpc/canary_stage_social_discovery"
+      },
+      "position": [
+        160,
+        -120
+      ],
+      "type": "n8n-nodes-base.httpRequest",
+      "typeVersion": 4.2
+    },
+    {
+      "id": "f2079f87-7f53-4948-8907-ebd504198dc3",
+      "name": "Aggregate Discovery Threads",
+      "parameters": {
+        "aggregate": "aggregateAllItemData",
+        "destinationFieldName": "items",
+        "options": {}
+      },
+      "position": [
+        400,
+        -120
+      ],
+      "type": "n8n-nodes-base.aggregate",
+      "typeVersion": 1
+    },
+    {
+      "id": "53a1f6ac-7d3e-4ff1-ae4e-b1e03e037e7f",
+      "name": "Build Discovery Run Record",
+      "parameters": {
+        "assignments": {
+          "assignments": [
+            {
+              "id": "3990f9d8-4762-4aa5-9c94-831b361a32e0",
+              "name": "status",
+              "type": "string",
+              "value": "={{ ($('Run Facebook Thompson High').all().length + $('Run Facebook Thompson Middle').all().length + $('Run Facebook Creek View').all().length + $('Run Facebook District Name').all().length + $('Run Facebook Thompson Intermediate').all().length + $('Run Facebook Meadow View').all().length) === 0 ? \"partial\" : \"success\" }}"
+            },
+            {
+              "id": "87d01b5d-864c-4d5a-a898-5d603e61615b",
+              "name": "completed_at",
+              "type": "string",
+              "value": "={{ $now.toISO() }}"
+            },
+            {
+              "id": "c19d6a85-921e-408e-9a46-a9904060d243",
+              "name": "raw_items",
+              "type": "number",
+              "value": "={{ $('Run Instagram Tagged Posts').all().length + ($('Run Facebook Thompson High').all().length + $('Run Facebook Thompson Middle').all().length + $('Run Facebook Creek View').all().length + $('Run Facebook District Name').all().length + $('Run Facebook Thompson Intermediate').all().length + $('Run Facebook Meadow View').all().length) }}"
+            },
+            {
+              "id": "746614f8-6fc7-435a-9615-b42b865c3043",
+              "name": "accepted_threads",
+              "type": "number",
+              "value": "={{ new Set($json.items.map(x => x.id)).size }}"
+            },
+            {
+              "id": "f3fb0b06-0203-42f1-a0c9-41489f2956da",
+              "name": "accepted_comments",
+              "type": "number",
+              "value": 0
+            },
+            {
+              "id": "dec3ad20-2022-4df0-8f78-03e2d98400dd",
+              "name": "duplicate_items",
+              "type": "number",
+              "value": "={{ $json.items.filter(x => x.created_at !== x.updated_at).length }}"
+            },
+            {
+              "id": "c1a3aa2d-ddc0-45e4-a7a6-845e93297360",
+              "name": "rejected_items",
+              "type": "number",
+              "value": "={{ ($('Run Instagram Tagged Posts').all().length + ($('Run Facebook Thompson High').all().length + $('Run Facebook Thompson Middle').all().length + $('Run Facebook Creek View').all().length + $('Run Facebook District Name').all().length + $('Run Facebook Thompson Intermediate').all().length + $('Run Facebook Meadow View').all().length)) - new Set($json.items.map(x => x.id)).size }}"
+            },
+            {
+              "id": "846eb844-f8a7-4c1a-af0f-503589bb3cf9",
+              "name": "provider_errors",
+              "type": "number",
+              "value": "={{ ($('Run Facebook Thompson High').all().length + $('Run Facebook Thompson Middle').all().length + $('Run Facebook Creek View').all().length + $('Run Facebook District Name').all().length + $('Run Facebook Thompson Intermediate').all().length + $('Run Facebook Meadow View').all().length) === 0 ? 1 : 0 }}"
+            },
+            {
+              "id": "9b6de015-9aa5-4e3f-b170-888c6cf7840f",
+              "name": "diagnostics",
+              "type": "object",
+              "value": "={{ { pilot: \"alabaster\", lane: \"apify_public_discovery\", review_only: true, execution_id: $execution.id, facebook_provider_empty: ($('Run Facebook Thompson High').all().length + $('Run Facebook Thompson Middle').all().length + $('Run Facebook Creek View').all().length + $('Run Facebook District Name').all().length + $('Run Facebook Thompson Intermediate').all().length + $('Run Facebook Meadow View').all().length) === 0, tasks: [\"instagram-structured-tags\",\"facebook-thompson-high\",\"facebook-thompson-middle\",\"facebook-creek-view\",\"facebook-district-name\",\"facebook-thompson-intermediate\",\"facebook-meadow-view\"], stored_thread_ids: [...new Set($json.items.map(x => x.id))] } }}"
+            },
+            {
+              "id": "b511faa0-9ece-4a1b-aae0-0e9065660078",
+              "name": "estimated_cost",
+              "type": "number",
+              "value": "={{ Number((6 * 0.09 + ($('Run Facebook Thompson High').all().length + $('Run Facebook Thompson Middle').all().length + $('Run Facebook Creek View').all().length + $('Run Facebook District Name').all().length + $('Run Facebook Thompson Intermediate').all().length + $('Run Facebook Meadow View').all().length) * 0.00999 + $('Run Instagram Tagged Posts').all().length * 0.0027).toFixed(4)) }}"
+            },
+            {
+              "id": "9e5fa344-a717-426d-8a1a-91a68fcd15c0",
+              "name": "error_code",
+              "type": "string",
+              "value": "={{ ($('Run Facebook Thompson High').all().length + $('Run Facebook Thompson Middle').all().length + $('Run Facebook Creek View').all().length + $('Run Facebook District Name').all().length + $('Run Facebook Thompson Intermediate').all().length + $('Run Facebook Meadow View').all().length) === 0 ? \"facebook_provider_empty\" : null }}"
+            },
+            {
+              "id": "c368d207-8388-48bc-9a3c-01baeceb83d0",
+              "name": "error_message",
+              "type": "string",
+              "value": "={{ ($('Run Facebook Thompson High').all().length + $('Run Facebook Thompson Middle').all().length + $('Run Facebook Creek View').all().length + $('Run Facebook District Name').all().length + $('Run Facebook Thompson Intermediate').all().length + $('Run Facebook Meadow View').all().length) === 0 ? \"All Facebook public-search branches returned zero items; Instagram results were stored and this run is partial.\" : null }}"
+            }
+          ]
+        },
+        "includeOtherFields": false,
+        "options": {}
+      },
+      "position": [
+        640,
+        -120
+      ],
+      "type": "n8n-nodes-base.set",
+      "typeVersion": 3.4
+    },
+    {
+      "credentials": {
+        "supabaseApi": {
+          "id": "UCjtxc1jIM6CBLXV",
+          "name": "Canary Data Supabase Production 2026-08"
+        }
+      },
+      "id": "b2479965-767d-4d31-a285-af7a2472a627",
+      "name": "Complete Discovery Run",
+      "parameters": {
+        "authentication": "predefinedCredentialType",
+        "headerParameters": {
+          "parameters": [
+            {
+              "name": "Content-Type",
+              "value": "application/json"
+            },
+            {
+              "name": "Prefer",
+              "value": "return=representation"
+            }
+          ]
+        },
+        "jsonBody": "={{ $json }}",
+        "method": "PATCH",
+        "nodeCredentialType": "supabaseApi",
+        "options": {
+          "timeout": 120000
+        },
+        "sendBody": true,
+        "sendHeaders": true,
+        "specifyBody": "json",
+        "url": "={{ 'https://fehdonfrlsrrkzaemkxp.supabase.co/rest/v1/social_collection_runs?id=eq.' + $('Start Discovery Run').first().json.id }}"
+      },
+      "position": [
+        880,
+        -120
+      ],
+      "type": "n8n-nodes-base.httpRequest",
+      "typeVersion": 4.2
+    },
+    {
+      "credentials": {
+        "httpHeaderAuth": {
+          "id": "NDX7NB0u0n6VDSEd",
+          "name": "Canary Data - Apify API 2026-08"
+        }
+      },
+      "id": "bbe8c708-7f04-4702-a560-2b8e9b3b6d0c",
+      "name": "Run Facebook District Name",
+      "parameters": {
+        "authentication": "genericCredentialType",
+        "genericAuthType": "httpHeaderAuth",
+        "jsonBody": "={{ { query: 'Alabaster City Schools', recent_posts: true, start_date: $now.minus({days: 30}).toFormat('yyyy-MM-dd'), end_date: $now.toFormat('yyyy-MM-dd'), maxResults: 10 } }}",
+        "method": "POST",
+        "options": {
+          "timeout": 360000
+        },
+        "sendBody": true,
+        "specifyBody": "json",
+        "url": "https://api.apify.com/v2/actor-tasks/9N4m10W1XZ519jAsi/run-sync-get-dataset-items?timeout=300&memory=1024&clean=true"
+      },
+      "position": [
+        -800,
+        520
+      ],
+      "type": "n8n-nodes-base.httpRequest",
+      "typeVersion": 4.2
+    },
+    {
+      "id": "8ac778f6-2782-4485-8b65-658d81c295ae",
+      "name": "Map Facebook District Name",
+      "parameters": {
+        "assignments": {
+          "assignments": [
+            {
+              "id": "fe0bfc9c-abae-4257-a8d8-071949b8a8bd",
+              "name": "district_id",
+              "type": "string",
+              "value": "alabaster-city-schools"
+            },
+            {
+              "id": "60c87e75-216a-4156-a741-8481a7f4dd8e",
+              "name": "provider",
+              "type": "string",
+              "value": "apify"
+            },
+            {
+              "id": "bdf4c4d0-9c6e-46cc-8156-af0cd006e00b",
+              "name": "relationship_type",
+              "type": "string",
+              "value": "ambient"
+            },
+            {
+              "id": "f1fa2da4-46b3-4249-84e2-00b33842eade",
+              "name": "reply_count",
+              "type": "number",
+              "value": 0
+            },
+            {
+              "id": "46debfdf-45e1-4592-940e-92c9701c4461",
+              "name": "tags",
+              "type": "array",
+              "value": []
+            },
+            {
+              "id": "acf32269-dbec-49d0-aa96-9f31f60cbfc8",
+              "name": "strategic_alignment",
+              "type": "array",
+              "value": []
+            },
+            {
+              "id": "f02ae913-107a-4717-a965-f057d5f9ea0c",
+              "name": "matched_terms",
+              "type": "array",
+              "value": []
+            },
+            {
+              "id": "fea42e8d-2a72-49e6-b242-4460a054eb5f",
+              "name": "identity_confidence",
+              "type": "number",
+              "value": 0.96
+            },
+            {
+              "id": "213c2831-7894-4753-97b8-5c1366ff8288",
+              "name": "visibility_status",
+              "type": "string",
+              "value": "review"
+            },
+            {
+              "id": "8c642450-58bd-47d8-a4b4-b32d78d80b22",
+              "name": "last_seen_at",
+              "type": "string",
+              "value": "={{ $now.toISO() }}"
+            },
+            {
+              "id": "a1ff73c2-1f35-452e-8a3e-53c935608fe5",
+              "name": "social_account_id",
+              "type": "string",
+              "value": "60f18942-c8f6-4481-b7c1-c92392b60b5b"
+            },
+            {
+              "id": "042154f8-b69b-426b-ada3-8abe23e0226b",
+              "name": "platform",
+              "type": "string",
+              "value": "facebook"
+            },
+            {
+              "id": "aef535c6-837d-45ec-ac37-a5ddd1729b37",
+              "name": "external_thread_id",
+              "type": "string",
+              "value": "={{ String($json.post_id || $json.id || $json.url || \"\") }}"
+            },
+            {
+              "id": "399be05f-085e-4900-99e7-78f7798df175",
+              "name": "canonical_url",
+              "type": "string",
+              "value": "={{ $json.url }}"
+            },
+            {
+              "id": "810fdc52-ef7f-4687-9b1f-31deb6764b89",
+              "name": "author_name",
+              "type": "string",
+              "value": "={{ $json.author?.name || \"Facebook account\" }}"
+            },
+            {
+              "id": "0889baed-c1b0-4fb2-85c9-6a7eada56015",
+              "name": "author_handle",
+              "type": "string",
+              "value": "={{ $json.author?.url || null }}"
+            },
+            {
+              "id": "e8ddd29b-45cc-4300-a971-24b4f9ef1422",
+              "name": "headline",
+              "type": "string",
+              "value": "={{ ($json.message || \"Public Facebook post\").slice(0,240) }}"
+            },
+            {
+              "id": "4e7e93af-0b7c-4fa5-b39e-2a144451bf44",
+              "name": "body",
+              "type": "string",
+              "value": "={{ $json.message || \"Public Facebook post\" }}"
+            },
+            {
+              "id": "9b7ffeb6-048d-43f7-87c1-7715137a4ffb",
+              "name": "published_at",
+              "type": "string",
+              "value": "={{ new Date(Number($json.timestamp) * 1000).toISOString() }}"
+            },
+            {
+              "id": "0b7257ef-d881-420e-8c64-14d98fbe614c",
+              "name": "comment_count",
+              "type": "number",
+              "value": "={{ Math.max(0, Number($json.comments_count || 0)) }}"
+            },
+            {
+              "id": "1951d485-eb4e-4974-80ef-21484fd49029",
+              "name": "reaction_count",
+              "type": "number",
+              "value": "={{ Math.max(0, Number($json.reactions_count || 0)) }}"
+            },
+            {
+              "id": "880aab5a-9326-401b-a374-64689a2e4dd3",
+              "name": "share_count",
+              "type": "number",
+              "value": "={{ Math.max(0, Number($json.reshare_count || 0)) }}"
+            },
+            {
+              "id": "3203b239-06eb-4b41-904c-de1843f3da8e",
+              "name": "view_count",
+              "type": "number",
+              "value": "={{ Math.max(0, Number($json.video_view_count || 0)) }}"
+            },
+            {
+              "id": "31606053-3b40-4539-b8c7-fe3274724c7c",
+              "name": "engagement_total",
+              "type": "number",
+              "value": "={{ Math.max(0, Number($json.comments_count || 0)) + Math.max(0, Number($json.reactions_count || 0)) + Math.max(0, Number($json.reshare_count || 0)) }}"
+            },
+            {
+              "id": "7043a220-015a-47b1-84dd-232007d1328d",
+              "name": "matched_terms",
+              "type": "array",
+              "value": [
+                "Alabaster City Schools"
+              ]
+            },
+            {
+              "id": "1645d639-af0f-4d87-89e7-6684dadd7afa",
+              "name": "match_reason",
+              "type": "string",
+              "value": "Public Facebook post explicitly mentioned Alabaster City Schools."
+            },
+            {
+              "id": "77c27429-4a85-4cd6-ba69-2f98bdbcfe49",
+              "name": "provider_metadata",
+              "type": "object",
+              "value": "={{ { collected_via: \"apify_public_discovery\", discovery_type: \"facebook_keyword_search\", provider_actor: \"powerai/facebook-post-search-scraper\", query: \"Alabaster City Schools\", author_id: String($json.author?.id || \"\"), author_profile_url: $json.author?.url || null, profile_picture_url: $json.author?.profile_picture_url || null, is_owned_author: String($json.author?.id || \"\") === \"100063475723470\", media_url: $json.image?.uri || $json.video_thumbnail || (Array.isArray($json.album_preview) ? $json.album_preview[0]?.uri : null) || null, video_url: Array.isArray($json.video_files) ? ($json.video_files.find(v => v?.url)?.url || null) : ($json.video?.url || null), media_type: ($json.video || $json.video_thumbnail || (Array.isArray($json.video_files) && $json.video_files.length)) ? \"video\" : (($json.image?.uri || (Array.isArray($json.album_preview) && $json.album_preview.length)) ? \"image\" : \"text\"), carousel_count: Array.isArray($json.album_preview) ? $json.album_preview.length : 0, is_text_only: !($json.image?.uri || $json.video || $json.video_thumbnail || (Array.isArray($json.album_preview) && $json.album_preview.length)), metric_availability: { reactions: typeof $json.reactions_count === \"number\", comments: typeof $json.comments_count === \"number\", shares: typeof $json.reshare_count === \"number\", views: typeof $json.video_view_count === \"number\" }, pilot: \"alabaster\", review_only: true } }}"
+            }
+          ]
+        },
+        "includeOtherFields": false,
+        "options": {}
+      },
+      "position": [
+        -590,
+        520
+      ],
+      "type": "n8n-nodes-base.set",
+      "typeVersion": 3.4
+    },
+    {
+      "id": "e9fc1d4b-9508-4a0c-836c-dc981b017561",
+      "name": "Accept Facebook District Name",
+      "parameters": {
+        "conditions": {
+          "combinator": "and",
+          "conditions": [
+            {
+              "id": "9e8c1914-7ace-42d6-80ce-455d43dad0ef",
+              "leftValue": "={{ (() => { const t=String($json.body || \"\").toLowerCase(); const commercial=/(zoned for|move-in ready|for sale|realtor|listing|bedroom|bathroom|walker springs|dogs got out|lost dog|missing dog|found dog|price adjustment|come buy this home|acre property|nannying job|babysit|cuido ni\u00f1os|mini sessions|nothing bundt cakes|website design)/.test(t); const published=Date.parse(String($json.published_at || \"\")); const recent=Number.isFinite(published) && published >= Date.parse($now.minus({ days: 30 }).startOf(\"day\").toISO()) && published <= Date.now() + 3600000; return recent && !$json.provider_metadata.is_owned_author && !commercial && t.length > 20 && (t.includes(\"alabaster city schools\")); })() }}",
+              "operator": {
+                "operation": "true",
+                "singleValue": true,
+                "type": "boolean"
+              },
+              "rightValue": ""
+            }
+          ],
+          "options": {
+            "caseSensitive": true,
+            "typeValidation": "strict",
+            "version": 2
+          }
+        },
+        "options": {}
+      },
+      "position": [
+        -360,
+        520
+      ],
+      "type": "n8n-nodes-base.if",
+      "typeVersion": 2
+    },
+    {
+      "credentials": {
+        "httpHeaderAuth": {
+          "id": "NDX7NB0u0n6VDSEd",
+          "name": "Canary Data - Apify API 2026-08"
+        }
+      },
+      "id": "b3ecc408-d964-43f0-8a67-6c35e5bc0677",
+      "name": "Run Facebook Thompson Intermediate",
+      "parameters": {
+        "authentication": "genericCredentialType",
+        "genericAuthType": "httpHeaderAuth",
+        "jsonBody": "={{ { query: 'Thompson Intermediate School Alabaster', recent_posts: true, start_date: $now.minus({days: 30}).toFormat('yyyy-MM-dd'), end_date: $now.toFormat('yyyy-MM-dd'), maxResults: 10 } }}",
+        "method": "POST",
+        "options": {
+          "timeout": 360000
+        },
+        "sendBody": true,
+        "specifyBody": "json",
+        "url": "https://api.apify.com/v2/actor-tasks/MWDsltFFn04PbQajn/run-sync-get-dataset-items?timeout=300&memory=1024&clean=true"
+      },
+      "position": [
+        -800,
+        780
+      ],
+      "type": "n8n-nodes-base.httpRequest",
+      "typeVersion": 4.2
+    },
+    {
+      "id": "5e1e071b-afb1-4158-af8a-591eb44f69f7",
+      "name": "Map Facebook Thompson Intermediate",
+      "parameters": {
+        "assignments": {
+          "assignments": [
+            {
+              "id": "cdb74aad-992c-464a-8538-fbb38f28f65b",
+              "name": "district_id",
+              "type": "string",
+              "value": "alabaster-city-schools"
+            },
+            {
+              "id": "fc06b936-b907-4fd4-a0f1-d651655e6455",
+              "name": "provider",
+              "type": "string",
+              "value": "apify"
+            },
+            {
+              "id": "262c3376-2f76-4475-95ce-ba9a9664b80b",
+              "name": "relationship_type",
+              "type": "string",
+              "value": "ambient"
+            },
+            {
+              "id": "c17cf2d7-ad7f-4ea1-86b8-3890a5cf7e6f",
+              "name": "reply_count",
+              "type": "number",
+              "value": 0
+            },
+            {
+              "id": "486a209d-730b-479c-a2b3-d956124254fe",
+              "name": "tags",
+              "type": "array",
+              "value": []
+            },
+            {
+              "id": "3946cfa3-0ea0-4f86-b5b4-d4677f9de3d1",
+              "name": "strategic_alignment",
+              "type": "array",
+              "value": []
+            },
+            {
+              "id": "da755ed5-cc16-4254-89ba-33876cc6b1a5",
+              "name": "matched_terms",
+              "type": "array",
+              "value": []
+            },
+            {
+              "id": "4b35297b-ca03-441a-8ae0-4233535be6ea",
+              "name": "identity_confidence",
+              "type": "number",
+              "value": 0.96
+            },
+            {
+              "id": "3ac989c1-c9b6-4870-af3c-63fae0f9ba42",
+              "name": "visibility_status",
+              "type": "string",
+              "value": "review"
+            },
+            {
+              "id": "154e8500-9293-4a21-a682-57ed4c04fc78",
+              "name": "last_seen_at",
+              "type": "string",
+              "value": "={{ $now.toISO() }}"
+            },
+            {
+              "id": "c9125753-a67e-4dc5-bc3f-6a482b9664ce",
+              "name": "social_account_id",
+              "type": "string",
+              "value": "60f18942-c8f6-4481-b7c1-c92392b60b5b"
+            },
+            {
+              "id": "cd7ea57a-cccd-42b8-baf8-8fbda8dfd195",
+              "name": "platform",
+              "type": "string",
+              "value": "facebook"
+            },
+            {
+              "id": "187bb532-0ab1-408a-ad22-30c5dba17759",
+              "name": "external_thread_id",
+              "type": "string",
+              "value": "={{ String($json.post_id || $json.id || $json.url || \"\") }}"
+            },
+            {
+              "id": "11ce3727-870d-4f87-998d-65454ace5da9",
+              "name": "canonical_url",
+              "type": "string",
+              "value": "={{ $json.url }}"
+            },
+            {
+              "id": "e34b3d4e-f805-48c4-8c3b-4046a91a4893",
+              "name": "author_name",
+              "type": "string",
+              "value": "={{ $json.author?.name || \"Facebook account\" }}"
+            },
+            {
+              "id": "0c287c95-f1e0-4f12-a2ec-3181d7d49e60",
+              "name": "author_handle",
+              "type": "string",
+              "value": "={{ $json.author?.url || null }}"
+            },
+            {
+              "id": "b320aa3e-33e9-411c-adaa-d7d77a78ed97",
+              "name": "headline",
+              "type": "string",
+              "value": "={{ ($json.message || \"Public Facebook post\").slice(0,240) }}"
+            },
+            {
+              "id": "1c7e4777-2f39-4301-9677-75a21dc48e10",
+              "name": "body",
+              "type": "string",
+              "value": "={{ $json.message || \"Public Facebook post\" }}"
+            },
+            {
+              "id": "25ad58e7-20a0-4027-b564-8cfd077ee007",
+              "name": "published_at",
+              "type": "string",
+              "value": "={{ new Date(Number($json.timestamp) * 1000).toISOString() }}"
+            },
+            {
+              "id": "5b66951b-9888-4eec-b4fc-56619c5b194a",
+              "name": "comment_count",
+              "type": "number",
+              "value": "={{ Math.max(0, Number($json.comments_count || 0)) }}"
+            },
+            {
+              "id": "e994e24d-0860-4d90-8ae7-4ac55623ead2",
+              "name": "reaction_count",
+              "type": "number",
+              "value": "={{ Math.max(0, Number($json.reactions_count || 0)) }}"
+            },
+            {
+              "id": "9986fc41-bae1-4985-b98d-18741bfb3bfc",
+              "name": "share_count",
+              "type": "number",
+              "value": "={{ Math.max(0, Number($json.reshare_count || 0)) }}"
+            },
+            {
+              "id": "ca64ea26-c664-49e3-b8e5-0b6bcb1d2429",
+              "name": "view_count",
+              "type": "number",
+              "value": "={{ Math.max(0, Number($json.video_view_count || 0)) }}"
+            },
+            {
+              "id": "07479c3b-8ae4-4a64-9baa-a8d8622e1563",
+              "name": "engagement_total",
+              "type": "number",
+              "value": "={{ Math.max(0, Number($json.comments_count || 0)) + Math.max(0, Number($json.reactions_count || 0)) + Math.max(0, Number($json.reshare_count || 0)) }}"
+            },
+            {
+              "id": "c1aa88d7-4ad3-4b23-945e-79e163e62541",
+              "name": "matched_terms",
+              "type": "array",
+              "value": [
+                "Thompson Intermediate School Alabaster"
+              ]
+            },
+            {
+              "id": "80bbd5a8-4d9c-4657-ad01-c433c4f6fbf1",
+              "name": "match_reason",
+              "type": "string",
+              "value": "Public Facebook post matched Thompson Intermediate School within Alabaster context."
+            },
+            {
+              "id": "06adf0fa-c8e1-4486-b949-5bdaecb90e65",
+              "name": "provider_metadata",
+              "type": "object",
+              "value": "={{ { collected_via: \"apify_public_discovery\", discovery_type: \"facebook_keyword_search\", provider_actor: \"powerai/facebook-post-search-scraper\", query: \"Thompson Intermediate School Alabaster\", author_id: String($json.author?.id || \"\"), author_profile_url: $json.author?.url || null, profile_picture_url: $json.author?.profile_picture_url || null, is_owned_author: String($json.author?.id || \"\") === \"100063475723470\", media_url: $json.image?.uri || $json.video_thumbnail || (Array.isArray($json.album_preview) ? $json.album_preview[0]?.uri : null) || null, video_url: Array.isArray($json.video_files) ? ($json.video_files.find(v => v?.url)?.url || null) : ($json.video?.url || null), media_type: ($json.video || $json.video_thumbnail || (Array.isArray($json.video_files) && $json.video_files.length)) ? \"video\" : (($json.image?.uri || (Array.isArray($json.album_preview) && $json.album_preview.length)) ? \"image\" : \"text\"), carousel_count: Array.isArray($json.album_preview) ? $json.album_preview.length : 0, is_text_only: !($json.image?.uri || $json.video || $json.video_thumbnail || (Array.isArray($json.album_preview) && $json.album_preview.length)), metric_availability: { reactions: typeof $json.reactions_count === \"number\", comments: typeof $json.comments_count === \"number\", shares: typeof $json.reshare_count === \"number\", views: typeof $json.video_view_count === \"number\" }, pilot: \"alabaster\", review_only: true } }}"
+            }
+          ]
+        },
+        "includeOtherFields": false,
+        "options": {}
+      },
+      "position": [
+        -590,
+        780
+      ],
+      "type": "n8n-nodes-base.set",
+      "typeVersion": 3.4
+    },
+    {
+      "id": "1c4dc33f-0208-45b5-a076-d96416120156",
+      "name": "Accept Facebook Thompson Intermediate",
+      "parameters": {
+        "conditions": {
+          "combinator": "and",
+          "conditions": [
+            {
+              "id": "a9da9c57-53ad-4d8d-a3c3-ad0eaa0680eb",
+              "leftValue": "={{ (() => { const t=String($json.body || \"\").toLowerCase(); const commercial=/(zoned for|move-in ready|for sale|realtor|listing|bedroom|bathroom|walker springs|dogs got out|lost dog|missing dog|found dog|price adjustment|come buy this home|acre property|nannying job|babysit|cuido ni\u00f1os|mini sessions|nothing bundt cakes|website design)/.test(t); const published=Date.parse(String($json.published_at || \"\")); const recent=Number.isFinite(published) && published >= Date.parse($now.minus({ days: 30 }).startOf(\"day\").toISO()) && published <= Date.now() + 3600000; return recent && !$json.provider_metadata.is_owned_author && !commercial && t.length > 20 && (t.includes(\"thompson intermediate school\") || (t.includes(\"thompson intermediate\") && t.includes(\"alabaster\"))); })() }}",
+              "operator": {
+                "operation": "true",
+                "singleValue": true,
+                "type": "boolean"
+              },
+              "rightValue": ""
+            }
+          ],
+          "options": {
+            "caseSensitive": true,
+            "typeValidation": "strict",
+            "version": 2
+          }
+        },
+        "options": {}
+      },
+      "position": [
+        -360,
+        780
+      ],
+      "type": "n8n-nodes-base.if",
+      "typeVersion": 2
+    },
+    {
+      "credentials": {
+        "httpHeaderAuth": {
+          "id": "NDX7NB0u0n6VDSEd",
+          "name": "Canary Data - Apify API 2026-08"
+        }
+      },
+      "id": "ce2feeea-0aa3-40d5-af3a-9a8d2de8f842",
+      "name": "Run Facebook Meadow View",
+      "parameters": {
+        "authentication": "genericCredentialType",
+        "genericAuthType": "httpHeaderAuth",
+        "jsonBody": "={{ { query: 'Meadow View Elementary School Alabaster', recent_posts: true, start_date: $now.minus({days: 30}).toFormat('yyyy-MM-dd'), end_date: $now.toFormat('yyyy-MM-dd'), maxResults: 10 } }}",
+        "method": "POST",
+        "options": {
+          "timeout": 360000
+        },
+        "sendBody": true,
+        "specifyBody": "json",
+        "url": "https://api.apify.com/v2/actor-tasks/66PeCxNOKXrlPsUx9/run-sync-get-dataset-items?timeout=300&memory=1024&clean=true"
+      },
+      "position": [
+        -800,
+        1040
+      ],
+      "type": "n8n-nodes-base.httpRequest",
+      "typeVersion": 4.2
+    },
+    {
+      "id": "780b6ef0-825d-462d-a76a-c7881b13261c",
+      "name": "Map Facebook Meadow View",
+      "parameters": {
+        "assignments": {
+          "assignments": [
+            {
+              "id": "b3bb9ce6-6157-4553-9ce2-1d07405feaca",
+              "name": "district_id",
+              "type": "string",
+              "value": "alabaster-city-schools"
+            },
+            {
+              "id": "8acd3b6e-3b6f-4f80-8e41-8d8f116ad7a5",
+              "name": "provider",
+              "type": "string",
+              "value": "apify"
+            },
+            {
+              "id": "c3fce450-97c1-45c5-b0f1-009a0c682a5b",
+              "name": "relationship_type",
+              "type": "string",
+              "value": "ambient"
+            },
+            {
+              "id": "35cf0366-fb44-48c2-968f-8149fc71488b",
+              "name": "reply_count",
+              "type": "number",
+              "value": 0
+            },
+            {
+              "id": "5092752c-c113-4dfe-a79f-844d39d2f86e",
+              "name": "tags",
+              "type": "array",
+              "value": []
+            },
+            {
+              "id": "367b0661-d7e8-4ef5-a2ec-15fe2a8e9f4a",
+              "name": "strategic_alignment",
+              "type": "array",
+              "value": []
+            },
+            {
+              "id": "db2f739f-9651-47e0-86fc-fd68e90ee0a9",
+              "name": "matched_terms",
+              "type": "array",
+              "value": []
+            },
+            {
+              "id": "6c7a83cd-11a6-4f40-8569-0afe6d8e459c",
+              "name": "identity_confidence",
+              "type": "number",
+              "value": 0.96
+            },
+            {
+              "id": "cc87058b-5b90-4140-a5b8-9d03a0e979ef",
+              "name": "visibility_status",
+              "type": "string",
+              "value": "review"
+            },
+            {
+              "id": "aea7201e-81eb-4347-a49d-5540cc4ac85b",
+              "name": "last_seen_at",
+              "type": "string",
+              "value": "={{ $now.toISO() }}"
+            },
+            {
+              "id": "1676bbb1-a301-4ff3-b168-8d79fed6c9a0",
+              "name": "social_account_id",
+              "type": "string",
+              "value": "60f18942-c8f6-4481-b7c1-c92392b60b5b"
+            },
+            {
+              "id": "f92a1774-c2dc-45ad-8f5d-13f8d6016d10",
+              "name": "platform",
+              "type": "string",
+              "value": "facebook"
+            },
+            {
+              "id": "7d96377d-8c6f-4d39-bf16-d08a066b110d",
+              "name": "external_thread_id",
+              "type": "string",
+              "value": "={{ String($json.post_id || $json.id || $json.url || \"\") }}"
+            },
+            {
+              "id": "3af8f43c-2a31-4210-9a02-fd72a81a35b0",
+              "name": "canonical_url",
+              "type": "string",
+              "value": "={{ $json.url }}"
+            },
+            {
+              "id": "ae41d845-4ac2-43cd-9923-88c288a5fc09",
+              "name": "author_name",
+              "type": "string",
+              "value": "={{ $json.author?.name || \"Facebook account\" }}"
+            },
+            {
+              "id": "1d2445f7-6e6b-4891-9bca-8c5335d24697",
+              "name": "author_handle",
+              "type": "string",
+              "value": "={{ $json.author?.url || null }}"
+            },
+            {
+              "id": "9a600949-7350-4dcb-a1ad-e959ec935f57",
+              "name": "headline",
+              "type": "string",
+              "value": "={{ ($json.message || \"Public Facebook post\").slice(0,240) }}"
+            },
+            {
+              "id": "bd9cb23b-fc0f-421a-ac98-014f966963f7",
+              "name": "body",
+              "type": "string",
+              "value": "={{ $json.message || \"Public Facebook post\" }}"
+            },
+            {
+              "id": "3e01e022-9eda-43f6-b03b-566dcdb135c6",
+              "name": "published_at",
+              "type": "string",
+              "value": "={{ new Date(Number($json.timestamp) * 1000).toISOString() }}"
+            },
+            {
+              "id": "1353fa3e-51b7-4438-906f-6ecc41638660",
+              "name": "comment_count",
+              "type": "number",
+              "value": "={{ Math.max(0, Number($json.comments_count || 0)) }}"
+            },
+            {
+              "id": "a2a946dc-fc88-4705-a408-16735df8f8fa",
+              "name": "reaction_count",
+              "type": "number",
+              "value": "={{ Math.max(0, Number($json.reactions_count || 0)) }}"
+            },
+            {
+              "id": "068a9fac-f525-46e9-bb74-0f00d86396c1",
+              "name": "share_count",
+              "type": "number",
+              "value": "={{ Math.max(0, Number($json.reshare_count || 0)) }}"
+            },
+            {
+              "id": "f470aa48-b020-461f-a3ad-8cd3b86a4698",
+              "name": "view_count",
+              "type": "number",
+              "value": "={{ Math.max(0, Number($json.video_view_count || 0)) }}"
+            },
+            {
+              "id": "40c2a19d-8b1e-4a9e-80d4-bbe91d5f9a91",
+              "name": "engagement_total",
+              "type": "number",
+              "value": "={{ Math.max(0, Number($json.comments_count || 0)) + Math.max(0, Number($json.reactions_count || 0)) + Math.max(0, Number($json.reshare_count || 0)) }}"
+            },
+            {
+              "id": "6df83af4-d50a-43b8-b76c-b3288a26ca5b",
+              "name": "matched_terms",
+              "type": "array",
+              "value": [
+                "Meadow View Elementary School Alabaster"
+              ]
+            },
+            {
+              "id": "fa6bba42-c288-4170-b9be-4adca42309c5",
+              "name": "match_reason",
+              "type": "string",
+              "value": "Public Facebook post matched Meadow View Elementary School within Alabaster context."
+            },
+            {
+              "id": "8c9d53fb-4329-4d70-8776-ce66883f486f",
+              "name": "provider_metadata",
+              "type": "object",
+              "value": "={{ { collected_via: \"apify_public_discovery\", discovery_type: \"facebook_keyword_search\", provider_actor: \"powerai/facebook-post-search-scraper\", query: \"Meadow View Elementary School Alabaster\", author_id: String($json.author?.id || \"\"), author_profile_url: $json.author?.url || null, profile_picture_url: $json.author?.profile_picture_url || null, is_owned_author: String($json.author?.id || \"\") === \"100063475723470\", media_url: $json.image?.uri || $json.video_thumbnail || (Array.isArray($json.album_preview) ? $json.album_preview[0]?.uri : null) || null, video_url: Array.isArray($json.video_files) ? ($json.video_files.find(v => v?.url)?.url || null) : ($json.video?.url || null), media_type: ($json.video || $json.video_thumbnail || (Array.isArray($json.video_files) && $json.video_files.length)) ? \"video\" : (($json.image?.uri || (Array.isArray($json.album_preview) && $json.album_preview.length)) ? \"image\" : \"text\"), carousel_count: Array.isArray($json.album_preview) ? $json.album_preview.length : 0, is_text_only: !($json.image?.uri || $json.video || $json.video_thumbnail || (Array.isArray($json.album_preview) && $json.album_preview.length)), metric_availability: { reactions: typeof $json.reactions_count === \"number\", comments: typeof $json.comments_count === \"number\", shares: typeof $json.reshare_count === \"number\", views: typeof $json.video_view_count === \"number\" }, pilot: \"alabaster\", review_only: true } }}"
+            }
+          ]
+        },
+        "includeOtherFields": false,
+        "options": {}
+      },
+      "position": [
+        -590,
+        1040
+      ],
+      "type": "n8n-nodes-base.set",
+      "typeVersion": 3.4
+    },
+    {
+      "id": "7a020562-83c4-44f3-b612-7b2bea8a9b96",
+      "name": "Accept Facebook Meadow View",
+      "parameters": {
+        "conditions": {
+          "combinator": "and",
+          "conditions": [
+            {
+              "id": "eac8e028-8bcd-49a4-b9b8-7eab5d9595e4",
+              "leftValue": "={{ (() => { const t=String($json.body || \"\").toLowerCase(); const commercial=/(zoned for|move-in ready|for sale|realtor|listing|bedroom|bathroom|walker springs|dogs got out|lost dog|missing dog|found dog|price adjustment|come buy this home|acre property|nannying job|babysit|cuido ni\u00f1os|mini sessions|nothing bundt cakes|website design)/.test(t); const published=Date.parse(String($json.published_at || \"\")); const recent=Number.isFinite(published) && published >= Date.parse($now.minus({ days: 30 }).startOf(\"day\").toISO()) && published <= Date.now() + 3600000; return recent && !$json.provider_metadata.is_owned_author && !commercial && t.length > 20 && (t.includes(\"meadow view elementary\") || (t.includes(\"meadow view\") && t.includes(\"alabaster\"))); })() }}",
+              "operator": {
+                "operation": "true",
+                "singleValue": true,
+                "type": "boolean"
+              },
+              "rightValue": ""
+            }
+          ],
+          "options": {
+            "caseSensitive": true,
+            "typeValidation": "strict",
+            "version": 2
+          }
+        },
+        "options": {}
+      },
+      "position": [
+        -360,
+        1040
+      ],
+      "type": "n8n-nodes-base.if",
+      "typeVersion": 2
+    },
+    {
+      "id": "2fe12616-6301-4fda-bb36-fa44d8a57f39",
+      "name": "Build Stage Failure Record",
+      "parameters": {
+        "assignments": {
+          "assignments": [
+            {
+              "id": "d3ecd479-4331-4b02-9870-7ff9218778da",
+              "name": "status",
+              "type": "string",
+              "value": "failed"
+            },
+            {
+              "id": "504f1ab7-b207-4a50-ba5e-c4f7103634ef",
+              "name": "completed_at",
+              "type": "string",
+              "value": "={{ $now.toISO() }}"
+            },
+            {
+              "id": "c5b7bd1a-df92-4841-b48f-244b1ab10e70",
+              "name": "error_code",
+              "type": "string",
+              "value": "candidate_stage_write_failed"
+            },
+            {
+              "id": "1d024ed5-8da2-44b3-97e1-2bd4c2be64b0",
+              "name": "error_message",
+              "type": "string",
+              "value": "={{ String($json.error?.message || $json.message || \"Candidate staging write failed\").slice(0,1000) }}"
+            },
+            {
+              "id": "775c794e-7310-4147-a149-16c8079bb1d2",
+              "name": "provider_errors",
+              "type": "number",
+              "value": 0
+            },
+            {
+              "id": "e702798b-d4e3-4469-bd08-e38338b884d8",
+              "name": "diagnostics",
+              "type": "object",
+              "value": "={{ { pilot: \"alabaster\", lane: \"apify_public_discovery\", review_only: true, workflow_id: $workflow.id, execution_id: $execution.id, failure_node: \"Stage Review Discovery Candidates\", staging_gate: true } }}"
+            }
+          ]
+        },
+        "includeOtherFields": false,
+        "options": {}
+      },
+      "position": [
+        400,
+        80
+      ],
+      "type": "n8n-nodes-base.set",
+      "typeVersion": 3.4
+    },
+    {
+      "id": "b3c7e63c-236f-4573-b46e-36d0f63ab1fb",
+      "name": "Fail Discovery Run",
+      "parameters": {
+        "authentication": "predefinedCredentialType",
+        "headerParameters": {
+          "parameters": [
+            {
+              "name": "Content-Type",
+              "value": "application/json"
+            },
+            {
+              "name": "Prefer",
+              "value": "return=representation"
+            }
+          ]
+        },
+        "jsonBody": "={{ $json }}",
+        "method": "PATCH",
+        "nodeCredentialType": "supabaseApi",
+        "options": {
+          "timeout": 120000
+        },
+        "sendBody": true,
+        "sendHeaders": true,
+        "specifyBody": "json",
+        "url": "={{ 'https://fehdonfrlsrrkzaemkxp.supabase.co/rest/v1/social_collection_runs?id=eq.' + $('Start Discovery Run').first().json.id }}"
+      },
+      "position": [
+        640,
+        80
+      ],
+      "type": "n8n-nodes-base.httpRequest",
+      "typeVersion": 4.2
+    }
+  ],
+  "settings": {
+    "errorWorkflow": "Oijguk0aIBSBVqTq",
+    "executionOrder": "v1",
+    "saveDataErrorExecution": "all",
+    "saveDataSuccessExecution": "all",
+    "saveExecutionProgress": true,
+    "saveManualExecutions": true,
+    "timezone": "America/Phoenix"
+  }
+}

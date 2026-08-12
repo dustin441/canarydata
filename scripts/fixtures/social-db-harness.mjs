@@ -93,11 +93,11 @@ export async function withSocialDatabase(label, test) {
     started = true;
     let ready = false;
     for (let attempt = 0; attempt < 60; attempt += 1) {
-      const check = spawnSync('docker', ['exec', container, 'pg_isready', '-U', 'postgres'], { encoding: 'utf8' });
+      const check = spawnSync('docker', ['exec', container, 'psql', '-X', '-U', 'postgres', '-d', 'postgres', '-c', 'select 1;'], { encoding: 'utf8' });
       if (check.status === 0) { ready = true; break; }
       await new Promise((resolve) => setTimeout(resolve, 250));
     }
-    assert.ok(ready, 'Disposable PostgreSQL did not become ready.');
+    assert.ok(ready, 'Disposable PostgreSQL did not pass an executable SELECT 1 readiness check.');
     const [fixture, legacy, migration] = await Promise.all([
       readFile(new URL('./social-n1.sql', import.meta.url), 'utf8'),
       readFile(new URL('../../supabase/social_review_workflow.sql', import.meta.url), 'utf8'),

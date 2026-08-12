@@ -1,0 +1,657 @@
+{
+  "active": false,
+  "connections": {
+    "Build Candidate Stage Failure Run": {
+      "main": [
+        [
+          {
+            "index": 0,
+            "node": "Create Terminal Collection Run",
+            "type": "main"
+          }
+        ]
+      ]
+    },
+    "Build District Context": {
+      "main": [
+        [
+          {
+            "index": 0,
+            "node": "Run Facebook Public Search",
+            "type": "main"
+          }
+        ]
+      ]
+    },
+    "Build District Inputs": {
+      "main": [
+        [
+          {
+            "index": 0,
+            "node": "Loop Districts",
+            "type": "main"
+          }
+        ]
+      ]
+    },
+    "Build Empty or Failed Run Record": {
+      "main": [
+        [
+          {
+            "index": 0,
+            "node": "Create Terminal Collection Run",
+            "type": "main"
+          }
+        ]
+      ]
+    },
+    "Build Successful Run Record": {
+      "main": [
+        [
+          {
+            "index": 0,
+            "node": "Create Terminal Collection Run",
+            "type": "main"
+          }
+        ]
+      ]
+    },
+    "Create Terminal Collection Run": {
+      "main": [
+        [
+          {
+            "index": 0,
+            "node": "Pace Districts",
+            "type": "main"
+          }
+        ]
+      ]
+    },
+    "Get Active Social Queries": {
+      "main": [
+        [
+          {
+            "index": 0,
+            "node": "Build District Inputs",
+            "type": "main"
+          }
+        ]
+      ]
+    },
+    "Get District Search Profile": {
+      "main": [
+        [
+          {
+            "index": 0,
+            "node": "Build District Context",
+            "type": "main"
+          }
+        ]
+      ]
+    },
+    "Has Accepted Public Posts": {
+      "main": [
+        [
+          {
+            "index": 0,
+            "node": "Strip Internal Fields",
+            "type": "main"
+          }
+        ],
+        [
+          {
+            "index": 0,
+            "node": "Build Empty or Failed Run Record",
+            "type": "main"
+          }
+        ]
+      ]
+    },
+    "Loop Districts": {
+      "main": [
+        [
+          {
+            "index": 0,
+            "node": "Complete Rollout Execution",
+            "type": "main"
+          }
+        ],
+        [
+          {
+            "index": 0,
+            "node": "Get District Search Profile",
+            "type": "main"
+          }
+        ]
+      ]
+    },
+    "Manual Trigger": {
+      "main": [
+        [
+          {
+            "index": 0,
+            "node": "Get Active Social Queries",
+            "type": "main"
+          }
+        ]
+      ]
+    },
+    "Mon Wed Fri 7:15 AM Arizona": {
+      "main": [
+        [
+          {
+            "index": 0,
+            "node": "Get Active Social Queries",
+            "type": "main"
+          }
+        ]
+      ]
+    },
+    "Normalize and Validate Public Posts": {
+      "main": [
+        [
+          {
+            "index": 0,
+            "node": "Has Accepted Public Posts",
+            "type": "main"
+          }
+        ]
+      ]
+    },
+    "Pace Districts": {
+      "main": [
+        [
+          {
+            "index": 0,
+            "node": "Loop Districts",
+            "type": "main"
+          }
+        ]
+      ]
+    },
+    "Prepare Social Candidate RPC": {
+      "main": [
+        [
+          {
+            "index": 0,
+            "node": "Stage Review Social Candidates",
+            "type": "main"
+          }
+        ]
+      ]
+    },
+    "Public Listening Webhook": {
+      "main": [
+        [
+          {
+            "index": 0,
+            "node": "Get Active Social Queries",
+            "type": "main"
+          }
+        ]
+      ]
+    },
+    "Run Facebook Public Search": {
+      "main": [
+        [
+          {
+            "index": 0,
+            "node": "Normalize and Validate Public Posts",
+            "type": "main"
+          }
+        ]
+      ]
+    },
+    "Stage Review Social Candidates": {
+      "main": [
+        [
+          {
+            "index": 0,
+            "node": "Build Successful Run Record",
+            "type": "main"
+          }
+        ],
+        [
+          {
+            "index": 0,
+            "node": "Build Candidate Stage Failure Run",
+            "type": "main"
+          }
+        ]
+      ]
+    },
+    "Strip Internal Fields": {
+      "main": [
+        [
+          {
+            "index": 0,
+            "node": "Prepare Social Candidate RPC",
+            "type": "main"
+          }
+        ]
+      ]
+    }
+  },
+  "id": "SLZABQRPOmXstYV7",
+  "name": "Canary Data - Public Social Listening - All Active Districts (Facebook v1)",
+  "nodes": [
+    {
+      "id": "95e18477-fb27-485b-8b8e-67338f97b87e",
+      "name": "Manual Trigger",
+      "parameters": {},
+      "position": [
+        -1200,
+        -160
+      ],
+      "type": "n8n-nodes-base.manualTrigger",
+      "typeVersion": 1
+    },
+    {
+      "id": "8ad354f3-8c94-42d3-93da-98c27d118e38",
+      "name": "Public Listening Webhook",
+      "parameters": {
+        "httpMethod": "POST",
+        "options": {},
+        "path": "canary-task6-7d881e50de11492287eea8154498c684",
+        "responseMode": "onReceived"
+      },
+      "position": [
+        -1200,
+        120
+      ],
+      "type": "n8n-nodes-base.webhook",
+      "typeVersion": 2,
+      "webhookId": "11051392-f530-4f21-ab20-276bc0d50ac7"
+    },
+    {
+      "credentials": {
+        "supabaseApi": {
+          "id": "sQ6YKGg0XnYQtooD",
+          "name": "Canary Data Production Service Role 2026-08"
+        }
+      },
+      "id": "a36038a3-42b8-4d0d-bb15-8607c7736013",
+      "name": "Get Active Social Queries",
+      "parameters": {
+        "authentication": "predefinedCredentialType",
+        "method": "GET",
+        "nodeCredentialType": "supabaseApi",
+        "options": {
+          "timeout": 120000
+        },
+        "url": "https://fehdonfrlsrrkzaemkxp.supabase.co/rest/v1/search_queries?select=id,district_id,district_name,query_text&active=eq.true&channels=eq.social&order=district_id.asc"
+      },
+      "position": [
+        -980,
+        -20
+      ],
+      "type": "n8n-nodes-base.httpRequest",
+      "typeVersion": 4.3
+    },
+    {
+      "id": "061827a0-48ba-41a6-ae32-4d73fa35dc01",
+      "name": "Build District Inputs",
+      "parameters": {
+        "jsCode": "function norm(v){return String(v||'').trim();}\nlet override='';\ntry { const w=$('Public Listening Webhook').first().json||{}; override=norm(w.body?.district_id||w.district_id); } catch(e) {}\nconst by=new Map();\nfor(const item of $input.all()){\n const j=item.json||{}; if(!j.district_id) continue;\n const d=by.get(j.district_id)||{district_id:j.district_id,district_name:norm(j.district_name)||String(j.district_id).replace(/-/g,' '),query_ids:[],positive_terms:[]};\n d.query_ids.push(j.id); const q=norm(j.query_text);\n const rx=/(^|[^-])\"([^\"]{5,100})\"/g; let m;\n while((m=rx.exec(q))!==null){ const t=norm(m[2]); if(t&&!d.positive_terms.some(x=>x.toLowerCase()===t.toLowerCase())) d.positive_terms.push(t); }\n by.set(j.district_id,d);\n}\nlet rows=[...by.values()].map(d=>{d.positive_terms=[d.district_name,...d.positive_terms].filter((x,i,a)=>x&&a.findIndex(y=>y.toLowerCase()===x.toLowerCase())===i).slice(0,18);d.search_query=d.district_name;return d;});\nif(override) rows=rows.filter(x=>x.district_id===override);\nif(!rows.length) throw new Error(override?'social_query_override_not_found':'no_active_social_queries');\nreturn rows.map(json=>({json}));"
+      },
+      "position": [
+        -760,
+        -20
+      ],
+      "type": "n8n-nodes-base.code",
+      "typeVersion": 2
+    },
+    {
+      "id": "ed53ccc7-98e0-4ccb-8762-0a6da44b2d8c",
+      "name": "Loop Districts",
+      "parameters": {
+        "batchSize": 1,
+        "options": {
+          "reset": false
+        }
+      },
+      "position": [
+        -540,
+        -20
+      ],
+      "type": "n8n-nodes-base.splitInBatches",
+      "typeVersion": 3
+    },
+    {
+      "alwaysOutputData": true,
+      "credentials": {
+        "supabaseApi": {
+          "id": "sQ6YKGg0XnYQtooD",
+          "name": "Canary Data Production Service Role 2026-08"
+        }
+      },
+      "id": "8d188df2-96b6-4dee-914a-b5cc26222279",
+      "name": "Get District Search Profile",
+      "parameters": {
+        "authentication": "predefinedCredentialType",
+        "method": "GET",
+        "nodeCredentialType": "supabaseApi",
+        "options": {
+          "timeout": 120000
+        },
+        "url": "={{ 'https://fehdonfrlsrrkzaemkxp.supabase.co/rest/v1/district_search_profiles?select=district_id,primary_city,state_full,state_abbrev,include_geo_terms,exclude_geo_terms&active=eq.true&district_id=eq.' + $json.district_id + '&limit=1' }}"
+      },
+      "position": [
+        -320,
+        120
+      ],
+      "type": "n8n-nodes-base.httpRequest",
+      "typeVersion": 4.3
+    },
+    {
+      "id": "540d99e6-f372-4c46-9f4b-ca0a5d6570c5",
+      "name": "Build District Context",
+      "parameters": {
+        "jsCode": "const q=$('Loop Districts').itemMatching(0).json;const profiles=$input.all().map(i=>i.json||{}).filter(x=>x.district_id===q.district_id);const p=profiles[0]||{};const clean=v=>String(v||'').trim();const include=[...new Set([p.state_full,...(p.include_geo_terms||[])].map(clean).filter(Boolean))];const primary=clean(p.primary_city).toLowerCase();const strongGeo=include.filter(t=>{const x=t.toLowerCase();if(x.length<4)return false;if(x===primary&&q.district_name.toLowerCase().includes(primary))return false;if(/^[a-z]{2}$/i.test(t))return false;return true;});return [{json:{...q,primary_city:p.primary_city||null,state_full:p.state_full||null,state_abbrev:p.state_abbrev||null,strong_geo_terms:strongGeo,exclude_geo_terms:(p.exclude_geo_terms||[]).map(clean).filter(Boolean),run_started_at:$now.toISO()}}];"
+      },
+      "position": [
+        -100,
+        120
+      ],
+      "type": "n8n-nodes-base.code",
+      "typeVersion": 2
+    },
+    {
+      "alwaysOutputData": true,
+      "credentials": {
+        "httpHeaderAuth": {
+          "id": "rdhnPt22XVonnh8v",
+          "name": "Canary Data - Apify API (Company)"
+        }
+      },
+      "id": "6bc4ff74-b3a4-403a-b175-0e04f510c110",
+      "name": "Run Facebook Public Search",
+      "onError": "continueRegularOutput",
+      "parameters": {
+        "authentication": "genericCredentialType",
+        "genericAuthType": "httpHeaderAuth",
+        "jsonBody": "={{ { query: $json.search_query, recent_posts: true, start_date: $now.minus({days: 7}).toFormat('yyyy-MM-dd'), end_date: $now.toFormat('yyyy-MM-dd'), maxResults: 10 } }}",
+        "method": "POST",
+        "options": {
+          "timeout": 360000
+        },
+        "sendBody": true,
+        "specifyBody": "json",
+        "url": "https://api.apify.com/v2/actor-tasks/9N4m10W1XZ519jAsi/run-sync-get-dataset-items?timeout=300&memory=1024&clean=true"
+      },
+      "position": [
+        120,
+        120
+      ],
+      "type": "n8n-nodes-base.httpRequest",
+      "typeVersion": 4.3
+    },
+    {
+      "id": "f1178b0a-41d8-4a07-8b28-ccd7fecbecaf",
+      "name": "Normalize and Validate Public Posts",
+      "parameters": {
+        "jsCode": "const raw=$input.all().map(i=>i.json||{});const ctx=$('Build District Context').itemMatching(0).json;function n(v){return String(v||'').toLowerCase().replace(/[^a-z0-9]+/g,' ').trim();}function iso(v){if(v===null||v===undefined||v==='')return null;const d=typeof v==='number'?new Date(v>1e11?v:v*1000):new Date(v);return Number.isNaN(d.getTime())?null:d.toISOString();}function safe(v){const s=String(v||'').replace(/[\\u0000-\\u001F\\u007F]/g,' ');return (s.toWellFormed?s.toWellFormed():s).normalize('NFC').trim();}const errorItem=raw.find(j=>j.error||j.errorMessage||Number(j.statusCode||0)>=400||((!j.post_id&&!j.url)&&/payment required|insufficient|actor.*failed|unauthorized|forbidden/i.test(String(j.message||j.description||''))));const candidates=raw.filter(j=>j.post_id||j.id||j.url).filter(j=>j.message||j.message_rich||j.text||j.postText);const terms=(ctx.positive_terms||[]).map(n).filter(x=>x.length>=6);const strongGeo=(ctx.strong_geo_terms||[]).map(n).filter(x=>x.length>=4);const excluded=(ctx.exclude_geo_terms||[]).map(n).filter(x=>x.length>=4);const now=Date.now(),min=now-14*86400000,max=now+2*86400000;const accepted=[];let rejected=0;for(const p of candidates){const body=safe(p.message||p.message_rich||p.text||p.postText||'');const url=safe(p.url||p.postUrl||p.facebookUrl||'');const published=iso(p.timestamp||p.time||p.date||p.postedAt||p.created_time);const authorName=safe(p.author?.name||p.authorName||p.pageTitle||p.pageName||'');const authorHandle=safe(p.author?.url||p.authorHandle||p.pageName||'');const text=n([body,authorName,authorHandle,url].join(' '));const matched=terms.filter(t=>text.includes(t)).slice(0,8);const exactDistrict=text.includes(n(ctx.district_name));const geoMatched=strongGeo.filter(t=>text.includes(t)).slice(0,6);const excludedMatched=excluded.some(t=>text.includes(t));const needsGeo=!exactDistrict||/(county|central|orange|riverside|garfield|morgan)/i.test(ctx.district_name);const isOfficial=n(authorName)===n(ctx.district_name)||(/school|academy|district|elementary|middle|high|fine arts|education foundation/i.test(authorName)&&terms.some(t=>t.length>=8&&(n(authorName).includes(t)||t.includes(n(authorName)))));const d=published?new Date(published).getTime():NaN;const commercial=/(zoned for|move in ready|for sale|for rent|house for rent|casa en renta|renta mensual|realtor|listing|bedroom|bathroom|\\bbeds?\\b|\\bbaths?\\b|deposit|sqft|open house|property for sale)/i.test(body);if(!body||!url||!published||d<min||d>max||!matched.length||excludedMatched||(needsGeo&&!geoMatched.length)||isOfficial||commercial){rejected++;continue;}const ext=String(p.post_id||p.id||url);const reactions=Math.max(0,Number(p.reactions_count||p.likesCount||p.likes||0));const comments=Math.max(0,Number(p.comments_count||p.commentsCount||p.comments||0));const shares=Math.max(0,Number(p.reshare_count||p.sharesCount||p.shares||0));const views=Math.max(0,Number(p.video_view_count||p.videoPlayCount||p.viewsCount||0));accepted.push({district_id:ctx.district_id,social_account_id:null,provider:'apify',platform:'facebook',external_thread_id:ext,canonical_url:url,relationship_type:'ambient',author_name:authorName||null,author_handle:authorHandle||null,headline:Array.from(body).slice(0,240).join(''),body,summary:null,recommendation:null,published_at:published,comment_count:Math.floor(comments),reply_count:0,reaction_count:Math.floor(reactions),share_count:Math.floor(shares),view_count:Math.floor(views),engagement_total:Math.floor(reactions+comments+shares),tags:[],strategic_alignment:[],matched_terms:matched,match_reason:'Public Facebook search matched a configured district identity term.',identity_confidence:matched.some(t=>t===n(ctx.district_name))?0.95:0.85,visibility_status:'review',provider_metadata:{collected_via:'apify_all_district_public_listening_v1',query_id:ctx.query_ids?.[0]||null,query:ctx.search_query,source_query_ids:ctx.query_ids||[],profile_picture_url:p.author?.profile_picture_url||null,media_url:p.image||p.video_thumbnail||null,video_url:p.video||null,media_type:p.video?'video':(p.image?'image':'text'),metric_availability:{reactions:p.reactions_count!==undefined,comments:p.comments_count!==undefined,shares:p.reshare_count!==undefined,views:p.video_view_count!==undefined},review_only:true}});}const stats={district_id:ctx.district_id,district_name:ctx.district_name,run_started_at:ctx.run_started_at,raw_count:candidates.length,accepted_count:accepted.length,rejected_count:rejected,provider_error:errorItem?String(errorItem.error?.message||errorItem.error||errorItem.errorMessage||errorItem.message||errorItem.description||'provider_error'):null,query_ids:ctx.query_ids||[],estimated_cost:Number((0.09+candidates.length*0.00999).toFixed(4))};if(!accepted.length)return[{json:{_is_social_row:false,_stats:stats}}];return accepted.map(row=>{row.provider_metadata.collection_stats=stats;return{json:{...row,_is_social_row:true}};});"
+      },
+      "position": [
+        360,
+        120
+      ],
+      "type": "n8n-nodes-base.code",
+      "typeVersion": 2
+    },
+    {
+      "id": "96194bee-35f5-45da-8980-a9deb61c30b5",
+      "name": "Has Accepted Public Posts",
+      "parameters": {
+        "conditions": {
+          "combinator": "and",
+          "conditions": [
+            {
+              "id": "6767ba71-e148-420e-8cb2-98669c142e51",
+              "leftValue": "={{ $json._is_social_row === true }}",
+              "operator": {
+                "operation": "equals",
+                "type": "boolean"
+              },
+              "rightValue": true
+            }
+          ],
+          "options": {
+            "caseSensitive": true,
+            "typeValidation": "strict",
+            "version": 2
+          }
+        },
+        "options": {}
+      },
+      "position": [
+        600,
+        120
+      ],
+      "type": "n8n-nodes-base.if",
+      "typeVersion": 2
+    },
+    {
+      "id": "9780b8ca-17b7-4c11-a694-de2d9469598a",
+      "name": "Strip Internal Fields",
+      "parameters": {
+        "jsCode": "return $input.all().map(item=>{const j={...item.json};delete j._is_social_row;return{json:j};});"
+      },
+      "position": [
+        820,
+        20
+      ],
+      "type": "n8n-nodes-base.code",
+      "typeVersion": 2
+    },
+    {
+      "alwaysOutputData": true,
+      "credentials": {
+        "supabaseApi": {
+          "id": "sQ6YKGg0XnYQtooD",
+          "name": "Canary Data Production Service Role 2026-08"
+        }
+      },
+      "id": "9115e0c6-3c7a-4bd3-be66-b11830b2abfe",
+      "name": "Stage Review Social Candidates",
+      "onError": "continueErrorOutput",
+      "parameters": {
+        "authentication": "predefinedCredentialType",
+        "body": "={{ JSON.stringify($json) }}",
+        "contentType": "raw",
+        "headerParameters": {
+          "parameters": [
+            {
+              "name": "Content-Type",
+              "value": "application/json"
+            },
+            {
+              "name": "Prefer",
+              "value": "return=representation"
+            }
+          ]
+        },
+        "method": "POST",
+        "nodeCredentialType": "supabaseApi",
+        "options": {
+          "timeout": 120000
+        },
+        "rawContentType": "application/json",
+        "sendBody": true,
+        "sendHeaders": true,
+        "url": "https://fehdonfrlsrrkzaemkxp.supabase.co/rest/v1/rpc/canary_stage_social_discovery"
+      },
+      "position": [
+        1300,
+        20
+      ],
+      "type": "n8n-nodes-base.httpRequest",
+      "typeVersion": 4.3
+    },
+    {
+      "id": "14317d83-7150-4695-8108-0e21eebf1293",
+      "name": "Build Successful Run Record",
+      "parameters": {
+        "jsCode": "const rows=$input.all().map(i=>i.json||{});const first=rows[0]||{};let stats=first.provider_metadata?.collection_stats||{};if(!stats.district_id){try{stats=$('Strip Internal Fields').itemMatching(0).json.provider_metadata?.collection_stats||{};}catch(e){}}const ids=[...new Set(rows.map(x=>x.id).filter(Boolean))];return[{json:{district_id:stats.district_id||first.district_id||null,provider:'apify',run_type:'public_search',status:'success',started_at:stats.run_started_at||$now.toISO(),completed_at:$now.toISO(),raw_items:Number(stats.raw_count||0),accepted_threads:ids.length,accepted_comments:0,duplicate_items:Math.max(0,Number(stats.accepted_count||0)-ids.length),rejected_items:Number(stats.rejected_count||0),provider_errors:0,estimated_cost:Number(stats.estimated_cost||0),error_code:null,error_message:null,diagnostics:{lane:'all_district_public_facebook_v1',review_only:true,workflow_id:$workflow.id,execution_id:$execution.id,district_name:stats.district_name||null,query_ids:stats.query_ids||[],staged_candidate_ids:ids}}}];"
+      },
+      "position": [
+        1260,
+        20
+      ],
+      "type": "n8n-nodes-base.code",
+      "typeVersion": 2
+    },
+    {
+      "id": "8e03c738-1ca5-4cbf-8518-b83c772e5c3a",
+      "name": "Build Empty or Failed Run Record",
+      "parameters": {
+        "jsCode": "const stats=$input.first().json._stats||{};const failed=Boolean(stats.provider_error);return[{json:{district_id:stats.district_id||null,provider:'apify',run_type:'public_search',status:failed?'failed':'empty',started_at:stats.run_started_at||$now.toISO(),completed_at:$now.toISO(),raw_items:Number(stats.raw_count||0),accepted_threads:0,accepted_comments:0,duplicate_items:0,rejected_items:Number(stats.rejected_count||0),provider_errors:failed?1:0,estimated_cost:Number(stats.estimated_cost||0),error_code:failed?'provider_error':null,error_message:failed?String(stats.provider_error).slice(0,1000):null,diagnostics:{lane:'all_district_public_facebook_v1',review_only:true,workflow_id:$workflow.id,execution_id:$execution.id,district_name:stats.district_name||null,query_ids:stats.query_ids||[]}}}];"
+      },
+      "position": [
+        820,
+        220
+      ],
+      "type": "n8n-nodes-base.code",
+      "typeVersion": 2
+    },
+    {
+      "credentials": {
+        "supabaseApi": {
+          "id": "sQ6YKGg0XnYQtooD",
+          "name": "Canary Data Production Service Role 2026-08"
+        }
+      },
+      "id": "91c03095-44cd-43af-a965-52a24d25ae42",
+      "name": "Create Terminal Collection Run",
+      "parameters": {
+        "authentication": "predefinedCredentialType",
+        "headerParameters": {
+          "parameters": [
+            {
+              "name": "Content-Type",
+              "value": "application/json"
+            },
+            {
+              "name": "Prefer",
+              "value": "return=representation"
+            }
+          ]
+        },
+        "jsonBody": "={{ $json }}",
+        "method": "POST",
+        "nodeCredentialType": "supabaseApi",
+        "options": {
+          "timeout": 120000
+        },
+        "sendBody": true,
+        "sendHeaders": true,
+        "specifyBody": "json",
+        "url": "https://fehdonfrlsrrkzaemkxp.supabase.co/rest/v1/social_collection_runs"
+      },
+      "position": [
+        1480,
+        120
+      ],
+      "type": "n8n-nodes-base.httpRequest",
+      "typeVersion": 4.3
+    },
+    {
+      "id": "ab52d541-7e72-4a26-8047-4468de8013f1",
+      "name": "Pace Districts",
+      "parameters": {
+        "amount": 3,
+        "unit": "seconds"
+      },
+      "position": [
+        1700,
+        120
+      ],
+      "type": "n8n-nodes-base.wait",
+      "typeVersion": 1.1,
+      "webhookId": "80efb95a890439147511b4445f3ae7db"
+    },
+    {
+      "id": "23f93a02-8f29-4041-804b-104e60e2f99d",
+      "name": "Complete Rollout Execution",
+      "parameters": {
+        "jsCode": "return [{json:{status:'complete',workflow_id:$workflow.id,execution_id:$execution.id,completed_at:$now.toISO()}}];"
+      },
+      "position": [
+        -300,
+        -180
+      ],
+      "type": "n8n-nodes-base.code",
+      "typeVersion": 2
+    },
+    {
+      "id": "6ff727a1-a0ef-4eff-8163-d0db61f4003e",
+      "name": "Task 6 Staging Guard",
+      "parameters": {
+        "content": "## PUBLIC SOCIAL DISCOVERY CANDIDATE STAGING\nInactive pending-review workflow. Provider discoveries write only to canary_stage_social_discovery. Do not activate until the production candidate-gate migration and bounded QA are complete.",
+        "height": 180,
+        "width": 420
+      },
+      "position": [
+        -1200,
+        -440
+      ],
+      "type": "n8n-nodes-base.stickyNote",
+      "typeVersion": 1
+    },
+    {
+      "id": "d67679bf-a367-475f-b4b7-5b98c46dc4cc",
+      "name": "Mon Wed Fri 7:15 AM Arizona",
+      "parameters": {
+        "rule": {
+          "interval": [
+            {
+              "expression": "15 7 * * 1,3,5",
+              "field": "cronExpression"
+            }
+          ]
+        }
+      },
+      "position": [
+        -1200,
+        -20
+      ],
+      "type": "n8n-nodes-base.scheduleTrigger",
+      "typeVersion": 1.2
+    },
+    {
+      "id": "74c0d6cb-71ee-414e-9db2-8ce7a823e879",
+      "name": "Prepare Social Candidate RPC",
+      "parameters": {
+        "jsCode": "const workflowId=$workflow.id;const executionId=$execution.id;return $input.all().map((item,index)=>({json:{p_candidate:{...item.json,source_workflow_id:workflowId,source_execution_id:executionId}},pairedItem:{item:index}}));"
+      },
+      "position": [
+        1040,
+        20
+      ],
+      "type": "n8n-nodes-base.code",
+      "typeVersion": 2
+    },
+    {
+      "id": "5b6853e3-7a3a-49d5-9bed-85649c7469a2",
+      "name": "Build Candidate Stage Failure Run",
+      "parameters": {
+        "jsCode": "let stats={};try{stats=$('Strip Internal Fields').itemMatching(0).json.provider_metadata?.collection_stats||{};}catch(e){}const err=$input.first().json||{};return[{json:{district_id:stats.district_id||null,provider:'apify',run_type:'public_search',status:'failed',started_at:stats.run_started_at||$now.toISO(),completed_at:$now.toISO(),raw_items:Number(stats.raw_count||0),accepted_threads:0,accepted_comments:0,duplicate_items:0,rejected_items:Number(stats.rejected_count||0),provider_errors:0,estimated_cost:Number(stats.estimated_cost||0),error_code:'candidate_stage_write_failed',error_message:String(err.error?.message||err.message||'Candidate staging write failed').slice(0,1000),diagnostics:{lane:'all_district_public_facebook_v1',review_only:true,staging_gate:true,failure_node:'Stage Review Social Candidates',workflow_id:$workflow.id,execution_id:$execution.id,district_name:stats.district_name||null,query_ids:stats.query_ids||[]}}}];"
+      },
+      "position": [
+        1480,
+        -100
+      ],
+      "type": "n8n-nodes-base.code",
+      "typeVersion": 2
+    }
+  ],
+  "settings": {
+    "errorWorkflow": "Oijguk0aIBSBVqTq",
+    "executionOrder": "v1",
+    "executionTimeout": 10800,
+    "saveDataErrorExecution": "all",
+    "saveDataSuccessExecution": "all",
+    "saveExecutionProgress": true,
+    "timezone": "America/Phoenix"
+  }
+}

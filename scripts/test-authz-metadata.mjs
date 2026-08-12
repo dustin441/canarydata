@@ -29,7 +29,7 @@ for (const action of ['addQuery', 'deleteQuery']) {
   const start = actions.indexOf(`export async function ${action}`);
   assert.match(actions.slice(start, start + 2500), /assertDistrictAccess\(actor,/, `${action} must enforce district access`);
 }
-for (const action of ['claimSocialAffiliate', 'revokeSocialAffiliate']) {
+for (const action of ['claimSocialAffiliate', 'revokeSocialAffiliate', 'reviewSocialDiscoveryCandidate']) {
   const start = actions.indexOf(`export async function ${action}`);
   assert.notEqual(start, -1, `${action} must exist`);
   const body = actions.slice(start, start + 3500);

@@ -2977,6 +2977,19 @@ input[type="date"]::-webkit-calendar-picker-indicator {
 .affiliate-claim-list article > div { display: grid; gap: 3px; }
 .affiliate-claim-list span, .affiliate-claim-list small { color: var(--text-tertiary); }
 
+.affiliate-admin-continuation { padding-top: 0; }
+.social-discovery-review-panel > div:first-child { display: grid; gap: 6px; }
+.social-discovery-review-panel > div:first-child > span { color: var(--accent-primary); font-size: .72rem; font-weight: 800; text-transform: uppercase; letter-spacing: .08em; }
+.social-discovery-candidate-list { display: grid; gap: 14px; margin-top: 18px; }
+.social-discovery-candidate-list article { border: 1px solid var(--border-primary); border-radius: var(--radius-md); padding: 16px; display: grid; gap: 12px; }
+.social-discovery-candidate-list header { display: flex; justify-content: space-between; gap: 16px; }
+.social-discovery-candidate-list header > div { display: grid; gap: 4px; }
+.social-discovery-candidate-list span, .social-discovery-candidate-list small { color: var(--text-tertiary); }
+.social-discovery-evidence, .social-discovery-actions { display: flex; gap: 10px; align-items: center; flex-wrap: wrap; }
+.social-discovery-evidence span { border: 1px solid var(--border-primary); border-radius: 999px; padding: 4px 9px; font-size: .78rem; }
+.social-discovery-actions { justify-content: flex-end; }
+.social-discovery-actions button, .social-discovery-actions a { padding: 8px 12px; border-radius: var(--radius-sm); }
+
 .affiliate-preview-panel { display: grid; gap: 18px; }
 .affiliate-preview-heading { display: flex; align-items: start; justify-content: space-between; gap: 20px; }
 .affiliate-preview-heading > div { display: grid; gap: 5px; }

@@ -332,3 +332,20 @@ export async function getQueries(districtId = null) {
   if (error) throw error;
   return data ?? [];
 }
+
+export async function getPendingSocialDiscoveryCandidates(districtId) {
+  if (!districtId || districtId === 'All') throw new Error('A specific district is required.');
+  const supabase = createAdminClient();
+  const { data, error } = await supabase
+    .from('social_discovery_candidates')
+    .select('id,district_id,provider,platform,external_thread_id,canonical_url,relationship_type,candidate_payload,status,review_version,source_workflow_id,source_execution_id,first_seen_at,last_seen_at')
+    .eq('district_id', districtId)
+    .eq('status', 'pending')
+    .order('last_seen_at', { ascending: false })
+    .limit(100);
+  if (error) {
+    if (error.code === '42P01' || error.code === 'PGRST205') return { available: false, candidates: [] };
+    throw error;
+  }
+  return { available: true, candidates: data ?? [] };
+}
