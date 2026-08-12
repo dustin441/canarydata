@@ -40,6 +40,18 @@ function assertCanaryReviewer(actor) {
 
 const SOCIAL_CORRECTION_ACTIONS = new Set(['exclude', 'restore']);
 
+const SOCIAL_AFFILIATE_TYPES = new Set(['school', 'athletics', 'fine_arts', 'cte', 'club', 'booster', 'foundation', 'pto_pta', 'program', 'other']);
+const SOCIAL_AFFILIATE_VERIFICATION_SOURCES = new Set(['district', 'canary_admin', 'official_website']);
+
+function cleanAffiliateText(value, label, maxLength, required = false) {
+  const text = String(value || '').replace(/\s+/g, ' ').trim();
+  if (required && !text) throw new Error(`${label} is required.`);
+  if (text.length > maxLength) throw new Error(`${label} is too long.`);
+  return text || null;
+}
+
+
+
 function customerSearchQuerySlotId(districtId, slotIndex) {
   const hex = createHash('sha256').update(`canary-search-query-slot:${districtId}:${slotIndex}`).digest('hex').slice(0, 32);
   return `${hex.slice(0, 8)}-${hex.slice(8, 12)}-${hex.slice(12, 16)}-${hex.slice(16, 20)}-${hex.slice(20)}`;
@@ -792,6 +804,71 @@ export async function reviewSocialThread({ socialThreadId, action, expectedVersi
   if (error) throw error;
   revalidatePath('/dashboard');
   return data;
+}
+
+export async function claimSocialAffiliate(input = {}) {
+  const { actor, admin: supabase } = await requireCanaryActor();
+  assertCanaryReviewer(actor);
+  const districtId = cleanAffiliateText(input.districtId, 'District', 200, true);
+  assertDistrictAccess(actor, districtId);
+  const affiliateType = String(input.affiliateType || '').trim().toLowerCase();
+  const verificationSource = String(input.verificationSource || '').trim().toLowerCase();
+  if (!SOCIAL_AFFILIATE_TYPES.has(affiliateType)) throw new Error('Unsupported affiliate type.');
+  if (!SOCIAL_AFFILIATE_VERIFICATION_SOURCES.has(verificationSource)) throw new Error('Unsupported verification source.');
+  const socialAccountId = cleanAffiliateText(input.socialAccountId, 'Social account', 100, true);
+  const { data: account, error: accountError } = await supabase
+    .from('social_accounts')
+    .select('id, district_id, active, platform_account_id, handle')
+    .eq('id', socialAccountId)
+    .eq('district_id', districtId)
+    .eq('active', true)
+    .maybeSingle();
+  if (accountError) throw accountError;
+  if (!account) throw new Error('Active Social account not found for this district.');
+  if (!account.platform_account_id && !String(account.handle || '').replace(/^@+/, '').trim()) throw new Error('Social account lacks an exact provider account ID or handle.');
+  const { data, error } = await supabase.rpc('canary_claim_social_affiliate', {
+    p_actor_user_id: actor.id,
+    p_district_id: districtId,
+    p_social_account_id: socialAccountId,
+    p_affiliate_type: affiliateType,
+    p_relationship_label: cleanAffiliateText(input.relationshipLabel, 'Relationship label', 120, true),
+    p_verification_source: verificationSource,
+    p_verification_note: cleanAffiliateText(input.verificationNote, 'Verification note', 2000),
+    p_idempotency_key: cleanAffiliateText(input.idempotencyKey || randomUUID(), 'Idempotency key', 200, true),
+  });
+  if (error) throw new Error(error.message || 'Unable to claim affiliate account.');
+  revalidatePath('/dashboard/affiliates');
+  return Array.isArray(data) ? data[0] : data;
+}
+
+export async function revokeSocialAffiliate(input = {}) {
+  const { actor, admin: supabase } = await requireCanaryActor();
+  assertCanaryReviewer(actor);
+  const districtId = cleanAffiliateText(input.districtId, 'District', 200, true);
+  const affiliateClaimId = cleanAffiliateText(input.affiliateClaimId, 'Affiliate claim', 100, true);
+  const expectedVersion = Number(input.expectedVersion);
+  if (!Number.isInteger(expectedVersion) || expectedVersion < 1) throw new Error('Affiliate claim version is required.');
+  assertDistrictAccess(actor, districtId);
+  const { data: current, error: currentError } = await supabase
+    .from('social_affiliate_claims')
+    .select('id, district_id, status, claim_version')
+    .eq('id', affiliateClaimId)
+    .eq('district_id', districtId)
+    .maybeSingle();
+  if (currentError) throw currentError;
+  if (!current) throw new Error('Affiliate claim not found.');
+  if (current.status !== 'active') throw new Error('Affiliate claim is not active.');
+  const { data, error } = await supabase.rpc('canary_revoke_social_affiliate', {
+    p_actor_user_id: actor.id,
+    p_district_id: districtId,
+    p_affiliate_claim_id: affiliateClaimId,
+    p_expected_version: expectedVersion,
+    p_revocation_reason: cleanAffiliateText(input.revocationReason, 'Revocation reason', 1000, true),
+    p_idempotency_key: cleanAffiliateText(input.idempotencyKey || randomUUID(), 'Idempotency key', 200, true),
+  });
+  if (error) throw new Error(error.message || 'Unable to revoke affiliate claim.');
+  revalidatePath('/dashboard/affiliates');
+  return Array.isArray(data) ? data[0] : data;
 }
 
 const SEARCH_QUERY_RETURN_COLUMNS = 'id, query_text, district_id, district_name, geo_city, geo_state, geo_zip, channels, active, created_at';

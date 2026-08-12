@@ -97,7 +97,7 @@
     },
     "expected": {
       "summary": "FWCS will use late starts or early dismissals during driver shortages and is adding route changes, ID scanners, cameras and a parent bus-tracking app.",
-      "recommendation": "N/A",
+      "recommendation": "Review the source details before taking communications action.",
       "sentiment": -0.1
     }
   },

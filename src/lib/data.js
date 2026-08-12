@@ -113,6 +113,19 @@ export async function getSocialSources(districtId = null) {
   }));
 }
 
+export async function getSocialAffiliateClaims(districtId) {
+  if (!districtId || districtId === 'All') throw new Error('A specific district is required.');
+  const supabase = createAdminClient();
+  const { data, error } = await supabase
+    .from('social_affiliate_claims')
+    .select('id, district_id, social_account_id, affiliate_type, relationship_label, verification_source, verification_note, status, claimed_by, claimed_at, verified_by, verified_at, revoked_by, revoked_at, revocation_reason, claim_version, created_at, updated_at, social_accounts!inner(id, platform, platform_account_id, handle, display_name, profile_url, active)')
+    .eq('district_id', districtId)
+    .order('status')
+    .order('relationship_label');
+  if (error) throw error;
+  return data ?? [];
+}
+
 const SOCIAL_THREAD_COLUMNS = 'id, district_id, social_account_id, provider, platform, external_thread_id, canonical_url, relationship_type, author_name, author_handle, headline, body, summary, recommendation, published_at, comment_count, reply_count, reaction_count, share_count, view_count, engagement_total, sentiment, risk_level, canary_score, tags, strategic_alignment, matched_terms, match_reason, identity_confidence, visibility_status, reviewer_note, review_version, reviewed_at, reviewed_by, provider_metadata, created_at, updated_at';
 const SOCIAL_THREAD_PAGE_SIZE = 1000;
 const SOCIAL_REVIEW_EVENT_COLUMNS = 'id, batch_id, district_id, social_thread_id, actor_user_id, action, before_state, after_state, resulting_version, created_at';

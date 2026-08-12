@@ -1,0 +1,44 @@
+import assert from 'node:assert/strict';
+import { readFile } from 'node:fs/promises';
+import { spawnSync } from 'node:child_process';
+const hasDocker = spawnSync('docker',['version'],{encoding:'utf8'}).status===0;
+if(!hasDocker){console.log('Claimed-affiliate PostgreSQL integration checks skipped: Docker unavailable.');process.exit(0);}
+const container=`canary-affiliate-${process.pid}`;
+const run=(args,options={})=>{const r=spawnSync(args[0],args.slice(1),{encoding:'utf8',...options});if(options.allowFailure!==true&&r.status!==0)throw new Error(`${args.join(' ')} failed\n${r.stdout}\n${r.stderr}`);return r;};
+const sql=async(path)=>{const input=await readFile(path,'utf8');let last;for(let attempt=0;attempt<10;attempt++){last=run(['docker','exec','-i',container,'psql','-v','ON_ERROR_STOP=1','-U','postgres','-d','postgres'],{input,allowFailure:true});if(last.status===0)return last;await new Promise(r=>setTimeout(r,500));}throw new Error(`Fixture SQL failed\n${last?.stdout}\n${last?.stderr}`);};
+const query=(statement,allowFailure=false)=>run(['docker','exec','-i',container,'psql','-At','-v','ON_ERROR_STOP=1','-U','postgres','-d','postgres','-c',statement],{allowFailure});
+try{
+ run(['docker','run','--rm','-d','--name',container,'-e','POSTGRES_PASSWORD=fixture-only','postgres:16-alpine']);
+ let ready=false;for(let i=0;i<40;i++){const p=spawnSync('docker',['exec',container,'psql','-At','-U','postgres','-d','postgres','-c','select 1;'],{encoding:'utf8'});if(p.status===0&&p.stdout.trim()==='1'){ready=true;break;}await new Promise(r=>setTimeout(r,500));}assert.equal(ready,true);
+ await sql(new URL('./fixtures/social-affiliate-pre.sql',import.meta.url));
+ await sql(new URL('../supabase/migrations/20260812013000_social_claimed_affiliates.sql',import.meta.url));
+ const admin='aaaaaaaa-aaaa-aaaa-aaaa-aaaaaaaaaaaa',client='bbbbbbbb-bbbb-bbbb-bbbb-bbbbbbbbbbbb',account='11111111-1111-1111-1111-111111111111';
+ const args=`'${admin}','district-a','${account}','athletics','District athletics','district','Verified by district communications','claim-test-001'`;
+ const id=query(`select id from public.canary_claim_social_affiliate(${args});`).stdout.trim();assert.match(id,/^[0-9a-f-]{36}$/);
+ assert.equal(query(`select id from public.canary_claim_social_affiliate(${args});`).stdout.trim(),id);
+ assert.equal(query('select count(*) from public.social_affiliate_claims;').stdout.trim(),'1');
+ assert.equal(query('select count(*) from public.social_affiliate_claim_events;').stdout.trim(),'1');
+ const changedPayload=query(`select id from public.canary_claim_social_affiliate('${admin}','district-a','${account}','school','Changed payload','district',null,'claim-test-001');`,true);assert.notEqual(changedPayload.status,0);assert.match(changedPayload.stderr,/different affiliate operation/i);
+ const normalizedDuplicate=query("insert into public.social_accounts(district_id,platform,platform_account_id,handle,display_name) values('district-a','facebook','page-999','@districtathletics','Duplicate semantic identity');",true);assert.notEqual(normalizedDuplicate.status,0);assert.match(normalizedDuplicate.stderr,/social_accounts_normalized_handle_uidx/i);
+ const whitespaceDuplicate=query("insert into public.social_accounts(district_id,platform,platform_account_id,handle,display_name) values('district-a','facebook','page-998',' DistrictAthletics ','Whitespace duplicate identity');",true);assert.notEqual(whitespaceDuplicate.status,0);assert.match(whitespaceDuplicate.stderr,/social_accounts_normalized_handle_uidx/i);
+ const delimiterCollisionKey='claim-test-delimiter';
+ const delimiterFirst=query(`select id from public.canary_claim_social_affiliate('${admin}','district-b','22222222-2222-2222-2222-222222222222','school','Alpha|district','canary_admin','note','${delimiterCollisionKey}');`).stdout.trim();assert.match(delimiterFirst,/^[0-9a-f-]{36}$/);
+ const delimiterSecond=query(`select id from public.canary_claim_social_affiliate('${admin}','district-b','22222222-2222-2222-2222-222222222222','school','Alpha','district','canary_admin|note','${delimiterCollisionKey}');`,true);assert.notEqual(delimiterSecond.status,0);assert.match(delimiterSecond.stderr,/different affiliate operation/i);
+ const duplicate=query(`select id from public.canary_claim_social_affiliate('${admin}','district-a','${account}','athletics','Duplicate','canary_admin',null,'claim-test-002');`,true);assert.notEqual(duplicate.status,0);assert.match(duplicate.stderr,/active affiliate claim already exists/i);
+ const crossDistrict=query(`select id from public.canary_claim_social_affiliate('${admin}','district-a','22222222-2222-2222-2222-222222222222','school','Wrong district','canary_admin',null,'claim-test-003');`,true);assert.notEqual(crossDistrict.status,0);assert.match(crossDistrict.stderr,/not found for this district/i);
+ const unauthorized=query(`select id from public.canary_claim_social_affiliate('${client}','district-a','${account}','athletics','Unauthorized','district',null,'claim-test-004');`,true);assert.notEqual(unauthorized.status,0);assert.match(unauthorized.stderr,/reviewer access/i);
+ assert.equal(query(`with inserted as (insert into public.social_threads(district_id,relationship_type,affiliate_claim_id) values('district-a','ambient','${id}') returning relationship_type) select relationship_type from inserted;`).stdout.trim(),'ambient');
+ const wrongThread=query(`insert into public.social_threads(district_id,relationship_type,affiliate_claim_id) values('district-b','ambient','${id}');`,true);assert.notEqual(wrongThread.status,0);
+ const stale=query(`select id from public.canary_revoke_social_affiliate('${admin}','district-a','${id}',99,'No longer verified','revoke-test-001');`,true);assert.notEqual(stale.status,0);assert.match(stale.stderr,/changed; refresh/i);
+ const crossOperation=query(`select id from public.canary_revoke_social_affiliate('${admin}','district-a','${id}',1,'No longer verified','claim-test-001');`,true);assert.notEqual(crossOperation.status,0);assert.match(crossOperation.stderr,/different affiliate operation/i);
+ query(`update public.social_threads set affiliate_claim_id=null where affiliate_claim_id='${id}';`);
+ assert.equal(query(`select id from public.canary_revoke_social_affiliate('${admin}','district-a','${id}',1,'No longer verified','revoke-test-002');`).stdout.trim(),id);
+ assert.equal(query(`select status||':'||claim_version from public.social_affiliate_claims where id='${id}';`).stdout.trim(),'revoked:2');
+ assert.equal(query(`select status||':'||claim_version from public.canary_claim_social_affiliate(${args});`).stdout.trim(),'active:1');
+ assert.equal(query(`select id from public.canary_revoke_social_affiliate('${admin}','district-a','${id}',1,'No longer verified','revoke-test-002');`).stdout.trim(),id);
+ const tamper=query("update public.social_affiliate_claim_events set action='revoke';",true);assert.notEqual(tamper.status,0);assert.match(tamper.stderr,/immutable/i);
+ assert.equal(query(`select id from public.canary_revoke_social_affiliate('${admin}','district-b','${delimiterFirst}',1,'Fixture cleanup','revoke-test-delimiter-cleanup');`).stdout.trim(),delimiterFirst);
+ await sql(new URL('../supabase/rollbacks/20260812013000_social_claimed_affiliates_down.sql',import.meta.url));
+ assert.equal(query("select to_regclass('public.social_affiliate_claims') is null;").stdout.trim(),'t');
+ console.log('Claimed-affiliate PostgreSQL integration checks passed.');
+}finally{spawnSync('docker',['rm','-f',container],{encoding:'utf8'});}

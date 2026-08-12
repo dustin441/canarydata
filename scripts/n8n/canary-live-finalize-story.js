@@ -83,7 +83,7 @@ return $input.all().map((item, index) => {
         tags: [],
         innovation_flag: false,
         innovation_reason: 'N/A',
-        recommendation: 'N/A',
+        recommendation: 'Review the source details before taking communications action.',
         source_query: prepared.source_query || meta.source_query || '',
         district_id: prepared.district_id || meta.district_id || '',
         source_type: prepared.source_type || meta.source_type || 'news',
@@ -182,9 +182,13 @@ return $input.all().map((item, index) => {
   const originalSummary = String(cleanJson.summary ?? '').trim();
   const originalRecommendation = String(cleanJson.local_recommendation ?? '').trim();
   const summary = ACCESS_LIMITATION_CLAIM.test(originalSummary) && monitoringExcerpt ? monitoringExcerpt : originalSummary;
+  const isBlankRecommendation = (value) => !String(value ?? '').trim()
+    || /^(n\/?a|not applicable|none|null|undefined|-)$/i.test(String(value).trim());
   let recommendation = ACCESS_LIMITATION_CLAIM.test(originalSummary) || ACCESS_LIMITATION_CLAIM.test(originalRecommendation)
-    ? 'N/A'
-    : (originalRecommendation || 'N/A');
+    ? 'Review the source details before taking communications action.'
+    : (isBlankRecommendation(originalRecommendation)
+      ? 'No immediate communications action recommended. Continue routine monitoring.'
+      : originalRecommendation);
   const interpretationText = [title, summary, monitoringExcerpt, cleanJson.author, source, link].join(' ').toLowerCase();
   const repeatsDeliveredTransparency = /\b(prepare|issue|hold|publish|write|create|communicate|explain|provide)\b.{0,100}\b(statement|press conference|news conference|column|op[- ]?ed|budget|funding|fiscal|legislation|transparent|transparency)\b/i.test(originalRecommendation);
   if (isProactiveTruthTelling(interpretationText) && repeatsDeliveredTransparency) {

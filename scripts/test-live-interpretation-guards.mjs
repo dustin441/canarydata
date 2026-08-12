@@ -45,7 +45,24 @@ const incomplete = runFinalizer({
   data: 'Fort Wayne Community Schools announces transportation changes\n\nFWCS will use late starts or early dismissals and is adding ID scanners, cameras and a parent tracking app.',
 });
 assert.equal(incomplete.summary, 'FWCS will use late starts or early dismissals and is adding ID scanners, cameras and a parent tracking app.');
-assert.equal(incomplete.recommendation, 'N/A');
+assert.equal(incomplete.recommendation, 'Review the source details before taking communications action.');
+
+const noAction = runFinalizer({
+  summary: 'A routine positive athletics scheduling item.',
+  local_recommendation: 'N/A',
+  sentiment: 0.15,
+  risk: 'Low',
+  tags: ['Engagement'],
+  author: 'Reporter',
+  contact_info: 'N/A',
+  relevance_score: 0,
+}, {
+  ...basePrepared,
+  title: 'How to watch the high school football game',
+  data: 'Routine schedule and viewing information.',
+});
+assert.equal(noAction.recommendation, 'No immediate communications action recommended. Continue routine monitoring.');
+assert.notEqual(noAction.recommendation, 'N/A');
 
 const missingSentiment = runFinalizer({
   summary: 'The school created a forensic science course after a staffing challenge interrupted band instruction.',

@@ -121,9 +121,13 @@ export function normalizeArticleInterpretation(ai = {}, evidence = {}) {
   const summary = ACCESS_LIMITATION_CLAIM.test(originalSummary) && monitoringExcerpt
     ? monitoringExcerpt
     : originalSummary;
+  const isBlankRecommendation = (value) => !String(value ?? '').trim()
+    || /^(n\/?a|not applicable|none|null|undefined|-)$/i.test(String(value).trim());
   let recommendation = ACCESS_LIMITATION_CLAIM.test(originalSummary) || ACCESS_LIMITATION_CLAIM.test(originalRecommendation)
-    ? 'N/A'
-    : (originalRecommendation || 'N/A');
+    ? 'Review the source details before taking communications action.'
+    : (isBlankRecommendation(originalRecommendation)
+      ? 'No immediate communications action recommended. Continue routine monitoring.'
+      : originalRecommendation);
   const interpretationText = normalize([
     evidence.headline, summary, monitoringExcerpt, evidence.author, evidence.source, evidence.link,
   ].join(' '));

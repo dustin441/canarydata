@@ -29,6 +29,14 @@ for (const action of ['addQuery', 'deleteQuery']) {
   const start = actions.indexOf(`export async function ${action}`);
   assert.match(actions.slice(start, start + 2500), /assertDistrictAccess\(actor,/, `${action} must enforce district access`);
 }
+for (const action of ['claimSocialAffiliate', 'revokeSocialAffiliate']) {
+  const start = actions.indexOf(`export async function ${action}`);
+  assert.notEqual(start, -1, `${action} must exist`);
+  const body = actions.slice(start, start + 3500);
+  assert.match(body, /requireCanaryActor/, `${action} must authenticate the caller`);
+  assert.match(body, /assertCanaryReviewer\(actor\)/, `${action} must require protected Canary administrator access`);
+  assert.match(body, /assertDistrictAccess\(actor, districtId\)/, `${action} must enforce district scope`);
+}
 const addQueryStart = actions.indexOf('export async function addQuery');
 const deleteQueryStart = actions.indexOf('export async function deleteQuery');
 assert.match(actions.slice(addQueryStart, deleteQueryStart), /CUSTOMER_SEARCH_QUERY_LIMIT/, 'customer query additions must enforce the account limit');
