@@ -208,6 +208,7 @@ async function compileDataModuleForPaginationTest(source, createAdminClient) {
   const modules = {
     '@/lib/supabase/admin': { createAdminClient },
     '@/lib/collectionHealth.mjs': { buildCollectionHealth: () => ({}) },
+    '@/lib/social-affiliate-preview': { buildSocialAffiliatePreview: () => ({}) },
   };
   const controlledRequire = (specifier) => {
     assert.ok(specifier in modules, `Unexpected module import in data harness: ${specifier}`);

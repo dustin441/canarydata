@@ -1,5 +1,6 @@
 import { createAdminClient } from '@/lib/supabase/admin';
 import { buildCollectionHealth } from '@/lib/collectionHealth.mjs';
+import { buildSocialAffiliatePreview } from '@/lib/social-affiliate-preview';
 
 const ARTICLE_COLUMNS = 'id, created_at, date, headline, summary, source, source_type, canary_score, tags, notes, is_earned_media, is_perched, link, district_id, innovation_reason, recommendation, source_query, canonical_url, visibility_status, manual_override, correction_version';
 const ARTICLE_PAGE_SIZE = 1000;
@@ -137,6 +138,29 @@ export async function getSocialAffiliateAccounts(districtId) {
     .order('platform');
   if (error) throw error;
   return data ?? [];
+}
+
+export async function getSocialAffiliatePreviews(districtId, claims = null) {
+  if (!districtId || districtId === 'All') throw new Error('A specific district is required.');
+  const supabase = createAdminClient();
+  const scopedClaims = claims ?? await getSocialAffiliateClaims(districtId);
+  const activeClaims = scopedClaims.filter((claim) => claim.status === 'active');
+  if (activeClaims.length === 0) return [];
+  const threads = [];
+  for (let from = 0; ; from += SOCIAL_THREAD_PAGE_SIZE) {
+    const { data, error } = await supabase
+      .from('social_threads')
+      .select('id, district_id, platform, author_handle, author_name, headline, canonical_url, published_at, relationship_type, visibility_status, comment_count, reply_count, reaction_count, share_count, view_count, engagement_total')
+      .eq('district_id', districtId)
+      .order('published_at', { ascending: false })
+      .order('id', { ascending: true })
+      .range(from, from + SOCIAL_THREAD_PAGE_SIZE - 1);
+    if (error) throw error;
+    const page = data ?? [];
+    threads.push(...page);
+    if (page.length < SOCIAL_THREAD_PAGE_SIZE) break;
+  }
+  return activeClaims.map((claim) => buildSocialAffiliatePreview({ claim, threads }));
 }
 
 const SOCIAL_THREAD_COLUMNS = 'id, district_id, social_account_id, provider, platform, external_thread_id, canonical_url, relationship_type, author_name, author_handle, headline, body, summary, recommendation, published_at, comment_count, reply_count, reaction_count, share_count, view_count, engagement_total, sentiment, risk_level, canary_score, tags, strategic_alignment, matched_terms, match_reason, identity_confidence, visibility_status, reviewer_note, review_version, reviewed_at, reviewed_by, provider_metadata, created_at, updated_at';
