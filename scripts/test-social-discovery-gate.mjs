@@ -13,12 +13,14 @@ const candidatePayload = JSON.stringify({
   district_id: 'district-a', provider: 'apify', platform: 'facebook', external_thread_id: 'candidate-1',
   canonical_url: 'https://facebook.test/candidate-1', relationship_type: 'ambient', author_name: 'Public author',
   headline: 'Candidate headline', body: 'Candidate body', published_at: '2026-08-12T12:00:00Z',
+  last_seen_at: '2026-08-12T11:53:02-07:00',
   provider_metadata: { review_only: true }, source_workflow_id: 'workflow-1', source_execution_id: 'execution-1',
 }).replaceAll("'", "''");
 
 await withSocialDatabase('discovery-gate', async ({ sql, sqlAsync, expectFailure }) => {
-  const [gateMigration, gateRollback, gateVerify] = await Promise.all([
+  const [gateMigration, gateHotfix, gateRollback, gateVerify] = await Promise.all([
     readFile(new URL('../supabase/migrations/20260812162000_social_discovery_candidate_gate.sql', import.meta.url), 'utf8'),
+    readFile(new URL('../supabase/migrations/20260812205415_social_discovery_promotion_window.sql', import.meta.url), 'utf8'),
     readFile(new URL('../supabase/rollbacks/20260812162000_social_discovery_candidate_gate_down.sql', import.meta.url), 'utf8'),
     readFile(new URL('../supabase/verify_social_discovery_candidate_gate_readonly.sql', import.meta.url), 'utf8'),
   ]);
@@ -33,6 +35,7 @@ await withSocialDatabase('discovery-gate', async ({ sql, sqlAsync, expectFailure
     drop function if exists public.canary_bulk_review_social_threads(uuid,text,uuid[],text);
   `);
   sql(gateMigration);
+  sql(gateHotfix);
   const initialVerification = sql(gateVerify);
   assert.match(initialVerification, /"exact_visibility_constraint": true/);
   assert.match(initialVerification, /"composite_promotion_tenant_fk": true/);
@@ -44,6 +47,7 @@ await withSocialDatabase('discovery-gate', async ({ sql, sqlAsync, expectFailure
   assert.match(candidateId, /^[0-9a-f-]{36}$/);
   assert.equal(stage(), candidateId, 'rediscovery must reuse the exact candidate identity');
   assert.match(sql(`select status || '|' || review_version from public.social_discovery_candidates where id='${candidateId}';`), /\bpending\|1\b/);
+  sql(`update public.social_discovery_candidates set first_seen_at='2026-08-12T18:59:31Z', last_seen_at='2026-08-12T19:01:30Z' where id='${candidateId}';`);
   assert.match(sql(`select count(*) from public.social_threads where external_thread_id='candidate-1';`), /\n\s*0\s*\n/);
 
   expectFailure(`select public.canary_stage_social_discovery('${candidatePayload.replace('apify', 'other-provider')}'::jsonb);`, /provider lineage is immutable/i, { role: 'service_role' });
@@ -62,6 +66,7 @@ await withSocialDatabase('discovery-gate', async ({ sql, sqlAsync, expectFailure
   sql(`do $$ begin
     if (select status from public.social_discovery_candidates where id='${candidateId}') <> 'approved' then raise exception 'candidate not approved'; end if;
     if (select count(*) from public.social_threads where district_id='district-a' and platform='facebook' and external_thread_id='candidate-1' and visibility_status='active') <> 1 then raise exception 'promotion missing'; end if;
+    if not exists (select 1 from public.social_threads where external_thread_id='candidate-1' and first_seen_at='2026-08-12T18:59:31Z' and last_seen_at='2026-08-12T19:01:30Z') then raise exception 'promotion must use candidate gate observation window'; end if;
     if (select count(*) from public.social_discovery_review_events where candidate_id='${candidateId}' and action='approve') <> 1 then raise exception 'approval audited incorrectly'; end if;
   end $$;`);
   expectFailure(review(ADMIN, 'reject', 1, 'candidate-after-approval'), /Only pending/i, { role: 'service_role' });
