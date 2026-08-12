@@ -816,16 +816,6 @@ export async function reviewSocialDiscoveryCandidate(input = {}) {
   if (!['approve', 'reject'].includes(action)) throw new Error('Unsupported Social discovery action.');
   if (!Number.isInteger(expectedVersion) || expectedVersion < 0) throw new Error('Candidate version is required.');
   assertDistrictAccess(actor, districtId);
-  const { data: candidate, error: candidateError } = await supabase
-    .from('social_discovery_candidates')
-    .select('id,district_id,status,review_version')
-    .eq('id', candidateId)
-    .eq('district_id', districtId)
-    .maybeSingle();
-  if (candidateError) throw candidateError;
-  if (!candidate) throw new Error('Social discovery candidate not found.');
-  if (candidate.status !== 'pending') throw new Error('Only pending Social discovery candidates can be reviewed.');
-  if (candidate.review_version !== expectedVersion) throw new Error('Social discovery candidate changed; refresh and try again.');
   const { data, error } = await supabase.rpc('canary_review_social_discovery', {
     p_actor_user_id: actor.id,
     p_expected_district_id: districtId,

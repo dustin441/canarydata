@@ -1,17 +1,6 @@
 {
   "active": false,
   "connections": {
-    "Build Candidate Stage Failure Run": {
-      "main": [
-        [
-          {
-            "index": 0,
-            "node": "Create Terminal Collection Run",
-            "type": "main"
-          }
-        ]
-      ]
-    },
     "Build District Context": {
       "main": [
         [
@@ -45,7 +34,7 @@
         ]
       ]
     },
-    "Build Successful Run Record": {
+    "Build Staging Terminal Run Record": {
       "main": [
         [
           {
@@ -207,14 +196,7 @@
         [
           {
             "index": 0,
-            "node": "Build Successful Run Record",
-            "type": "main"
-          }
-        ],
-        [
-          {
-            "index": 0,
-            "node": "Build Candidate Stage Failure Run",
+            "node": "Build Staging Terminal Run Record",
             "type": "main"
           }
         ]
@@ -454,7 +436,7 @@
       },
       "id": "9115e0c6-3c7a-4bd3-be66-b11830b2abfe",
       "name": "Stage Review Social Candidates",
-      "onError": "continueErrorOutput",
+      "onError": "continueRegularOutput",
       "parameters": {
         "authentication": "predefinedCredentialType",
         "body": "={{ JSON.stringify($json) }}",
@@ -490,9 +472,9 @@
     },
     {
       "id": "14317d83-7150-4695-8108-0e21eebf1293",
-      "name": "Build Successful Run Record",
+      "name": "Build Staging Terminal Run Record",
       "parameters": {
-        "jsCode": "const rows=$input.all().map(i=>i.json||{});const first=rows[0]||{};let stats=first.provider_metadata?.collection_stats||{};if(!stats.district_id){try{stats=$('Strip Internal Fields').itemMatching(0).json.provider_metadata?.collection_stats||{};}catch(e){}}const ids=[...new Set(rows.map(x=>x.id).filter(Boolean))];return[{json:{district_id:stats.district_id||first.district_id||null,provider:'apify',run_type:'public_search',status:'success',started_at:stats.run_started_at||$now.toISO(),completed_at:$now.toISO(),raw_items:Number(stats.raw_count||0),accepted_threads:ids.length,accepted_comments:0,duplicate_items:Math.max(0,Number(stats.accepted_count||0)-ids.length),rejected_items:Number(stats.rejected_count||0),provider_errors:0,estimated_cost:Number(stats.estimated_cost||0),error_code:null,error_message:null,diagnostics:{lane:'all_district_public_facebook_v1',review_only:true,workflow_id:$workflow.id,execution_id:$execution.id,district_name:stats.district_name||null,query_ids:stats.query_ids||[],staged_candidate_ids:ids}}}];"
+        "jsCode": "const rows=$input.all().map(i=>i.json||{});const first=rows[0]||{};let stats=first.provider_metadata?.collection_stats||{};if(!stats.district_id){try{stats=$('Strip Internal Fields').itemMatching(0).json.provider_metadata?.collection_stats||{};}catch(e){}}const failures=rows.filter(x=>x.error||Number(x.statusCode||x.httpCode||0)>=400);const ids=[...new Set(rows.filter(x=>!x.error&&Number(x.statusCode||x.httpCode||0)<400).map(x=>x.id).filter(Boolean))];const failed=failures.length>0;return[{json:{district_id:stats.district_id||first.district_id||null,provider:'apify',run_type:'public_search',status:failed?'failed':'success',started_at:stats.run_started_at||$now.toISO(),completed_at:$now.toISO(),raw_items:Number(stats.raw_count||0),accepted_threads:ids.length,accepted_comments:0,duplicate_items:Math.max(0,Number(stats.accepted_count||0)-ids.length),rejected_items:Number(stats.rejected_count||0),provider_errors:0,estimated_cost:Number(stats.estimated_cost||0),error_code:failed?'candidate_stage_write_failed':null,error_message:failed?String(failures[0]?.error?.message||failures[0]?.message||'Candidate staging write failed').slice(0,1000):null,diagnostics:{lane:'all_district_public_facebook_v1',review_only:true,staging_gate:true,stage_write_failed:failed,workflow_id:$workflow.id,execution_id:$execution.id,district_name:stats.district_name||null,query_ids:stats.query_ids||[],staged_candidate_ids:ids}}}];"
       },
       "position": [
         1260,
@@ -627,19 +609,6 @@
       "position": [
         1040,
         20
-      ],
-      "type": "n8n-nodes-base.code",
-      "typeVersion": 2
-    },
-    {
-      "id": "5b6853e3-7a3a-49d5-9bed-85649c7469a2",
-      "name": "Build Candidate Stage Failure Run",
-      "parameters": {
-        "jsCode": "let stats={};try{stats=$('Strip Internal Fields').itemMatching(0).json.provider_metadata?.collection_stats||{};}catch(e){}const err=$input.first().json||{};return[{json:{district_id:stats.district_id||null,provider:'apify',run_type:'public_search',status:'failed',started_at:stats.run_started_at||$now.toISO(),completed_at:$now.toISO(),raw_items:Number(stats.raw_count||0),accepted_threads:0,accepted_comments:0,duplicate_items:0,rejected_items:Number(stats.rejected_count||0),provider_errors:0,estimated_cost:Number(stats.estimated_cost||0),error_code:'candidate_stage_write_failed',error_message:String(err.error?.message||err.message||'Candidate staging write failed').slice(0,1000),diagnostics:{lane:'all_district_public_facebook_v1',review_only:true,staging_gate:true,failure_node:'Stage Review Social Candidates',workflow_id:$workflow.id,execution_id:$execution.id,district_name:stats.district_name||null,query_ids:stats.query_ids||[]}}}];"
-      },
-      "position": [
-        1480,
-        -100
       ],
       "type": "n8n-nodes-base.code",
       "typeVersion": 2

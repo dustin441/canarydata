@@ -18,7 +18,12 @@ begin
   end if;
   if to_regclass('public.social_discovery_candidates') is not null
      or to_regclass('public.social_discovery_review_requests') is not null
-     or to_regclass('public.social_discovery_review_events') is not null then
+     or to_regclass('public.social_discovery_review_events') is not null
+     or exists (
+       select 1 from pg_constraint
+       where conrelid = 'public.social_threads'::regclass
+         and conname = 'social_threads_id_district_unique'
+     ) then
     raise exception 'Social discovery candidate gate objects already exist; verify before rerunning';
   end if;
   select pg_get_expr(d.adbin,d.adrelid) into current_default
@@ -26,16 +31,19 @@ begin
   where a.attrelid='public.social_threads'::regclass and a.attname='visibility_status';
   select pg_get_constraintdef(c.oid,true) into current_constraint
   from pg_constraint c where c.conrelid='public.social_threads'::regclass and c.conname='social_threads_visibility_status_check';
+  current_constraint := regexp_replace(coalesce(current_constraint, ''), '\s+', ' ', 'g');
   if current_default not in ('''active''::text','''active''')
-     or current_constraint is null
-     or current_constraint like '%review%'
-     or current_constraint like '%approved%'
-     or current_constraint not like '%active%excluded%'
+     or current_constraint <> 'CHECK (visibility_status = ANY (ARRAY[''active''::text, ''excluded''::text]))'
      or exists (select 1 from public.social_threads where visibility_status not in ('active','excluded')) then
     raise exception 'Current active/excluded Social visibility contract is required';
   end if;
 end
 $preflight$;
+
+alter table public.social_threads
+  add constraint social_threads_id_district_unique unique (id, district_id);
+comment on constraint social_threads_id_district_unique on public.social_threads
+  is 'canary_social_discovery_candidate_gate:20260812162000';
 
 create table public.social_discovery_candidates (
   id uuid primary key default gen_random_uuid(),
@@ -55,10 +63,12 @@ create table public.social_discovery_candidates (
   reviewed_at timestamptz,
   reviewed_by uuid,
   reviewer_note text check (reviewer_note is null or char_length(reviewer_note) <= 2000),
-  promoted_social_thread_id uuid references public.social_threads(id) on delete restrict,
+  promoted_social_thread_id uuid,
   created_at timestamptz not null default now(),
   updated_at timestamptz not null default now(),
   unique (district_id, platform, external_thread_id),
+  foreign key (promoted_social_thread_id, district_id)
+    references public.social_threads(id, district_id) on delete restrict,
   constraint social_discovery_candidates_review_state_check check (
     (status = 'pending' and reviewed_at is null and reviewed_by is null and promoted_social_thread_id is null)
     or (status = 'approved' and reviewed_at is not null and reviewed_by is not null and promoted_social_thread_id is not null)
@@ -68,6 +78,8 @@ create table public.social_discovery_candidates (
 
 create index social_discovery_candidates_queue_idx
   on public.social_discovery_candidates (district_id, status, last_seen_at desc, id);
+comment on index public.social_discovery_candidates_queue_idx
+  is 'canary_social_discovery_candidate_gate:20260812162000';
 
 create table public.social_discovery_review_requests (
   actor_user_id uuid not null,

@@ -92,9 +92,11 @@ export async function withSocialDatabase(label, test) {
     run('docker', ['run', '--detach', '--rm', '--name', container, '-e', `POSTGRES_PASSWORD=${PASSWORD}`, IMAGE]);
     started = true;
     let ready = false;
+    let consecutiveReady = 0;
     for (let attempt = 0; attempt < 60; attempt += 1) {
       const check = spawnSync('docker', ['exec', container, 'psql', '-X', '-U', 'postgres', '-d', 'postgres', '-c', 'select 1;'], { encoding: 'utf8' });
-      if (check.status === 0) { ready = true; break; }
+      consecutiveReady = check.status === 0 ? consecutiveReady + 1 : 0;
+      if (consecutiveReady >= 2) { ready = true; break; }
       await new Promise((resolve) => setTimeout(resolve, 250));
     }
     assert.ok(ready, 'Disposable PostgreSQL did not pass an executable SELECT 1 readiness check.');

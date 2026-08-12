@@ -100,17 +100,6 @@
         ]
       ]
     },
-    "Build Stage Failure Record": {
-      "main": [
-        [
-          {
-            "index": 0,
-            "node": "Fail Discovery Run",
-            "type": "main"
-          }
-        ]
-      ]
-    },
     "Daily 5 AM Arizona": {
       "main": [
         [
@@ -315,13 +304,6 @@
           {
             "index": 0,
             "node": "Aggregate Discovery Threads",
-            "type": "main"
-          }
-        ],
-        [
-          {
-            "index": 0,
-            "node": "Build Stage Failure Record",
             "type": "main"
           }
         ]
@@ -1453,7 +1435,7 @@
       },
       "id": "3be9c034-fd76-476f-a028-93088ed97ef9",
       "name": "Stage Review Discovery Candidates",
-      "onError": "continueErrorOutput",
+      "onError": "continueRegularOutput",
       "parameters": {
         "authentication": "predefinedCredentialType",
         "body": "={{ JSON.stringify({ p_candidate: { ...$json, source_workflow_id: $workflow.id, source_execution_id: $execution.id } }) }}",
@@ -1513,7 +1495,7 @@
               "id": "3990f9d8-4762-4aa5-9c94-831b361a32e0",
               "name": "status",
               "type": "string",
-              "value": "={{ ($('Run Facebook Thompson High').all().length + $('Run Facebook Thompson Middle').all().length + $('Run Facebook Creek View').all().length + $('Run Facebook District Name').all().length + $('Run Facebook Thompson Intermediate').all().length + $('Run Facebook Meadow View').all().length) === 0 ? \"partial\" : \"success\" }}"
+              "value": "={{ ($json.items || []).some(x => x.error || (Number(x.statusCode || x.httpCode || 0) >= 400)) ? \"failed\" : \"success\" }}"
             },
             {
               "id": "87d01b5d-864c-4d5a-a898-5d603e61615b",
@@ -1561,7 +1543,7 @@
               "id": "9b6de015-9aa5-4e3f-b170-888c6cf7840f",
               "name": "diagnostics",
               "type": "object",
-              "value": "={{ { pilot: \"alabaster\", lane: \"apify_public_discovery\", review_only: true, execution_id: $execution.id, facebook_provider_empty: ($('Run Facebook Thompson High').all().length + $('Run Facebook Thompson Middle').all().length + $('Run Facebook Creek View').all().length + $('Run Facebook District Name').all().length + $('Run Facebook Thompson Intermediate').all().length + $('Run Facebook Meadow View').all().length) === 0, tasks: [\"instagram-structured-tags\",\"facebook-thompson-high\",\"facebook-thompson-middle\",\"facebook-creek-view\",\"facebook-district-name\",\"facebook-thompson-intermediate\",\"facebook-meadow-view\"], stored_thread_ids: [...new Set($json.items.map(x => x.id))] } }}"
+              "value": "={{ { pilot: \"alabaster\", lane: \"apify_public_discovery\", review_only: true, execution_id: $execution.id, facebook_provider_empty: ($('Run Facebook Thompson High').all().length + $('Run Facebook Thompson Middle').all().length + $('Run Facebook Creek View').all().length + $('Run Facebook District Name').all().length + $('Run Facebook Thompson Intermediate').all().length + $('Run Facebook Meadow View').all().length) === 0, tasks: [\"instagram-structured-tags\",\"facebook-thompson-high\",\"facebook-thompson-middle\",\"facebook-creek-view\",\"facebook-district-name\",\"facebook-thompson-intermediate\",\"facebook-meadow-view\"], staged_candidate_ids: [...new Set($json.items.map(x => x.id))] , staging_gate: true, stage_write_failed: ($json.items || []).some(x => x.error || (Number(x.statusCode || x.httpCode || 0) >= 400)) } }}"
             },
             {
               "id": "b511faa0-9ece-4a1b-aae0-0e9065660078",
@@ -1573,13 +1555,13 @@
               "id": "9e5fa344-a717-426d-8a1a-91a68fcd15c0",
               "name": "error_code",
               "type": "string",
-              "value": "={{ ($('Run Facebook Thompson High').all().length + $('Run Facebook Thompson Middle').all().length + $('Run Facebook Creek View').all().length + $('Run Facebook District Name').all().length + $('Run Facebook Thompson Intermediate').all().length + $('Run Facebook Meadow View').all().length) === 0 ? \"facebook_provider_empty\" : null }}"
+              "value": "={{ ($json.items || []).some(x => x.error || (Number(x.statusCode || x.httpCode || 0) >= 400)) ? \"candidate_stage_write_failed\" : null }}"
             },
             {
               "id": "c368d207-8388-48bc-9a3c-01baeceb83d0",
               "name": "error_message",
               "type": "string",
-              "value": "={{ ($('Run Facebook Thompson High').all().length + $('Run Facebook Thompson Middle').all().length + $('Run Facebook Creek View').all().length + $('Run Facebook District Name').all().length + $('Run Facebook Thompson Intermediate').all().length + $('Run Facebook Meadow View').all().length) === 0 ? \"All Facebook public-search branches returned zero items; Instagram results were stored and this run is partial.\" : null }}"
+              "value": "={{ ($json.items || []).some(x => x.error || (Number(x.statusCode || x.httpCode || 0) >= 400)) ? String(($json.items || []).find(x => x.error || Number(x.statusCode || x.httpCode || 0) >= 400)?.error?.message || \"Candidate staging write failed\").slice(0,1000) : null }}"
             }
           ]
         },
@@ -2362,95 +2344,6 @@
       ],
       "type": "n8n-nodes-base.if",
       "typeVersion": 2
-    },
-    {
-      "id": "2fe12616-6301-4fda-bb36-fa44d8a57f39",
-      "name": "Build Stage Failure Record",
-      "parameters": {
-        "assignments": {
-          "assignments": [
-            {
-              "id": "d3ecd479-4331-4b02-9870-7ff9218778da",
-              "name": "status",
-              "type": "string",
-              "value": "failed"
-            },
-            {
-              "id": "504f1ab7-b207-4a50-ba5e-c4f7103634ef",
-              "name": "completed_at",
-              "type": "string",
-              "value": "={{ $now.toISO() }}"
-            },
-            {
-              "id": "c5b7bd1a-df92-4841-b48f-244b1ab10e70",
-              "name": "error_code",
-              "type": "string",
-              "value": "candidate_stage_write_failed"
-            },
-            {
-              "id": "1d024ed5-8da2-44b3-97e1-2bd4c2be64b0",
-              "name": "error_message",
-              "type": "string",
-              "value": "={{ String($json.error?.message || $json.message || \"Candidate staging write failed\").slice(0,1000) }}"
-            },
-            {
-              "id": "775c794e-7310-4147-a149-16c8079bb1d2",
-              "name": "provider_errors",
-              "type": "number",
-              "value": 0
-            },
-            {
-              "id": "e702798b-d4e3-4469-bd08-e38338b884d8",
-              "name": "diagnostics",
-              "type": "object",
-              "value": "={{ { pilot: \"alabaster\", lane: \"apify_public_discovery\", review_only: true, workflow_id: $workflow.id, execution_id: $execution.id, failure_node: \"Stage Review Discovery Candidates\", staging_gate: true } }}"
-            }
-          ]
-        },
-        "includeOtherFields": false,
-        "options": {}
-      },
-      "position": [
-        400,
-        80
-      ],
-      "type": "n8n-nodes-base.set",
-      "typeVersion": 3.4
-    },
-    {
-      "id": "b3c7e63c-236f-4573-b46e-36d0f63ab1fb",
-      "name": "Fail Discovery Run",
-      "parameters": {
-        "authentication": "predefinedCredentialType",
-        "headerParameters": {
-          "parameters": [
-            {
-              "name": "Content-Type",
-              "value": "application/json"
-            },
-            {
-              "name": "Prefer",
-              "value": "return=representation"
-            }
-          ]
-        },
-        "jsonBody": "={{ $json }}",
-        "method": "PATCH",
-        "nodeCredentialType": "supabaseApi",
-        "options": {
-          "timeout": 120000
-        },
-        "sendBody": true,
-        "sendHeaders": true,
-        "specifyBody": "json",
-        "url": "={{ 'https://fehdonfrlsrrkzaemkxp.supabase.co/rest/v1/social_collection_runs?id=eq.' + $('Start Discovery Run').first().json.id }}"
-      },
-      "position": [
-        640,
-        80
-      ],
-      "type": "n8n-nodes-base.httpRequest",
-      "typeVersion": 4.2
     }
   ],
   "settings": {

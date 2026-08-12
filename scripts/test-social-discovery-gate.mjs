@@ -17,9 +17,10 @@ const candidatePayload = JSON.stringify({
 }).replaceAll("'", "''");
 
 await withSocialDatabase('discovery-gate', async ({ sql, sqlAsync, expectFailure }) => {
-  const [gateMigration, gateRollback] = await Promise.all([
+  const [gateMigration, gateRollback, gateVerify] = await Promise.all([
     readFile(new URL('../supabase/migrations/20260812162000_social_discovery_candidate_gate.sql', import.meta.url), 'utf8'),
     readFile(new URL('../supabase/rollbacks/20260812162000_social_discovery_candidate_gate_down.sql', import.meta.url), 'utf8'),
+    readFile(new URL('../supabase/verify_social_discovery_candidate_gate_readonly.sql', import.meta.url), 'utf8'),
   ]);
   // The shared harness installs Task 4. Move only its disposable rows/constraint to the proven
   // Task 5 active/excluded shape; the guarded Task 5 migration has its own captured-contract suite.
@@ -32,6 +33,11 @@ await withSocialDatabase('discovery-gate', async ({ sql, sqlAsync, expectFailure
     drop function if exists public.canary_bulk_review_social_threads(uuid,text,uuid[],text);
   `);
   sql(gateMigration);
+  const initialVerification = sql(gateVerify);
+  assert.match(initialVerification, /"exact_visibility_constraint": true/);
+  assert.match(initialVerification, /"composite_promotion_tenant_fk": true/);
+  assert.match(initialVerification, /"invalid_visibility_rows": 0/);
+  assert.match(initialVerification, /"cross_district_promotion_links": 0/);
 
   const stage = () => uuidFrom(sql(`select (public.canary_stage_social_discovery('${candidatePayload}'::jsonb)).id;`, { role: 'service_role' }));
   const candidateId = stage();
@@ -84,7 +90,7 @@ await withSocialDatabase('discovery-gate', async ({ sql, sqlAsync, expectFailure
   }
 });
 
-await withSocialDatabase('discovery-gate-rollback', async ({ sql }) => {
+await withSocialDatabase('discovery-gate-rollback', async ({ sql, expectFailure }) => {
   const [gateMigration, gateRollback] = await Promise.all([
     readFile(new URL('../supabase/migrations/20260812162000_social_discovery_candidate_gate.sql', import.meta.url), 'utf8'),
     readFile(new URL('../supabase/rollbacks/20260812162000_social_discovery_candidate_gate_down.sql', import.meta.url), 'utf8'),
@@ -92,6 +98,48 @@ await withSocialDatabase('discovery-gate-rollback', async ({ sql }) => {
   sql(`update public.social_threads set visibility_status='active' where visibility_status in ('review','approved');alter table public.social_threads alter column visibility_status set default 'active';alter table public.social_threads drop constraint social_threads_visibility_status_check;alter table public.social_threads add constraint social_threads_visibility_status_check check (visibility_status in ('active','excluded'));drop function if exists public.canary_review_social_thread(uuid,uuid,text,integer,text,text);drop function if exists public.canary_bulk_review_social_threads(uuid,text,uuid[],text);`);
   sql(gateMigration);sql(gateRollback);
   assert.match(sql("select to_regclass('public.social_discovery_candidates') is null;"), /\n\s*t\s*\n/);
+  sql(gateRollback);
+  assert.match(sql("select to_regclass('public.social_discovery_candidates') is null;"), /\n\s*t\s*\n/, 'rollback must be idempotent when all gate objects are absent');
+  sql('alter table public.social_threads add constraint social_threads_id_district_unique unique(id,district_id);');
+  expectFailure(gateRollback, /Refusing rollback from a partial Social discovery candidate gate/i);
+  assert.match(sql("select count(*) from pg_constraint where conrelid='public.social_threads'::regclass and conname='social_threads_id_district_unique';"), /\n\s*1\s*\n/, 'absent-gate rollback must not remove a later same-named constraint');
+});
+
+await withSocialDatabase('discovery-gate-preflight', async ({ sql, expectFailure }) => {
+  const gateMigration = await readFile(new URL('../supabase/migrations/20260812162000_social_discovery_candidate_gate.sql', import.meta.url), 'utf8');
+  sql(`update public.social_threads set visibility_status='active' where visibility_status in ('review','approved');alter table public.social_threads alter column visibility_status set default 'active';alter table public.social_threads drop constraint social_threads_visibility_status_check;alter table public.social_threads add constraint social_threads_visibility_status_check check (visibility_status in ('active','excluded','pending'));drop function if exists public.canary_review_social_thread(uuid,uuid,text,integer,text,text);drop function if exists public.canary_bulk_review_social_threads(uuid,text,uuid[],text);`);
+  expectFailure(gateMigration, /Current active\/excluded Social visibility contract is required/i);
+});
+
+await withSocialDatabase('discovery-gate-partial-rollback', async ({ sql, expectFailure }) => {
+  const gateRollback = await readFile(new URL('../supabase/rollbacks/20260812162000_social_discovery_candidate_gate_down.sql', import.meta.url), 'utf8');
+  sql('create table public.social_discovery_candidates(id uuid primary key);');
+  expectFailure(gateRollback, /Refusing rollback from a partial Social discovery candidate gate/i);
+});
+
+await withSocialDatabase('discovery-gate-missing-index-rollback', async ({ sql, expectFailure }) => {
+  const [gateMigration, gateRollback] = await Promise.all([
+    readFile(new URL('../supabase/migrations/20260812162000_social_discovery_candidate_gate.sql', import.meta.url), 'utf8'),
+    readFile(new URL('../supabase/rollbacks/20260812162000_social_discovery_candidate_gate_down.sql', import.meta.url), 'utf8'),
+  ]);
+  sql(`update public.social_threads set visibility_status='active' where visibility_status in ('review','approved');alter table public.social_threads alter column visibility_status set default 'active';alter table public.social_threads drop constraint social_threads_visibility_status_check;alter table public.social_threads add constraint social_threads_visibility_status_check check (visibility_status in ('active','excluded'));drop function if exists public.canary_review_social_thread(uuid,uuid,text,integer,text,text);drop function if exists public.canary_bulk_review_social_threads(uuid,text,uuid[],text);`);
+  sql(gateMigration);
+  sql('drop index public.social_discovery_candidates_queue_idx;');
+  expectFailure(gateRollback, /Refusing rollback from a partial Social discovery candidate gate/i);
+  assert.match(sql("select to_regclass('public.social_discovery_candidates') is not null;"), /\n\s*t\s*\n/, 'missing-index rollback refusal must preserve the gate');
+});
+
+await withSocialDatabase('discovery-gate-ownership-rollback', async ({ sql, expectFailure }) => {
+  const [gateMigration, gateRollback] = await Promise.all([
+    readFile(new URL('../supabase/migrations/20260812162000_social_discovery_candidate_gate.sql', import.meta.url), 'utf8'),
+    readFile(new URL('../supabase/rollbacks/20260812162000_social_discovery_candidate_gate_down.sql', import.meta.url), 'utf8'),
+  ]);
+  sql(`update public.social_threads set visibility_status='active' where visibility_status in ('review','approved');alter table public.social_threads alter column visibility_status set default 'active';alter table public.social_threads drop constraint social_threads_visibility_status_check;alter table public.social_threads add constraint social_threads_visibility_status_check check (visibility_status in ('active','excluded'));drop function if exists public.canary_review_social_thread(uuid,uuid,text,integer,text,text);drop function if exists public.canary_bulk_review_social_threads(uuid,text,uuid[],text);`);
+  sql(gateMigration);
+  sql("comment on constraint social_threads_id_district_unique on public.social_threads is 'replacement-object';");
+  expectFailure(gateRollback, /object ownership or definitions do not match/i);
+  assert.match(sql("select count(*) from pg_constraint where conrelid='public.social_threads'::regclass and conname='social_threads_id_district_unique';"), /\n\s*1\s*\n/, 'ownership mismatch must preserve the support constraint');
+  assert.match(sql("select to_regclass('public.social_discovery_candidates') is not null;"), /\n\s*t\s*\n/, 'ownership mismatch must preserve the gate');
 });
 
 console.log('Social discovery candidate gate integration checks passed.');

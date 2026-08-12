@@ -37,6 +37,10 @@ for (const action of ['claimSocialAffiliate', 'revokeSocialAffiliate', 'reviewSo
   assert.match(body, /assertCanaryReviewer\(actor\)/, `${action} must require protected Canary administrator access`);
   assert.match(body, /assertDistrictAccess\(actor, districtId\)/, `${action} must enforce district scope`);
 }
+const discoveryReviewStart = actions.indexOf('export async function reviewSocialDiscoveryCandidate');
+const discoveryReviewBody = actions.slice(discoveryReviewStart, actions.indexOf('export async function claimSocialAffiliate'));
+assert.doesNotMatch(discoveryReviewBody, /\.from\('social_discovery_candidates'\)/, 'discovery review retries must reach the payload-bound idempotent RPC instead of pre-rejecting terminal candidates');
+assert.match(discoveryReviewBody, /rpc\('canary_review_social_discovery'/);
 const addQueryStart = actions.indexOf('export async function addQuery');
 const deleteQueryStart = actions.indexOf('export async function deleteQuery');
 assert.match(actions.slice(addQueryStart, deleteQueryStart), /CUSTOMER_SEARCH_QUERY_LIMIT/, 'customer query additions must enforce the account limit');
