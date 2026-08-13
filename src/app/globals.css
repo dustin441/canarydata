@@ -3799,6 +3799,7 @@ input[type="date"]::-webkit-calendar-picker-indicator {
 
 .collection-health-banner.warning { background: rgba(245, 158, 11, 0.09); }
 .collection-health-banner.critical { background: rgba(239, 68, 68, 0.09); }
+.collection-health-banner.not_enrolled { background: rgba(100, 116, 139, 0.08); }
 .collection-health-banner > div { display: grid; gap: 2px; }
 .collection-health-banner span,
 .collection-health-banner dt {

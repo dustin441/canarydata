@@ -7,6 +7,17 @@ assert.match(source, /new Set\(generatedQueries\.map/, 'only canonical generated
 assert.doesNotMatch(source, /district_collection_stale_36h/, 'zero-result districts must not be reported as scheduler failures');
 assert.match(source, /Zero stored results alone does not prove a scheduler failure/);
 assert.match(source, /workflow_no_success_36h/, 'workflow execution freshness must remain a critical scheduler check');
+assert.match(source, /social_workflow_no_success_96h/, 'the M/W/F Public Social scheduler must have its own freshness window');
+assert.match(source, /scheduled_social_collector_ownership_invalid/, 'the monitor must enforce one canonical scheduled Public Social collector');
+assert.match(source, /canonical_social_schedule_contract_invalid/, 'the monitor must pin the Public Social schedule and timezone');
+assert.match(source, /canonical_social_staging_contract_invalid/, 'the monitor must reject direct pre-review Social writes');
+assert.match(source, /social_collection_nonterminal/, 'nonterminal Social district runs must be critical');
+assert.match(source, /buildSocialCollectionHealth/, 'district Social health must use terminal collection-run evidence');
+assert.match(source, /executionChronology/, 'workflow recovery chronology must use execution starts');
+assert.match(source, /latestSocialSuccessExecution/, 'a later-started failed execution must not be masked by an older success that finishes later');
+assert.match(source, /async function pagedSupabase/, 'Social health source reads must paginate rather than silently truncate');
+assert.match(source, /district_id\.asc,id\.asc/, 'Social query and account pagination must use a deterministic unique order');
+assert.match(source, /started_at\.desc,id\.desc/, 'Social run pagination must use deterministic chronological ordering');
 assert.match(source, /query_review_pending_over_24h/, 'stale customer query reviews must be monitored');
 assert.match(source, /query_review_dispatch_uncertain_over_1h/, 'uncertain query-review dispatches must be surfaced without automatic retry');
 assert.match(source, /feedback_dispatch_uncertain_over_1h/, 'uncertain ordinary feedback dispatches must also be surfaced');

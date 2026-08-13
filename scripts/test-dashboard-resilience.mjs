@@ -23,10 +23,12 @@ for (const label of [
   'Strategic profiles',
   'Strategic priorities',
   'Collection health',
+  'Social collection health',
 ]) {
   assert.match(page, new RegExp(`loadDashboardDataset\\('${label.replace(/[.*+?^${}()|[\]\\]/g, '\\$&')}'`));
 }
 assert.match(page, /dataWarnings=\{dataWarnings\}/);
+assert.match(page, /socialCollectionHealth=\{socialCollectionHealth\}/);
 assert.match(page, /if \(isAdmin && !requestedDistrictId && districts\[0\]\?\.id\)[\s\S]*redirect\(`\/dashboard\?district=/);
 assert.match(page, /const dataDistrictId = userDistrictId \|\| \(initialDistrictId === 'All' \? null : initialDistrictId\)/);
 assert.match(page, /getArticles\(dataDistrictId\)/);
@@ -35,8 +37,15 @@ assert.match(dashboard, /Some dashboard data could not load/);
 assert.match(errorBoundary, /Dashboard could not finish loading/);
 assert.match(errorBoundary, /onClick=\{reset\}/);
 assert.match(dashboard, /before relying on the displayed totals/);
+assert.match(dashboard, /Public Social collection health/);
+assert.match(dashboard, /selectedSocialCollectionHealth\?\.latestRawItems/);
+assert.match(dashboard, /function handleDashboardPdf\(\)/, 'the main dashboard PDF handler must remain available');
+assert.match(dashboard, /onClick=\{handleDashboardPdf\}/, 'the main dashboard must expose its PDF trigger');
+assert.match(dashboard, /Export Dashboard PDF/, 'the main dashboard PDF action must be clearly labeled');
+assert.match(dashboard, /window\.setTimeout\(\(\) => window\.print\(\), 120\)/, 'dashboard PDF export must open the browser print flow after UI cleanup');
 assert.match(dashboard, /window\.location\.assign\(`\/dashboard\?\$\{params\.toString\(\)\}`\)/);
 assert.match(data, /groupStart < threads\.length; groupStart \+= 400/);
+assert.match(data, /order\('district_id'\)\.order\('id'\)/, 'Paginated Social query and account reads must have an immutable unique tie-breaker');
 assert.match(data, /Array\.from\(\{ length: 4 \}/);
 assert.match(data, /export async function getRecentSocialReviewEvents[\s\S]*?\.limit\(500\)/);
 

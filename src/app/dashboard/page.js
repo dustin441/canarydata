@@ -1,4 +1,4 @@
-import { getArticles, getDistricts, getQueries, getClients, getExcludedStories, getStoryCorrectionEvents, getSocialSources, getSocialThreads, getRecentSocialReviewEvents, getStrategicProfiles, getStrategicPriorities, getCollectionHealth } from '@/lib/data';
+import { getArticles, getDistricts, getQueries, getClients, getExcludedStories, getStoryCorrectionEvents, getSocialSources, getSocialThreads, getRecentSocialReviewEvents, getStrategicProfiles, getStrategicPriorities, getCollectionHealth, getSocialCollectionHealth } from '@/lib/data';
 import { createClient } from '@/lib/supabase/server';
 import { createAdminClient } from '@/lib/supabase/admin';
 import DashboardClient from './DashboardClient';
@@ -80,8 +80,9 @@ export default async function DashboardPage({ searchParams }) {
     loadDashboardDataset('Strategic profiles', () => getStrategicProfiles(dataDistrictId), []),
     loadDashboardDataset('Strategic priorities', () => getStrategicPriorities(dataDistrictId), []),
     loadDashboardDataset('Collection health', () => getCollectionHealth(districts, dataDistrictId), []),
+    loadDashboardDataset('Social collection health', () => getSocialCollectionHealth(districts, dataDistrictId), []),
   ]);
-  const [articles, queries, clients, excludedStories, correctionEvents, socialSources, socialThreads, socialReviewEvents, strategicProfiles, strategicPriorities, collectionHealth] = dataLoads.map((result) => result.data);
+  const [articles, queries, clients, excludedStories, correctionEvents, socialSources, socialThreads, socialReviewEvents, strategicProfiles, strategicPriorities, collectionHealth, socialCollectionHealth] = dataLoads.map((result) => result.data);
   const billingLoad = userDistrictId
     ? await loadDashboardDataset('Billing status', getAuthenticatedBillingContext, null)
     : { data: null, warning: null };
@@ -135,6 +136,7 @@ export default async function DashboardPage({ searchParams }) {
       strategicProfiles={strategicProfiles}
       strategicPriorities={strategicPriorities}
       collectionHealth={collectionHealth}
+      socialCollectionHealth={socialCollectionHealth}
       dataWarnings={dataWarnings}
       melodiEnabled={process.env.MELODI_ENABLED === 'true' && (process.env.MELODI_QA_MODE !== 'true' || isAdmin)}
       metaIntegrationEnabled={canManageIntegrations && process.env.META_INTEGRATION_ENABLED === 'true' && Boolean(process.env.META_APP_ID && process.env.META_APP_SECRET && process.env.META_TOKEN_ENCRYPTION_KEY && process.env.META_REDIRECT_URI)}

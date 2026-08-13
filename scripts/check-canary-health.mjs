@@ -1,6 +1,7 @@
 import { readFile, writeFile } from 'node:fs/promises';
 import { createHash } from 'node:crypto';
 import { feedbackDispatchAgeHours } from '../src/lib/feedbackDispatch.mjs';
+import { buildSocialCollectionHealth } from '../src/lib/collectionHealth.mjs';
 
 const required = (name) => {
   const value = process.env[name];
@@ -39,6 +40,20 @@ async function optionalSupabase(table, params) {
     throw error;
   }
 }
+async function pagedSupabase(table, params, order) {
+  const rows = [];
+  const pageSize = 1000;
+  for (let offset = 0; ; offset += pageSize) {
+    const page = await supabase(table, {
+      ...params,
+      order,
+      limit: String(pageSize),
+      offset: String(offset),
+    });
+    rows.push(...page);
+    if (page.length < pageSize) return rows;
+  }
+}
 async function allN8nWorkflows() {
   const workflows = [];
   let cursor = null;
@@ -55,8 +70,9 @@ async function allN8nWorkflows() {
 const latestDate = (values) => values.filter(Boolean).sort().at(-1) || null;
 const inc = (map, key) => map.set(key, (map.get(key) || 0) + 1);
 const activeWorkflowIds = ['dVIf6KnZklHYzQvi'];
+const canonicalSocialWorkflowId = 'SLZABQRPOmXstYV7';
 
-const [districts, generatedQueries, searchQueries, rawResults, stories, candidates, pendingQueryReviews, namedPendingFeedbackTasks, nullStatusFeedbackTasks, uncertainFeedbackDispatches, pendingOnboardingTasks, uncertainOnboardingDispatches, workflowExecutions, workflowDefinitions, workflowInventory] = await Promise.all([
+const [districts, generatedQueries, searchQueries, rawResults, stories, candidates, pendingQueryReviews, namedPendingFeedbackTasks, nullStatusFeedbackTasks, uncertainFeedbackDispatches, pendingOnboardingTasks, uncertainOnboardingDispatches, workflowExecutions, workflowDefinitions, workflowInventory, socialQueries, socialRuns, socialAccounts, socialWorkflowExecutions, socialWorkflowDefinition] = await Promise.all([
   supabase('districts', { select: 'id,name', limit: '1000' }),
   supabase('generated_queries', { select: 'id,district_id,query_type,query_text,search_params,active', active: 'eq.true', limit: '1000' }),
   supabase('search_queries', { select: 'id,district_id,query_text,active', active: 'eq.true', limit: '1000' }),
@@ -75,6 +91,11 @@ const [districts, generatedQueries, searchQueries, rawResults, stories, candidat
   }))),
   Promise.all(activeWorkflowIds.map((workflowId) => getJson(`${N8N_URL}/api/v1/workflows/${workflowId}`, { 'X-N8N-API-KEY': N8N_KEY }))),
   allN8nWorkflows(),
+  pagedSupabase('search_queries', { select: 'id,district_id,channels,active', channels: 'eq.social', active: 'eq.true' }, 'district_id.asc,id.asc'),
+  pagedSupabase('social_collection_runs', { select: 'id,district_id,status,started_at,completed_at,raw_items,accepted_threads,error_code,diagnostics', started_at: `gte.${isoAgo(7)}` }, 'started_at.desc,id.desc'),
+  pagedSupabase('social_accounts', { select: 'id,district_id,active', active: 'eq.true' }, 'district_id.asc,id.asc'),
+  getJson(`${N8N_URL}/api/v1/executions?workflowId=${canonicalSocialWorkflowId}&limit=20`, { 'X-N8N-API-KEY': N8N_KEY }),
+  getJson(`${N8N_URL}/api/v1/workflows/${canonicalSocialWorkflowId}`, { 'X-N8N-API-KEY': N8N_KEY }),
 ]);
 const pendingFeedbackTasks = [...namedPendingFeedbackTasks, ...nullStatusFeedbackTasks];
 const pendingStructuredOnboarding = pendingOnboardingTasks.filter((request) => !request.clickup_task_id);
@@ -168,6 +189,61 @@ for (const [districtId, missing] of missingBaselineByDistrict) {
   }
 }
 
+const publicDiscoveryRuns = socialRuns.filter((run) => run.diagnostics?.lane === 'all_district_public_facebook_v1');
+const socialDistrictHealth = buildSocialCollectionHealth({ districts, socialQueries, socialRuns: publicDiscoveryRuns, socialAccounts, now });
+for (const health of socialDistrictHealth) {
+  if (!health.enrolled) continue;
+  if (health.status === 'critical') {
+    add('critical', health.nonterminalRunCount > 0 ? 'social_collection_nonterminal' : health.latestRunStatus === 'failed' ? 'social_collection_latest_failed' : 'social_collection_stale', `${health.districtName}: ${health.detail}`, {
+      district_id: health.districtId,
+      latest_social_run: health.latestActivityAt,
+      latest_social_status: health.latestRunStatus,
+    });
+  } else if (health.status === 'warning') {
+    add('warning', health.latestRunStatus === 'partial' ? 'social_collection_latest_partial' : 'social_collection_delayed', `${health.districtName}: ${health.detail}`, { district_id: health.districtId, latest_social_run: health.latestActivityAt });
+  }
+}
+
+const scheduledSocialCollectors = workflowInventory.filter((workflow) => {
+  if (!workflow.active) return false;
+  const hasSchedule = (workflow.nodes || []).some((node) => node.type === 'n8n-nodes-base.scheduleTrigger' && node.disabled !== true);
+  const stagesSocialDiscovery = (workflow.nodes || []).some((node) => JSON.stringify(node.parameters || {}).includes('canary_stage_social_discovery'));
+  return hasSchedule && stagesSocialDiscovery;
+});
+if (scheduledSocialCollectors.length !== 1 || scheduledSocialCollectors[0]?.id !== canonicalSocialWorkflowId) {
+  add('critical', 'scheduled_social_collector_ownership_invalid', `Expected exactly one active scheduled Public Social collector (${canonicalSocialWorkflowId}), found ${scheduledSocialCollectors.length}.`, {
+    workflow_id: canonicalSocialWorkflowId,
+    active_scheduled_collectors: scheduledSocialCollectors.map(({ id, name }) => ({ id, name })),
+  });
+}
+if (!socialWorkflowDefinition.active) add('critical', 'canonical_social_workflow_inactive', `Canonical Public Social workflow ${canonicalSocialWorkflowId} is inactive.`, { workflow_id: canonicalSocialWorkflowId });
+const socialSchedules = (socialWorkflowDefinition.nodes || []).filter((node) => node.type === 'n8n-nodes-base.scheduleTrigger' && node.disabled !== true);
+const socialCronExpressions = socialSchedules.flatMap((node) => node.parameters?.rule?.interval || []).filter((entry) => entry.field === 'cronExpression').map((entry) => entry.expression);
+if (socialSchedules.length !== 1 || socialCronExpressions.length !== 1 || socialCronExpressions[0] !== '15 7 * * 1,3,5' || socialWorkflowDefinition.settings?.timezone !== 'America/Phoenix') {
+  add('critical', 'canonical_social_schedule_contract_invalid', `Canonical Public Social workflow ${canonicalSocialWorkflowId} does not have the approved Mon/Wed/Fri 07:15 America/Phoenix schedule.`, {
+    workflow_id: canonicalSocialWorkflowId,
+    schedule_count: socialSchedules.length,
+    cron_expressions: socialCronExpressions,
+    timezone: socialWorkflowDefinition.settings?.timezone || null,
+  });
+}
+const socialStageWriter = (socialWorkflowDefinition.nodes || []).find((node) => JSON.stringify(node.parameters || {}).includes('canary_stage_social_discovery'));
+const directSocialWriter = (socialWorkflowDefinition.nodes || []).find((node) => JSON.stringify(node.parameters || {}).includes('/rest/v1/social_threads'));
+if (!socialStageWriter || directSocialWriter) add('critical', 'canonical_social_staging_contract_invalid', `Canonical Public Social workflow ${canonicalSocialWorkflowId} no longer proves staging-only discovery writes.`, { workflow_id: canonicalSocialWorkflowId });
+const socialExecutions = socialWorkflowExecutions.data || [];
+const executionChronology = (execution) => new Date(execution.startedAt || execution.stoppedAt || 0);
+const socialSuccesses = socialExecutions.filter((execution) => String(execution.status).toLowerCase() === 'success');
+const latestSocialSuccessExecution = [...socialSuccesses].sort((a, b) => executionChronology(b) - executionChronology(a) || String(b.id || '').localeCompare(String(a.id || '')))[0] || null;
+const latestSocialSuccess = latestSocialSuccessExecution ? new Date(latestSocialSuccessExecution.stoppedAt || latestSocialSuccessExecution.startedAt || 0) : null;
+const unrecoveredSocialFailures = socialExecutions.filter((execution) => {
+  const failed = ['error', 'crashed', 'failed'].includes(String(execution.status).toLowerCase());
+  const started = executionChronology(execution);
+  const latestSuccessStarted = latestSocialSuccessExecution ? executionChronology(latestSocialSuccessExecution) : null;
+  return failed && now - started <= 7 * DAY && (!latestSuccessStarted || started > latestSuccessStarted || (started.getTime() === latestSuccessStarted.getTime() && String(execution.id || '').localeCompare(String(latestSocialSuccessExecution.id || '')) > 0));
+});
+if (unrecoveredSocialFailures.length) add('critical', 'social_workflow_unrecovered_failure', `Canonical Public Social workflow ${canonicalSocialWorkflowId} has ${unrecoveredSocialFailures.length} failure(s) newer than its latest success.`, { workflow_id: canonicalSocialWorkflowId, latest_failure: unrecoveredSocialFailures[0]?.stoppedAt || unrecoveredSocialFailures[0]?.startedAt || null, latest_success: latestSocialSuccess?.toISOString() || null });
+if (!latestSocialSuccess || now - latestSocialSuccess > 96 * 3_600_000) add('critical', 'social_workflow_no_success_96h', `Canonical Public Social workflow ${canonicalSocialWorkflowId} has no successful execution in the last 96 hours.`, { workflow_id: canonicalSocialWorkflowId, latest_success: latestSocialSuccess?.toISOString() || null });
+
 const scheduledStoryWriters = workflowInventory.filter((workflow) => {
   if (!workflow.active) return false;
   const hasSchedule = (workflow.nodes || []).some((node) => node.type === 'n8n-nodes-base.scheduleTrigger' && node.disabled !== true);
@@ -244,9 +320,13 @@ const report = {
     pending_feedback_tasks: pendingFeedbackTasks.length,
     pending_onboarding_tasks: pendingStructuredOnboarding.length,
     uncertain_feedback_dispatches: allUncertainDispatches.length,
+    social_enrolled_districts: socialDistrictHealth.filter((health) => health.enrolled).length,
+    social_healthy_districts: socialDistrictHealth.filter((health) => health.enrolled && health.status === 'healthy').length,
+    social_official_accounts: socialAccounts.length,
     alerts: alerts.length,
   },
   district_health: districtHealth.sort((a, b) => a.district_name.localeCompare(b.district_name)),
+  social_district_health: socialDistrictHealth.sort((a, b) => a.districtName.localeCompare(b.districtName)),
   alerts,
 };
 const fingerprintInput = alerts

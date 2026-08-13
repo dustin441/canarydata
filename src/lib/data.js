@@ -1,5 +1,5 @@
 import { createAdminClient } from '@/lib/supabase/admin';
-import { buildCollectionHealth } from '@/lib/collectionHealth.mjs';
+import { buildCollectionHealth, buildSocialCollectionHealth } from '@/lib/collectionHealth.mjs';
 import { buildSocialAffiliatePreview } from '@/lib/social-affiliate-preview';
 
 const ARTICLE_COLUMNS = 'id, created_at, date, headline, summary, source, source_type, canary_score, tags, notes, is_earned_media, is_perched, link, district_id, innovation_reason, recommendation, source_query, canonical_url, visibility_status, manual_override, correction_version';
@@ -317,6 +317,31 @@ export async function getCollectionHealth(districts, districtId = null) {
   ]);
   const scopedDistricts = districtId ? districts.filter((district) => district.id === districtId) : districts;
   return buildCollectionHealth({ districts: scopedDistricts, rawResults, candidates, stories });
+}
+
+export async function getSocialCollectionHealth(districts, districtId = null) {
+  const supabase = createAdminClient();
+  const cutoff = new Date(Date.now() - 7 * 86_400_000).toISOString();
+  const readPages = async (table, columns, configure) => {
+    const rows = [];
+    for (let from = 0; ; from += 1000) {
+      let query = configure(supabase.from(table).select(columns));
+      if (districtId) query = query.eq('district_id', districtId);
+      const { data, error } = await query.range(from, from + 999);
+      if (error) throw error;
+      const page = data ?? [];
+      rows.push(...page);
+      if (page.length < 1000) break;
+    }
+    return rows;
+  };
+  const [socialQueries, socialRuns, socialAccounts] = await Promise.all([
+    readPages('search_queries', 'id,district_id,channels,active', (query) => query.eq('channels', 'social').eq('active', true).order('district_id').order('id')),
+    readPages('social_collection_runs', 'id,district_id,status,started_at,completed_at,raw_items,accepted_threads,error_code,diagnostics', (query) => query.gte('started_at', cutoff).contains('diagnostics', { lane: 'all_district_public_facebook_v1' }).order('started_at', { ascending: false }).order('id', { ascending: false })),
+    readPages('social_accounts', 'id,district_id,active', (query) => query.eq('active', true).order('district_id').order('id')),
+  ]);
+  const scopedDistricts = districtId ? districts.filter((district) => district.id === districtId) : districts;
+  return buildSocialCollectionHealth({ districts: scopedDistricts, socialQueries, socialRuns, socialAccounts });
 }
 
 export async function getQueries(districtId = null) {

@@ -3425,7 +3425,7 @@ export function SocialView({ socialResults, legacySocialResults = [], socialSour
   );
 }
 
-export default function DashboardClient({ articles, districts, queries: initialQueries, clients = [], userDistrictId, initialDistrictId = null, initialView = 'dashboard', paymentNotice = null, billingInfo = null, excludedStories = [], correctionEvents = [], socialSources = [], socialThreads = [], socialReviewEvents = [], strategicProfiles = [], strategicPriorities = [], collectionHealth = [], dataWarnings = [], isAdmin = false, melodiEnabled = false, metaIntegrationEnabled = false, demoMode = false }) {
+export default function DashboardClient({ articles, districts, queries: initialQueries, clients = [], userDistrictId, initialDistrictId = null, initialView = 'dashboard', paymentNotice = null, billingInfo = null, excludedStories = [], correctionEvents = [], socialSources = [], socialThreads = [], socialReviewEvents = [], strategicProfiles = [], strategicPriorities = [], collectionHealth = [], socialCollectionHealth = [], dataWarnings = [], isAdmin = false, melodiEnabled = false, metaIntegrationEnabled = false, demoMode = false }) {
   const defaultDistrictFilter = userDistrictId ?? initialDistrictId ?? districts[0]?.id ?? 'All';
   const [currentView, setCurrentView] = useState(initialView);
   const [search, setSearch] = useState('');
@@ -3735,6 +3735,13 @@ export default function DashboardClient({ articles, districts, queries: initialQ
     );
   }
 
+  function handleDashboardPdf() {
+    setColMenuOpen(false);
+    setFeedbackOpen(false);
+    setSidebarOpen(false);
+    window.setTimeout(() => window.print(), 120);
+  }
+
   function handleBirdEyePdf() {
     setColMenuOpen(false);
     setFeedbackOpen(false);
@@ -3834,6 +3841,10 @@ export default function DashboardClient({ articles, districts, queries: initialQ
   const selectedCollectionHealth = useMemo(
     () => collectionHealth.find((item) => item.districtId === districtFilter) ?? null,
     [collectionHealth, districtFilter],
+  );
+  const selectedSocialCollectionHealth = useMemo(
+    () => socialCollectionHealth.find((item) => item.districtId === districtFilter) ?? null,
+    [socialCollectionHealth, districtFilter],
   );
   const collectionHealthClass = selectedCollectionHealth?.status === 'critical'
     ? 'negative'
@@ -4142,6 +4153,16 @@ export default function DashboardClient({ articles, districts, queries: initialQ
                 ⬇ Export CSV
               </button>
             )}
+            {currentView === 'dashboard' && (
+              <button
+                className="btn btn-secondary btn-sm export-pdf-btn"
+                type="button"
+                onClick={handleDashboardPdf}
+                title="Prints the currently filtered Media Intelligence Dashboard so it can be saved as PDF."
+              >
+                ⬇ Export Dashboard PDF
+              </button>
+            )}
             {SHOW_GLOBAL_BOARD_REPORT_EXPORT && ['dashboard', 'birdseye', 'social'].includes(currentView) && (
               <button
                 className="btn btn-secondary btn-sm export-pdf-btn"
@@ -4418,6 +4439,20 @@ export default function DashboardClient({ articles, districts, queries: initialQ
                 <div><dt>Latest collection evidence</dt><dd>{selectedCollectionHealth?.latestActivityAt ? formatDate(selectedCollectionHealth.latestActivityAt) : 'Not available'}</dd></div>
                 <div><dt>Raw results, 7 days</dt><dd>{selectedCollectionHealth?.rawResults7d ?? 'N/A'}</dd></div>
                 <div><dt>New stories, 14 days</dt><dd>{selectedCollectionHealth?.acceptedStories14d ?? 'N/A'}</dd></div>
+              </dl>
+            </div>
+
+            <div className={`collection-health-banner ${selectedSocialCollectionHealth?.status ?? 'unknown'}`}>
+              <div>
+                <span>Public Social collection health</span>
+                <strong>{selectedSocialCollectionHealth?.label ?? 'Status unavailable'}</strong>
+                <p>{selectedSocialCollectionHealth?.detail ?? 'No Public Social collection-health evidence is available for this district.'}</p>
+              </div>
+              <dl>
+                <div><dt>Latest terminal run</dt><dd>{selectedSocialCollectionHealth?.latestActivityAt ? formatDate(selectedSocialCollectionHealth.latestActivityAt) : 'Not available'}</dd></div>
+                <div><dt>Raw items checked</dt><dd>{selectedSocialCollectionHealth?.latestRawItems ?? 'N/A'}</dd></div>
+                <div><dt>Candidates staged</dt><dd>{selectedSocialCollectionHealth?.latestAcceptedCandidates ?? 'N/A'}</dd></div>
+                <div><dt>Official accounts</dt><dd>{selectedSocialCollectionHealth?.officialAccountCount ?? 'N/A'}</dd></div>
               </dl>
             </div>
 
