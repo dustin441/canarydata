@@ -9,11 +9,12 @@ The earlier draft was replaced after repository and security review. The executa
 
 ## First release boundary
 
-The first release authorizes and discovers:
+This schema creates the server-only authorization foundation for:
 
 - Facebook Pages
 - connected Instagram professional accounts
-- Meta ad accounts
+
+Meta ad accounts are intentionally outside the first owned-Social authorization release. A later ad-reporting release can extend the existing asset model without broadening this release's OAuth scope.
 
 It lets an authorized district integration manager choose which discovered assets belong to the district reporting workspace. It does not yet ingest native insight snapshots, publish content, manage comments, change advertising, or spend budget.
 
@@ -33,7 +34,8 @@ The discovery release requests exactly:
 - `pages_show_list`
 - `pages_read_engagement`
 - `instagram_basic`
-- `ads_read`
+
+`ads_read` is deferred to a separate ad-reporting release rather than requested by the owned-Social connection.
 
 Insight-specific permissions are deferred until native metric ingestion is implemented and reconciled.
 

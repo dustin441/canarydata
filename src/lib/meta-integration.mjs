@@ -5,7 +5,6 @@ export const META_REQUIRED_SCOPES = Object.freeze([
   'pages_show_list',
   'pages_read_engagement',
   'instagram_basic',
-  'ads_read',
 ]);
 
 export function metaConfigured() {
@@ -95,7 +94,7 @@ function safeGraphError(payload, fallback) {
   return error;
 }
 
-export async function metaGraph(path, accessToken, params = {}) {
+export async function metaGraph(path, accessToken, params = {}, options = {}) {
   const query = new URLSearchParams(
     Object.fromEntries(Object.entries(params).filter(([, value]) => value !== undefined && value !== null)),
   );
@@ -111,7 +110,7 @@ export async function metaGraph(path, accessToken, params = {}) {
     headers: { 'Content-Type': 'application/x-www-form-urlencoded', Accept: 'application/json' },
     body,
     cache: 'no-store',
-    signal: AbortSignal.timeout(25000),
+    signal: options.signal ? AbortSignal.any([options.signal, AbortSignal.timeout(25000)]) : AbortSignal.timeout(25000),
   });
   const batchPayload = await response.json().catch(() => null);
   if (!response.ok || !Array.isArray(batchPayload) || batchPayload.length !== 1) {
@@ -125,10 +124,10 @@ export async function metaGraph(path, accessToken, params = {}) {
   return payload;
 }
 
-export async function metaGraphAll(path, accessToken, params = {}, maxPages = 20) {
+export async function metaGraphAll(path, accessToken, params = {}, maxPages = 20, options = {}) {
   const rows = [];
   const seenCursors = new Set();
-  let payload = await metaGraph(path, accessToken, params);
+  let payload = await metaGraph(path, accessToken, params, options);
   for (let page = 0; page < maxPages; page += 1) {
     rows.push(...(Array.isArray(payload?.data) ? payload.data : []));
     const next = payload?.paging?.next;
@@ -139,9 +138,27 @@ export async function metaGraphAll(path, accessToken, params = {}, maxPages = 20
     if (!after || seenCursors.has(after)) throw new Error('Meta pagination returned an invalid cursor.');
     if (page === maxPages - 1) throw new Error('Meta pagination exceeded the safe page limit.');
     seenCursors.add(after);
-    payload = await metaGraph(path, accessToken, { ...params, after });
+    payload = await metaGraph(path, accessToken, { ...params, after }, options);
   }
   return rows;
+}
+
+export async function debugMetaToken(accessToken, options = {}) {
+  const appAccessToken = `${process.env.META_APP_ID}|${process.env.META_APP_SECRET}`;
+  const body = new URLSearchParams({
+    input_token: accessToken,
+    access_token: appAccessToken,
+  });
+  const response = await fetch(`https://graph.facebook.com/${META_GRAPH_VERSION}/debug_token`, {
+    method: 'POST',
+    headers: { 'Content-Type': 'application/x-www-form-urlencoded', Accept: 'application/json' },
+    body,
+    cache: 'no-store',
+    signal: options.signal ? AbortSignal.any([options.signal, AbortSignal.timeout(25000)]) : AbortSignal.timeout(25000),
+  });
+  const payload = await response.json().catch(() => ({}));
+  if (!response.ok || payload?.error || !payload?.data) throw safeGraphError(payload, 'Meta token validation failed.');
+  return payload.data;
 }
 
 export async function exchangeMetaCode(code) {

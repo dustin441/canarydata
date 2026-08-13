@@ -4,7 +4,7 @@ import { useCallback, useEffect, useMemo, useState } from 'react';
 import styles from './integrations.module.css';
 
 const STATUS_COPY = {
-  connected: 'Meta access was connected. Select the Pages, Instagram accounts, and ad accounts Canary should use.',
+  connected: 'Meta access was connected. Select the Pages and Instagram accounts Canary should use.',
   permissions_limited: 'Meta connected, but one or more requested permissions were not granted. Available assets are shown below.',
   cancelled: 'Meta authorization was cancelled. No access was added.',
   invalid_state: 'That authorization link expired or was already used. Start a new connection.',
@@ -17,7 +17,7 @@ const STATUS_COPY = {
 const GROUPS = [
   { type: 'facebook_page', title: 'Facebook Pages', description: 'Official Page posts and Page-level reporting.' },
   { type: 'instagram_account', title: 'Instagram accounts', description: 'Professional accounts connected to an authorized Facebook Page.' },
-  { type: 'ad_account', title: 'Meta ad accounts', description: 'Read-only campaign delivery and paid-versus-organic reporting.' },
+
 ];
 
 function statusClass(status) {
@@ -116,7 +116,7 @@ export default function MetaIntegrationClient({ districtId, districtName, distri
         <a className={styles.back} href="/dashboard">← Back to dashboard</a>
         <span className={styles.eyebrow}>Canary integrations</span>
         <h1>Connect Meta</h1>
-        <p>Give Canary read-only access to official Facebook Pages, connected Instagram professional accounts, and Meta ad accounts.</p>
+        <p>Give Canary read-only access to official Facebook Pages and connected Instagram professional accounts.</p>
       </header>
 
       {isAdmin && (
@@ -149,7 +149,7 @@ export default function MetaIntegrationClient({ districtId, districtName, distri
         </div>
         <div className={styles.permissionList}>
           <span>✓ Identify Pages and connected Instagram accounts</span>
-          <span>✓ Authorize read-only ad-account access</span>
+          <span>✓ Read selected official posts and media</span>
           <span>✓ Choose which assets Canary uses</span>
           <span>✓ Disconnect at any time</span>
         </div>
@@ -161,7 +161,7 @@ export default function MetaIntegrationClient({ districtId, districtName, distri
             <div className={styles.sectionHeading}>
               <div>
                 <h2>Connection</h2>
-                <p>Meta will show the Pages and ad accounts available to the person signing in.</p>
+                <p>Meta will show the Pages and connected Instagram accounts available to the person signing in.</p>
               </div>
               {data?.configured ? (
                 <form action="/api/integrations/meta/start" method="post">

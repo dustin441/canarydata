@@ -36,6 +36,23 @@ export async function PATCH(request) {
       throw mappingError;
     }
 
+    if (process.env.META_NATIVE_SYNC_ENABLED === 'true') {
+      const { data: connection, error: connectionError } = await admin
+        .from('social_provider_connections')
+        .select('id')
+        .eq('district_id', actor.districtId)
+        .eq('provider', 'meta')
+        .in('status', ['active', 'needs_permissions'])
+        .maybeSingle();
+      if (connectionError) throw connectionError;
+      if (!connection) throw new Error('An active Meta connection is required before linking selected assets.');
+      const { error: linkError } = await admin.rpc('canary_link_selected_meta_assets', {
+        p_district_id: actor.districtId,
+        p_connection_id: connection.id,
+      });
+      if (linkError) throw linkError;
+    }
+
     return Response.json({ ok: true, selectedCount: Number(selectedCount) || 0 });
   } catch (error) {
     return integrationErrorResponse(error);

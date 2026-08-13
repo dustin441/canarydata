@@ -5,6 +5,7 @@ import { requireIntegrationActor } from '@/lib/integration-auth';
 import {
   META_REQUIRED_SCOPES,
   constantTimeEqualText,
+  debugMetaToken,
   encryptMetaToken,
   exchangeLongLivedMetaToken,
   exchangeMetaCode,
@@ -32,7 +33,7 @@ function redirectWithStatus(request, path, status, detail = null) {
   return response;
 }
 
-function assetRows({ pages, adAccounts }) {
+function assetRows({ pages }) {
   const rows = [];
   for (const page of pages) {
     rows.push({
@@ -58,24 +59,6 @@ function assetRows({ pages, adAccounts }) {
         metadata: { facebook_page_id: String(page.id), profile_picture_url: instagram.profile_picture_url || null },
       });
     }
-  }
-  for (const account of adAccounts) {
-    rows.push({
-      provider_asset_id: String(account.id),
-      asset_type: 'ad_account',
-      platform: 'meta_ads',
-      name: String(account.name || account.account_id || 'Meta ad account'),
-      handle: account.account_id ? String(account.account_id) : null,
-      profile_url: null,
-      parent_provider_asset_id: account.business?.id ? String(account.business.id) : null,
-      metadata: {
-        account_id: account.account_id ? String(account.account_id) : null,
-        account_status: account.account_status ?? null,
-        currency: account.currency || null,
-        timezone_name: account.timezone_name || null,
-        business_name: account.business?.name || null,
-      },
-    });
   }
   return rows;
 }
@@ -128,28 +111,26 @@ export async function GET(request) {
     const longLived = await exchangeLongLivedMetaToken(shortLived.access_token);
     const accessToken = longLived.access_token;
 
-    const [identity, permissionPayload] = await Promise.all([
+    const [identity, permissionPayload, tokenData] = await Promise.all([
       metaGraph('me', accessToken, { fields: 'id,name' }),
       metaGraph('me/permissions', accessToken),
+      debugMetaToken(accessToken),
     ]);
     if (!identity?.id) throw new Error('Meta identity validation failed.');
+    if (tokenData?.is_valid !== true
+      || String(tokenData?.app_id || '') !== String(process.env.META_APP_ID)
+      || String(tokenData?.user_id || '') !== String(identity.id)) {
+      throw new Error('Meta grant validation failed.');
+    }
 
     const granted = (permissionPayload?.data || []).filter((item) => item.status === 'granted').map((item) => item.permission);
     const declined = META_REQUIRED_SCOPES.filter((scope) => !granted.includes(scope));
     const pageFields = granted.includes('instagram_basic')
       ? 'id,name,category,tasks,instagram_business_account{id,username,name,profile_picture_url}'
       : 'id,name,category,tasks';
-    const [pages, adAccounts] = await Promise.all([
-      granted.includes('pages_show_list')
-        ? metaGraphAll('me/accounts', accessToken, { fields: pageFields, limit: '100' })
-        : Promise.resolve([]),
-      granted.includes('ads_read')
-        ? metaGraphAll('me/adaccounts', accessToken, {
-          fields: 'id,account_id,name,account_status,currency,timezone_name,business{id,name}',
-          limit: '100',
-        })
-        : Promise.resolve([]),
-    ]);
+    const pages = granted.includes('pages_show_list')
+      ? await metaGraphAll('me/accounts', accessToken, { fields: pageFields, limit: '100' })
+      : [];
 
     const providerUserId = String(identity.id);
     const providerUserName = identity.name ? String(identity.name) : null;
@@ -164,7 +145,7 @@ export async function GET(request) {
     if (!connectionId) throw new Error('Canary could not prepare the Meta connection.');
 
     const tokenContext = `${connectionId}:${actor.districtId}:meta`;
-    const rows = assetRows({ pages, adAccounts });
+    const rows = assetRows({ pages });
     const { error: finalizeError } = await admin.rpc('canary_finalize_meta_connection', {
       p_connection_id: connectionId,
       p_district_id: actor.districtId,
@@ -173,7 +154,8 @@ export async function GET(request) {
       p_provider_user_id: providerUserId,
       p_provider_user_name: providerUserName,
       p_status: declined.length ? 'needs_permissions' : 'active',
-      p_token_expires_at: tokenExpiry(longLived.expires_in || shortLived.expires_in),
+      p_token_expires_at: tokenExpiry(longLived.expires_in || shortLived.expires_in)
+        || (tokenData?.expires_at ? new Date(Number(tokenData.expires_at) * 1000).toISOString() : null),
       p_granted_scopes: granted,
       p_declined_scopes: declined,
       p_encrypted_access_token: encryptMetaToken(accessToken, tokenContext),

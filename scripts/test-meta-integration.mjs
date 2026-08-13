@@ -27,9 +27,8 @@ assert.deepEqual(meta.META_REQUIRED_SCOPES, [
   'pages_show_list',
   'pages_read_engagement',
   'instagram_basic',
-  'ads_read',
 ]);
-for (const forbidden of ['ads_management', 'business_management', 'pages_manage_posts', 'read_insights', 'instagram_manage_insights']) {
+for (const forbidden of ['ads_read', 'ads_management', 'business_management', 'pages_manage_posts', 'read_insights', 'instagram_manage_insights']) {
   assert.ok(!meta.META_REQUIRED_SCOPES.includes(forbidden), `Discovery release must not request ${forbidden}.`);
 }
 
@@ -53,6 +52,20 @@ assert.ok(!graphRequest.url.includes('url-sensitive-token'), 'Meta access tokens
 assert.ok(!graphRequest.url.includes('appsecret_proof'), 'Meta app-secret proofs must not appear in Graph request URLs.');
 assert.equal(graphRequest.options.method, 'POST');
 assert.ok(String(graphRequest.options.body).includes('batch='), 'Read requests must use a body-authenticated Graph batch call.');
+const aborted = new AbortController();
+aborted.abort(new Error('execution budget'));
+await meta.metaGraph('me', 'url-sensitive-token', { fields: 'id' }, { signal: aborted.signal });
+assert.equal(graphRequest.options.signal.aborted, true, 'Native sync must propagate an already-aborted execution signal into Graph fetch.');
+globalThis.fetch = async (url, options) => {
+  graphRequest = { url: String(url), options };
+  return { ok: true, json: async () => ({ data: { is_valid: true, app_id: 'test-app-id', user_id: 'meta-user-1' } }) };
+};
+assert.equal((await meta.debugMetaToken('url-sensitive-token')).is_valid, true);
+assert.ok(!graphRequest.url.includes('url-sensitive-token'), 'Meta debug input tokens must not appear in request URLs.');
+assert.ok(!graphRequest.url.includes('test-app-secret'), 'Meta app credentials must not appear in debug request URLs.');
+assert.equal(graphRequest.options.method, 'POST');
+await meta.debugMetaToken('url-sensitive-token', { signal: aborted.signal });
+assert.equal(graphRequest.options.signal.aborted, true, 'Token introspection must share the native-sync execution signal.');
 globalThis.fetch = async (url, options) => {
   graphRequest = { url: String(url), options };
   return { ok: true, json: async () => ({ success: true }) };
@@ -92,8 +105,9 @@ assert.ok(callback.includes("admin.rpc('canary_finalize_meta_connection'"), 'Cal
 assert.ok(!callback.includes(".from('social_provider_credentials')"), 'Callback must not write credentials outside the finalization transaction.');
 assert.ok(callback.includes("p_provider_app_id: process.env.META_APP_ID"), 'Callback must bind persisted connections to the configured Meta app.');
 assert.ok(callback.includes('encryptMetaToken(accessToken, tokenContext)'), 'User token must be encrypted with AAD before storage.');
+assert.ok(callback.includes('debugMetaToken(accessToken)'), 'OAuth exchange must introspect and bind the grant to the configured app and provider identity.');
 assert.ok(callback.includes("status: declined.length ? 'needs_permissions' : 'active'"), 'Denied permissions must remain a visible connection state.');
-assert.ok(callback.includes("granted.includes('ads_read')"), 'Ad-account discovery must tolerate denied ads_read.');
+assert.ok(!callback.includes("granted.includes('ads_read')"), 'Owned-Social authorization must not request or discover ad accounts.');
 assert.ok(callback.includes("granted.includes('pages_show_list')"), 'Page discovery must tolerate denied pages_show_list.');
 assert.ok(!callback.includes("fields: 'id,name,category,tasks,access_token"), 'Page access tokens must not be requested during discovery.');
 assert.ok(!callback.includes('access_token: accessToken,'), 'Callback database payload must not store plaintext user token.');

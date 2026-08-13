@@ -9,7 +9,7 @@
     "lint": "eslint",
     "test:webhook": "node scripts/test-stripe-webhook.mjs",
     "test:authz": "node scripts/test-authz-metadata.mjs",
-    "test:meta": "node scripts/test-meta-integration.mjs",
+    "test:meta": "node scripts/test-meta-integration.mjs && node scripts/test-meta-owned-sync.mjs && node scripts/test-meta-native-sync.mjs && node scripts/test-meta-owned-sync-postgres.mjs",
     "test:quality": "node scripts/test-canary-quality.mjs && node scripts/test-ingestion-lineage.mjs && node scripts/test-provider-query-lineage.mjs && node scripts/test-live-interpretation-guards.mjs && node scripts/test-neutral-presentation.mjs && node scripts/test-article-search.mjs && node scripts/test-news-identity-schema.mjs && node scripts/test-collection-health.mjs && node scripts/test-health-monitor-policy.mjs && node scripts/test-feedback-dispatch.mjs && node scripts/test-onboarding-clickup-parity.mjs && node scripts/test-reporting-dataset.mjs && node scripts/test-dashboard-resilience.mjs && node scripts/check-strategic-alignment-label-parser.mjs && node scripts/test-strategic-alignment-sort.mjs && node scripts/test-meta-integration.mjs",
     "test:strategic-sort": "node scripts/test-strategic-alignment-sort.mjs",
     "test:corrections": "node scripts/test-story-corrections.mjs",
