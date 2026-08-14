@@ -66,6 +66,8 @@ const partial = mapFacebookPagePosts({
 assert.equal(partial.status, 'partial');
 assert.equal(partial.threads.length, 1);
 assert.equal(partial.rejected.length, 1);
+assert.deepEqual(partial.threads[0].provider_metadata.metric_availability, { comments: false, reactions: false, shares: false, views: false });
+assert.equal(partial.threads[0].engagement_total, 0);
 
 const empty = mapInstagramMedia({ districtId, asset: { id: 'asset-ig', provider_asset_id: 'ig-1', name: 'IG' }, rows: [] });
 assert.equal(empty.status, 'empty');

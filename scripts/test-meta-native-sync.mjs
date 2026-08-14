@@ -40,6 +40,9 @@ assert.ok(service.includes('debugMetaToken(accessToken, { signal: executionSigna
 assert.ok(service.includes("String(tokenData.app_id) !== String(process.env.META_APP_ID)"));
 assert.ok(service.includes("String(tokenData.user_id) !== String(connection.provider_user_id)"));
 assert.ok(service.includes("['ANALYZE', 'MANAGE'].includes(task)"), 'Facebook Page sync must require an analytics-capable task.');
+assert.ok(!service.includes('comments.limit(0).summary(true)'), 'Least-privilege Page sync must not request comment data without pages_read_user_content.');
+assert.ok(!service.includes('reactions.limit(0).summary(true)'), 'Least-privilege Page sync must not request reaction data without broader access.');
+assert.ok(!service.includes('pages_read_user_content'), 'Owned-post discovery must not broaden the initial permission set.');
 assert.ok(service.includes("admin.rpc('canary_ingest_owned_social_observation'"));
 assert.ok(service.includes(".eq('id', run.id).eq('status', 'running')"), 'Run finalization must be conditional.');
 assert.ok(service.includes('Meta synchronization failed and its run could not be finalized.'), 'Failed-run persistence must be checked instead of silently leaving a running lease.');

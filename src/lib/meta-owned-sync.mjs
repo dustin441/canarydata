@@ -25,6 +25,9 @@ function metaProviderError(providerError) {
 }
 
 function facebookItem(asset, row) {
+  const commentsAvailable = row?.comments?.summary?.total_count != null || row?.comments_count != null;
+  const reactionsAvailable = row?.reactions?.summary?.total_count != null || row?.reactions_count != null;
+  const sharesAvailable = row?.shares?.count != null || row?.shares_count != null;
   const comments = count(row?.comments?.summary?.total_count ?? row?.comments_count);
   const reactions = count(row?.reactions?.summary?.total_count ?? row?.reactions_count);
   const shares = count(row?.shares?.count ?? row?.shares_count);
@@ -47,7 +50,7 @@ function facebookItem(asset, row) {
       provider_asset_id: asset?.id,
       provider_page_id: asset?.provider_asset_id,
       source: 'meta_graph',
-      metric_availability: { comments: true, reactions: true, shares: true, views: false },
+      metric_availability: { comments: commentsAvailable, reactions: reactionsAvailable, shares: sharesAvailable, views: false },
     },
   };
 }

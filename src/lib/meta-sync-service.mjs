@@ -2,7 +2,7 @@ import { decryptMetaToken, debugMetaToken, metaGrantedScopes, metaGraph, metaGra
 import { boundedMetaSourceCutoff, mapFacebookPagePosts, mapInstagramMedia, summarizeMetaSyncOutcome, validateMetaSyncSelection } from './meta-owned-sync.mjs';
 
 const PAGE_FIELDS = 'id,access_token,tasks';
-const POST_FIELDS = 'id,message,story,created_time,permalink_url,from,comments.limit(0).summary(true),reactions.limit(0).summary(true),shares';
+const POST_FIELDS = 'id,message,story,created_time,permalink_url,from';
 const MEDIA_FIELDS = 'id,caption,media_type,permalink,timestamp,username,comments_count,like_count';
 
 function safeError(error) {
