@@ -16,7 +16,10 @@ create table public.social_provider_metric_snapshots (
   provider_object_id text not null check (btrim(provider_object_id) <> ''),
   provider_metric_name text not null check (btrim(provider_metric_name) <> ''),
   normalized_metric_name text not null check (btrim(normalized_metric_name) <> ''),
+  metric_variant text not null default 'default' check (btrim(metric_variant) <> ''),
   period text not null default 'lifetime' check (btrim(period) <> ''),
+  period_start_at timestamptz,
+  period_end_at timestamptz,
   source_scope text not null default 'unknown' check (source_scope in ('organic','paid','total','unknown')),
   availability text not null default 'available' check (availability in ('available','unavailable','unsupported','error')),
   metric_value numeric,
@@ -26,12 +29,13 @@ create table public.social_provider_metric_snapshots (
   provider_metadata jsonb not null default '{}'::jsonb check (jsonb_typeof(provider_metadata) = 'object'),
   created_at timestamptz not null default now(),
   updated_at timestamptz not null default now(),
-  unique (provider_account_link_id, provider_object_id, provider_metric_name, period, source_scope, effective_at),
+  unique (provider_account_link_id, provider_object_id, provider_metric_name, metric_variant, period, source_scope, effective_at),
   foreign key (provider_account_link_id, district_id)
     references public.social_provider_account_links(id, district_id) on delete cascade,
   foreign key (social_thread_id, district_id)
     references public.social_threads(id, district_id) on delete cascade,
   check ((metric_scope = 'content' and social_thread_id is not null) or (metric_scope = 'account' and social_thread_id is null)),
+  check (period_start_at is null or period_end_at is null or period_end_at >= period_start_at),
   check (availability <> 'available' or metric_value is not null or breakdown <> '{}'::jsonb)
 );
 
@@ -48,7 +52,7 @@ create or replace function public.canary_upsert_meta_metric_snapshot(
 ) returns uuid
 language plpgsql
 security definer
-set search_path = public
+set search_path = public, pg_temp
 as $$
 declare
   v_link public.social_provider_account_links%rowtype;
@@ -59,7 +63,10 @@ declare
   v_object_id text := btrim(coalesce(p_metric->>'provider_object_id',''));
   v_provider_metric text := btrim(coalesce(p_metric->>'provider_metric_name',''));
   v_normalized_metric text := btrim(coalesce(p_metric->>'normalized_metric_name',''));
+  v_metric_variant text := btrim(coalesce(p_metric->>'metric_variant','default'));
   v_period text := btrim(coalesce(p_metric->>'period','lifetime'));
+  v_period_start_at timestamptz := nullif(p_metric->>'period_start_at','')::timestamptz;
+  v_period_end_at timestamptz := nullif(p_metric->>'period_end_at','')::timestamptz;
   v_source_scope text := coalesce(p_metric->>'source_scope','unknown');
   v_availability text := coalesce(p_metric->>'availability','available');
   v_value numeric;
@@ -84,14 +91,15 @@ begin
   if not found then raise exception 'Active Meta connection is required'; end if;
 
   if v_scope not in ('account','content') then raise exception 'Metric scope must be account or content'; end if;
-  if v_object_id='' or v_provider_metric='' or v_normalized_metric='' or v_period='' then
-    raise exception 'Metric object, provider name, normalized name, and period are required';
+  if v_object_id='' or v_provider_metric='' or v_normalized_metric='' or v_metric_variant='' or v_period='' then
+    raise exception 'Metric object, provider name, normalized name, variant, and period are required';
   end if;
   if v_source_scope not in ('organic','paid','total','unknown') then raise exception 'Invalid metric source scope'; end if;
   if v_availability not in ('available','unavailable','unsupported','error') then raise exception 'Invalid metric availability'; end if;
   if jsonb_typeof(v_breakdown) <> 'object' or jsonb_typeof(v_metadata) <> 'object' then raise exception 'Metric breakdown and metadata must be objects'; end if;
   v_effective_at := nullif(p_metric->>'effective_at','')::timestamptz;
   if v_effective_at is null then raise exception 'Metric effective_at is required'; end if;
+  if v_period_start_at is not null and v_period_end_at is not null and v_period_end_at < v_period_start_at then raise exception 'Metric period end cannot precede its start'; end if;
   if p_metric ? 'metric_value' and jsonb_typeof(p_metric->'metric_value') = 'number' then v_value := (p_metric->>'metric_value')::numeric; end if;
   if v_value is not null and (v_value = 'NaN'::numeric or v_value < 0) then raise exception 'Metric value must be a finite non-negative number'; end if;
   if v_availability='available' and v_value is null and v_breakdown='{}'::jsonb then raise exception 'Available metric requires a value or breakdown'; end if;
@@ -110,16 +118,18 @@ begin
 
   insert into public.social_provider_metric_snapshots (
     district_id,provider_account_link_id,social_thread_id,provider,platform,metric_scope,
-    provider_object_id,provider_metric_name,normalized_metric_name,period,source_scope,
+    provider_object_id,provider_metric_name,normalized_metric_name,metric_variant,period,period_start_at,period_end_at,source_scope,
     availability,metric_value,breakdown,effective_at,observed_at,provider_metadata
   ) values (
     v_link.district_id,v_link.id,p_social_thread_id,'meta',v_asset.platform,v_scope,
-    v_object_id,v_provider_metric,v_normalized_metric,v_period,v_source_scope,
+    v_object_id,v_provider_metric,v_normalized_metric,v_metric_variant,v_period,v_period_start_at,v_period_end_at,v_source_scope,
     v_availability,v_value,v_breakdown,v_effective_at,v_observed_at,v_metadata
-  ) on conflict (provider_account_link_id,provider_object_id,provider_metric_name,period,source_scope,effective_at)
+  ) on conflict (provider_account_link_id,provider_object_id,provider_metric_name,metric_variant,period,source_scope,effective_at)
   do update set
     social_thread_id=excluded.social_thread_id,
     normalized_metric_name=excluded.normalized_metric_name,
+    period_start_at=excluded.period_start_at,
+    period_end_at=excluded.period_end_at,
     availability=excluded.availability,
     metric_value=excluded.metric_value,
     breakdown=excluded.breakdown,
@@ -131,10 +141,35 @@ begin
 end;
 $$;
 
+create or replace function public.canary_upsert_meta_metric_snapshots(
+  p_provider_account_link_id uuid,
+  p_social_thread_id uuid,
+  p_metrics jsonb
+) returns integer
+language plpgsql
+security definer
+set search_path = public, pg_temp
+as $$
+declare
+  v_metric jsonb;
+  v_count integer := 0;
+begin
+  if jsonb_typeof(p_metrics) <> 'array' then raise exception 'Metrics payload must be an array'; end if;
+  if jsonb_array_length(p_metrics) > 250 then raise exception 'Metrics payload exceeds the 250-row limit'; end if;
+  for v_metric in select value from jsonb_array_elements(p_metrics)
+  loop
+    perform public.canary_upsert_meta_metric_snapshot(p_provider_account_link_id,p_social_thread_id,v_metric);
+    v_count := v_count + 1;
+  end loop;
+  return v_count;
+end;
+$$;
+
 alter table public.social_provider_metric_snapshots enable row level security;
 revoke all on public.social_provider_metric_snapshots from anon, authenticated;
 grant select on public.social_provider_metric_snapshots to service_role;
 revoke all on function public.canary_upsert_meta_metric_snapshot(uuid, uuid, jsonb) from public, anon, authenticated;
-grant execute on function public.canary_upsert_meta_metric_snapshot(uuid, uuid, jsonb) to service_role;
+revoke all on function public.canary_upsert_meta_metric_snapshots(uuid, uuid, jsonb) from public, anon, authenticated;
+grant execute on function public.canary_upsert_meta_metric_snapshots(uuid, uuid, jsonb) to service_role;
 
 commit;

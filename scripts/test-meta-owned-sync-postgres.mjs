@@ -82,6 +82,9 @@ await withSocialDatabase('meta-owned-sync', async ({ sql, expectFailure, session
   }).replaceAll("'", "''");
   const snapshotId = sql(`copy (select public.canary_upsert_meta_metric_snapshot('${linkId}','${threadId}','${metric}'::jsonb)) to stdout;`).trim();
   assert.ok(snapshotId);
+  const metricBatch = `[${metric}]`;
+  assert.equal(sql(`copy (select public.canary_upsert_meta_metric_snapshots('${linkId}','${threadId}','${metricBatch}'::jsonb)) to stdout;`, { role:'service_role' }).trim().split('\n').at(-1), '1');
+  expectFailure(`select public.canary_upsert_meta_metric_snapshots('${linkId}','${threadId}','${metricBatch}'::jsonb);`, /permission denied/i, { role:'authenticated' });
   sql(`select public.canary_upsert_meta_metric_snapshot('${linkId}','${threadId}','${metric}'::jsonb);`);
   assert.equal(sql(`copy (select count(*) from public.social_provider_metric_snapshots where provider_account_link_id='${linkId}' and provider_metric_name='post_media_view') to stdout;`).trim(), '1');
   const updatedMetric = JSON.stringify({ ...JSON.parse(metric.replaceAll("''", "'")), metric_value:500 }).replaceAll("'", "''");
@@ -97,7 +100,7 @@ await withSocialDatabase('meta-owned-sync', async ({ sql, expectFailure, session
   expectFailure(`select public.canary_upsert_meta_metric_snapshot('${linkId}','${threadId}','${metric}'::jsonb);`, /permission denied/i, { role:'authenticated' });
   sql(`update public.social_provider_connections set status='revoked' where id='10000000-0000-4000-8000-000000000001';`);
   expectFailure(`select public.canary_ingest_owned_social_observation('${linkId}','${replay}'::jsonb);`, /Active Meta connection is required/, { role:'service_role' });
-  expectFailure(`select public.canary_upsert_meta_metric_snapshot('${linkId}','${threadId}','${metric}'::jsonb);`, /Active Meta connection is required/, { role:'service_role' });
+  expectFailure(`select public.canary_upsert_meta_metric_snapshots('${linkId}','${threadId}','${metricBatch}'::jsonb);`, /Active Meta connection is required/, { role:'service_role' });
   sql(`delete from public.social_threads where district_id='district-meta'; delete from public.social_accounts where district_id='district-meta';`);
   assert.equal(sql(`copy (select count(*) from public.social_provider_metric_snapshots where district_id='district-meta') to stdout;`).trim(), '0');
 });

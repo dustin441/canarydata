@@ -36,16 +36,20 @@ assert.ok(migration.includes('provider_metadata = social_threads.provider_metada
 assert.ok(migration.includes('Canonical Social account reassignment is not allowed'));
 assert.ok(!migration.includes('visibility_status = excluded.visibility_status'), 'Provider sync must not overwrite product-owned visibility.');
 assert.ok(insightsMigration.includes('create table public.social_provider_metric_snapshots'));
-assert.ok(insightsMigration.includes('unique (provider_account_link_id, provider_object_id, provider_metric_name, period, source_scope, effective_at)'), 'Metric snapshots must converge for the same provider-effective point.');
+assert.ok(insightsMigration.includes('unique (provider_account_link_id, provider_object_id, provider_metric_name, metric_variant, period, source_scope, effective_at)'), 'Metric snapshots must converge for the same provider-effective point and query variant.');
+assert.ok(insightsMigration.includes('period_start_at timestamptz'));
+assert.ok(insightsMigration.includes('period_end_at timestamptz'));
 assert.ok(insightsMigration.includes("metric_scope in ('account','content')"));
 assert.ok(insightsMigration.includes("availability in ('available','unavailable','unsupported','error')"));
 assert.ok(insightsMigration.includes("source_scope in ('organic','paid','total','unknown')"));
 assert.ok(insightsMigration.includes('canary_upsert_meta_metric_snapshot'));
+assert.ok(insightsMigration.includes('canary_upsert_meta_metric_snapshots'));
+assert.ok(insightsMigration.includes("jsonb_array_length(p_metrics) > 250"));
 assert.ok(insightsMigration.includes("status in ('active','needs_permissions') for update"), 'Metric writes must lock an authorized connection.');
 assert.ok(insightsMigration.includes('Selected active Meta asset is required'));
 assert.ok(insightsMigration.includes('enable row level security'));
 assert.ok(insightsMigration.includes('revoke all on function public.canary_upsert_meta_metric_snapshot(uuid, uuid, jsonb) from public, anon, authenticated'));
-assert.ok(insightsMigration.includes('grant execute on function public.canary_upsert_meta_metric_snapshot(uuid, uuid, jsonb) to service_role'));
+assert.ok(insightsMigration.includes('grant execute on function public.canary_upsert_meta_metric_snapshots(uuid, uuid, jsonb) to service_role'));
 
 assert.ok(service.includes("process.env.META_NATIVE_SYNC_ENABLED !== 'true'"), 'Native sync must remain disabled until migration and app readiness pass.');
 assert.ok(service.includes('debugMetaToken(accessToken, { signal: executionSignal })'), 'Every native sync must introspect its grant within the execution budget.');

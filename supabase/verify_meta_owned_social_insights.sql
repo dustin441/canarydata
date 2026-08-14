@@ -7,7 +7,8 @@ select
   to_regprocedure('public.canary_claim_meta_sync_run(text,uuid,integer,timestamp with time zone,jsonb)') is not null as claim_rpc_ready,
   to_regprocedure('public.canary_link_selected_meta_assets(text,uuid)') is not null as link_rpc_ready,
   to_regprocedure('public.canary_ingest_owned_social_observation(uuid,jsonb)') is not null as ingest_rpc_ready,
-  to_regprocedure('public.canary_upsert_meta_metric_snapshot(uuid,uuid,jsonb)') is not null as metric_rpc_ready;
+  to_regprocedure('public.canary_upsert_meta_metric_snapshot(uuid,uuid,jsonb)') is not null as metric_row_rpc_ready,
+  to_regprocedure('public.canary_upsert_meta_metric_snapshots(uuid,uuid,jsonb)') is not null as metric_bulk_rpc_ready;
 
 select relname,relrowsecurity
 from pg_class
@@ -23,7 +24,7 @@ from information_schema.routine_privileges
 where routine_schema='public'
   and routine_name in (
     'canary_claim_meta_sync_run','canary_link_selected_meta_assets',
-    'canary_ingest_owned_social_observation','canary_upsert_meta_metric_snapshot'
+    'canary_ingest_owned_social_observation','canary_upsert_meta_metric_snapshot','canary_upsert_meta_metric_snapshots'
   )
 order by routine_name,grantee;
 
