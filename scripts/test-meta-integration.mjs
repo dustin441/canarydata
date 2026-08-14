@@ -70,12 +70,16 @@ await meta.metaGraph('me', 'url-sensitive-token', { fields: 'id' }, { signal: ab
 assert.equal(graphRequest.options.signal.aborted, true, 'Native sync must propagate an already-aborted execution signal into Graph fetch.');
 globalThis.fetch = async (url, options) => {
   graphRequest = { url: String(url), options };
-  return { ok: true, json: async () => ({ data: { is_valid: true, app_id: 'test-app-id', user_id: 'meta-user-1' } }) };
+  return { ok: true, json: async () => [{
+    code: 200,
+    body: JSON.stringify({ data: { is_valid: true, app_id: 'test-app-id', user_id: 'meta-user-1', scopes: ['pages_show_list'] } }),
+  }] };
 };
 assert.equal((await meta.debugMetaToken('url-sensitive-token')).is_valid, true);
 assert.ok(!graphRequest.url.includes('url-sensitive-token'), 'Meta debug input tokens must not appear in request URLs.');
 assert.ok(!graphRequest.url.includes('test-app-secret'), 'Meta app credentials must not appear in debug request URLs.');
 assert.equal(graphRequest.options.method, 'POST');
+assert.ok(String(graphRequest.options.body).includes('batch='), 'Token introspection must use a body-authenticated Graph Batch GET.');
 await meta.debugMetaToken('url-sensitive-token', { signal: aborted.signal });
 assert.equal(graphRequest.options.signal.aborted, true, 'Token introspection must share the native-sync execution signal.');
 globalThis.fetch = async (url, options) => {

@@ -155,19 +155,27 @@ export async function metaGraphAll(path, accessToken, params = {}, maxPages = 20
 
 export async function debugMetaToken(accessToken, options = {}) {
   const appAccessToken = `${process.env.META_APP_ID}|${process.env.META_APP_SECRET}`;
+  const relativeUrl = `debug_token?${new URLSearchParams({ input_token: accessToken })}`;
   const body = new URLSearchParams({
-    input_token: accessToken,
     access_token: appAccessToken,
+    batch: JSON.stringify([{ method: 'GET', relative_url: relativeUrl }]),
+    include_headers: 'false',
   });
-  const response = await fetch(`https://graph.facebook.com/${META_GRAPH_VERSION}/debug_token`, {
+  const response = await fetch(`https://graph.facebook.com/${META_GRAPH_VERSION}/`, {
     method: 'POST',
     headers: { 'Content-Type': 'application/x-www-form-urlencoded', Accept: 'application/json' },
     body,
     cache: 'no-store',
     signal: options.signal ? AbortSignal.any([options.signal, AbortSignal.timeout(25000)]) : AbortSignal.timeout(25000),
   });
-  const payload = await response.json().catch(() => ({}));
-  if (!response.ok || payload?.error || !payload?.data) throw safeGraphError(payload, 'Meta token validation failed.');
+  const batchPayload = await response.json().catch(() => []);
+  const result = Array.isArray(batchPayload) ? batchPayload[0] : null;
+  const payload = (() => {
+    try { return JSON.parse(result?.body || '{}'); } catch { return {}; }
+  })();
+  if (!response.ok || Number(result?.code) < 200 || Number(result?.code) >= 300 || payload?.error || !payload?.data) {
+    throw safeGraphError(payload, 'Meta token validation failed.');
+  }
   return payload.data;
 }
 
