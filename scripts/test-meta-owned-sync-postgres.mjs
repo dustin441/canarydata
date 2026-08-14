@@ -25,8 +25,10 @@ await withSocialDatabase('meta-owned-sync', async ({ sql, expectFailure, session
   `);
   const base = await readFile(new URL('../supabase/meta_social_integration.sql', import.meta.url), 'utf8');
   const migration = await readFile(new URL('../supabase/migrations/20260813224000_meta_owned_social_sync.sql', import.meta.url), 'utf8');
+  const insightsMigration = await readFile(new URL('../supabase/migrations/20260814223000_meta_owned_social_insights.sql', import.meta.url), 'utf8');
   sql(base);
   sql(migration);
+  sql(insightsMigration);
   sql(`
     insert into public.districts(id,name) values ('district-meta','District Meta');
     insert into public.social_provider_connections(id,district_id,provider,provider_app_id,provider_user_id,status)
@@ -73,9 +75,31 @@ await withSocialDatabase('meta-owned-sync', async ({ sql, expectFailure, session
   sql(`select (public.canary_ingest_owned_social_observation('${linkId}','${replay}'::jsonb)).id;`, { role:'service_role' });
   assert.equal(sql(`copy (select visibility_status||'|'||reviewer_note||'|'||review_version||'|'||body from public.social_threads where district_id='district-meta' and external_thread_id='post-1') to stdout;`).trim(), 'excluded|keep excluded|3|Edited provider text');
   assert.equal(sql(`copy (select count(*) from public.social_thread_provider_observations where district_id='district-meta') to stdout;`).trim(), '1');
+  expectFailure(`insert into public.social_provider_account_links(district_id,social_account_id,provider_asset_id,provider) values ('district-a','${accountId}','20000000-0000-4000-8000-000000000001','meta');`, /foreign key|duplicate/i);
+  const threadId = sql(`copy (select id from public.social_threads where district_id='district-meta' and external_thread_id='post-1') to stdout;`).trim();
+  const metric = JSON.stringify({
+    metric_scope:'content',provider_object_id:'post-1',provider_metric_name:'post_media_view',normalized_metric_name:'views',period:'lifetime',source_scope:'organic',availability:'available',metric_value:494,effective_at:'2026-08-14T00:00:00Z',provider_metadata:{graph_version:'v25.0'},
+  }).replaceAll("'", "''");
+  const snapshotId = sql(`copy (select public.canary_upsert_meta_metric_snapshot('${linkId}','${threadId}','${metric}'::jsonb)) to stdout;`).trim();
+  assert.ok(snapshotId);
+  sql(`select public.canary_upsert_meta_metric_snapshot('${linkId}','${threadId}','${metric}'::jsonb);`);
+  assert.equal(sql(`copy (select count(*) from public.social_provider_metric_snapshots where provider_account_link_id='${linkId}' and provider_metric_name='post_media_view') to stdout;`).trim(), '1');
+  const updatedMetric = JSON.stringify({ ...JSON.parse(metric.replaceAll("''", "'")), metric_value:500 }).replaceAll("'", "''");
+  sql(`select public.canary_upsert_meta_metric_snapshot('${linkId}','${threadId}','${updatedMetric}'::jsonb);`);
+  assert.equal(sql(`copy (select metric_value::text from public.social_provider_metric_snapshots where id='${snapshotId}') to stdout;`).trim(), '500');
+  expectFailure(`select public.canary_upsert_meta_metric_snapshot('${linkId}',null,'${metric}'::jsonb);`, /content metric requires/i);
+  const accountMetric = JSON.stringify({
+    metric_scope:'account',provider_object_id:'page-1',provider_metric_name:'page_media_view',normalized_metric_name:'views',period:'day',source_scope:'total',availability:'available',metric_value:14574,effective_at:'2026-08-13T07:00:00Z',
+  }).replaceAll("'", "''");
+  assert.ok(sql(`copy (select public.canary_upsert_meta_metric_snapshot('${linkId}',null,'${accountMetric}'::jsonb)) to stdout;`).trim());
+  const wrongAccountMetric = accountMetric.replace('page-1', 'page-outside');
+  expectFailure(`select public.canary_upsert_meta_metric_snapshot('${linkId}',null,'${wrongAccountMetric}'::jsonb);`, /does not match the selected Meta asset/i);
+  expectFailure(`select public.canary_upsert_meta_metric_snapshot('${linkId}','${threadId}','${metric}'::jsonb);`, /permission denied/i, { role:'authenticated' });
   sql(`update public.social_provider_connections set status='revoked' where id='10000000-0000-4000-8000-000000000001';`);
   expectFailure(`select public.canary_ingest_owned_social_observation('${linkId}','${replay}'::jsonb);`, /Active Meta connection is required/, { role:'service_role' });
-  expectFailure(`insert into public.social_provider_account_links(district_id,social_account_id,provider_asset_id,provider) values ('district-a','${accountId}','20000000-0000-4000-8000-000000000001','meta');`, /foreign key|duplicate/i);
+  expectFailure(`select public.canary_upsert_meta_metric_snapshot('${linkId}','${threadId}','${metric}'::jsonb);`, /Active Meta connection is required/, { role:'service_role' });
+  sql(`delete from public.social_threads where district_id='district-meta'; delete from public.social_accounts where district_id='district-meta';`);
+  assert.equal(sql(`copy (select count(*) from public.social_provider_metric_snapshots where district_id='district-meta') to stdout;`).trim(), '0');
 });
 
 console.log('Meta owned-social PostgreSQL lifecycle rehearsal passed.');
