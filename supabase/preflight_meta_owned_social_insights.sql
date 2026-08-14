@@ -1,6 +1,20 @@
 -- READ ONLY. Run first in the production Supabase SQL Editor.
--- Every ready_* value must be true before applying migrations.
+-- This consolidated version returns one result row per Meta district connection.
+-- Every ready_* value must be true. Every *_before value must be null on first application.
 
+with meta_summary as (
+  select c.district_id,c.status,c.token_expires_at,
+         coalesce(cardinality(c.granted_scopes), 0) as granted_scope_count,
+         count(distinct a.id) filter (where a.selected and a.active) as selected_active_assets,
+         count(distinct m.id) as active_mappings
+  from public.social_provider_connections c
+  left join public.social_provider_assets a
+    on a.connection_id=c.id and a.district_id=c.district_id
+  left join public.social_account_mappings m
+    on m.provider_asset_id=a.id and m.district_id=a.district_id
+  where c.provider='meta'
+  group by c.district_id,c.status,c.token_expires_at,c.granted_scopes
+)
 select
   to_regclass('public.districts') is not null as ready_districts,
   to_regclass('public.social_accounts') is not null as ready_social_accounts,
@@ -18,20 +32,10 @@ select
     select 1 from pg_constraint
     where conrelid='public.social_threads'::regclass and contype='u'
       and pg_get_constraintdef(oid) like 'UNIQUE (id, district_id)%'
-  ) as ready_social_thread_tenant_key;
-
-select
+  ) as ready_social_thread_tenant_key,
   to_regclass('public.social_provider_account_links') as base_link_table_before,
   to_regclass('public.social_thread_provider_observations') as base_observation_table_before,
-  to_regclass('public.social_provider_metric_snapshots') as insights_table_before;
-
-select c.district_id,c.status,c.token_expires_at,
-       coalesce(cardinality(c.granted_scopes), 0) as granted_scope_count,
-       count(distinct a.id) filter (where a.selected and a.active) as selected_active_assets,
-       count(distinct m.id) as active_mappings
-from public.social_provider_connections c
-left join public.social_provider_assets a on a.connection_id=c.id and a.district_id=c.district_id
-left join public.social_account_mappings m on m.provider_asset_id=a.id and m.district_id=a.district_id
-where c.provider='meta'
-group by c.district_id,c.status,c.token_expires_at,c.granted_scopes
-order by c.district_id;
+  to_regclass('public.social_provider_metric_snapshots') as insights_table_before,
+  meta_summary.*
+from meta_summary
+order by district_id;
