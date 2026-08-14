@@ -33,7 +33,7 @@ function dayStart(value){const d=new Date(value); return new Date(Date.UTC(d.get
 function sourceScope(name){return name.startsWith('total_')||name.includes('_total')?'total':'unknown';}
 export function isMetaUnsupportedMetricError(result){
  const message=String(result?.error?.message||'');
- return String(result?.error?.code||'')==='100'&&/(metric[^.]{0,80}(not supported|unsupported|incompatible|not a valid)|not a valid insights metric)/i.test(message);
+ return String(result?.error?.code||'')==='100'&&/(metrics?[^.]{0,120}(not supported|unsupported|incompatible|not (?:a )?valid)|must be a valid insights metric|invalid insights metric)/i.test(message);
 }
 function errorAvailability(result){return isMetaUnsupportedMetricError(result)?'unsupported':'error';}
 function snapshotBase({platform,metricScope,providerObjectId,observedAt,request:spec,name,period,effectiveAt}){

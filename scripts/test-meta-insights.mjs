@@ -54,6 +54,9 @@ const unsupported=normalizeMetaInsightBatch({
 assert.equal(unsupported[0].availability,'unsupported');
 assert.equal(unsupported[0].provider_metadata.provider_error_code,'100');
 assert.equal(isMetaUnsupportedMetricError({ok:false,error:{code:100,message:'The metric is incompatible with this media type'}}),true);
+assert.equal(isMetaUnsupportedMetricError({ok:false,error:{code:100,message:'The following metrics are not valid for the specified media'}}),true);
+assert.equal(isMetaUnsupportedMetricError({ok:false,error:{code:100,message:'The value must be a valid insights metric'}}),true);
+assert.equal(isMetaUnsupportedMetricError({ok:false,error:{code:100,message:'Invalid insights metric requested'}}),true);
 assert.equal(isMetaUnsupportedMetricError({ok:false,error:{code:100,message:'Unsupported get request. Object does not exist or is inaccessible'}}),false);
 assert.equal(isMetaUnsupportedMetricError({ok:false,error:{code:100,message:'Missing permission for object'}}),false);
 
