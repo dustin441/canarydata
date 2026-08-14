@@ -9,6 +9,7 @@ import {
   encryptMetaToken,
   exchangeMetaCode,
   hashOauthState,
+  metaGrantedScopes,
   metaGraph,
   metaGraphAll,
   sanitizeReturnPath,
@@ -69,6 +70,7 @@ export async function GET(request) {
   const providerError = url.searchParams.get('error');
   const admin = createAdminClient();
   let returnPath = '/dashboard/integrations';
+  let stage = 'state_validation';
 
   try {
     if (!state) return redirectWithStatus(request, returnPath, 'invalid_state');
@@ -106,32 +108,31 @@ export async function GET(request) {
     returnPath = sanitizeReturnPath(consumedRows[0].return_path || returnPath);
     if (providerError || !code) return redirectWithStatus(request, returnPath, 'cancelled');
 
+    stage = 'code_exchange';
     const tokenGrant = await exchangeMetaCode(code);
     const accessToken = tokenGrant.access_token;
 
-    const [identity, permissionPayload, tokenData] = await Promise.all([
-      metaGraph('me', accessToken, { fields: 'id,name' }),
-      metaGraph('me/permissions', accessToken),
-      debugMetaToken(accessToken),
-    ]);
-    if (!identity?.id) throw new Error('Meta identity validation failed.');
+    stage = 'token_introspection';
+    const tokenData = await debugMetaToken(accessToken);
     if (tokenData?.is_valid !== true
       || String(tokenData?.app_id || '') !== String(process.env.META_APP_ID)
-      || String(tokenData?.user_id || '') !== String(identity.id)) {
+      || !tokenData?.user_id) {
       throw new Error('Meta grant validation failed.');
     }
 
-    const granted = (permissionPayload?.data || []).filter((item) => item.status === 'granted').map((item) => item.permission);
+    const granted = metaGrantedScopes(tokenData);
     const declined = META_REQUIRED_SCOPES.filter((scope) => !granted.includes(scope));
     const pageFields = granted.includes('instagram_basic')
       ? 'id,name,category,tasks,instagram_business_account{id,username,name,profile_picture_url}'
       : 'id,name,category,tasks';
+    stage = 'asset_discovery';
     const pages = granted.includes('pages_show_list')
       ? await metaGraphAll('me/accounts', accessToken, { fields: pageFields, limit: '100' })
       : [];
 
-    const providerUserId = String(identity.id);
-    const providerUserName = identity.name ? String(identity.name) : null;
+    const providerUserId = String(tokenData.user_id);
+    const providerUserName = null;
+    stage = 'connection_prepare';
     const { data: connectionId, error: prepareError } = await admin.rpc('canary_prepare_meta_connection', {
       p_district_id: actor.districtId,
       p_connected_by: actor.id,
@@ -144,6 +145,7 @@ export async function GET(request) {
 
     const tokenContext = `${connectionId}:${actor.districtId}:meta`;
     const rows = assetRows({ pages });
+    stage = 'connection_finalize';
     const { error: finalizeError } = await admin.rpc('canary_finalize_meta_connection', {
       p_connection_id: connectionId,
       p_district_id: actor.districtId,
@@ -164,7 +166,7 @@ export async function GET(request) {
 
     return redirectWithStatus(request, returnPath, declined.length ? 'permissions_limited' : 'connected');
   } catch (error) {
-    console.error('Meta OAuth callback failed', { code: error?.code || 'unknown', type: error?.type || error?.name || 'Error' });
+    console.error('Meta OAuth callback failed', { stage, code: error?.code || 'unknown', type: error?.type || error?.name || 'Error' });
     return redirectWithStatus(request, returnPath, 'callback_failed');
   }
 }

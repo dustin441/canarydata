@@ -8,6 +8,14 @@ export const META_REQUIRED_SCOPES = Object.freeze([
   'instagram_basic',
 ]);
 
+export function metaGrantedScopes(tokenData) {
+  const scopes = Array.isArray(tokenData?.scopes) ? tokenData.scopes : [];
+  const granularScopes = Array.isArray(tokenData?.granular_scopes)
+    ? tokenData.granular_scopes.map((entry) => entry?.scope)
+    : [];
+  return [...new Set([...scopes, ...granularScopes].filter((scope) => typeof scope === 'string' && scope))];
+}
+
 export function metaConfigured() {
   return Boolean(
     process.env.META_APP_ID

@@ -1,4 +1,4 @@
-import { decryptMetaToken, debugMetaToken, metaGraph, metaGraphAll } from './meta-integration.mjs';
+import { decryptMetaToken, debugMetaToken, metaGrantedScopes, metaGraph, metaGraphAll } from './meta-integration.mjs';
 import { boundedMetaSourceCutoff, mapFacebookPagePosts, mapInstagramMedia, summarizeMetaSyncOutcome, validateMetaSyncSelection } from './meta-owned-sync.mjs';
 
 const PAGE_FIELDS = 'id,access_token,tasks';
@@ -34,8 +34,7 @@ export async function syncSelectedMetaAssets({ admin, districtId, connectionId, 
   const tokenData = await debugMetaToken(accessToken, { signal: executionSignal });
   if (tokenData?.is_valid !== true || String(tokenData.app_id) !== String(process.env.META_APP_ID)
     || String(tokenData.user_id) !== String(connection.provider_user_id)) throw new Error('Meta authorization is no longer valid for this connection.');
-  const permissionPayload = await metaGraph('me/permissions', accessToken, {}, { signal: executionSignal });
-  const granted = (permissionPayload?.data || []).filter((row) => row.status === 'granted').map((row) => row.permission);
+  const granted = metaGrantedScopes(tokenData);
   for (const required of ['pages_show_list', 'pages_read_engagement']) {
     if (!granted.includes(required)) throw new Error(`Meta permission ${required} is required for synchronization.`);
   }

@@ -47,6 +47,11 @@ assert.equal(authUrl.searchParams.has('auth_type'), false, 'Business Login confi
 assert.ok(!authUrl.toString().includes('test-app-secret'), 'Meta app secret must never enter the browser authorization URL.');
 assert.equal(meta.sanitizeReturnPath('/dashboard/integrations?districtId=abc'), '/dashboard/integrations?districtId=abc');
 assert.equal(meta.sanitizeReturnPath('https://evil.example/steal'), '/dashboard/integrations');
+assert.deepEqual(meta.metaGrantedScopes({
+  scopes: ['business_management', 'pages_show_list', 'pages_show_list'],
+  granular_scopes: [{ scope: 'pages_read_engagement', target_ids: ['page-1'] }, { scope: 'instagram_basic' }],
+}), ['business_management', 'pages_show_list', 'pages_read_engagement', 'instagram_basic']);
+assert.deepEqual(meta.metaGrantedScopes(null), []);
 
 const originalFetch = globalThis.fetch;
 let graphRequest;
@@ -114,6 +119,9 @@ assert.ok(!callback.includes(".from('social_provider_credentials')"), 'Callback 
 assert.ok(callback.includes("p_provider_app_id: process.env.META_APP_ID"), 'Callback must bind persisted connections to the configured Meta app.');
 assert.ok(callback.includes('encryptMetaToken(accessToken, tokenContext)'), 'User token must be encrypted with AAD before storage.');
 assert.ok(callback.includes('debugMetaToken(accessToken)'), 'OAuth exchange must introspect and bind the grant to the configured app and provider identity.');
+assert.ok(callback.includes('metaGrantedScopes(tokenData)'), 'BISU permissions must come from token introspection.');
+assert.ok(!callback.includes("metaGraph('me/permissions'"), 'BISU callback must not call the legacy personal-user permissions edge.');
+assert.ok(callback.includes("const providerUserId = String(tokenData.user_id)"), 'BISU provider identity must come from the validated token subject.');
 assert.ok(callback.includes("status: declined.length ? 'needs_permissions' : 'active'"), 'Denied permissions must remain a visible connection state.');
 assert.ok(!callback.includes("granted.includes('ads_read')"), 'Owned-Social authorization must not request or discover ad accounts.');
 assert.ok(callback.includes("granted.includes('pages_show_list')"), 'Page discovery must tolerate denied pages_show_list.');
@@ -156,6 +164,9 @@ assert.ok(dashboardClient.includes('Facebook & Instagram'), 'Settings must ident
 assert.ok(dashboardClient.includes('Manage Meta connection'), 'Settings must expose the Meta connection action.');
 assert.ok(dashboardClient.includes('metaIntegrationEnabled={metaIntegrationEnabled}'), 'Settings must receive server-verified Meta configuration status.');
 assert.ok(!dashboardClient.includes('<span className="sidebar-link-icon">🔗</span>'), 'Meta integration must live in Settings rather than as a standalone sidebar item.');
+const syncService = fs.readFileSync(new URL('../src/lib/meta-sync-service.mjs', import.meta.url), 'utf8');
+assert.ok(syncService.includes('metaGrantedScopes(tokenData)'), 'Native sync must validate BISU scopes through token introspection.');
+assert.ok(!syncService.includes("metaGraph('me/permissions'"), 'Native sync must not call the legacy personal-user permissions edge.');
 assert.ok(!fs.readFileSync(new URL('../src/lib/meta-integration.mjs', import.meta.url), 'utf8').includes('fetch(nextUrl'), 'Provider pagination URLs containing credentials must never be fetched directly.');
 
 console.log('Meta integration security and structure tests passed.');
