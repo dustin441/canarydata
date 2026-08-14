@@ -139,6 +139,31 @@ export async function metaGraph(path, accessToken, params = {}, options = {}) {
   return payload;
 }
 
+export async function metaGraphBatch(requests, accessToken, options = {}) {
+  if (!Array.isArray(requests) || requests.length < 1 || requests.length > 50) throw new Error('Meta Graph batch requires 1 to 50 requests.');
+  const batch = requests.map(({ path, params = {} }) => {
+    const query = new URLSearchParams(Object.fromEntries(Object.entries(params).filter(([, value]) => value !== undefined && value !== null)));
+    const relativePath = String(path).replace(/^\//, '');
+    return { method: 'GET', relative_url: `${relativePath}${query.size ? `?${query.toString()}` : ''}` };
+  });
+  const body = new URLSearchParams({ access_token: accessToken, appsecret_proof: metaAppSecretProof(accessToken), batch: JSON.stringify(batch) });
+  const response = await fetch(`https://graph.facebook.com/${META_GRAPH_VERSION}/`, {
+    method: 'POST', headers: { 'Content-Type': 'application/x-www-form-urlencoded', Accept: 'application/json' }, body,
+    cache: 'no-store', signal: options.signal ? AbortSignal.any([options.signal, AbortSignal.timeout(25000)]) : AbortSignal.timeout(25000),
+  });
+  const payload = await response.json().catch(() => null);
+  if (!response.ok || !Array.isArray(payload) || payload.length !== requests.length) throw safeGraphError(payload, 'Meta could not complete the batch request.');
+  return payload.map((result) => {
+    let parsed = {};
+    try { parsed = JSON.parse(result?.body || '{}'); } catch { parsed = {}; }
+    const status = Number(result?.code || 0);
+    if (status < 200 || status >= 300 || parsed?.error) {
+      return { ok: false, status, error: { code: parsed?.error?.code || status || 'META_BATCH_ERROR', type: parsed?.error?.type || 'MetaError', message: String(parsed?.error?.message || 'Meta metric request failed.').slice(0, 300) } };
+    }
+    return { ok: true, status, payload: parsed };
+  });
+}
+
 export async function metaGraphAll(path, accessToken, params = {}, maxPages = 20, options = {}) {
   const rows = [];
   const seenCursors = new Set();

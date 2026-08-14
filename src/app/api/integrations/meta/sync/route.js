@@ -15,6 +15,8 @@ export async function POST(request) {
       districtId: actor.districtId,
       connectionId,
       sourceCutoff: body?.sourceCutoff || null,
+      pilotItemLimit: body?.pilotItemLimit ?? null,
+      platforms: body?.platforms ?? null,
     });
     return Response.json({ ok: true, ...result });
   } catch (error) {

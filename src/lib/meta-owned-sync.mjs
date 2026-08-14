@@ -78,6 +78,7 @@ function instagramItem(asset, row) {
       provider_instagram_id: asset?.provider_asset_id,
       parent_provider_page_id: asset?.parent_provider_asset_id || null,
       media_type: row?.media_type || null,
+      media_product_type: row?.media_product_type || null,
       source: 'meta_graph',
       metric_availability: { comments: true, reactions: true, shares: false, views: false },
     },
