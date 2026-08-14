@@ -152,7 +152,10 @@ assert.ok(integrationClient.includes('<option value="" disabled>Select one distr
 assert.ok(integrationClient.includes('if (!districtId)'), 'Integration client must avoid loading Meta data before an admin selects a district.');
 
 const dashboardClient = fs.readFileSync(new URL('../src/app/dashboard/DashboardClient.js', import.meta.url), 'utf8');
-assert.ok(dashboardClient.includes("href={isAdmin ? '/dashboard/integrations'"), 'Admin navigation must not attach an implicitly selected district.');
+assert.ok(dashboardClient.includes('Facebook & Instagram'), 'Settings must identify the Meta owned-social connection clearly.');
+assert.ok(dashboardClient.includes('Manage Meta connection'), 'Settings must expose the Meta connection action.');
+assert.ok(dashboardClient.includes('metaIntegrationEnabled={metaIntegrationEnabled}'), 'Settings must receive server-verified Meta configuration status.');
+assert.ok(!dashboardClient.includes('<span className="sidebar-link-icon">🔗</span>'), 'Meta integration must live in Settings rather than as a standalone sidebar item.');
 assert.ok(!fs.readFileSync(new URL('../src/lib/meta-integration.mjs', import.meta.url), 'utf8').includes('fetch(nextUrl'), 'Provider pagination URLs containing credentials must never be fetched directly.');
 
 console.log('Meta integration security and structure tests passed.');

@@ -1617,7 +1617,7 @@ function HowItWorksView() {
   );
 }
 
-function SettingsView({ userDistrictId, districts, billingInfo = null, onPayByCard = null }) {
+function SettingsView({ userDistrictId, districts, billingInfo = null, onPayByCard = null, metaIntegrationEnabled = false, selectedDistrictId = null }) {
   const [issue, setIssue] = useState('');
   const [isPending, startSupportTransition] = useTransition();
   const [isBillingPending, startBillingTransition] = useTransition();
@@ -1637,6 +1637,8 @@ function SettingsView({ userDistrictId, districts, billingInfo = null, onPayByCa
   const assignedDistrict = userDistrictId ? districts?.find((d) => d.id === userDistrictId) : null;
   const profileName = assignedDistrict?.name ?? 'Canary Admin';
   const profileDetail = userDistrictId ? 'Client view · 1 district' : 'Admin view · all districts';
+  const integrationDistrictId = userDistrictId || (selectedDistrictId && selectedDistrictId !== 'All' ? selectedDistrictId : null);
+  const integrationDistrict = integrationDistrictId ? districts?.find((district) => district.id === integrationDistrictId) : null;
 
   const handleLogout = async () => {
     try {
@@ -1715,6 +1717,32 @@ function SettingsView({ userDistrictId, districts, billingInfo = null, onPayByCa
           </button>
         </div>
       </div>
+
+      {/* Connected accounts */}
+      {metaIntegrationEnabled && (
+        <div style={{ background: 'var(--bg-elevated)', border: '1px solid var(--border-secondary)', borderRadius: 'var(--radius-lg)', padding: '32px', maxWidth: '800px', marginBottom: '24px' }}>
+          <div style={{ display: 'flex', alignItems: 'flex-start', justifyContent: 'space-between', gap: '16px', marginBottom: '8px' }}>
+            <div>
+              <h4 style={{ color: 'var(--text-primary)', marginBottom: '8px', fontSize: '1.2rem' }}>Facebook & Instagram</h4>
+              <p style={{ color: 'var(--text-secondary)', fontSize: '0.9rem', lineHeight: 1.6, margin: 0 }}>
+                Connect official Facebook Pages and linked Instagram professional accounts for read-only reporting.
+              </p>
+            </div>
+            <span style={{ border: '1px solid rgba(34,197,94,0.35)', borderRadius: '999px', color: '#22C55E', fontSize: '0.75rem', fontWeight: 700, padding: '6px 10px', whiteSpace: 'nowrap' }}>Read-only</span>
+          </div>
+          <div style={{ marginTop: '20px', padding: '16px', border: '1px solid var(--border-secondary)', borderRadius: 'var(--radius-md)', color: 'var(--text-secondary)', fontSize: '0.86rem', lineHeight: 1.55 }}>
+            <strong style={{ color: 'var(--text-primary)' }}>Workspace:</strong> {integrationDistrict?.name || 'Select a district from the sidebar first'}<br />
+            Canary cannot publish posts, reply to comments, send messages, manage ads, or spend advertising budget.
+          </div>
+          <div style={{ display: 'flex', justifyContent: 'flex-end', marginTop: '20px' }}>
+            {integrationDistrictId ? (
+              <a className="btn btn-primary" href={`/dashboard/integrations?districtId=${encodeURIComponent(integrationDistrictId)}`}>Manage Meta connection</a>
+            ) : (
+              <button className="btn btn-secondary" type="button" disabled>Select a district to manage Meta</button>
+            )}
+          </div>
+        </div>
+      )}
 
       {/* Billing Documents */}
       {userDistrictId && (
@@ -3954,16 +3982,7 @@ export default function DashboardClient({ articles, districts, queries: initialQ
               Social
               <span className="sidebar-link-badge">{socialResultCount}</span>
             </button>
-            {!demoMode && metaIntegrationEnabled && (isAdmin || districtFilter !== 'All') && (
-              <a
-                className="sidebar-link"
-                href={isAdmin ? '/dashboard/integrations' : `/dashboard/integrations?districtId=${encodeURIComponent(districtFilter)}`}
-              >
-                <span className="sidebar-link-icon">🔗</span>
-                Integrations
-                <span className="sidebar-link-badge">Meta</span>
-              </a>
-            )}
+
             {!demoMode && melodiEnabled && (
               <button
                 className={`sidebar-link melodi-sidebar-link ${currentView === 'melodi' ? 'active' : ''}`}
@@ -4237,7 +4256,7 @@ export default function DashboardClient({ articles, districts, queries: initialQ
             </div>
           )}
           {currentView === 'clients' && <ClientsView clients={clients} />}
-          {currentView === 'settings' && <SettingsView userDistrictId={userDistrictId} districts={districts} billingInfo={billingInfo} onPayByCard={openPaymentModal} />}
+          {currentView === 'settings' && <SettingsView userDistrictId={userDistrictId} districts={districts} billingInfo={billingInfo} onPayByCard={openPaymentModal} metaIntegrationEnabled={metaIntegrationEnabled} selectedDistrictId={districtFilter} />}
           {currentView === 'howto' && <HowItWorksView />}
           {currentView === 'social' && (
             <SocialView
