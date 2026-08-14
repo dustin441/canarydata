@@ -3,6 +3,7 @@ import fs from 'node:fs';
 
 const migration = fs.readFileSync(new URL('../supabase/migrations/20260813224000_meta_owned_social_sync.sql', import.meta.url), 'utf8');
 const insightsMigration = fs.readFileSync(new URL('../supabase/migrations/20260814223000_meta_owned_social_insights.sql', import.meta.url), 'utf8');
+const insightsPermissionPatch = fs.readFileSync(new URL('../supabase/migrations/20260814224500_meta_insights_restrict_row_rpc.sql', import.meta.url), 'utf8');
 const preflight = fs.readFileSync(new URL('../supabase/preflight_meta_owned_social_insights.sql', import.meta.url), 'utf8');
 const service = fs.readFileSync(new URL('../src/lib/meta-sync-service.mjs', import.meta.url), 'utf8');
 const route = fs.readFileSync(new URL('../src/app/api/integrations/meta/sync/route.js', import.meta.url), 'utf8');
@@ -49,8 +50,11 @@ assert.ok(insightsMigration.includes("jsonb_array_length(p_metrics) > 250"));
 assert.ok(insightsMigration.includes("status in ('active','needs_permissions') for update"), 'Metric writes must lock an authorized connection.');
 assert.ok(insightsMigration.includes('Selected active Meta asset is required'));
 assert.ok(insightsMigration.includes('enable row level security'));
-assert.ok(insightsMigration.includes('revoke all on function public.canary_upsert_meta_metric_snapshot(uuid, uuid, jsonb) from public, anon, authenticated'));
+assert.ok(insightsMigration.includes('revoke all on function public.canary_upsert_meta_metric_snapshot(uuid, uuid, jsonb) from public, anon, authenticated, service_role'));
 assert.ok(insightsMigration.includes('grant execute on function public.canary_upsert_meta_metric_snapshots(uuid, uuid, jsonb) to service_role'));
+assert.ok(insightsPermissionPatch.includes('canary_upsert_meta_metric_snapshot(uuid, uuid, jsonb)'));
+assert.ok(insightsPermissionPatch.includes('from public, anon, authenticated, service_role'));
+assert.ok(insightsPermissionPatch.includes('grant execute on function public.canary_upsert_meta_metric_snapshots(uuid, uuid, jsonb)'));
 assert.ok(preflight.includes('cardinality(c.granted_scopes)'), 'Production Meta scopes are stored as text[].');
 assert.ok(!preflight.includes('jsonb_array_length(c.granted_scopes)'), 'Preflight must not treat text[] scopes as JSONB.');
 

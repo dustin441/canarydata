@@ -168,7 +168,7 @@ $$;
 alter table public.social_provider_metric_snapshots enable row level security;
 revoke all on public.social_provider_metric_snapshots from anon, authenticated;
 grant select on public.social_provider_metric_snapshots to service_role;
-revoke all on function public.canary_upsert_meta_metric_snapshot(uuid, uuid, jsonb) from public, anon, authenticated;
+revoke all on function public.canary_upsert_meta_metric_snapshot(uuid, uuid, jsonb) from public, anon, authenticated, service_role;
 revoke all on function public.canary_upsert_meta_metric_snapshots(uuid, uuid, jsonb) from public, anon, authenticated;
 grant execute on function public.canary_upsert_meta_metric_snapshots(uuid, uuid, jsonb) to service_role;
 
