@@ -1,8 +1,13 @@
 import { createHash, createHmac, randomBytes, createCipheriv, createDecipheriv, timingSafeEqual } from 'node:crypto';
 
 export const META_GRAPH_VERSION = process.env.META_GRAPH_VERSION || 'v25.0';
-export const META_REQUIRED_SCOPES = Object.freeze([
+export const META_CONFIGURATION_PERMISSIONS = Object.freeze([
   'business_management',
+  'pages_show_list',
+  'pages_read_engagement',
+  'instagram_basic',
+]);
+export const META_REQUIRED_SCOPES = Object.freeze([
   'pages_show_list',
   'pages_read_engagement',
   'instagram_basic',

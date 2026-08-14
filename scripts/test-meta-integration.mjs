@@ -24,12 +24,18 @@ assert.throws(() => meta.decryptMetaToken(encrypted, 'wrong-context'), 'Wrong AA
 const tampered = `${encrypted.slice(0, -1)}${encrypted.endsWith('A') ? 'B' : 'A'}`;
 assert.throws(() => meta.decryptMetaToken(tampered, tokenContext), 'Tampered ciphertext must fail authentication.');
 
-assert.deepEqual(meta.META_REQUIRED_SCOPES, [
+assert.deepEqual(meta.META_CONFIGURATION_PERMISSIONS, [
   'business_management',
   'pages_show_list',
   'pages_read_engagement',
   'instagram_basic',
 ]);
+assert.deepEqual(meta.META_REQUIRED_SCOPES, [
+  'pages_show_list',
+  'pages_read_engagement',
+  'instagram_basic',
+]);
+assert.ok(!meta.META_REQUIRED_SCOPES.includes('business_management'), 'Meta does not report configuration-level business_management in BISU token scopes.');
 for (const forbidden of ['ads_read', 'ads_management', 'pages_manage_posts', 'read_insights', 'instagram_manage_insights']) {
   assert.ok(!meta.META_REQUIRED_SCOPES.includes(forbidden), `Discovery release must not request ${forbidden}.`);
 }
