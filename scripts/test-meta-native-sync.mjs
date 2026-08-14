@@ -67,6 +67,7 @@ assert.ok(service.includes("['ANALYZE', 'MANAGE'].includes(task)"), 'Facebook Pa
 assert.ok(service.includes("granted.includes('read_insights')"));
 assert.ok(service.includes("granted.includes('instagram_manage_insights')"));
 assert.ok(service.includes("pilotLimit > 2"), 'Controlled persistence pilot must have a hard two-item cap.');
+assert.ok(service.includes("pilotLimit && assets.length !== 1"), 'The two-item pilot cap must be global, not multiplied per selected asset.');
 assert.ok(service.includes("META_NATIVE_SYNC_PILOT_ONLY !== 'false'"), 'Unbounded native sync must remain blocked by default.');
 assert.ok(service.includes("String(result?.error?.code || '') !== '100'"), 'Only provider metric incompatibility may converge as unsupported; auth and transient errors must fail the run.');
 assert.ok(service.includes("platformFilter.includes(asset.platform)"), 'Pilot may narrow but never broaden selected assets.');

@@ -30,7 +30,7 @@ export function instagramContentInsightRequests(mediaId,{mediaProductType}={}){
 }
 
 function dayStart(value){const d=new Date(value); return new Date(Date.UTC(d.getUTCFullYear(),d.getUTCMonth(),d.getUTCDate())).toISOString();}
-function sourceScope(name){return name.startsWith('total_')||name.includes('_total')||['likes','comments','shares','saved','reposts','total_interactions'].includes(name)?'total':'unknown';}
+function sourceScope(name){return name.startsWith('total_')||name.includes('_total')?'total':'unknown';}
 function errorAvailability(result){return String(result?.error?.code||'')==='100'?'unsupported':'error';}
 function snapshotBase({platform,metricScope,providerObjectId,observedAt,request:spec,name,period,effectiveAt}){
  return {metric_scope:metricScope,provider_object_id:String(providerObjectId),provider_metric_name:name||spec.providerMetricName,normalized_metric_name:spec.normalizedMetricName,metric_variant:spec.metricVariant,period:period||spec.period,period_start_at:spec.periodStartAt,period_end_at:spec.periodEndAt,source_scope:sourceScope(name||spec.providerMetricName),availability:'available',metric_value:null,breakdown:{},effective_at:effectiveAt,observed_at:new Date(observedAt).toISOString(),provider_metadata:{platform,source:'meta_graph_insights'}};

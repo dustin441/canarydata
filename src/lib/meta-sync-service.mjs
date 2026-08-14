@@ -70,6 +70,7 @@ export async function syncSelectedMetaAssets({ admin, districtId, connectionId, 
   validateMetaSyncSelection(selectedAssets || []);
   const assets = (selectedAssets || []).filter((asset) => !platformFilter || platformFilter.includes(asset.platform));
   if (!assets.length) throw new Error('No selected Meta assets match the requested pilot platforms.');
+  if (pilotLimit && assets.length !== 1) throw new Error('A controlled Meta pilot must resolve to exactly one selected platform asset.');
   if (assets.some((asset) => asset.platform === 'facebook') && !granted.includes('read_insights')) throw new Error('Meta permission read_insights is required for Facebook reporting.');
   if (assets.some((asset) => asset.platform === 'instagram') && !granted.includes('instagram_manage_insights')) throw new Error('Meta permission instagram_manage_insights is required for Instagram reporting.');
   const { error: linkError } = await admin.rpc('canary_link_selected_meta_assets', { p_district_id: districtId, p_connection_id: connectionId });

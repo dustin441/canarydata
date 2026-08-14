@@ -63,4 +63,11 @@ assert.equal(accountTotal[0].metric_variant,'total_value');
 assert.equal(accountTotal[0].period_start_at,'2026-08-07T00:00:00.000Z');
 assert.equal(accountTotal[0].period_end_at,'2026-08-14T00:00:00.000Z');
 
+const igLikes=normalizeMetaInsightBatch({
+ platform:'instagram',metricScope:'content',providerObjectId:'ig-media-1',observedAt,
+ requests:[instagramContentInsightRequests('ig-media-1',{mediaProductType:'REELS'}).find((r)=>r.providerMetricName==='likes')],
+ results:[{ok:true,payload:{data:[{name:'likes',period:'lifetime',values:[{value:3}]}]}}],
+});
+assert.equal(igLikes[0].source_scope,'unknown');
+
 console.log('Meta Insights normalization tests passed.');
