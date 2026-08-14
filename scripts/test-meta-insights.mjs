@@ -4,6 +4,7 @@ import {
   facebookContentInsightRequests,
   instagramAccountInsightRequests,
   instagramContentInsightRequests,
+  isMetaUnsupportedMetricError,
   normalizeMetaInsightBatch,
 } from '../src/lib/meta-insights.mjs';
 
@@ -52,6 +53,9 @@ const unsupported=normalizeMetaInsightBatch({
 });
 assert.equal(unsupported[0].availability,'unsupported');
 assert.equal(unsupported[0].provider_metadata.provider_error_code,'100');
+assert.equal(isMetaUnsupportedMetricError({ok:false,error:{code:100,message:'The metric is incompatible with this media type'}}),true);
+assert.equal(isMetaUnsupportedMetricError({ok:false,error:{code:100,message:'Unsupported get request. Object does not exist or is inaccessible'}}),false);
+assert.equal(isMetaUnsupportedMetricError({ok:false,error:{code:100,message:'Missing permission for object'}}),false);
 
 const accountTotal=normalizeMetaInsightBatch({
  platform:'instagram',metricScope:'account',providerObjectId:'ig-1',observedAt,
@@ -62,6 +66,15 @@ assert.equal(accountTotal[0].metric_value,905);
 assert.equal(accountTotal[0].metric_variant,'total_value');
 assert.equal(accountTotal[0].period_start_at,'2026-08-07T00:00:00.000Z');
 assert.equal(accountTotal[0].period_end_at,'2026-08-14T00:00:00.000Z');
+assert.equal(instagramAccountInsightRequests('ig-1',{since:'2026-08-07',until:'2026-08-14'}).find((r)=>r.providerMetricName==='follows_and_unfollows').metricVariant,'total_value');
+assert.equal(instagramAccountInsightRequests('ig-1',{since:'2026-08-07',until:'2026-08-14'}).find((r)=>r.providerMetricName==='follows_and_unfollows').params.breakdown,'follow_type');
+const followBreakdown=normalizeMetaInsightBatch({
+ platform:'instagram',metricScope:'account',providerObjectId:'ig-1',observedAt,
+ requests:[instagramAccountInsightRequests('ig-1',{since:'2026-08-07',until:'2026-08-14'}).find((r)=>r.providerMetricName==='follows_and_unfollows')],
+ results:[{ok:true,payload:{data:[{name:'follows_and_unfollows',period:'day',total_value:{breakdowns:[{dimension_keys:['follow_type'],results:[{dimension_values:['FOLLOWER'],value:4},{dimension_values:['NON_FOLLOWER'],value:1}]}]}}]}}],
+});
+assert.equal(followBreakdown[0].availability,'available');
+assert.equal(followBreakdown[0].breakdown.breakdowns[0].results[0].value,4);
 
 const igLikes=normalizeMetaInsightBatch({
  platform:'instagram',metricScope:'content',providerObjectId:'ig-media-1',observedAt,

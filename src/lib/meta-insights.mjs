@@ -20,8 +20,8 @@ export function instagramAccountInsightRequests(accountId,{since,until}){
  const start=new Date(`${since}T00:00:00.000Z`).toISOString(); const end=new Date(`${until}T00:00:00.000Z`).toISOString();
  const common={period:'day',periodStartAt:start,periodEndAt:end};
  return [
-  ...['reach','follower_count','follows_and_unfollows'].map((metric)=>request(`${accountId}/insights`,metric,null,{...common,metricVariant:'time_series',params:{metric,period:'day',since,until}})),
-  ...['views','profile_views','website_clicks','profile_links_taps','accounts_engaged','total_interactions'].map((metric)=>request(`${accountId}/insights`,metric,null,{...common,metricVariant:'total_value',params:{metric,period:'day',metric_type:'total_value',since,until}})),
+  ...['reach','follower_count'].map((metric)=>request(`${accountId}/insights`,metric,null,{...common,metricVariant:'time_series',params:{metric,period:'day',since,until}})),
+  ...['views','profile_views','website_clicks','profile_links_taps','accounts_engaged','total_interactions','follows_and_unfollows'].map((metric)=>request(`${accountId}/insights`,metric,null,{...common,metricVariant:'total_value',params:{metric,period:'day',metric_type:'total_value',since,until,...(metric==='follows_and_unfollows'?{breakdown:'follow_type'}:{})}})),
  ];
 }
 export function instagramContentInsightRequests(mediaId,{mediaProductType}={}){
@@ -31,7 +31,11 @@ export function instagramContentInsightRequests(mediaId,{mediaProductType}={}){
 
 function dayStart(value){const d=new Date(value); return new Date(Date.UTC(d.getUTCFullYear(),d.getUTCMonth(),d.getUTCDate())).toISOString();}
 function sourceScope(name){return name.startsWith('total_')||name.includes('_total')?'total':'unknown';}
-function errorAvailability(result){return String(result?.error?.code||'')==='100'?'unsupported':'error';}
+export function isMetaUnsupportedMetricError(result){
+ const message=String(result?.error?.message||'');
+ return String(result?.error?.code||'')==='100'&&/(metric[^.]{0,80}(not supported|unsupported|incompatible|not a valid)|not a valid insights metric)/i.test(message);
+}
+function errorAvailability(result){return isMetaUnsupportedMetricError(result)?'unsupported':'error';}
 function snapshotBase({platform,metricScope,providerObjectId,observedAt,request:spec,name,period,effectiveAt}){
  return {metric_scope:metricScope,provider_object_id:String(providerObjectId),provider_metric_name:name||spec.providerMetricName,normalized_metric_name:spec.normalizedMetricName,metric_variant:spec.metricVariant,period:period||spec.period,period_start_at:spec.periodStartAt,period_end_at:spec.periodEndAt,source_scope:sourceScope(name||spec.providerMetricName),availability:'available',metric_value:null,breakdown:{},effective_at:effectiveAt,observed_at:new Date(observedAt).toISOString(),provider_metadata:{platform,source:'meta_graph_insights'}};
 }
@@ -55,7 +59,15 @@ export function normalizeMetaInsightBatch({platform,metricScope,providerObjectId
   const data=Array.isArray(result.payload?.data)?result.payload.data:[];
   if(!data.length){output.push(unavailable(args,result));return;}
   for(const metric of data){
-   if(metric?.total_value){const row=snapshotBase({...args,name:metric.name,period:metric.period,effectiveAt:spec.periodEndAt||dayStart(observedAt)});output.push(setValue(row,metric.total_value.value));continue;}
+   if(metric?.total_value){
+    const row=snapshotBase({...args,name:metric.name,period:metric.period,effectiveAt:spec.periodEndAt||dayStart(observedAt)});
+    const breakdowns=Array.isArray(metric.total_value.breakdowns)?metric.total_value.breakdowns:[];
+    const usefulBreakdowns=breakdowns.filter((item)=>Array.isArray(item?.results)&&item.results.length>0);
+    if(usefulBreakdowns.length) row.breakdown={breakdowns:usefulBreakdowns};
+    if(typeof metric.total_value.value==='number') row.metric_value=metric.total_value.value;
+    if(row.metric_value==null&&Object.keys(row.breakdown).length===0) row.availability='unavailable';
+    output.push(row);continue;
+   }
    const values=Array.isArray(metric?.values)?metric.values:[];
    if(!values.length){output.push(unavailable({...args,request:{...spec,period:metric?.period||spec.period}},result));continue;}
    for(const point of values){const effectiveAt=point?.end_time?new Date(point.end_time).toISOString():spec.periodEndAt||dayStart(observedAt);const row=snapshotBase({...args,name:metric.name,period:metric.period,effectiveAt});output.push(setValue(row,point?.value));}

@@ -69,7 +69,7 @@ assert.ok(service.includes("granted.includes('instagram_manage_insights')"));
 assert.ok(service.includes("pilotLimit > 2"), 'Controlled persistence pilot must have a hard two-item cap.');
 assert.ok(service.includes("pilotLimit && assets.length !== 1"), 'The two-item pilot cap must be global, not multiplied per selected asset.');
 assert.ok(service.includes("META_NATIVE_SYNC_PILOT_ONLY !== 'false'"), 'Unbounded native sync must remain blocked by default.');
-assert.ok(service.includes("String(result?.error?.code || '') !== '100'"), 'Only provider metric incompatibility may converge as unsupported; auth and transient errors must fail the run.');
+assert.ok(service.includes("!isMetaUnsupportedMetricError(result)"), 'Only specifically identified provider metric incompatibility may converge as unsupported; auth and transient errors must fail the run.');
 assert.ok(service.includes("platformFilter.includes(asset.platform)"), 'Pilot may narrow but never broaden selected assets.');
 assert.ok(service.includes("admin.rpc('canary_upsert_meta_metric_snapshots'"));
 assert.ok(service.includes('metric_rows_written: metricRowsWritten'));
@@ -84,6 +84,9 @@ assert.ok(service.includes('Meta synchronization failed and its run could not be
 assert.ok(service.includes("admin.rpc('canary_claim_meta_sync_run'"));
 assert.ok(service.includes('const deadline = Date.now() + 45_000'));
 assert.ok(service.includes('const executionSignal = AbortSignal.timeout(45_000)'));
+assert.ok(service.includes("['AbortError', 'TimeoutError'].includes"));
+assert.ok(service.includes("errorCode: 'EXECUTION_BUDGET', threads: []"), 'Account Insights timeout must produce a replayable partial run before content writes.');
+assert.ok(service.includes("batch.threads.slice(0, writtenCount + 1)"), 'Content Insights timeout must record the already-ingested thread and replay from the input cursor.');
 assert.ok(service.includes('{ signal: executionSignal }'), 'Every Meta request in native sync must share an abortable execution budget.');
 assert.ok(service.includes('next_cursor: nextCursor'));
 assert.ok(service.includes("previousRun?.status === 'partial' ? previousRun.source_cutoff : sourceCutoff"), 'Continuation must preserve the original bounded source cutoff.');

@@ -1,6 +1,6 @@
 import { decryptMetaToken, debugMetaToken, metaGrantedScopes, metaGraph, metaGraphAll, metaGraphBatch } from './meta-integration.mjs';
 import { boundedMetaSourceCutoff, mapFacebookPagePosts, mapInstagramMedia, summarizeMetaSyncOutcome, validateMetaSyncSelection } from './meta-owned-sync.mjs';
-import { facebookAccountInsightRequests, facebookContentInsightRequests, instagramAccountInsightRequests, instagramContentInsightRequests, normalizeMetaInsightBatch, sevenDayInsightWindow } from './meta-insights.mjs';
+import { facebookAccountInsightRequests, facebookContentInsightRequests, instagramAccountInsightRequests, instagramContentInsightRequests, isMetaUnsupportedMetricError, normalizeMetaInsightBatch, sevenDayInsightWindow } from './meta-insights.mjs';
 
 const PAGE_FIELDS = 'id,access_token,tasks';
 const POST_FIELDS = 'id,message,story,created_time,permalink_url,from';
@@ -8,6 +8,10 @@ const MEDIA_FIELDS = 'id,caption,media_type,media_product_type,permalink,timesta
 
 function safeError(error) {
   return { code: String(error?.code || error?.type || 'META_SYNC_ERROR'), message: String(error?.message || 'Meta synchronization failed.').slice(0, 300) };
+}
+
+function isExecutionBudgetError(error, signal) {
+  return signal?.aborted || ['AbortError', 'TimeoutError'].includes(String(error?.name || ''));
 }
 
 async function requireOne(query, message) {
@@ -19,7 +23,7 @@ async function requireOne(query, message) {
 
 async function persistInsightBatch({ admin, link, threadId = null, platform, metricScope, providerObjectId, requests, accessToken, observedAt, signal }) {
   const results = await metaGraphBatch(requests, accessToken, { signal });
-  const fatal = results.find((result) => !result.ok && String(result?.error?.code || '') !== '100');
+  const fatal = results.find((result) => !result.ok && !isMetaUnsupportedMetricError(result));
   if (fatal) throw Object.assign(new Error(fatal.error?.message || 'Meta Insights request failed.'), { code: fatal.error?.code, type: fatal.error?.type });
   const metrics = normalizeMetaInsightBatch({ platform, metricScope, providerObjectId, requests, results, observedAt });
   if (!metrics.length) return 0;
@@ -149,7 +153,15 @@ export async function syncSelectedMetaAssets({ admin, districtId, connectionId, 
         const accountRequests = asset.platform === 'facebook'
           ? facebookAccountInsightRequests(asset.provider_asset_id)
           : instagramAccountInsightRequests(asset.provider_asset_id, sevenDayInsightWindow(now()));
-        metricRowsWritten += await persistInsightBatch({ admin, link, platform: asset.platform, metricScope: 'account', providerObjectId: asset.provider_asset_id, requests: accountRequests, accessToken: assetToken, observedAt, signal: executionSignal });
+        try {
+          metricRowsWritten += await persistInsightBatch({ admin, link, platform: asset.platform, metricScope: 'account', providerObjectId: asset.provider_asset_id, requests: accountRequests, accessToken: assetToken, observedAt, signal: executionSignal });
+        } catch (error) {
+          if (!isExecutionBudgetError(error, executionSignal)) throw error;
+          nextCursor[asset.id] = continuation[asset.id] || null;
+          batch = { ...batch, status: 'partial', errorCode: 'EXECUTION_BUDGET', threads: [] };
+          batches[batches.length - 1] = batch;
+          continue;
+        }
       }
       let writtenCount = 0;
       for (const thread of batch.threads) {
@@ -172,7 +184,15 @@ export async function syncSelectedMetaAssets({ admin, districtId, connectionId, 
         const contentRequests = thread.platform === 'facebook'
           ? facebookContentInsightRequests(thread.external_thread_id)
           : instagramContentInsightRequests(thread.external_thread_id, { mediaProductType: thread.provider_metadata?.media_product_type });
-        metricRowsWritten += await persistInsightBatch({ admin, link, threadId: persistedThread.id, platform: thread.platform, metricScope: 'content', providerObjectId: thread.external_thread_id, requests: contentRequests, accessToken: assetToken, observedAt: now().toISOString(), signal: executionSignal });
+        try {
+          metricRowsWritten += await persistInsightBatch({ admin, link, threadId: persistedThread.id, platform: thread.platform, metricScope: 'content', providerObjectId: thread.external_thread_id, requests: contentRequests, accessToken: assetToken, observedAt: now().toISOString(), signal: executionSignal });
+        } catch (error) {
+          if (!isExecutionBudgetError(error, executionSignal)) throw error;
+          nextCursor[asset.id] = continuation[asset.id] || null;
+          batch = { ...batch, status: 'partial', errorCode: 'EXECUTION_BUDGET', threads: batch.threads.slice(0, writtenCount + 1) };
+          batches[batches.length - 1] = batch;
+          break;
+        }
         writtenCount += 1;
       }
     }
