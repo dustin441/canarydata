@@ -26,9 +26,11 @@ await withSocialDatabase('meta-owned-sync', async ({ sql, expectFailure, session
   const base = await readFile(new URL('../supabase/meta_social_integration.sql', import.meta.url), 'utf8');
   const migration = await readFile(new URL('../supabase/migrations/20260813224000_meta_owned_social_sync.sql', import.meta.url), 'utf8');
   const insightsMigration = await readFile(new URL('../supabase/migrations/20260814223000_meta_owned_social_insights.sql', import.meta.url), 'utf8');
+  const finalCurrentState = await readFile(new URL('../supabase/manual/canary_meta_database_final_current_state.sql', import.meta.url), 'utf8');
   sql(base);
   sql(migration);
   sql(insightsMigration);
+  sql(finalCurrentState);
   sql(`
     insert into public.districts(id,name) values ('district-meta','District Meta');
     insert into public.social_provider_connections(id,district_id,provider,provider_app_id,provider_user_id,status)
