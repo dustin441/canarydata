@@ -33,6 +33,7 @@ Use Graph API `v25.0` unless a later version has been explicitly tested.
 
 Request only:
 
+- `business_management` (required by Meta's Business Pages use case; this does not grant ads access)
 - `pages_show_list`
 - `pages_read_engagement`
 - `instagram_basic`

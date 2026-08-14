@@ -31,6 +31,7 @@ Editable `user_metadata`, request-body roles, and request-body district assignme
 
 The discovery release requests exactly:
 
+- `business_management` (required by Meta's Business Pages use case; this does not grant ads access)
 - `pages_show_list`
 - `pages_read_engagement`
 - `instagram_basic`

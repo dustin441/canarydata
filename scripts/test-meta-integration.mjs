@@ -24,11 +24,12 @@ const tampered = `${encrypted.slice(0, -1)}${encrypted.endsWith('A') ? 'B' : 'A'
 assert.throws(() => meta.decryptMetaToken(tampered, tokenContext), 'Tampered ciphertext must fail authentication.');
 
 assert.deepEqual(meta.META_REQUIRED_SCOPES, [
+  'business_management',
   'pages_show_list',
   'pages_read_engagement',
   'instagram_basic',
 ]);
-for (const forbidden of ['ads_read', 'ads_management', 'business_management', 'pages_manage_posts', 'read_insights', 'instagram_manage_insights']) {
+for (const forbidden of ['ads_read', 'ads_management', 'pages_manage_posts', 'read_insights', 'instagram_manage_insights']) {
   assert.ok(!meta.META_REQUIRED_SCOPES.includes(forbidden), `Discovery release must not request ${forbidden}.`);
 }
 
