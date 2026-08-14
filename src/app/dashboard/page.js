@@ -139,7 +139,7 @@ export default async function DashboardPage({ searchParams }) {
       socialCollectionHealth={socialCollectionHealth}
       dataWarnings={dataWarnings}
       melodiEnabled={process.env.MELODI_ENABLED === 'true' && (process.env.MELODI_QA_MODE !== 'true' || isAdmin)}
-      metaIntegrationEnabled={canManageIntegrations && process.env.META_INTEGRATION_ENABLED === 'true' && Boolean(process.env.META_APP_ID && process.env.META_APP_SECRET && process.env.META_TOKEN_ENCRYPTION_KEY && process.env.META_REDIRECT_URI)}
+      metaIntegrationEnabled={canManageIntegrations && process.env.META_INTEGRATION_ENABLED === 'true' && Boolean(process.env.META_APP_ID && process.env.META_APP_SECRET && process.env.META_CONFIG_ID && process.env.META_TOKEN_ENCRYPTION_KEY && process.env.META_REDIRECT_URI)}
     />
   );
 }

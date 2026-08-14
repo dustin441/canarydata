@@ -7,7 +7,6 @@ import {
   constantTimeEqualText,
   debugMetaToken,
   encryptMetaToken,
-  exchangeLongLivedMetaToken,
   exchangeMetaCode,
   hashOauthState,
   metaGraph,
@@ -107,9 +106,8 @@ export async function GET(request) {
     returnPath = sanitizeReturnPath(consumedRows[0].return_path || returnPath);
     if (providerError || !code) return redirectWithStatus(request, returnPath, 'cancelled');
 
-    const shortLived = await exchangeMetaCode(code);
-    const longLived = await exchangeLongLivedMetaToken(shortLived.access_token);
-    const accessToken = longLived.access_token;
+    const tokenGrant = await exchangeMetaCode(code);
+    const accessToken = tokenGrant.access_token;
 
     const [identity, permissionPayload, tokenData] = await Promise.all([
       metaGraph('me', accessToken, { fields: 'id,name' }),
@@ -154,7 +152,7 @@ export async function GET(request) {
       p_provider_user_id: providerUserId,
       p_provider_user_name: providerUserName,
       p_status: declined.length ? 'needs_permissions' : 'active',
-      p_token_expires_at: tokenExpiry(longLived.expires_in || shortLived.expires_in)
+      p_token_expires_at: tokenExpiry(tokenGrant.expires_in)
         || (tokenData?.expires_at ? new Date(Number(tokenData.expires_at) * 1000).toISOString() : null),
       p_granted_scopes: granted,
       p_declined_scopes: declined,

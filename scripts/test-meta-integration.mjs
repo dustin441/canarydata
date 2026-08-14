@@ -3,6 +3,7 @@ import fs from 'node:fs';
 
 process.env.META_APP_ID = 'test-app-id';
 process.env.META_APP_SECRET = 'test-app-secret';
+process.env.META_CONFIG_ID = 'test-config-id';
 process.env.META_REDIRECT_URI = 'https://www.canarydata.media/api/integrations/meta/callback';
 process.env.META_TOKEN_ENCRYPTION_KEY = Buffer.alloc(32, 7).toString('base64');
 
@@ -36,8 +37,13 @@ for (const forbidden of ['ads_read', 'ads_management', 'pages_manage_posts', 're
 const authUrl = new URL(meta.buildMetaAuthorizationUrl(state));
 assert.equal(authUrl.hostname, 'www.facebook.com');
 assert.equal(authUrl.searchParams.get('client_id'), 'test-app-id');
+assert.equal(authUrl.searchParams.get('config_id'), 'test-config-id');
 assert.equal(authUrl.searchParams.get('redirect_uri'), process.env.META_REDIRECT_URI);
 assert.equal(authUrl.searchParams.get('state'), state);
+assert.equal(authUrl.searchParams.get('response_type'), 'code');
+assert.equal(authUrl.searchParams.get('override_default_response_type'), 'true');
+assert.equal(authUrl.searchParams.has('scope'), false, 'Business Login configuration must replace the scope query parameter.');
+assert.equal(authUrl.searchParams.has('auth_type'), false, 'Business Login configuration must not use the legacy rerequest parameter.');
 assert.ok(!authUrl.toString().includes('test-app-secret'), 'Meta app secret must never enter the browser authorization URL.');
 assert.equal(meta.sanitizeReturnPath('/dashboard/integrations?districtId=abc'), '/dashboard/integrations?districtId=abc');
 assert.equal(meta.sanitizeReturnPath('https://evil.example/steal'), '/dashboard/integrations');
@@ -99,6 +105,7 @@ assert.ok(sql.includes('connected_by uuid references auth.users(id) on delete se
 assert.ok(sql.includes('mapped_by uuid references auth.users(id) on delete set null'));
 
 const callback = fs.readFileSync(new URL('../src/app/api/integrations/meta/callback/route.js', import.meta.url), 'utf8');
+assert.ok(!callback.includes('exchangeLongLivedMetaToken'), 'BISU code exchange already returns the configured system-user token and must not use the legacy user-token extension flow.');
 assert.ok(callback.includes("admin.rpc('canary_consume_meta_oauth_state'"), 'Callback must atomically consume state.');
 assert.ok(callback.includes('canary_meta_oauth_binding'), 'Callback must require the OAuth binding cookie.');
 assert.ok(callback.includes("admin.rpc('canary_prepare_meta_connection'"), 'Callback must use a stable pending connection identity.');

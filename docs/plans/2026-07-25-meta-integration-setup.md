@@ -4,20 +4,13 @@
 
 This owned-Social integration is read-only. Its first release requests access only to authorized Facebook Pages and connected Instagram professional accounts. Meta ad accounts, publishing, comment management, messaging, and Instagram publishing are outside this release.
 
-## Existing Meta application
+## Dedicated Meta application
 
-The existing EIC-owned app is the approved implementation app:
-
-- Current app name: `Data Puller`
-- App ID: `1044951167739104`
-- Current business owner: `Every Impression Counts`
-- Approved for Canary integration use: July 25, 2026
-
-A read-only Graph verification on July 25, 2026 confirmed that its connected identity can enumerate assigned Facebook Pages and active ad accounts. This proves the app/token path has working Page and Marketing API access, but it does not prove that the app is customer-ready. Before Canary customers see its OAuth dialog, update the customer-facing app name and icon to Canary Data, add the Canary domain and callback URLs below, verify Live Mode and App Review access, and confirm the business-owner disclosure shown by Meta is acceptable.
+Use the dedicated `Canary Data` Business app owned by the Canary Data business portfolio. Do not reuse the EIC `Data Puller` app or either superseded Consumer/advertising Canary app. The production application must use the approved Facebook Login for Business configuration ID rather than a legacy scope-based Facebook Login URL.
 
 ## Meta application
 
-Use the existing app only after the customer-facing Canary configuration is complete. Do not expose EIC branding in district authorization screens.
+Do not enable customer authorization until the customer-facing Canary configuration, app review, and pilot verification are complete.
 
 Production values:
 
@@ -59,6 +52,7 @@ Set these only in Vercel/server secrets:
 - `META_INTEGRATION_ENABLED=true`
 - `META_APP_ID=<Canary Meta App ID>`
 - `META_APP_SECRET=<Canary Meta App Secret>`
+- `META_CONFIG_ID=<Canary Facebook Login for Business configuration ID>`
 - `META_TOKEN_ENCRYPTION_KEY=<base64-encoded 32-byte random key>`
 - `META_REDIRECT_URI=https://www.canarydata.media/api/integrations/meta/callback`
 - `META_GRAPH_VERSION=v25.0`

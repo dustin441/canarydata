@@ -12,6 +12,7 @@ export function metaConfigured() {
   return Boolean(
     process.env.META_APP_ID
     && process.env.META_APP_SECRET
+    && process.env.META_CONFIG_ID
     && process.env.META_TOKEN_ENCRYPTION_KEY
     && process.env.META_REDIRECT_URI
   );
@@ -76,11 +77,11 @@ export function buildMetaAuthorizationUrl(state) {
   if (!metaConfigured()) throw new Error('Meta integration is not configured.');
   const params = new URLSearchParams({
     client_id: process.env.META_APP_ID,
+    config_id: process.env.META_CONFIG_ID,
     redirect_uri: process.env.META_REDIRECT_URI,
     state,
     response_type: 'code',
-    scope: META_REQUIRED_SCOPES.join(','),
-    auth_type: 'rerequest',
+    override_default_response_type: 'true',
   });
   return `https://www.facebook.com/${META_GRAPH_VERSION}/dialog/oauth?${params.toString()}`;
 }
