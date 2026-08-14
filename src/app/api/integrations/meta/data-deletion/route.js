@@ -4,6 +4,14 @@ import { metaDeletionConfigured, verifyMetaSignedRequest } from '@/lib/meta-inte
 
 export const runtime = 'nodejs';
 
+export async function GET() {
+  return Response.json({
+    ok: true,
+    endpoint: 'Meta data deletion callback',
+    method: 'POST',
+  });
+}
+
 export async function POST(request) {
   try {
     if (!metaDeletionConfigured()) return Response.json({ error: 'Meta data deletion is not configured.' }, { status: 503 });

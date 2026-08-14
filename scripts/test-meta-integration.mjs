@@ -122,6 +122,8 @@ assert.ok(!actorRoute.includes('user_metadata'), 'Integration authorization must
 assert.ok(actorRoute.includes('const districtId = isAdmin ? requestedDistrictId : assignedDistrictId'), 'Admins must provide an explicit district to every integration API route.');
 
 const deletionRoute = fs.readFileSync(new URL('../src/app/api/integrations/meta/data-deletion/route.js', import.meta.url), 'utf8');
+assert.ok(deletionRoute.includes('export async function GET()'), 'Meta must be able to validate the public deletion callback URL without a signed deletion payload.');
+assert.ok(deletionRoute.includes("method: 'POST'"), 'Deletion callback validation must state that mutations require POST.');
 assert.ok(deletionRoute.includes("admin.rpc('canary_complete_meta_data_deletion'"), 'Meta deletion and its confirmation record must be transactional.');
 assert.ok(!deletionRoute.includes(".from('social_provider_connections')"), 'Meta deletion must not delete connections outside the transaction.');
 assert.ok(deletionRoute.includes('metaDeletionConfigured()'), 'Meta deletion must depend only on deletion-specific configuration.');
