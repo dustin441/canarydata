@@ -26,7 +26,7 @@ select
   to_regclass('public.social_provider_metric_snapshots') as insights_table_before;
 
 select c.district_id,c.status,c.token_expires_at,
-       jsonb_array_length(c.granted_scopes) as granted_scope_count,
+       coalesce(cardinality(c.granted_scopes), 0) as granted_scope_count,
        count(distinct a.id) filter (where a.selected and a.active) as selected_active_assets,
        count(distinct m.id) as active_mappings
 from public.social_provider_connections c
