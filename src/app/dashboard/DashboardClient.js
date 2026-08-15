@@ -135,11 +135,34 @@ const SHOW_GLOBAL_BOARD_REPORT_EXPORT = false;
 
 function formatSocialMetric(value) {
   const number = Number(value);
-  return Number.isFinite(number) && number > 0 ? Math.round(number).toLocaleString('en-US') : '0';
+  return Number.isFinite(number) ? Math.round(number).toLocaleString('en-US') : '0';
 }
 
 function formatAvailableSocialMetric(result, metric, value) {
   return result?.metricAvailability?.[metric] ? formatSocialMetric(value) : 'N/A';
+}
+
+function nativeSocialMetric(result, key) {
+  const metric = result?.providerMetadata?.native_metrics?.[key];
+  return metric && typeof metric === 'object' ? metric : null;
+}
+
+function nativeSocialMetricValue(result, key) {
+  const metric = nativeSocialMetric(result, key);
+  return metric?.availability === 'available' && metric.value !== null && metric.value !== undefined && Number.isFinite(Number(metric.value)) ? Number(metric.value) : null;
+}
+
+function nativeSocialScopeLabel(metric) {
+  if (!metric) return 'N/A';
+  if (metric.sourceScope === 'total') return 'Total';
+  if (metric.sourceScope === 'organic') return 'Organic';
+  if (metric.sourceScope === 'paid') return 'Paid';
+  return 'Attribution not separated';
+}
+
+function nativeSocialObservedLabel(metric) {
+  const date = new Date(metric?.observedAt || '');
+  return Number.isFinite(date.getTime()) ? `Observed ${date.toLocaleDateString('en-US', { month: 'short', day: 'numeric', year: 'numeric', timeZone: 'UTC' })}` : 'Observation time unavailable';
 }
 
 function proxiedSocialMediaUrl(value) {
@@ -408,7 +431,10 @@ const BIRD_EYE_CSV_COLUMNS = ALL_COLUMNS.filter((column) =>
 
 const SOCIAL_CSV_HEADERS = [
   'Date', 'District', 'Platform', 'Classification', 'Account', 'Post', 'Source URL', 'Media type',
-  'Reactions', 'Comments / Replies', 'Shares', 'Views', 'Total public interactions', 'Engagement rate (complete interaction metrics only)',
+  'Reactions', 'Comments / Replies', 'Shares', 'Views', 'Viewers / reach', 'Clicks', 'Saves', 'Reposts', 'Total public interactions', 'Engagement rate (complete interaction metrics only)',
+  'Views observed at', 'Viewers / reach observed at', 'Reactions observed at', 'Comments observed at', 'Shares observed at', 'Clicks observed at', 'Saves observed at', 'Reposts observed at',
+  'Views availability', 'Viewers / reach availability', 'Reactions availability', 'Comments availability', 'Shares availability', 'Clicks availability', 'Saves availability', 'Reposts availability',
+  'Views attribution scope', 'Viewers / reach attribution scope', 'Reactions attribution scope', 'Comments attribution scope', 'Shares attribution scope', 'Clicks attribution scope', 'Saves attribution scope', 'Reposts attribution scope',
   'Review state', 'Strategic priorities', 'Recommended action',
 ];
 
@@ -434,8 +460,36 @@ function socialCsvRow(result, source) {
     metricValue('comments'),
     metricValue('shares'),
     metricValue('views'),
+    nativeSocialMetricValue(result, 'uniqueViewers') ?? 'N/A',
+    nativeSocialMetricValue(result, 'clicks') ?? 'N/A',
+    nativeSocialMetricValue(result, 'saves') ?? 'N/A',
+    nativeSocialMetricValue(result, 'reposts') ?? 'N/A',
     interactionTotal ?? 'N/A',
     engagementRate === null || engagementRate === undefined ? 'N/A' : `${engagementRate.toFixed(2)}%`,
+    nativeSocialMetric(result, 'views')?.observedAt || 'N/A',
+    nativeSocialMetric(result, 'uniqueViewers')?.observedAt || 'N/A',
+    nativeSocialMetric(result, 'reactions')?.observedAt || 'N/A',
+    nativeSocialMetric(result, 'comments')?.observedAt || 'N/A',
+    nativeSocialMetric(result, 'shares')?.observedAt || 'N/A',
+    nativeSocialMetric(result, 'clicks')?.observedAt || 'N/A',
+    nativeSocialMetric(result, 'saves')?.observedAt || 'N/A',
+    nativeSocialMetric(result, 'reposts')?.observedAt || 'N/A',
+    nativeSocialMetric(result, 'views')?.availability || 'N/A',
+    nativeSocialMetric(result, 'uniqueViewers')?.availability || 'N/A',
+    nativeSocialMetric(result, 'reactions')?.availability || 'N/A',
+    nativeSocialMetric(result, 'comments')?.availability || 'N/A',
+    nativeSocialMetric(result, 'shares')?.availability || 'N/A',
+    nativeSocialMetric(result, 'clicks')?.availability || 'N/A',
+    nativeSocialMetric(result, 'saves')?.availability || 'N/A',
+    nativeSocialMetric(result, 'reposts')?.availability || 'N/A',
+    nativeSocialScopeLabel(nativeSocialMetric(result, 'views')),
+    nativeSocialScopeLabel(nativeSocialMetric(result, 'uniqueViewers')),
+    nativeSocialScopeLabel(nativeSocialMetric(result, 'reactions')),
+    nativeSocialScopeLabel(nativeSocialMetric(result, 'comments')),
+    nativeSocialScopeLabel(nativeSocialMetric(result, 'shares')),
+    nativeSocialScopeLabel(nativeSocialMetric(result, 'clicks')),
+    nativeSocialScopeLabel(nativeSocialMetric(result, 'saves')),
+    nativeSocialScopeLabel(nativeSocialMetric(result, 'reposts')),
     result.visibilityStatus || '',
     (result.actionIntelligence?.strategicPriorityLabels || []).join('; '),
     result.actionIntelligence?.recommendedAction || '',
@@ -2763,7 +2817,45 @@ function SocialReportTable({ results, ranked = false }) {
   );
 }
 
-function SocialReportView({ districtName, reportWindow, filterContext, posts, analystNote }) {
+function NativeAccountMetricCell({ metric, detail = '' }) {
+  if (!metric) return <span className="social-native-na">N/A</span>;
+  if (metric.availability !== 'available' || metric.value === null || metric.value === undefined || !Number.isFinite(Number(metric.value))) return <span className="social-native-metric social-native-na"><strong>N/A</strong><small>{metric.availability || 'unavailable'}</small><small>{nativeSocialObservedLabel(metric)}</small></span>;
+  const scope = nativeSocialScopeLabel(metric);
+  return <span className="social-native-metric"><strong>{formatSocialMetric(metric.value)}</strong><small>{detail || scope}</small>{detail && <small>{scope}</small>}<small>{nativeSocialObservedLabel(metric)}</small></span>;
+}
+
+function NativeAccountMetrics({ summary }) {
+  const rows = Object.entries(summary?.platforms || {});
+  if (!rows.length) return <aside className="social-monthly-data-readiness"><strong>Native account metrics</strong><span>No authorized account-level snapshot is available. Post reporting remains source-aware and unavailable fields stay N/A.</span></aside>;
+  return (
+    <section className="social-native-account-metrics" aria-label="Latest native account metrics">
+      <div className="social-monthly-section-heading">
+        <h3>Latest native account snapshot</h3>
+        <p>Platform-specific source windows are shown separately. Reach and unique-viewer audiences are not added across platforms.</p>
+      </div>
+      <div className="social-monthly-table-wrap">
+        <table>
+          <thead><tr><th>Platform</th><th>Source window</th><th>Views</th><th>Reach / unique viewers</th><th>Engagements / interactions</th><th>Profile views</th><th>Link actions</th><th>Net follows</th></tr></thead>
+          <tbody>{rows.map(([platform, row]) => (
+            <tr key={`native-account-${platform}`}>
+              <td>{formatSourceLabel(platform)}</td>
+              <td><span className="social-native-metric"><strong>{row.windowLabel}</strong><small>Latest authorized snapshot</small></span></td>
+              <td><NativeAccountMetricCell metric={row.views} /></td>
+              <td><NativeAccountMetricCell metric={row.uniqueViewers || row.reach} detail={row.reachWindowLabel || ''} /></td>
+              <td><NativeAccountMetricCell metric={row.engagements || row.totalInteractions} /></td>
+              <td><NativeAccountMetricCell metric={row.profileViews} /></td>
+              <td>{row.profileLinkTaps || row.websiteClicks ? <span className="social-native-metric"><strong>Profile {row.profileLinkTaps?.value ?? 'N/A'}</strong><small>Website {row.websiteClicks?.value ?? 'N/A'} · attribution not separated</small><small>Profile {nativeSocialObservedLabel(row.profileLinkTaps)} · Website {nativeSocialObservedLabel(row.websiteClicks)}</small></span> : <span className="social-native-na">N/A</span>}</td>
+              <td><NativeAccountMetricCell metric={row.netFollowerChange} detail={row.netFollowerChange ? `${row.netFollowerChange.follows ?? 'N/A'} follows · ${row.netFollowerChange.unfollows ?? 'N/A'} unfollows` : ''} /></td>
+            </tr>
+          ))}</tbody>
+        </table>
+      </div>
+      <p className="social-native-account-note">“Total” appears only when Meta explicitly labels the provider metric total. “Attribution not separated” means organic and paid contributions are not split and must not be presented as organic-only performance.</p>
+    </section>
+  );
+}
+
+function SocialReportView({ districtName, reportWindow, filterContext, posts, analystNote, accountMetricSummary }) {
   const summary = summarizeSocialReport(posts);
   const topPerformerGroups = groupTopReportPostsByPlatform(posts, 3);
   const allPosts = [...posts].sort((a, b) => {
@@ -2786,11 +2878,12 @@ function SocialReportView({ districtName, reportWindow, filterContext, posts, an
       {analystNote?.trim() && <section className="social-report-section social-report-analyst-note"><div className="social-report-section-heading"><h2>Social Media Brief</h2><p>Human-reviewed context for leadership and board discussion.</p></div><p>{analystNote.trim()}</p></section>}
       <section className="social-report-scorecards" aria-label="Executive scorecards">
         <article><span>Official posts published</span><strong>{summary.officialPosts}</strong><small>Active owned posts</small></article>
-        <article><span>Total public interactions</span><strong>{summary.totalInteractions === null ? 'Not available' : formatSocialMetric(summary.totalInteractions)}</strong><small>{interactionMetricCoverage}</small></article>
-        <article><span>Average reported interactions</span><strong>{summary.averageInteractions === null ? 'Not available' : formatSocialMetric(summary.averageInteractions)}</strong><small>{interactionCoverage}</small></article>
-        <article><span>Reported views</span><strong>{summary.reportedViews === null ? 'Not available' : formatSocialMetric(summary.reportedViews)}</strong><small>{viewCoverage}</small></article>
+        <article><span>Total public interactions</span><strong>{summary.totalInteractions === null ? 'Not available' : formatSocialMetric(summary.totalInteractions)}</strong><small>{interactionMetricCoverage} · latest lifetime snapshots</small></article>
+        <article><span>Average reported interactions</span><strong>{summary.averageInteractions === null ? 'Not available' : formatSocialMetric(summary.averageInteractions)}</strong><small>{interactionCoverage} · latest lifetime snapshots</small></article>
+        <article><span>Reported views</span><strong>{summary.reportedViews === null ? 'Not available' : formatSocialMetric(summary.reportedViews)}</strong><small>{viewCoverage} · latest lifetime snapshots</small></article>
         <article><span>Platforms</span><strong>{summary.platformCount || 'Not available'}</strong><small>{platformBreakdown || 'No platform data available'}</small></article>
       </section>
+      <NativeAccountMetrics summary={accountMetricSummary} />
       {posts.length ? (
         <>
           <section className="social-report-section social-report-top-performers">
@@ -2808,7 +2901,7 @@ function SocialReportView({ districtName, reportWindow, filterContext, posts, an
           </section>
           <aside className="social-report-data-notes">
             <strong>Data notes</strong>
-            <span>This report includes leadership highlights and the complete eligible post table. The CSV provides the same post-level evidence for analysis. “Not available” means the source did not supply that metric. Reported views are platform-provided views, not unique reach.</span>
+            <span>This report includes leadership highlights and the complete eligible post table. The CSV provides the same post-level evidence plus native viewers/reach, clicks, saves, attribution scope, and observation time. Post metrics are latest lifetime values for posts published in the report window. Account metrics retain the source windows shown above. “Not available” means the provider did not supply that metric.</span>
           </aside>
         </>
       ) : (
@@ -2891,6 +2984,7 @@ function MonthlySocialPerformance({
   setCampaignSearch,
   onExportPdf,
   onExportCsv,
+  accountMetricSummary,
 }) {
   const [postTableSort, setPostTableSort] = useState('newest');
   const summary = summarizeSocialReport(posts);
@@ -2906,6 +3000,7 @@ function MonthlySocialPerformance({
     interactions: calculateSocialMetricChange(summary.totalInteractions, previousSummary.totalInteractions),
     views: calculateSocialMetricChange(summary.reportedViews, previousSummary.reportedViews),
   };
+  const instagramNetFollows = accountMetricSummary?.platforms?.instagram?.netFollowerChange || null;
   const sortedPosts = [...posts].sort((a, b) => {
     if (postTableSort === 'interactions') return (socialReportInteractionTotal(b) ?? -1) - (socialReportInteractionTotal(a) ?? -1);
     if (postTableSort === 'views') return (socialReportMetricValue(b, 'views') ?? -1) - (socialReportMetricValue(a, 'views') ?? -1);
@@ -2951,12 +3046,14 @@ function MonthlySocialPerformance({
 
       <div className="social-monthly-kpis" aria-label="Monthly Social scorecards">
         <article><span>Official posts</span><strong>{summary.officialPosts}</strong><small>{formatSocialComparison(comparisons.posts)} vs. prior period</small></article>
-        <article><span>Reported interactions</span><strong>{summary.totalInteractions === null ? 'Not available' : formatSocialMetric(summary.totalInteractions)}</strong><small>{formatSocialComparison(comparisons.interactions)} vs. prior period · available for {summary.interactionsAvailable}/{summary.officialPosts}</small></article>
-        <article><span>Average interactions</span><strong>{summary.averageInteractions === null ? 'Not available' : formatSocialMetric(summary.averageInteractions)}</strong><small>Based only on posts with available interaction metrics</small></article>
-        <article><span>Reported views</span><strong>{summary.reportedViews === null ? 'Not available' : formatSocialMetric(summary.reportedViews)}</strong><small>{formatSocialComparison(comparisons.views)} vs. prior period · available for {summary.viewsCoverage.available}/{summary.viewsCoverage.total}</small></article>
-        <article className="pending-meta"><span>Impressions / reach</span><strong>Not available</strong><small>Requires an authorized Meta account connection</small></article>
-        <article className="pending-meta"><span>Net follower growth</span><strong>Not available</strong><small>Requires daily official-account snapshots</small></article>
+        <article><span>Latest post interactions</span><strong>{summary.totalInteractions === null ? 'Not available' : formatSocialMetric(summary.totalInteractions)}</strong><small>Lifetime values for posts published in this report · available for {summary.interactionsAvailable}/{summary.officialPosts}</small></article>
+        <article><span>Average latest interactions</span><strong>{summary.averageInteractions === null ? 'Not available' : formatSocialMetric(summary.averageInteractions)}</strong><small>Lifetime values based only on posts with available interaction metrics</small></article>
+        <article><span>Latest post views</span><strong>{summary.reportedViews === null ? 'Not available' : formatSocialMetric(summary.reportedViews)}</strong><small>Lifetime values for posts published in this report · available for {summary.viewsCoverage.available}/{summary.viewsCoverage.total}</small></article>
+        <article><span>Reach / unique viewers</span><strong>{accountMetricSummary?.platformCount ? 'By platform' : 'Not available'}</strong><small>Not summed across platforms; see the native account table</small></article>
+        <article><span>Latest net follows</span><strong>{instagramNetFollows?.value === null || instagramNetFollows?.value === undefined ? 'Not available' : formatSocialMetric(instagramNetFollows.value)}</strong><small>{instagramNetFollows ? `${instagramNetFollows.follows ?? 'N/A'} follows · ${instagramNetFollows.unfollows ?? 'N/A'} unfollows · ${accountMetricSummary.platforms.instagram.windowLabel}` : 'No compatible authorized account snapshot'}</small></article>
       </div>
+
+      <NativeAccountMetrics summary={accountMetricSummary} />
 
       <div className="social-monthly-analysis-grid">
         <section>
@@ -2984,7 +3081,7 @@ function MonthlySocialPerformance({
         </div>
         <div className="social-monthly-table-wrap social-monthly-post-table-wrap">
           <table>
-            <thead><tr><th>Date</th><th>Platform</th><th>Post</th><th>Format</th><th>Interactions</th><th>Views</th><th>Source</th></tr></thead>
+            <thead><tr><th>Date</th><th>Platform</th><th>Post</th><th>Format</th><th>Interactions</th><th>Views</th><th>Viewers / reach</th><th>Clicks</th><th>Saves</th><th>Source</th></tr></thead>
             <tbody>
               {sortedPosts.length ? sortedPosts.map((post) => {
                 const postUrl = safeSocialUrl(post.url);
@@ -2992,19 +3089,33 @@ function MonthlySocialPerformance({
                 const format = mediaType.includes('video') || mediaType.includes('reel') ? 'Video / Reel' : post.mediaUrl ? 'Image / Photo' : 'Text / Link';
                 const interactions = socialReportInteractionTotal(post);
                 const views = socialReportMetricValue(post, 'views');
-                return <tr key={`monthly-row-${post.id}`}><td>{formatDate(post.date)}</td><td><span className={`social-platform-label ${post.platform}`}>{formatSourceLabel(post.platform)}</span></td><td className="social-monthly-post-copy"><strong>{post.headline || post.summary || 'Untitled post'}</strong><small>{post.authorName || post.authorHandle || 'Official district account'}</small></td><td>{format}</td><td>{interactions === null ? 'N/A' : formatSocialMetric(interactions)}</td><td>{views === null ? 'N/A' : formatSocialMetric(views)}</td><td>{postUrl ? <a href={postUrl} target="_blank" rel="noopener noreferrer">Open post ↗</a> : 'Unavailable'}</td></tr>;
-              }) : <tr><td colSpan={7}>No report-eligible official posts match this period and campaign filter.</td></tr>}
+                const reactions = socialReportMetricValue(post, 'reactions');
+                const comments = socialReportMetricValue(post, 'comments');
+                const shares = socialReportMetricValue(post, 'shares');
+                const viewers = nativeSocialMetricValue(post, 'uniqueViewers');
+                const clicks = nativeSocialMetricValue(post, 'clicks');
+                const saves = nativeSocialMetricValue(post, 'saves');
+                const viewMetric = nativeSocialMetric(post, 'views');
+                const viewerMetric = nativeSocialMetric(post, 'uniqueViewers');
+                const clickMetric = nativeSocialMetric(post, 'clicks');
+                const saveMetric = nativeSocialMetric(post, 'saves');
+                const reactionMetric = nativeSocialMetric(post, 'reactions');
+                const commentMetric = nativeSocialMetric(post, 'comments');
+                const shareMetric = nativeSocialMetric(post, 'shares');
+                const hasNativeInteractionScopes = Boolean(reactionMetric || commentMetric || shareMetric);
+                return <tr key={`monthly-row-${post.id}`}><td>{formatDate(post.date)}</td><td><span className={`social-platform-label ${post.platform}`}>{formatSourceLabel(post.platform)}</span></td><td className="social-monthly-post-copy"><strong>{post.headline || post.summary || 'Untitled post'}</strong><small>{post.authorName || post.authorHandle || 'Official district account'}</small></td><td>{format}</td><td><span className="social-native-metric"><strong>{interactions === null ? 'N/A' : formatSocialMetric(interactions)}</strong><small>R {reactions ?? 'N/A'} · C {comments ?? 'N/A'} · S {shares ?? 'N/A'}</small>{hasNativeInteractionScopes && <small>Scopes: R {nativeSocialScopeLabel(reactionMetric)} · C {nativeSocialScopeLabel(commentMetric)} · S {nativeSocialScopeLabel(shareMetric)}</small>}</span></td><td>{viewMetric ? <NativeAccountMetricCell metric={viewMetric} /> : views === null ? 'N/A' : formatSocialMetric(views)}</td><td>{viewerMetric ? <NativeAccountMetricCell metric={viewerMetric} /> : viewers === null ? 'N/A' : formatSocialMetric(viewers)}</td><td>{clickMetric ? <NativeAccountMetricCell metric={clickMetric} /> : clicks === null ? 'N/A' : formatSocialMetric(clicks)}</td><td>{saveMetric ? <NativeAccountMetricCell metric={saveMetric} /> : saves === null ? 'N/A' : formatSocialMetric(saves)}</td><td>{postUrl ? <a href={postUrl} target="_blank" rel="noopener noreferrer">Open post ↗</a> : 'Unavailable'}</td></tr>;
+              }) : <tr><td colSpan={10}>No report-eligible official posts match this period and campaign filter.</td></tr>}
             </tbody>
           </table>
         </div>
       </section>
 
-      <aside className="social-monthly-data-readiness"><strong>Data readiness</strong><span>Current reporting uses verified official posts and public metrics. Direct Meta connection is the next data release for impressions, reach, follower growth, and more reliable account-level reporting.</span></aside>
+      <aside className="social-monthly-data-readiness"><strong>Data readiness</strong><span>{accountMetricSummary?.platformCount ? 'Authorized Meta post and account snapshots are connected for the selected district. Post metrics are latest lifetime values for posts published in the report window, not interactions accrued only during that window. Account metrics retain their platform-specific source periods.' : 'No authorized Meta account snapshot is available for this view. Public or canonical post metrics may still appear where their source reports them; unavailable native fields remain N/A.'}</span></aside>
     </section>
   );
 }
 
-export function SocialView({ socialResults, legacySocialResults = [], socialSources, socialReviewEvents = [], districtFilter, districts, campaignSearch, setCampaignSearch, isAdmin = false }) {
+export function SocialView({ socialResults, legacySocialResults = [], socialSources, socialAccountMetricSummaries = {}, socialReviewEvents = [], districtFilter, districts, campaignSearch, setCampaignSearch, isAdmin = false }) {
   const [socialPageTab, setSocialPageTab] = useState('overview');
   const [relationshipFilter, setRelationshipFilter] = useState('public');
   const socialSearch = campaignSearch;
@@ -3046,6 +3157,9 @@ export function SocialView({ socialResults, legacySocialResults = [], socialSour
   const [topPostsCustomEnd, setTopPostsCustomEnd] = useState('');
 
   const results = socialResults;
+  const accountMetricSummary = districtFilter === 'All'
+    ? { platforms: {}, platformCount: 0, combinedReachOrViewers: null }
+    : socialAccountMetricSummaries[districtFilter] || { platforms: {}, platformCount: 0, combinedReachOrViewers: null };
   const summary = useMemo(() => summarizeSocialResults(results), [results]);
   const topPostsWindow = useMemo(
     () => resolveSocialReportWindow(topPostsPeriod, topPostsAsOf, topPostsCustomStart, topPostsCustomEnd),
@@ -3214,6 +3328,7 @@ export function SocialView({ socialResults, legacySocialResults = [], socialSour
           filterContext={reportFilterContext}
           posts={socialReportPosts}
           analystNote={socialAnalystNote}
+          accountMetricSummary={accountMetricSummary}
         />
       )}
       <nav className="social-page-tabs" aria-label="Social page sections">
@@ -3243,6 +3358,7 @@ export function SocialView({ socialResults, legacySocialResults = [], socialSour
         setCampaignSearch={(value) => changeSocialFilter(setSocialSearch, value)}
         onExportPdf={exportSocialPdf}
         onExportCsv={exportOfficialSocialCsv}
+        accountMetricSummary={accountMetricSummary}
       />
       {socialMessage && <p className="social-review-error" role="alert">{socialMessage}</p>}
       {isAdmin && legacySocialResults.length > 0 && (
@@ -3452,7 +3568,7 @@ export function SocialView({ socialResults, legacySocialResults = [], socialSour
   );
 }
 
-export default function DashboardClient({ articles, districts, queries: initialQueries, clients = [], userDistrictId, initialDistrictId = null, initialView = 'dashboard', paymentNotice = null, billingInfo = null, publicPricingLabel = 'Annual access', publicPricingIntroductory = false, excludedStories = [], correctionEvents = [], socialSources = [], socialThreads = [], socialReviewEvents = [], strategicProfiles = [], strategicPriorities = [], collectionHealth = [], socialCollectionHealth = [], dataWarnings = [], isAdmin = false, melodiEnabled = false, metaIntegrationEnabled = false, demoMode = false }) {
+export default function DashboardClient({ articles, districts, queries: initialQueries, clients = [], userDistrictId, initialDistrictId = null, initialView = 'dashboard', paymentNotice = null, billingInfo = null, publicPricingLabel = 'Annual access', publicPricingIntroductory = false, excludedStories = [], correctionEvents = [], socialSources = [], socialThreads = [], socialAccountMetricSummaries = {}, socialReviewEvents = [], strategicProfiles = [], strategicPriorities = [], collectionHealth = [], socialCollectionHealth = [], dataWarnings = [], isAdmin = false, melodiEnabled = false, metaIntegrationEnabled = false, demoMode = false }) {
   const defaultDistrictFilter = userDistrictId ?? initialDistrictId ?? districts[0]?.id ?? 'All';
   const [currentView, setCurrentView] = useState(initialView);
   const [search, setSearch] = useState('');
@@ -4263,6 +4379,7 @@ export default function DashboardClient({ articles, districts, queries: initialQ
               socialResults={campaignSocialResults}
               legacySocialResults={campaignSuppressedLegacySocialResults}
               socialSources={socialSources}
+              socialAccountMetricSummaries={socialAccountMetricSummaries}
               socialReviewEvents={socialReviewEvents}
               districtFilter={districtFilter}
               districts={districts}

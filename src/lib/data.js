@@ -165,6 +165,9 @@ export async function getSocialAffiliatePreviews(districtId, claims = null) {
 
 const SOCIAL_THREAD_COLUMNS = 'id, district_id, social_account_id, provider, platform, external_thread_id, canonical_url, relationship_type, author_name, author_handle, headline, body, summary, recommendation, published_at, comment_count, reply_count, reaction_count, share_count, view_count, engagement_total, sentiment, risk_level, canary_score, tags, strategic_alignment, matched_terms, match_reason, identity_confidence, visibility_status, reviewer_note, review_version, reviewed_at, reviewed_by, provider_metadata, created_at, updated_at';
 const SOCIAL_THREAD_PAGE_SIZE = 1000;
+const SOCIAL_METRIC_SNAPSHOT_COLUMNS = 'id, district_id, provider_account_link_id, social_thread_id, provider, platform, metric_scope, provider_object_id, provider_metric_name, normalized_metric_name, metric_variant, period, period_start_at, period_end_at, source_scope, availability, metric_value, breakdown, effective_at, observed_at';
+const SOCIAL_METRIC_SNAPSHOT_PAGE_SIZE = 1000;
+const SOCIAL_METRIC_LINK_BATCH_SIZE = 100;
 const SOCIAL_REVIEW_EVENT_COLUMNS = 'id, batch_id, district_id, social_thread_id, actor_user_id, action, before_state, after_state, resulting_version, created_at';
 const SOCIAL_REVIEW_EVENT_PAGE_SIZE = 1000;
 
@@ -221,6 +224,37 @@ export async function getSocialThreads(districtId = null, includeReview = false)
     ...thread,
     social_comments: commentsByThread.get(thread.id) ?? [],
   }));
+}
+
+export async function getSocialMetricSnapshots(districtId = null) {
+  const supabase = createAdminClient();
+  let linkQuery = supabase.from('social_provider_account_links').select('id').eq('provider', 'meta').eq('active', true);
+  if (districtId) linkQuery = linkQuery.eq('district_id', districtId);
+  const { data: activeLinks, error: linkError } = await linkQuery;
+  if (linkError) throw linkError;
+  const activeLinkIds = (activeLinks ?? []).map((link) => link.id).filter(Boolean);
+  if (!activeLinkIds.length) return [];
+
+  const snapshots = [];
+  for (let linkOffset = 0; linkOffset < activeLinkIds.length; linkOffset += SOCIAL_METRIC_LINK_BATCH_SIZE) {
+    const linkBatch = activeLinkIds.slice(linkOffset, linkOffset + SOCIAL_METRIC_LINK_BATCH_SIZE);
+    for (let from = 0; ; from += SOCIAL_METRIC_SNAPSHOT_PAGE_SIZE) {
+      let query = supabase
+        .from('social_provider_metric_snapshots')
+        .select(SOCIAL_METRIC_SNAPSHOT_COLUMNS)
+        .in('provider_account_link_id', linkBatch)
+        .order('effective_at', { ascending: false })
+        .order('id', { ascending: true })
+        .range(from, from + SOCIAL_METRIC_SNAPSHOT_PAGE_SIZE - 1);
+      if (districtId) query = query.eq('district_id', districtId);
+      const { data, error } = await query;
+      if (error) throw error;
+      const page = data ?? [];
+      snapshots.push(...page);
+      if (page.length < SOCIAL_METRIC_SNAPSHOT_PAGE_SIZE) break;
+    }
+  }
+  return snapshots;
 }
 
 export async function readAllSocialReviewEvents(supabase, districtId = null) {

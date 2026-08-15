@@ -402,6 +402,7 @@ async function compileSocialViewForInteractionTest(source, reviewSocialThreadMoc
     '@/lib/canonicalTags.mjs': { CORE_TAGS: [], canonicalTags: () => [] },
     '@/lib/social.mjs': socialModule,
     '@/lib/socialReport.mjs': socialReportModule,
+    '@/lib/socialMetrics.mjs': { enrichSocialThreadsWithNativeMetrics: (threads) => threads, summarizeOwnedSocialAccountMetrics: () => ({ platforms: {}, platformCount: 0, combinedReachOrViewers: null }) },
     '@/lib/date.mjs': dateModule,
     '@/lib/queryPolicy.mjs': { CUSTOMER_SEARCH_QUERY_LIMIT: 10, activeNewsQueryCount: () => 0 },
     '@/lib/communicationsBrief.mjs': { buildCommunicationsBrief: () => ({}), formatCommunicationsBriefRecommendation: () => '' },
@@ -677,6 +678,7 @@ assert.match(styles, /\.social-page-tabs[\s\S]*grid-template-columns: repeat\(2,
 assert.match(styles, /\.btn:focus-visible\s*\{[^}]*outline:\s*[2-9]px\s+solid\s+var\(--canary-yellow(?:-light)?\);[^}]*outline-offset:\s*[2-9]px;/);
 assert.match(styles, /\.social-correction-controls/);
 assert.match(styles, /\.social-monthly-analyst-note > summary/);
+assert.match(styles, /@media print[\s\S]*\.social-report \.social-native-account-metrics[\s\S]*page-break-inside: avoid/);
 assert.match(styles, /@media \(max-width: 768px\)[\s\S]*\.social-page-tabs[\s\S]*grid-template-columns: minmax\(0, 1fr\)/);
 
 const socialReportSource = dashboard.slice(dashboard.indexOf('function SocialReportThumbnail'), dashboard.indexOf('function BoardReportView'));
@@ -703,7 +705,7 @@ assert.match(socialReportSource, /topPerformerGroups\.map/);
 assert.match(socialReportSource, /<SocialReportTable results=\{group\.posts\} ranked \/>/);
 assert.doesNotMatch(socialReportSource, /news|evidence appendix|Strategic Alignment/i);
 assert.doesNotMatch(socialReportSource, /Official Post Detail|Complete detail for every eligible post/);
-for (const marker of ['Monthly Social Performance', 'Latest completed month', 'Campaign or topic', 'Platform performance', 'Content format', 'Leadership highlights', 'All official posts', 'Sort posts', 'Open post ↗', 'Social Media Brief', 'Requires an authorized Meta account connection']) {
+for (const marker of ['Monthly Social Performance', 'Latest completed month', 'Campaign or topic', 'Platform performance', 'Content format', 'Leadership highlights', 'All official posts', 'Sort posts', 'Open post ↗', 'Social Media Brief', 'Authorized Meta post and account snapshots are connected']) {
   assert.ok(dashboard.includes(marker), `Monthly Social Performance must include ${marker}`);
 }
 assert.match(dashboard, /const \[postTableSort, setPostTableSort\] = useState\('newest'\)/);
@@ -752,6 +754,11 @@ assert.match(dashboard, /Top 3 official social posts/);
 assert.match(dashboard, /socialReportPosts\.map\(\(result, index\)/);
 assert.match(dashboard, /canary-social-performance-/);
 assert.match(dashboard, /socialReportPosts\.map\(\(result\) => socialCsvRow/);
+assert.doesNotMatch(dashboard, /latestObservedAt/);
+assert.match(dashboard, /metric\.value !== null && metric\.value !== undefined/,'native metric display must not coerce null values to zero');
+assert.match(dashboard, /nativeSocialScopeLabel\(nativeSocialMetric\(result, 'views'\)\)/,'CSV attribution scope must use human-facing labels');
+for (const marker of ['Views observed at', 'Viewers / reach observed at', 'Reactions observed at', 'Comments observed at', 'Shares observed at', 'Clicks observed at', 'Saves observed at', 'Reposts observed at']) assert.ok(dashboard.includes(marker), `Social CSV must include per-metric timestamp: ${marker}`);
+for (const marker of ['Views availability', 'Viewers / reach availability', 'Reactions availability', 'Comments availability', 'Shares availability', 'Clicks availability', 'Saves availability', 'Reposts availability']) assert.ok(dashboard.includes(marker), `Social CSV must include per-metric availability: ${marker}`);
 assert.match(dashboard, /metricValue\('comments'\)/);
 assert.match(dashboard, /interactionTotal \?\? 'N\/A'/);
 assert.match(dashboard, /Comments \/ Replies/);

@@ -1,7 +1,8 @@
-import { getArticles, getDistricts, getQueries, getClients, getExcludedStories, getStoryCorrectionEvents, getSocialSources, getSocialThreads, getRecentSocialReviewEvents, getStrategicProfiles, getStrategicPriorities, getCollectionHealth, getSocialCollectionHealth } from '@/lib/data';
+import { getArticles, getDistricts, getQueries, getClients, getExcludedStories, getStoryCorrectionEvents, getSocialSources, getSocialThreads, getSocialMetricSnapshots, getRecentSocialReviewEvents, getStrategicProfiles, getStrategicPriorities, getCollectionHealth, getSocialCollectionHealth } from '@/lib/data';
 import { createClient } from '@/lib/supabase/server';
 import { createAdminClient } from '@/lib/supabase/admin';
 import DashboardClient from './DashboardClient';
+import { enrichSocialThreadsWithNativeMetrics, summarizeOwnedSocialAccountMetrics } from '@/lib/socialMetrics.mjs';
 import { getAuthenticatedBillingContext } from '@/lib/billing';
 import { formatAnnualPriceLabel, INTRODUCTORY_ANNUAL_PRICE_CENTS, resolveCanaryPricing } from '@/lib/pricing';
 import { redirect } from 'next/navigation';
@@ -85,13 +86,21 @@ export default async function DashboardPage({ searchParams }) {
     loadDashboardDataset('News correction history', () => getStoryCorrectionEvents(dataDistrictId), []),
     loadDashboardDataset('Social sources', () => getSocialSources(dataDistrictId), []),
     loadDashboardDataset('Social results', () => getSocialThreads(dataDistrictId, isAdmin), []),
+    loadDashboardDataset('Native Social metrics', () => getSocialMetricSnapshots(dataDistrictId), []),
     isAdmin ? loadDashboardDataset('Social correction history', () => getRecentSocialReviewEvents(dataDistrictId), []) : Promise.resolve({ data: [], warning: null }),
     loadDashboardDataset('Strategic profiles', () => getStrategicProfiles(dataDistrictId), []),
     loadDashboardDataset('Strategic priorities', () => getStrategicPriorities(dataDistrictId), []),
     loadDashboardDataset('Collection health', () => getCollectionHealth(districts, dataDistrictId), []),
     loadDashboardDataset('Social collection health', () => getSocialCollectionHealth(districts, dataDistrictId), []),
   ]);
-  const [articles, queries, clients, excludedStories, correctionEvents, socialSources, socialThreads, socialReviewEvents, strategicProfiles, strategicPriorities, collectionHealth, socialCollectionHealth] = dataLoads.map((result) => result.data);
+  const [articles, queries, clients, excludedStories, correctionEvents, socialSources, socialThreads, socialMetricSnapshots, socialReviewEvents, strategicProfiles, strategicPriorities, collectionHealth, socialCollectionHealth] = dataLoads.map((result) => result.data);
+  const enrichedSocialThreads = enrichSocialThreadsWithNativeMetrics(socialThreads, socialMetricSnapshots);
+  const socialAccountMetricSummaries = Object.fromEntries(
+    [...new Set(socialMetricSnapshots.map((row) => row.district_id).filter(Boolean))].map((districtId) => [
+      districtId,
+      summarizeOwnedSocialAccountMetrics(socialMetricSnapshots.filter((row) => row.district_id === districtId)),
+    ]),
+  );
   const billingLoad = userDistrictId
     ? await loadDashboardDataset('Billing status', getAuthenticatedBillingContext, null)
     : { data: null, warning: null };
@@ -146,7 +155,8 @@ export default async function DashboardPage({ searchParams }) {
       excludedStories={excludedStories}
       correctionEvents={correctionEvents}
       socialSources={socialSources}
-      socialThreads={socialThreads}
+      socialThreads={enrichedSocialThreads}
+      socialAccountMetricSummaries={socialAccountMetricSummaries}
       socialReviewEvents={socialReviewEvents}
       isAdmin={isAdmin}
       strategicProfiles={strategicProfiles}
