@@ -5,11 +5,12 @@ const files = [
   '../src/lib/billing.js',
   '../src/lib/billing-documents.js',
   '../src/lib/payment-state.js',
+  '../src/lib/pricing.js',
   '../src/app/payment/actions.js',
   '../src/app/dashboard/page.js',
 ];
 const source = (await Promise.all(files.map(async (file) => readFile(new URL(file, import.meta.url), 'utf8')))).join('\n');
-const sensitiveUserMetadata = /user_metadata\?*\.?(?:payment_status|payment_paid_at|paid_through|access_status|trial_status|trial_starts_at|trial_ends_at|stripe_customer_id|stripe_checkout_session_id|district_id)/;
+const sensitiveUserMetadata = /user_metadata\?*\.?(?:payment_status|payment_paid_at|paid_through|access_status|trial_status|trial_starts_at|trial_ends_at|stripe_customer_id|stripe_checkout_session_id|district_id|annual_price_cents|renewal_price_cents|pricing_lock_status|pricing_lock_reason|pricing_locked_at|pricing_entitlement_reason|pricing_po_status|pricing_po_reference|pricing_commitment_reference)/;
 assert.equal(sensitiveUserMetadata.test(source), false, 'security-sensitive state must not be read from user_metadata');
 assert.match(source, /app_metadata/, 'protected app_metadata must be used for authorization state');
 

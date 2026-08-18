@@ -3,6 +3,7 @@ import { createClient } from '@/lib/supabase/server';
 import { createAdminClient } from '@/lib/supabase/admin';
 import DashboardClient from './DashboardClient';
 import { getAuthenticatedBillingContext } from '@/lib/billing';
+import { formatAnnualPriceLabel, INTRODUCTORY_ANNUAL_PRICE_CENTS, resolveCanaryPricing } from '@/lib/pricing';
 import { redirect } from 'next/navigation';
 
 const DASHBOARD_DATA_TIMEOUT_MS = 6500;
@@ -114,7 +115,12 @@ export default async function DashboardPage({ searchParams }) {
     billingCity: billingContext.user?.user_metadata?.billing_city || '',
     billingState: billingContext.user?.user_metadata?.billing_state || '',
     billingZip: billingContext.user?.user_metadata?.billing_zip || '',
+    amountCents: billingContext.pricing?.amountCents || null,
+    amountLabel: billingContext.pricing ? formatAnnualPriceLabel(billingContext.pricing.amountCents) : '',
+    pricingReason: billingContext.pricing?.reason || '',
+    pricingLocked: Boolean(billingContext.pricing?.locked),
   } : null;
+  const publicPricing = resolveCanaryPricing();
 
   return (
     <DashboardClient
@@ -127,6 +133,8 @@ export default async function DashboardPage({ searchParams }) {
       initialView={initialView}
       paymentNotice={paymentNotice}
       billingInfo={billingInfo}
+      publicPricingLabel={formatAnnualPriceLabel(publicPricing.amountCents)}
+      publicPricingIntroductory={publicPricing.amountCents === INTRODUCTORY_ANNUAL_PRICE_CENTS}
       excludedStories={excludedStories}
       correctionEvents={correctionEvents}
       socialSources={socialSources}

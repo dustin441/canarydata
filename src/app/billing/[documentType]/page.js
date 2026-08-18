@@ -8,6 +8,7 @@ import {
   formatDate,
 } from '@/lib/billing-documents';
 import PrintButton from './PrintButton';
+import { INTRODUCTORY_ANNUAL_PRICE_CENTS } from '@/lib/pricing';
 
 export const metadata = {
   title: 'Canary Data Billing Document',
@@ -52,6 +53,7 @@ function PaymentTerms({ documentType, doc }) {
     <>
       <strong>Payment terms:</strong> Net 30 from document issue date.<br />
       <strong>Trial policy:</strong> The 30-day trial begins when the account is activated. Generating this price quote does not extend the trial period.<br />
+      <strong>Price status:</strong> {doc.pricingLocked ? `${doc.amountLabel} is locked for this account and renewal.` : (doc.amountCents === INTRODUCTORY_ANNUAL_PRICE_CENTS ? 'This quote alone does not lock the introductory rate. A documented commitment with a PO in process by August 31 is required.' : `${doc.amountLabel} is the current annual rate.`)}<br />
       <strong>Renewal:</strong> Annual access does not automatically renew unless a renewal agreement is completed.
     </>
   );

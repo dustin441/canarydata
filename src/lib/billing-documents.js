@@ -1,11 +1,11 @@
-const ANNUAL_PRICE_CENTS = 149900;
+import { INTRODUCTORY_ANNUAL_PRICE_CENTS, resolveCanaryPricing } from './pricing.js';
 
 const CANARY_VENDOR_NAME = process.env.CANARY_VENDOR_NAME || 'Canary Data';
 const CANARY_VENDOR_ADDRESS_LINE1 = process.env.CANARY_VENDOR_ADDRESS_LINE1 || 'Vendor address to be provided';
 const CANARY_VENDOR_ADDRESS_LINE2 = process.env.CANARY_VENDOR_ADDRESS_LINE2 || '';
 const CANARY_VENDOR_EMAIL = process.env.CANARY_VENDOR_EMAIL || 'hello@canarydata.media';
 
-export function formatCurrency(cents = ANNUAL_PRICE_CENTS) {
+export function formatCurrency(cents = INTRODUCTORY_ANNUAL_PRICE_CENTS) {
   return new Intl.NumberFormat('en-US', { style: 'currency', currency: 'USD' }).format((Number(cents) || 0) / 100);
 }
 
@@ -47,9 +47,10 @@ export function billingDocumentNumbers({ districtId, email, year = new Date().ge
   };
 }
 
-export function buildBillingDocumentContext({ user, districtId, districtName, email, onboardingRequest }) {
+export function buildBillingDocumentContext({ user, districtId, districtName, email, onboardingRequest, pricing: resolvedPricing }) {
   const metadata = user?.user_metadata || {};
   const protectedMetadata = user?.app_metadata || {};
+  const pricing = resolvedPricing || resolveCanaryPricing({ protectedMetadata });
   const issuedAt = new Date();
   const dueAt = addDays(issuedAt, 30);
   const numbers = billingDocumentNumbers({ districtId, email });
@@ -85,8 +86,13 @@ export function buildBillingDocumentContext({ user, districtId, districtName, em
     paymentStatus,
     paidAt,
     paidThrough,
-    amountCents: ANNUAL_PRICE_CENTS,
-    amountLabel: formatCurrency(ANNUAL_PRICE_CENTS),
+    amountCents: pricing.amountCents,
+    amountLabel: formatCurrency(pricing.amountCents),
+    renewalAmountCents: pricing.renewalAmountCents,
+    pricingPolicyVersion: pricing.policyVersion,
+    pricingReason: pricing.reason,
+    pricingLocked: pricing.locked,
+    pricingLockedAt: pricing.lockedAt,
     netTerms: 'Net 30',
   };
 }

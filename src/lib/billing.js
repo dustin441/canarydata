@@ -1,5 +1,6 @@
 import { createClient } from '@/lib/supabase/server';
 import { createAdminClient } from '@/lib/supabase/admin';
+import { resolveCanaryPricing } from '@/lib/pricing';
 
 export async function getAuthenticatedBillingContext() {
   const supabase = await createClient();
@@ -61,5 +62,7 @@ export async function getAuthenticatedBillingContext() {
     };
   }
 
-  return { user: user || sessionUser, districtId, districtName, email, onboardingRequest };
+  const billingUser = user || sessionUser;
+  const pricing = resolveCanaryPricing({ protectedMetadata: billingUser?.app_metadata || protectedMetadata });
+  return { user: billingUser, districtId, districtName, email, onboardingRequest, pricing };
 }

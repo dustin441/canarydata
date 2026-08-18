@@ -1617,7 +1617,7 @@ function HowItWorksView() {
   );
 }
 
-function SettingsView({ userDistrictId, districts, billingInfo = null, onPayByCard = null, metaIntegrationEnabled = false, selectedDistrictId = null }) {
+function SettingsView({ userDistrictId, districts, billingInfo = null, publicPricingLabel = 'Annual access', onPayByCard = null, metaIntegrationEnabled = false, selectedDistrictId = null }) {
   const [issue, setIssue] = useState('');
   const [isPending, startSupportTransition] = useTransition();
   const [isBillingPending, startBillingTransition] = useTransition();
@@ -1827,7 +1827,7 @@ function SettingsView({ userDistrictId, districts, billingInfo = null, onPayByCa
             ) : (
               <>Trial ends: <strong style={{ color: 'var(--text-primary)' }}>{billingInfo?.trialEndsAt ? new Date(billingInfo.trialEndsAt).toLocaleDateString() : 'Not set'}</strong><br /></>
             )}
-            Annual access: <strong style={{ color: 'var(--text-primary)' }}>$1,499</strong>
+            Annual access: <strong style={{ color: 'var(--text-primary)' }}>{billingInfo?.amountLabel || publicPricingLabel}</strong>
           </div>
         </div>
       )}
@@ -2182,15 +2182,15 @@ function FeedbackModal({ districtId, districtName, onClose }) {
   );
 }
 
-function ReleaseSignupModal({ onClose }) {
+function ReleaseSignupModal({ onClose, publicPricingLabel, publicPricingIntroductory }) {
   return (
     <div className="modal-overlay" onClick={(e) => e.target === e.currentTarget && onClose()}>
       <div className="modal-box release-signup-modal">
         <div>
           <h3>Set Up Your 30-Day Trial</h3>
           <div className="release-pricing-card">
-            <span className="release-pricing-eyebrow">Early adopter launch offer</span>
-            <div className="release-pricing-price">$1,499 <small>/ year</small></div>
+            <span className="release-pricing-eyebrow">{publicPricingIntroductory ? 'Introductory rate through August 31' : 'Standard annual access'}</span>
+            <div className="release-pricing-price">{publicPricingLabel.replace(' annual access', '')} <small>/ year</small></div>
             <p>Built for school communicators who need clarity without enterprise software sticker shock.</p>
             <ul>
               <li>Unlimited users for the district team</li>
@@ -3453,7 +3453,7 @@ export function SocialView({ socialResults, legacySocialResults = [], socialSour
   );
 }
 
-export default function DashboardClient({ articles, districts, queries: initialQueries, clients = [], userDistrictId, initialDistrictId = null, initialView = 'dashboard', paymentNotice = null, billingInfo = null, excludedStories = [], correctionEvents = [], socialSources = [], socialThreads = [], socialReviewEvents = [], strategicProfiles = [], strategicPriorities = [], collectionHealth = [], socialCollectionHealth = [], dataWarnings = [], isAdmin = false, melodiEnabled = false, metaIntegrationEnabled = false, demoMode = false }) {
+export default function DashboardClient({ articles, districts, queries: initialQueries, clients = [], userDistrictId, initialDistrictId = null, initialView = 'dashboard', paymentNotice = null, billingInfo = null, publicPricingLabel = 'Annual access', publicPricingIntroductory = false, excludedStories = [], correctionEvents = [], socialSources = [], socialThreads = [], socialReviewEvents = [], strategicProfiles = [], strategicPriorities = [], collectionHealth = [], socialCollectionHealth = [], dataWarnings = [], isAdmin = false, melodiEnabled = false, metaIntegrationEnabled = false, demoMode = false }) {
   const defaultDistrictFilter = userDistrictId ?? initialDistrictId ?? districts[0]?.id ?? 'All';
   const [currentView, setCurrentView] = useState(initialView);
   const [search, setSearch] = useState('');
@@ -3484,7 +3484,7 @@ export default function DashboardClient({ articles, districts, queries: initialQ
   const [paymentLoading, setPaymentLoading] = useState(false);
   const [paymentError, setPaymentError] = useState('');
   const [paymentSuccess, setPaymentSuccess] = useState(false);
-  const [paymentAmountLabel, setPaymentAmountLabel] = useState('$1,499 annual access');
+  const [paymentAmountLabel, setPaymentAmountLabel] = useState(billingInfo?.amountLabel || publicPricingLabel);
   const [embeddedCheckout, setEmbeddedCheckout] = useState(null);
   const [embeddedCheckoutSessionId, setEmbeddedCheckoutSessionId] = useState('');
   const embeddedCheckoutRef = useRef(null);
@@ -3541,7 +3541,7 @@ export default function DashboardClient({ articles, districts, queries: initialQ
       }
       setEmbeddedCheckout(null);
       const session = await createEmbeddedCanaryCheckout();
-      setPaymentAmountLabel(session.amountLabel || '$1,499 annual access');
+      setPaymentAmountLabel(session.amountLabel || billingInfo?.amountLabel || publicPricingLabel);
       setEmbeddedCheckoutSessionId(session.sessionId);
       const stripe = await stripePromise;
       if (!stripe) throw new Error('Stripe could not load. Please refresh and try again.');
@@ -4256,7 +4256,7 @@ export default function DashboardClient({ articles, districts, queries: initialQ
             </div>
           )}
           {currentView === 'clients' && <ClientsView clients={clients} />}
-          {currentView === 'settings' && <SettingsView userDistrictId={userDistrictId} districts={districts} billingInfo={billingInfo} onPayByCard={openPaymentModal} metaIntegrationEnabled={metaIntegrationEnabled} selectedDistrictId={districtFilter} />}
+          {currentView === 'settings' && <SettingsView userDistrictId={userDistrictId} districts={districts} billingInfo={billingInfo} publicPricingLabel={publicPricingLabel} onPayByCard={openPaymentModal} metaIntegrationEnabled={metaIntegrationEnabled} selectedDistrictId={districtFilter} />}
           {currentView === 'howto' && <HowItWorksView />}
           {currentView === 'social' && (
             <SocialView
@@ -5041,7 +5041,7 @@ export default function DashboardClient({ articles, districts, queries: initialQ
       )}
 
       {releaseSignupOpen && (
-        <ReleaseSignupModal onClose={() => setReleaseSignupOpen(false)} />
+        <ReleaseSignupModal onClose={() => setReleaseSignupOpen(false)} publicPricingLabel={publicPricingLabel} publicPricingIntroductory={publicPricingIntroductory} />
       )}
     </div>
   );

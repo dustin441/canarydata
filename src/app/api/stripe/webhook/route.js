@@ -1,12 +1,12 @@
 import { NextResponse } from 'next/server';
 import { markCanaryPaymentPaid } from '@/lib/payment-state';
+import { retrieveCheckoutSession } from '@/lib/stripe';
 import { verifyStripeWebhookSignature } from '@/lib/stripe-webhook';
 
 export const runtime = 'nodejs';
 
 const PAID_CHECKOUT_EVENTS = new Set([
   'checkout.session.completed',
-  'checkout.session.async_payment_succeeded',
 ]);
 
 export async function POST(request) {
@@ -35,16 +35,14 @@ export async function POST(request) {
     return NextResponse.json({ received: true, handled: false });
   }
 
-  const session = event?.data?.object;
-  if (session?.payment_status !== 'paid') {
+  const eventSession = event?.data?.object;
+  if (eventSession?.payment_status !== 'paid') {
     return NextResponse.json({ received: true, handled: false, reason: 'session_not_paid' });
   }
 
   try {
-    const result = await markCanaryPaymentPaid({
-      session,
-      paidAt: Number(event.created) ? Number(event.created) * 1000 : undefined,
-    });
+    const session = await retrieveCheckoutSession(eventSession.id);
+    const result = await markCanaryPaymentPaid({ session, eventId: event.id });
     if (!result.ok) {
       console.error('Stripe webhook could not reconcile Canary payment:', result.reason);
       return NextResponse.json({ received: true, handled: false, reason: result.reason });

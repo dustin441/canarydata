@@ -23,18 +23,24 @@ export default async function PaymentSuccessPage({ searchParams }) {
   if (sessionId) {
     try {
       session = await retrieveCheckoutSession(sessionId);
-      verified = session?.payment_status === 'paid';
       const sessionUserId = session?.metadata?.user_id;
-      if (sessionUserId && sessionUserId !== billingContext.user.id) {
-        verified = false;
+      const protectedDistrictId = String(billingContext.user.app_metadata?.district_id || '');
+      if (!sessionUserId || sessionUserId !== billingContext.user.id) {
         error = 'This Stripe session does not match the signed-in user.';
+      } else if (!protectedDistrictId || session?.metadata?.district_id !== protectedDistrictId) {
+        error = 'This Stripe session does not match the signed-in district.';
+      } else if (session?.payment_status !== 'paid') {
+        error = 'Stripe has not confirmed payment for this session yet.';
       } else {
         const paymentResult = await markCanaryPaymentPaid({ session });
+        verified = paymentResult.ok === true;
         savedRequest = paymentResult.ok
           ? { organization_name: billingContext.districtName || session?.metadata?.organization_name || 'your account' }
           : null;
       }
     } catch (err) {
+      verified = false;
+      savedRequest = null;
       error = err?.message || 'Unable to verify payment yet.';
     }
   }

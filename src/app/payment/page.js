@@ -16,7 +16,7 @@ export default async function PaymentPage() {
 
   const organizationName = districtName || onboardingRequest?.organization_name || '';
   const alreadyPaid = onboardingRequest?.payment_status === 'paid';
-  const amountLabel = getCanaryCheckoutAmountLabel(email);
+  const amountLabel = getCanaryCheckoutAmountLabel(email, user?.app_metadata || {});
 
   return (
     <div className="auth-page">

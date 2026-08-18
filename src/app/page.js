@@ -1,6 +1,9 @@
 import Link from 'next/link';
 import Header from './Header';
 import styles from './page.module.css';
+import { formatAnnualPriceLabel, INTRODUCTORY_ANNUAL_PRICE_CENTS, resolveCanaryPricing } from '@/lib/pricing';
+
+export const dynamic = 'force-dynamic';
 
 export const metadata = {
   title: 'Canary Data | Strategic Communications Intelligence for School Districts',
@@ -53,6 +56,9 @@ const testimonials = [
 ];
 
 export default function Home() {
+  const pricing = resolveCanaryPricing();
+  const priceDisplay = formatAnnualPriceLabel(pricing.amountCents).replace(' annual access', '');
+  const introductory = pricing.amountCents === INTRODUCTORY_ANNUAL_PRICE_CENTS;
   return (
     <div className={styles.container}>
       {/* Header */}
@@ -291,8 +297,8 @@ export default function Home() {
         </div>
 
         <div className={styles.priceCard}>
-          <div className={styles.priceSub}>Comprehensive Annual Access</div>
-          <div className={styles.priceAmount}>$1,499<span style={{ fontSize: '2rem', color: '#64748b' }}>/yr</span></div>
+          <div className={styles.priceSub}>{introductory ? 'Introductory Annual Access Through August 31' : 'Comprehensive Annual Access'}</div>
+          <div className={styles.priceAmount}>{priceDisplay}<span style={{ fontSize: '2rem', color: '#64748b' }}>/yr</span></div>
           <ul className={styles.priceList}>
             <li>Unlimited Users</li>
             <li>AI-Summarized Daily Mentions</li>
@@ -323,7 +329,9 @@ export default function Home() {
             </p>
           </div>
           <p style={{ marginTop: '1.5rem', fontSize: '0.9rem', color: '#94a3b8', lineHeight: '1.6' }}>
-            We believe in our product. Start your 30-day free trial today—no payment upfront, no barriers to entry. We know school district payment cycles take time, so we&apos;re giving you full access now. Just submit payment within 30 days to keep monitoring without interruption. We&apos;ll provide a price quote that you can use for approval, then payment can be made by check, ACH, or credit card. Let&apos;s get started!
+            {introductory
+              ? 'Start your 30-day free trial with no payment upfront. A documented commitment with a purchase order in process by August 31 locks the $1,499 annual rate, even if the trial continues into September. Payment can be made by check, ACH, or credit card.'
+              : 'Start your 30-day free trial with no payment upfront. We will provide a price quote for district approval, and payment can be made by check, ACH, or credit card before monitoring continues beyond the trial.'}
           </p>
         </div>
       </section>
