@@ -1,5 +1,6 @@
 import { NextResponse } from 'next/server';
 import { cookies } from 'next/headers';
+import { createHash } from 'node:crypto';
 import { createAdminClient } from '@/lib/supabase/admin';
 import { requireIntegrationActor } from '@/lib/integration-auth';
 import {
@@ -12,6 +13,7 @@ import {
   metaGrantedScopes,
   metaGraph,
   metaGraphAll,
+  metaIntegrationEnabledForDistrict,
   sanitizeReturnPath,
   tokenExpiry,
 } from '@/lib/meta-integration.mjs';
@@ -71,6 +73,10 @@ export async function GET(request) {
   const admin = createAdminClient();
   let returnPath = '/dashboard/integrations';
   let stage = 'state_validation';
+  let accessToken = null;
+  let preparedDistrictId = null;
+  let preparedAttemptId = null;
+  let finalized = false;
 
   try {
     if (!state) return redirectWithStatus(request, returnPath, 'invalid_state');
@@ -107,10 +113,13 @@ export async function GET(request) {
     }
     returnPath = sanitizeReturnPath(consumedRows[0].return_path || returnPath);
     if (providerError || !code) return redirectWithStatus(request, returnPath, 'cancelled');
+    if (!metaIntegrationEnabledForDistrict(actor.districtId)) {
+      return redirectWithStatus(request, returnPath, 'not_configured');
+    }
 
     stage = 'code_exchange';
     const tokenGrant = await exchangeMetaCode(code);
-    const accessToken = tokenGrant.access_token;
+    accessToken = tokenGrant.access_token;
 
     stage = 'token_introspection';
     const tokenData = await debugMetaToken(accessToken);
@@ -131,27 +140,36 @@ export async function GET(request) {
       : [];
 
     const providerUserId = String(tokenData.user_id);
+    const providerUserIdHash = createHash('sha256').update(providerUserId).digest('hex');
     const providerUserName = null;
     stage = 'connection_prepare';
     const { data: connectionId, error: prepareError } = await admin.rpc('canary_prepare_meta_connection', {
+      p_attempt_id: consumedRows[0].oauth_attempt_id,
       p_district_id: actor.districtId,
       p_connected_by: actor.id,
       p_provider_app_id: process.env.META_APP_ID,
       p_provider_user_id: providerUserId,
+      p_provider_user_id_hash: providerUserIdHash,
       p_provider_user_name: providerUserName,
+      p_expected_connection_id: consumedRows[0].expected_connection_id,
+      p_expected_lifecycle_version: consumedRows[0].expected_lifecycle_version,
     });
     if (prepareError) throw prepareError;
     if (!connectionId) throw new Error('Canary could not prepare the Meta connection.');
+    preparedDistrictId = actor.districtId;
+    preparedAttemptId = consumedRows[0].oauth_attempt_id;
 
     const tokenContext = `${connectionId}:${actor.districtId}:meta`;
     const rows = assetRows({ pages });
     stage = 'connection_finalize';
     const { error: finalizeError } = await admin.rpc('canary_finalize_meta_connection', {
+      p_attempt_id: preparedAttemptId,
       p_connection_id: connectionId,
       p_district_id: actor.districtId,
       p_connected_by: actor.id,
       p_provider_app_id: process.env.META_APP_ID,
       p_provider_user_id: providerUserId,
+      p_provider_user_id_hash: providerUserIdHash,
       p_provider_user_name: providerUserName,
       p_status: declined.length ? 'needs_permissions' : 'active',
       p_token_expires_at: tokenExpiry(tokenGrant.expires_in)
@@ -163,10 +181,23 @@ export async function GET(request) {
       p_assets: rows,
     });
     if (finalizeError) throw finalizeError;
+    finalized = true;
 
     return redirectWithStatus(request, returnPath, declined.length ? 'permissions_limited' : 'connected');
   } catch (error) {
+    // Meta permission deletion is app/user-wide. A failed reconnect must not
+    // revoke a healthy or concurrently successful grant, so discard the
+    // in-memory token and abandon only this locally claimed attempt.
+    accessToken = null;
+    if (preparedAttemptId && preparedDistrictId && !finalized) {
+      const { error: cleanupError } = await admin.rpc('canary_abandon_meta_connection_attempt', {
+        p_attempt_id: preparedAttemptId,
+        p_district_id: preparedDistrictId,
+      });
+      if (cleanupError) console.warn('Meta pending connection cleanup failed', { code: cleanupError.code || 'unknown' });
+    }
     console.error('Meta OAuth callback failed', { stage, code: error?.code || 'unknown', type: error?.type || error?.name || 'Error' });
-    return redirectWithStatus(request, returnPath, 'callback_failed');
+    const identityMismatch = String(error?.message || '').includes('different Meta identity');
+    return redirectWithStatus(request, returnPath, identityMismatch ? 'identity_mismatch' : 'callback_failed');
   }
 }

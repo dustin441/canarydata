@@ -6,13 +6,22 @@ process.env.META_APP_SECRET = 'test-app-secret';
 process.env.META_CONFIG_ID = 'test-config-id';
 process.env.META_REDIRECT_URI = 'https://www.canarydata.media/api/integrations/meta/callback';
 process.env.META_TOKEN_ENCRYPTION_KEY = Buffer.alloc(32, 7).toString('base64');
+process.env.META_INTEGRATION_ENABLED = 'true';
+process.env.META_INTEGRATION_PILOT_DISTRICT_IDS = 'district-pilot,district-second';
 
 const meta = await import('../src/lib/meta-integration.mjs');
 
-const { state, stateHash } = meta.createOauthState();
+assert.equal(meta.metaIntegrationEnabledForDistrict('district-pilot'), true, 'Explicit pilot district must be enabled when configuration is complete.');
+assert.equal(meta.metaIntegrationEnabledForDistrict('district-outside'), false, 'A configured global flag must not enable an unlisted district.');
+process.env.META_INTEGRATION_PILOT_DISTRICT_IDS = '';
+assert.equal(meta.metaIntegrationEnabledForDistrict('district-pilot'), false, 'An empty pilot allowlist must fail closed.');
+process.env.META_INTEGRATION_PILOT_DISTRICT_IDS = 'district-pilot,district-second';
+
+const { state, stateHash, attemptId } = meta.createOauthState();
 assert.ok(state.length >= 40, 'OAuth state must have high entropy.');
 assert.equal(meta.hashOauthState(state), stateHash, 'OAuth state hash must be deterministic.');
 assert.notEqual(state, stateHash, 'Raw OAuth state must not be stored as its hash.');
+assert.match(attemptId, /^[0-9a-f-]{36}$/i, 'Each OAuth state must carry a distinct attempt identity.');
 assert.equal(meta.constantTimeEqualText(stateHash, stateHash), true);
 assert.equal(meta.constantTimeEqualText(stateHash, `${stateHash}x`), false);
 
@@ -129,6 +138,11 @@ assert.ok(!callback.includes(".from('social_provider_credentials')"), 'Callback 
 assert.ok(callback.includes("p_provider_app_id: process.env.META_APP_ID"), 'Callback must bind persisted connections to the configured Meta app.');
 assert.ok(callback.includes('encryptMetaToken(accessToken, tokenContext)'), 'User token must be encrypted with AAD before storage.');
 assert.ok(callback.includes('debugMetaToken(accessToken)'), 'OAuth exchange must introspect and bind the grant to the configured app and provider identity.');
+assert.ok(callback.includes('metaIntegrationEnabledForDistrict(actor.districtId)'), 'Callback must re-check the exact pilot district after atomic state consumption and before code exchange.');
+assert.ok(!callback.includes('revokeMetaPermissions(accessToken)'), 'A failed OAuth attempt must not perform app/user-wide compensating revocation.');
+assert.ok(callback.includes("admin.rpc('canary_abandon_meta_connection_attempt'"), 'A failed callback must clean up only its attempt-bound local state.');
+assert.ok(callback.includes('p_expected_lifecycle_version'), 'Callback preparation must use the state-recorded lifecycle version.');
+assert.ok(callback.includes('p_attempt_id: preparedAttemptId'), 'Finalization must compare-and-set the exact consumed OAuth attempt.');
 assert.ok(callback.includes('metaGrantedScopes(tokenData)'), 'BISU permissions must come from token introspection.');
 assert.ok(!callback.includes("metaGraph('me/permissions'"), 'BISU callback must not call the legacy personal-user permissions edge.');
 assert.ok(callback.includes("const providerUserId = String(tokenData.user_id)"), 'BISU provider identity must come from the validated token subject.');
@@ -141,6 +155,8 @@ assert.ok(!callback.includes('access_token: accessToken,'), 'Callback database p
 const disconnectRoute = fs.readFileSync(new URL('../src/app/api/integrations/meta/disconnect/route.js', import.meta.url), 'utf8');
 assert.ok(disconnectRoute.includes("admin.rpc('canary_disconnect_meta_connection'"), 'Disconnect mutations must be transactional.');
 assert.ok(!disconnectRoute.includes(".from('social_provider_assets')"), 'Disconnect must not mutate assets outside the transaction.');
+assert.ok(!disconnectRoute.includes('revokeMetaPermissions'), 'Per-district disconnect must never call Meta app/user-wide permission revocation.');
+assert.ok(disconnectRoute.includes("disconnectScope: 'district_local'"), 'Disconnect must disclose its safe local-only boundary.');
 
 const actorRoute = fs.readFileSync(new URL('../src/lib/integration-auth.js', import.meta.url), 'utf8');
 assert.ok(actorRoute.includes("permissions.includes('manage_integrations')"), 'Integration access must require protected capability metadata.');
@@ -160,6 +176,14 @@ assert.ok(authMiddleware.includes("request.nextUrl.pathname === '/api/integratio
 assert.ok(authMiddleware.includes("request.nextUrl.pathname === '/api/integrations/meta/data-deletion/status'"), 'Meta deletion status URL must be public.');
 
 const statusRoute = fs.readFileSync(new URL('../src/app/api/integrations/meta/route.js', import.meta.url), 'utf8');
+const startRoute = fs.readFileSync(new URL('../src/app/api/integrations/meta/start/route.js', import.meta.url), 'utf8');
+const accountsRoute = fs.readFileSync(new URL('../src/app/api/integrations/meta/accounts/route.js', import.meta.url), 'utf8');
+const syncRoute = fs.readFileSync(new URL('../src/app/api/integrations/meta/sync/route.js', import.meta.url), 'utf8');
+for (const [label, source] of [['status', statusRoute], ['start', startRoute], ['accounts', accountsRoute], ['sync', syncRoute]]) {
+  assert.ok(source.includes('metaIntegrationEnabledForDistrict'), `${label} route must enforce the exact pilot-district allowlist.`);
+}
+assert.ok(startRoute.includes(".select('id,lifecycle_version')"), 'OAuth start must snapshot the current connection identity and lifecycle version.');
+assert.ok(startRoute.includes('expected_connection_id: expectedConnection?.id || null'), 'OAuth state must persist its expected connection identity.');
 assert.ok(!statusRoute.includes('encrypted_access_token'), 'Browser status route must not select encrypted connection tokens.');
 assert.ok(!statusRoute.includes('social_provider_credentials'), 'Browser status route must not query credentials.');
 
@@ -174,6 +198,26 @@ assert.ok(dashboardClient.includes('Facebook & Instagram'), 'Settings must ident
 assert.ok(dashboardClient.includes('Manage Meta connection'), 'Settings must expose the Meta connection action.');
 assert.ok(dashboardClient.includes('metaIntegrationEnabled={metaIntegrationEnabled}'), 'Settings must receive server-verified Meta configuration status.');
 assert.ok(!dashboardClient.includes('<span className="sidebar-link-icon">🔗</span>'), 'Meta integration must live in Settings rather than as a standalone sidebar item.');
+assert.ok(dashboardClient.includes(": '/dashboard/integrations'}>Manage Meta connection</a>"), 'Administrator Settings navigation must enter integrations without a reporting-filter district.');
+assert.ok(!dashboardClient.includes('metaIntegrationEnabled={metaIntegrationEnabled} selectedDistrictId={districtFilter}'), 'Settings must not receive the dashboard reporting district as integration intent.');
+const lifecycleMigration = fs.readFileSync(new URL('../supabase/migrations/20260818190000_meta_oauth_attempt_lifecycle.sql', import.meta.url), 'utf8');
+assert.ok(lifecycleMigration.includes('lifecycle_version = lifecycle_version + 1'), 'Terminal and successful lifecycle transitions must invalidate stale callbacks.');
+assert.ok(lifecycleMigration.includes('social_provider_connection_attempts_one_pending_idx'), 'Only one pending OAuth attempt may own a district.');
+assert.ok(lifecycleMigration.includes('canary_abandon_meta_connection_attempt'), 'Migration must provide attempt-local cleanup.');
+assert.ok(lifecycleMigration.includes("raise exception 'Stale Meta OAuth callback"), 'Migration must reject stale callback interleavings.');
+assert.ok(lifecycleMigration.includes("'canary-meta-provider-user:' || p_provider_user_id_hash"), 'Callbacks and deletion must share a provider-user-global lock.');
+assert.ok(lifecycleMigration.includes('completed_at >= v_state_created_at'), 'A completed provider deletion must fence OAuth states issued before deletion.');
+assert.ok(lifecycleMigration.includes("raise exception 'A different Meta identity is already associated with this district'"), 'Reconnect must not erase the old provider identity needed for deletion provenance.');
+assert.ok(lifecycleMigration.includes("'completed',clock_timestamp()"), 'Deletion fences must record wall-clock completion rather than transaction start time.');
+assert.ok(callback.includes('p_provider_user_id_hash: providerUserIdHash'), 'Callback prepare/finalize must use the same provider identity hash as deletion.');
+assert.ok(syncRoute.includes('Native Meta synchronization is not released.'), 'Canonical Meta sync writes must remain hard-disabled until transactional deletion fencing exists.');
+assert.ok(!syncRoute.includes('syncSelectedMetaAssets'), 'The release route must not have an environment-only path to unfenced canonical writes.');
+assert.ok(!accountsRoute.includes('canary_link_selected_meta_assets'), 'Discovery-only asset selection must not create canonical Social rows.');
+assert.ok(statusRoute.includes('connections: connections || []'), 'Disabled-first status must retain local disconnect visibility for existing connections.');
+for (const status of ['pending', 'expired', 'error']) {
+  assert.ok(integrationClient.includes(`'${status}'`), `Disabled-first UI must expose disconnect for credential-bearing ${status} connections.`);
+}
+assert.ok(integrationClient.includes('manageableConnections.map'), 'Disconnect controls must render for every manageable credential-bearing connection.');
 const syncService = fs.readFileSync(new URL('../src/lib/meta-sync-service.mjs', import.meta.url), 'utf8');
 assert.ok(syncService.includes('metaGrantedScopes(tokenData)'), 'Native sync must validate BISU scopes through token introspection.');
 assert.ok(!syncService.includes("metaGraph('me/permissions'"), 'Native sync must not call the legacy personal-user permissions edge.');

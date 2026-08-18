@@ -4,13 +4,14 @@ import { useCallback, useEffect, useMemo, useState } from 'react';
 import styles from './integrations.module.css';
 
 const STATUS_COPY = {
-  connected: 'Meta access was connected. Select the Pages and Instagram accounts Canary should use.',
+  connected: 'Meta access was connected. Select the Pages and Instagram accounts for the future reporting release.',
   permissions_limited: 'Meta connected, but one or more requested permissions were not granted. Available assets are shown below.',
   cancelled: 'Meta authorization was cancelled. No access was added.',
   invalid_state: 'That authorization link expired or was already used. Start a new connection.',
   forbidden: 'That district connection is not available to this account.',
   start_failed: 'Canary could not start Meta authorization.',
   callback_failed: 'Meta returned access, but Canary could not finish the connection. No token was exposed.',
+  identity_mismatch: 'This district is already associated with a different Meta user. Reconnect with the same Meta identity or complete the deletion-safe identity replacement process first.',
   not_configured: 'The Canary Meta application still needs its production App ID, secret, encryption key, and redirect URI.',
 };
 
@@ -58,7 +59,8 @@ export default function MetaIntegrationClient({ districtId, districtName, distri
 
   useEffect(() => { load(); }, [load]);
 
-  const activeConnections = useMemo(() => (data?.connections || []).filter((connection) => ['active', 'needs_permissions'].includes(connection.status)), [data]);
+  const manageableConnections = useMemo(() => (data?.connections || []).filter((connection) => ['pending', 'active', 'needs_permissions', 'expired', 'error'].includes(connection.status)), [data]);
+  const reconnectableConnections = useMemo(() => manageableConnections.filter((connection) => ['active', 'needs_permissions'].includes(connection.status)), [manageableConnections]);
 
   function updateDraft(id, patch) {
     setDrafts((current) => ({ ...current, [id]: { ...current[id], ...patch } }));
@@ -99,9 +101,7 @@ export default function MetaIntegrationClient({ districtId, districtName, distri
       });
       const payload = await response.json();
       if (!response.ok) throw new Error(payload?.error || 'Meta could not be disconnected.');
-      setMessage(payload.remoteRevocationConfirmed
-        ? 'Meta access was revoked and removed from Canary.'
-        : 'Canary removed local access. Confirm revocation in Meta Business Integrations.');
+      setMessage('Canary removed this district’s local access. To revoke this Meta identity everywhere, remove Canary in Meta Business Integrations.');
       await load();
     } catch (requestError) {
       setError(requestError.message);
@@ -145,11 +145,11 @@ export default function MetaIntegrationClient({ districtId, districtName, distri
         <div>
           <span className={styles.eyebrow}>Read-only connection</span>
           <h2>{districtName}</h2>
-          <p>Canary will use the selected assets for reporting and reconciliation. This connection cannot publish posts, reply to comments, change campaigns, or spend advertising budget.</p>
+          <p>This authorization pilot verifies eligible assets and stores selections for a future reporting release. Native post synchronization is not yet enabled. This connection cannot publish posts, reply to comments, change campaigns, or spend advertising budget.</p>
         </div>
         <div className={styles.permissionList}>
           <span>✓ Identify Pages and connected Instagram accounts</span>
-          <span>✓ Read selected official posts and media</span>
+          <span>✓ Verify read-only asset authorization</span>
           <span>✓ Choose which assets Canary uses</span>
           <span>✓ Disconnect at any time</span>
         </div>
@@ -167,19 +167,19 @@ export default function MetaIntegrationClient({ districtId, districtName, distri
                 <form action="/api/integrations/meta/start" method="post">
                   <input type="hidden" name="districtId" value={districtId} />
                   <input type="hidden" name="returnPath" value={`/dashboard/integrations?districtId=${districtId}`} />
-                  <button className={styles.connectButton} type="submit">{activeConnections.length ? 'Reconnect Meta' : 'Continue with Meta'}</button>
+                  <button className={styles.connectButton} type="submit">{reconnectableConnections.length ? 'Reconnect Meta' : 'Continue with Meta'}</button>
                 </form>
               ) : <button className={styles.connectButton} disabled>Meta setup required</button>}
             </div>
 
-            {activeConnections.length === 0 ? (
-              <div className={styles.empty}>No active Meta connection for this district.</div>
-            ) : activeConnections.map((connection) => (
+            {manageableConnections.length === 0 ? (
+              <div className={styles.empty}>No stored Meta connection for this district.</div>
+            ) : manageableConnections.map((connection) => (
               <article className={styles.connection} key={connection.id}>
                 <div>
                   <span className={statusClass(connection.status)}>{connection.status}</span>
                   <h3>{connection.provider_user_name || 'Meta account'}</h3>
-                  <p>Connected {new Date(connection.connected_at).toLocaleDateString()} · Token expiry {connection.token_expires_at ? new Date(connection.token_expires_at).toLocaleDateString() : 'not reported'}</p>
+                  <p>{connection.connected_at ? `Connected ${new Date(connection.connected_at).toLocaleDateString()}` : 'Authorization was not finalized'} · Token expiry {connection.token_expires_at ? new Date(connection.token_expires_at).toLocaleDateString() : 'not reported'}</p>
                   {connection.declined_scopes?.length > 0 && <small>Missing permissions: {connection.declined_scopes.join(', ')}</small>}
                 </div>
                 <button className={styles.disconnectButton} type="button" disabled={saving} onClick={() => disconnect(connection.id)}>Disconnect</button>
@@ -190,7 +190,7 @@ export default function MetaIntegrationClient({ districtId, districtName, distri
           {(data?.accounts || []).length > 0 && (
             <section className={styles.assetsSection}>
               <div className={styles.sectionHeading}>
-                <div><h2>Select reporting assets</h2><p>Only selected assets will be included in Canary reporting and future scheduled syncs.</p></div>
+                <div><h2>Select future reporting assets</h2><p>Selections are saved for the future transactional sync release; this pilot does not ingest posts.</p></div>
                 <button className={styles.saveButton} type="button" disabled={saving} onClick={saveSelections}>{saving ? 'Saving…' : 'Save selections'}</button>
               </div>
 

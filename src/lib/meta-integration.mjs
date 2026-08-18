@@ -1,4 +1,4 @@
-import { createHash, createHmac, randomBytes, createCipheriv, createDecipheriv, timingSafeEqual } from 'node:crypto';
+import { createHash, createHmac, randomBytes, randomUUID, createCipheriv, createDecipheriv, timingSafeEqual } from 'node:crypto';
 
 export const META_GRAPH_VERSION = process.env.META_GRAPH_VERSION || 'v25.0';
 export const META_CONFIGURATION_PERMISSIONS = Object.freeze([
@@ -31,13 +31,33 @@ export function metaConfigured() {
   );
 }
 
+export function metaIntegrationEnabledForDistrict(districtId) {
+  if (!metaIntegrationPilotConfigured() || !districtId) return false;
+  return metaPilotDistricts().has(String(districtId));
+}
+
+function metaPilotDistricts() {
+  return new Set(
+    String(process.env.META_INTEGRATION_PILOT_DISTRICT_IDS || '')
+      .split(',')
+      .map((value) => value.trim())
+      .filter(Boolean),
+  );
+}
+
+export function metaIntegrationPilotConfigured() {
+  return process.env.META_INTEGRATION_ENABLED === 'true'
+    && metaConfigured()
+    && metaPilotDistricts().size > 0;
+}
+
 export function metaDeletionConfigured() {
   return Boolean(process.env.META_APP_SECRET && process.env.META_REDIRECT_URI);
 }
 
 export function createOauthState() {
   const state = randomBytes(32).toString('base64url');
-  return { state, stateHash: hashOauthState(state) };
+  return { state, stateHash: hashOauthState(state), attemptId: randomUUID() };
 }
 
 export function hashOauthState(state) {

@@ -10,7 +10,7 @@
     "test:webhook": "node scripts/test-stripe-webhook.mjs && node scripts/test-stripe-webhook-route.mjs",
     "test:authz": "node scripts/test-authz-metadata.mjs",
     "test:pricing": "node scripts/test-pricing-policy.mjs && node scripts/test-pricing-integration.mjs && node scripts/test-stripe-customer-lifecycle.mjs && node scripts/test-payment-state.mjs && node scripts/test-payment-actions.mjs && node scripts/test-pricing-operations.mjs && node scripts/test-payment-fulfillment-migration.mjs",
-    "test:meta": "node scripts/test-meta-integration.mjs && node scripts/test-meta-owned-sync.mjs && node scripts/test-meta-insights.mjs && node scripts/test-meta-native-sync.mjs && node scripts/test-meta-owned-sync-postgres.mjs",
+    "test:meta": "node scripts/test-meta-integration.mjs && node scripts/test-meta-owned-sync.mjs && node scripts/test-meta-insights.mjs && node scripts/test-meta-native-sync.mjs && node scripts/test-meta-owned-sync-postgres.mjs && node scripts/test-meta-oauth-lifecycle-postgres.mjs",
     "test:quality": "node scripts/test-canary-quality.mjs && node scripts/test-ingestion-lineage.mjs && node scripts/test-provider-query-lineage.mjs && node scripts/test-live-interpretation-guards.mjs && node scripts/test-neutral-presentation.mjs && node scripts/test-article-search.mjs && node scripts/test-news-identity-schema.mjs && node scripts/test-collection-health.mjs && node scripts/test-health-monitor-policy.mjs && node scripts/test-feedback-dispatch.mjs && node scripts/test-onboarding-clickup-parity.mjs && node scripts/test-reporting-dataset.mjs && node scripts/test-dashboard-resilience.mjs && node scripts/check-strategic-alignment-label-parser.mjs && node scripts/test-strategic-alignment-sort.mjs && node scripts/test-meta-integration.mjs",
     "test:strategic-sort": "node scripts/test-strategic-alignment-sort.mjs",
     "test:corrections": "node scripts/test-story-corrections.mjs",
@@ -51,6 +51,7 @@
     "eslint-config-next": "16.2.11"
   },
   "overrides": {
+    "nanoid": "3.3.18",
     "ws": "8.21.0",
     "postcss": "8.5.23",
     "sharp": "0.35.0"

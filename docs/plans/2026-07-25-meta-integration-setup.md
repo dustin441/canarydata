@@ -50,13 +50,33 @@ The schema intentionally exposes no anon or authenticated policies. OAuth state,
 Set these only in Vercel/server secrets:
 
 - `META_INTEGRATION_ENABLED=true`
+- `META_INTEGRATION_PILOT_DISTRICT_IDS=<comma-separated exact district IDs>`; the global flag alone enables nobody
 - `META_APP_ID=<Canary Meta App ID>`
 - `META_APP_SECRET=<Canary Meta App Secret>`
 - `META_CONFIG_ID=<Canary Facebook Login for Business configuration ID>`
 - `META_TOKEN_ENCRYPTION_KEY=<base64-encoded 32-byte random key>`
 - `META_REDIRECT_URI=https://www.canarydata.media/api/integrations/meta/callback`
+
+## Disabled-first migration order
+
+Keep `META_INTEGRATION_ENABLED=false` while promoting schema and code. Apply in this order:
+
+1. Existing base schema: `supabase/meta_social_integration.sql`
+2. Owned sync: `supabase/migrations/20260813224000_meta_owned_social_sync.sql`
+3. Insights: `supabase/migrations/20260814223000_meta_owned_social_insights.sql`
+4. Row-RPC restriction: `supabase/migrations/20260814224500_meta_insights_restrict_row_rpc.sql`
+5. OAuth attempt lifecycle CAS: `supabase/migrations/20260818190000_meta_oauth_attempt_lifecycle.sql`
+6. Run `supabase/verify_meta_social_integration_consolidated.sql` and require every `passed` value to be true.
+
+Only after the additive migration is catalog-verified, the schema-dependent application is deployed, provider configuration is verified, and an authenticated pilot passes may the global flag and exact district allowlist be enabled. This repository change does not apply production DDL or enable the pilot.
+
+The first authorization pilot is discovery-only: it may verify OAuth, enumerate eligible Facebook Pages and connected Instagram professional accounts, save provider-asset selections, disconnect locally, and process signed Meta data deletion. Asset selection does not create canonical `social_accounts` or provider links, and `/api/integrations/meta/sync` remains hard-disabled in code. Do not release canonical Social writes until each commit is transactionally bound to both the connection lifecycle version and the provider-user deletion fence.
+
+Reauthorization must use the same Meta provider identity already recorded for the district. The discovery pilot rejects an in-place switch to a different Meta user because overwriting that identity would erase the provenance required to honor a later deletion request for the former user. Identity replacement requires a future explicit, deletion-safe lifecycle rather than ordinary reconnect.
+
+Ordinary district disconnect is intentionally local-only. Meta's `DELETE /me/permissions` revokes the application grant for the whole Meta user identity, so a district-scoped action must never call it. Users who intend to revoke Canary everywhere must remove Canary in Meta Business Integrations. A future in-product global revocation operation would require explicit identity-wide confirmation and provider-user-global serialization.
 - `META_GRAPH_VERSION=v25.0`
-- `META_NATIVE_SYNC_ENABLED=false` until the additive provider-link migration, lifecycle rehearsal, and app-role pilot pass
+- `META_NATIVE_SYNC_ENABLED=false` (currently inert because the sync route is hard-disabled pending transactional deletion fencing)
 
 Generate the encryption key with a cryptographically secure tool. Never reuse the Meta App Secret as the encryption key.
 
@@ -89,7 +109,7 @@ Prepare a screen recording showing:
 - One protected district workspace
 - The read-only explanation
 - Meta authorization
-- Page, Instagram, and ad-account discovery
+- Facebook Page and connected Instagram professional-account discovery
 - Asset selection and district mapping
 - Reporting use of the selected assets
 - Disconnect behavior

@@ -1,4 +1,5 @@
 import { requireIntegrationActor, integrationErrorResponse } from '@/lib/integration-auth';
+import { metaIntegrationEnabledForDistrict } from '@/lib/meta-integration.mjs';
 
 export const runtime = 'nodejs';
 
@@ -8,6 +9,9 @@ export async function PATCH(request) {
   try {
     const body = await request.json();
     const { actor, admin } = await requireIntegrationActor(body?.districtId || null);
+    if (!metaIntegrationEnabledForDistrict(actor.districtId)) {
+      return Response.json({ error: 'Meta integration is not available for this district.' }, { status: 503 });
+    }
     const selections = Array.isArray(body?.accounts) ? body.accounts : [];
     if (selections.length > 250) return Response.json({ error: 'Too many accounts were selected.' }, { status: 400 });
 
@@ -34,23 +38,6 @@ export async function PATCH(request) {
         return Response.json({ error: 'One or more accounts are outside the authorized district.' }, { status: 403 });
       }
       throw mappingError;
-    }
-
-    if (process.env.META_NATIVE_SYNC_ENABLED === 'true') {
-      const { data: connection, error: connectionError } = await admin
-        .from('social_provider_connections')
-        .select('id')
-        .eq('district_id', actor.districtId)
-        .eq('provider', 'meta')
-        .in('status', ['active', 'needs_permissions'])
-        .maybeSingle();
-      if (connectionError) throw connectionError;
-      if (!connection) throw new Error('An active Meta connection is required before linking selected assets.');
-      const { error: linkError } = await admin.rpc('canary_link_selected_meta_assets', {
-        p_district_id: actor.districtId,
-        p_connection_id: connection.id,
-      });
-      if (linkError) throw linkError;
     }
 
     return Response.json({ ok: true, selectedCount: Number(selectedCount) || 0 });

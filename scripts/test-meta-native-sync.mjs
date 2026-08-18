@@ -92,14 +92,13 @@ assert.ok(service.includes('next_cursor: nextCursor'));
 assert.ok(service.includes("previousRun?.status === 'partial' ? previousRun.source_cutoff : sourceCutoff"), 'Continuation must preserve the original bounded source cutoff.');
 assert.ok(service.includes("nextCursor[asset.id] = continuation[asset.id] || null"), 'A partial page must replay from its input cursor rather than skip unwritten rows.');
 assert.ok(route.includes('requireIntegrationActor(body?.districtId || null)'), 'Manual sync route must enforce protected explicit tenant selection.');
-assert.ok(route.includes('pilotItemLimit: body?.pilotItemLimit ?? null'));
-assert.ok(route.includes('platforms: body?.platforms ?? null'));
-assert.ok(accountsRoute.includes("META_NATIVE_SYNC_ENABLED === 'true'"), 'Selection-to-canonical linking must remain migration-gated.');
-assert.ok(disconnectRoute.indexOf("admin.rpc('canary_disconnect_meta_connection'") < disconnectRoute.indexOf('await revokeMetaPermissions(accessToken)'), 'Disconnect must close local authorization before remote revocation.');
-assert.ok(disconnectRoute.includes("catch (tokenError)"));
-assert.ok(disconnectRoute.includes("connection.status !== 'revoked' && !credential?.encrypted_access_token"), 'Missing credentials on an active connection must make remote revocation unconfirmed.');
-assert.ok(disconnectRoute.includes("p_revocation_unconfirmed: revokeWarning"), 'Credential corruption must be recorded while local disconnect still proceeds.');
-assert.ok(disconnectRoute.indexOf("catch (tokenError)") < disconnectRoute.indexOf("admin.rpc('canary_disconnect_meta_connection'"), 'Credential decoding failure must not prevent local disconnect.');
+assert.ok(route.includes('Native Meta synchronization is not released.'), 'Canonical writes must remain hard-disabled until deletion fencing is transactional.');
+assert.ok(!route.includes('syncSelectedMetaAssets'), 'The route must not expose an environment-only path to unfenced sync writes.');
+assert.ok(!accountsRoute.includes('canary_link_selected_meta_assets'), 'Discovery-only asset selection must not create canonical Social accounts or links.');
+assert.ok(!accountsRoute.includes('META_NATIVE_SYNC_ENABLED'), 'Discovery-only selection must not retain an environment-only canonical-write path.');
+assert.ok(!disconnectRoute.includes('revokeMetaPermissions'), 'District disconnect must not revoke an app/user-wide Meta grant.');
+assert.ok(disconnectRoute.includes("disconnectScope: 'district_local'"), 'District disconnect must disclose its local-only scope.');
+assert.ok(disconnectRoute.includes('p_revocation_unconfirmed: false'), 'Local-only disconnect must not claim a failed provider revocation that was intentionally not requested.');
 
 for (const source of [migration, service, route, accountsRoute]) {
   assert.ok(!source.includes('ads_read'));

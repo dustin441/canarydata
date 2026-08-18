@@ -1,5 +1,5 @@
 import { requireIntegrationActor, integrationErrorResponse } from '@/lib/integration-auth';
-import { metaConfigured } from '@/lib/meta-integration.mjs';
+import { metaIntegrationEnabledForDistrict } from '@/lib/meta-integration.mjs';
 
 export const runtime = 'nodejs';
 
@@ -7,10 +7,7 @@ export async function GET(request) {
   try {
     const url = new URL(request.url);
     const { actor, admin } = await requireIntegrationActor(url.searchParams.get('districtId'));
-    const configured = metaConfigured() && process.env.META_INTEGRATION_ENABLED === 'true';
-    if (!configured) {
-      return Response.json({ configured: false, districtId: actor.districtId, connections: [], accounts: [] }, { headers: { 'Cache-Control': 'no-store' } });
-    }
+    const configured = metaIntegrationEnabledForDistrict(actor.districtId);
     const { data: connections, error: connectionError } = await admin
       .from('social_provider_connections')
       .select('id,provider_user_name,status,token_expires_at,granted_scopes,declined_scopes,connected_at,last_validated_at,last_error_code,revoked_at')
@@ -18,6 +15,12 @@ export async function GET(request) {
       .eq('provider', 'meta')
       .order('updated_at', { ascending: false });
     if (connectionError) throw connectionError;
+    if (!configured) {
+      // Disabled-first rollback must still expose existing local connections so
+      // an authorized district user can disconnect and remove stored access.
+      return Response.json({ configured: false, districtId: actor.districtId, connections: connections || [], accounts: [] }, { headers: { 'Cache-Control': 'no-store' } });
+    }
+
 
     const connectionIds = (connections || []).map((connection) => connection.id);
     let accounts = [];

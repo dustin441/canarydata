@@ -1,4 +1,4 @@
-import { decryptMetaToken, debugMetaToken, metaGrantedScopes, metaGraph, metaGraphAll, metaGraphBatch } from './meta-integration.mjs';
+import { decryptMetaToken, debugMetaToken, metaGrantedScopes, metaGraph, metaGraphAll, metaGraphBatch, metaIntegrationEnabledForDistrict } from './meta-integration.mjs';
 import { boundedMetaSourceCutoff, mapFacebookPagePosts, mapInstagramMedia, summarizeMetaSyncOutcome, validateMetaSyncSelection } from './meta-owned-sync.mjs';
 import { facebookAccountInsightRequests, facebookContentInsightRequests, instagramAccountInsightRequests, instagramContentInsightRequests, isMetaUnsupportedMetricError, normalizeMetaInsightBatch, sevenDayInsightWindow } from './meta-insights.mjs';
 
@@ -38,6 +38,7 @@ async function persistInsightBatch({ admin, link, threadId = null, platform, met
 }
 
 export async function syncSelectedMetaAssets({ admin, districtId, connectionId, sourceCutoff = null, pilotItemLimit = null, platforms = null, now = () => new Date() }) {
+  if (!metaIntegrationEnabledForDistrict(districtId)) throw Object.assign(new Error('Meta integration is not available for this district.'), { status: 503 });
   if (process.env.META_NATIVE_SYNC_ENABLED !== 'true') throw Object.assign(new Error('Native Meta synchronization is disabled.'), { status: 503 });
   const connection = await requireOne(admin.from('social_provider_connections')
     .select('id,district_id,provider_app_id,provider_user_id,status,granted_scopes,token_expires_at')

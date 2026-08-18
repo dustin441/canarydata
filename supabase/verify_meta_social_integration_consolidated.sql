@@ -8,12 +8,14 @@ with expected_tables(name) as (
     ('social_provider_assets'),
     ('social_account_mappings'),
     ('social_sync_runs'),
-    ('social_provider_deletion_requests')
+    ('social_provider_deletion_requests'),
+    ('social_provider_connection_attempts')
 ),
 expected_functions(name) as (
   values
     ('canary_consume_meta_oauth_state'),
     ('canary_prepare_meta_connection'),
+    ('canary_abandon_meta_connection_attempt'),
     ('canary_replace_meta_asset_mappings'),
     ('canary_finalize_meta_connection'),
     ('canary_disconnect_meta_connection'),
@@ -21,7 +23,7 @@ expected_functions(name) as (
 ),
 table_checks as (
   select
-    count(*) = 7 as all_tables_exist,
+    count(*) = 8 as all_tables_exist,
     bool_and(c.relrowsecurity) as all_tables_have_rls
   from expected_tables e
   left join pg_class c on c.relname = e.name
@@ -30,7 +32,7 @@ table_checks as (
 ),
 function_checks as (
   select
-    count(*) = 6 as all_functions_exist,
+    count(*) = 7 as all_functions_exist,
     bool_and(has_function_privilege('service_role', p.oid, 'EXECUTE')) as service_role_can_execute,
     bool_and(not has_function_privilege('authenticated', p.oid, 'EXECUTE')) as authenticated_cannot_execute,
     bool_and(not has_function_privilege('anon', p.oid, 'EXECUTE')) as anon_cannot_execute
@@ -44,10 +46,20 @@ column_checks as (
     count(*) filter (where column_name = 'district_id' and data_type = 'text' and is_nullable = 'NO') = 1 as district_id_is_required_text,
     count(*) filter (where column_name = 'provider_app_id' and data_type = 'text' and is_nullable = 'NO') = 1 as provider_app_id_is_required_text,
     count(*) filter (where column_name = 'provider_user_id' and data_type = 'text' and is_nullable = 'NO') = 1 as provider_user_id_is_required_text,
-    count(*) filter (where column_name = 'connected_by' and data_type = 'uuid' and is_nullable = 'YES') = 1 as connected_by_is_nullable_uuid
+    count(*) filter (where column_name = 'connected_by' and data_type = 'uuid' and is_nullable = 'YES') = 1 as connected_by_is_nullable_uuid,
+    count(*) filter (where column_name = 'lifecycle_version' and data_type = 'bigint' and is_nullable = 'NO') = 1 as lifecycle_version_is_required_bigint
   from information_schema.columns
   where table_schema = 'public'
     and table_name = 'social_provider_connections'
+),
+attempt_checks as (
+  select
+    count(*) filter (where column_name = 'attempt_id' and data_type = 'uuid' and is_nullable = 'NO') = 1 as attempt_id_is_required_uuid,
+    count(*) filter (where column_name = 'expires_at' and data_type = 'timestamp with time zone' and is_nullable = 'NO') = 1 as expires_at_is_required_timestamptz,
+    count(*) filter (where column_name = 'provider_user_id_hash' and data_type = 'text' and is_nullable = 'NO') = 1 as provider_user_hash_is_required_text
+  from information_schema.columns
+  where table_schema = 'public'
+    and table_name = 'social_provider_connection_attempts'
 ),
 privilege_checks as (
   select not exists (
@@ -60,9 +72,9 @@ privilege_checks as (
 )
 select check_name, passed
 from (
-  select 'all seven tables exist' as check_name, all_tables_exist as passed from table_checks
-  union all select 'RLS enabled on all seven tables', all_tables_have_rls from table_checks
-  union all select 'all six RPC functions exist', all_functions_exist from function_checks
+  select 'all eight tables exist' as check_name, all_tables_exist as passed from table_checks
+  union all select 'RLS enabled on all eight tables', all_tables_have_rls from table_checks
+  union all select 'all seven RPC functions exist', all_functions_exist from function_checks
   union all select 'service_role can execute all RPC functions', service_role_can_execute from function_checks
   union all select 'authenticated cannot execute RPC functions', authenticated_cannot_execute from function_checks
   union all select 'anon cannot execute RPC functions', anon_cannot_execute from function_checks
@@ -71,5 +83,9 @@ from (
   union all select 'provider_app_id is required text', provider_app_id_is_required_text from column_checks
   union all select 'provider_user_id is required text', provider_user_id_is_required_text from column_checks
   union all select 'connected_by is nullable uuid', connected_by_is_nullable_uuid from column_checks
+  union all select 'lifecycle_version is required bigint', lifecycle_version_is_required_bigint from column_checks
+  union all select 'attempt_id is required uuid', attempt_id_is_required_uuid from attempt_checks
+  union all select 'attempt expiry is required timestamptz', expires_at_is_required_timestamptz from attempt_checks
+  union all select 'attempt provider identity hash is required text', provider_user_hash_is_required_text from attempt_checks
 ) checks
 order by check_name;

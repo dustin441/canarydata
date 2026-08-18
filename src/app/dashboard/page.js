@@ -5,6 +5,7 @@ import DashboardClient from './DashboardClient';
 import { getAuthenticatedBillingContext } from '@/lib/billing';
 import { formatAnnualPriceLabel, INTRODUCTORY_ANNUAL_PRICE_CENTS, resolveCanaryPricing } from '@/lib/pricing';
 import { redirect } from 'next/navigation';
+import { metaIntegrationEnabledForDistrict, metaIntegrationPilotConfigured } from '@/lib/meta-integration.mjs';
 
 const DASHBOARD_DATA_TIMEOUT_MS = 6500;
 
@@ -43,12 +44,19 @@ export default async function DashboardPage({ searchParams }) {
   let userDistrictId = null;
   let isAdmin = false;
   let canManageIntegrations = false;
+  let hasExistingMetaConnection = false;
   if (sessionUser?.id) {
     const admin = createAdminClient();
     const { data: { user } } = await admin.auth.admin.getUserById(sessionUser.id);
     userDistrictId = user?.app_metadata?.district_id ?? null;
     isAdmin = user?.app_metadata?.role === 'admin';
     canManageIntegrations = isAdmin || (Array.isArray(user?.app_metadata?.permissions) && user.app_metadata.permissions.includes('manage_integrations'));
+    if (canManageIntegrations) {
+      let connectionQuery = admin.from('social_provider_connections').select('id').eq('provider', 'meta').limit(1);
+      if (!isAdmin && userDistrictId) connectionQuery = connectionQuery.eq('district_id', userDistrictId);
+      const { data: existingMetaConnections } = await connectionQuery;
+      hasExistingMetaConnection = Boolean(existingMetaConnections?.length);
+    }
   }
 
   if (!sessionUser?.id) redirect('/login?redirect_to=/dashboard');
@@ -147,7 +155,7 @@ export default async function DashboardPage({ searchParams }) {
       socialCollectionHealth={socialCollectionHealth}
       dataWarnings={dataWarnings}
       melodiEnabled={process.env.MELODI_ENABLED === 'true' && (process.env.MELODI_QA_MODE !== 'true' || isAdmin)}
-      metaIntegrationEnabled={canManageIntegrations && process.env.META_INTEGRATION_ENABLED === 'true' && Boolean(process.env.META_APP_ID && process.env.META_APP_SECRET && process.env.META_CONFIG_ID && process.env.META_TOKEN_ENCRYPTION_KEY && process.env.META_REDIRECT_URI)}
+      metaIntegrationEnabled={canManageIntegrations && (hasExistingMetaConnection || (isAdmin ? metaIntegrationPilotConfigured() : metaIntegrationEnabledForDistrict(userDistrictId)))}
     />
   );
 }
