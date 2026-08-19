@@ -2751,7 +2751,7 @@ function SocialReportCard({ result, rank }) {
           <span>#{rank} · {formatDisplayDate(result.date)}</span>
         </div>
         <strong>{result.headline || result.summary || 'Official district social post'}</strong>
-        <p><span>{socialReportInteractionTotal(result) === null ? 'Not available' : `${formatSocialMetric(socialReportInteractionTotal(result))} public interactions`}</span> · <span><SocialReportMetric result={result} metric="reactions" value={result.reactionCount} /> reactions</span> · <span><SocialReportMetric result={result} metric="comments" value={result.commentCount + result.replyCount} /> comments / replies</span> · <span><SocialReportMetric result={result} metric="shares" value={result.shareCount} /> shares</span></p>
+        <p><span>{socialReportInteractionTotal(result) === null ? 'Not available' : `${formatSocialMetric(socialReportInteractionTotal(result))} public interactions`}</span> · <span><SocialReportMetric result={result} metric="reactions" /> reactions</span> · <span><SocialReportMetric result={result} metric="comments" /> comments / replies</span> · <span><SocialReportMetric result={result} metric="shares" /> shares</span></p>
         {sourceUrl ? <a href={sourceUrl} target="_blank" rel="noopener noreferrer">View source</a> : <span>Source link unavailable in the collected record.</span>}
       </div>
     </article>
@@ -2774,8 +2774,9 @@ function SocialReportThumbnail({ result }) {
   );
 }
 
-function SocialReportMetric({ result, metric, value }) {
-  return result?.metricAvailability?.[metric] === true ? formatSocialMetric(value) : 'Not available';
+function SocialReportMetric({ result, metric }) {
+  const value = socialReportMetricValue(result, metric);
+  return value === null ? 'Not available' : formatSocialMetric(value);
 }
 
 function SocialReportTable({ results, ranked = false }) {
@@ -2806,10 +2807,10 @@ function SocialReportTable({ results, ranked = false }) {
                   {sourceUrl ? <a href={sourceUrl} target="_blank" rel="noopener noreferrer">{excerpt}</a> : <span>{excerpt}</span>}
                   {!sourceUrl && <small>Source link unavailable in the collected record.</small>}
                 </td>
-                <td><SocialReportMetric result={result} metric="views" value={result.viewCount} /></td>
-                <td><SocialReportMetric result={result} metric="reactions" value={result.reactionCount} /></td>
-                <td><SocialReportMetric result={result} metric="comments" value={result.commentCount + result.replyCount} /></td>
-                <td><SocialReportMetric result={result} metric="shares" value={result.shareCount} /></td>
+                <td><SocialReportMetric result={result} metric="views" /></td>
+                <td><SocialReportMetric result={result} metric="reactions" /></td>
+                <td><SocialReportMetric result={result} metric="comments" /></td>
+                <td><SocialReportMetric result={result} metric="shares" /></td>
                 <td>{interactions === null ? 'Not available' : formatSocialMetric(interactions)}</td>
               </tr>
             );

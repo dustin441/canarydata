@@ -716,6 +716,7 @@ for (const marker of [
   assert.ok(socialReportSource.includes(marker), `Social Report must include ${marker}`);
 }
 assert.match(socialReportSource, /safeSocialUrl\(result\.url\)/);
+assert.match(socialReportSource, /function SocialReportMetric\(\{ result, metric \}\)[\s\S]*socialReportMetricValue\(result, metric\)/,'PDF and report tables must use the same native-first metric contract as totals and CSV');
 assert.match(socialReportSource, /socialReportInteractionTotal\(result\)/);
 assert.match(socialReportSource, /ranked \? 'Rank' : 'Row'/);
 assert.match(socialReportSource, /topPerformerGroups\.map/);
