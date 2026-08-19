@@ -73,6 +73,7 @@ function metric(row, derivedValue = undefined) {
     sourceScope: row.source_scope || 'unknown',
     providerMetricName: row.provider_metric_name || null,
     normalizedMetricName: row.normalized_metric_name || null,
+    metricVariant: row.metric_variant || null,
     period: row.period || null,
     periodStartAt: row.period_start_at || null,
     periodEndAt: row.period_end_at || null,
@@ -127,8 +128,8 @@ export function enrichSocialThreadsWithNativeMetrics(threads = [], snapshots = [
     if (!metrics) return thread;
     const providerMetadata = thread.provider_metadata && typeof thread.provider_metadata === 'object' ? thread.provider_metadata : {};
     const existingAvailability = providerMetadata.metric_availability && typeof providerMetadata.metric_availability === 'object' ? providerMetadata.metric_availability : {};
-    const resolvedAvailability = (nativeMetric, field) => nativeMetric ? available(nativeMetric) : Boolean(existingAvailability[field]);
-    const resolvedCount = (nativeMetric, existingCount) => nativeMetric ? (available(nativeMetric) ? nativeMetric.value : 0) : existingCount;
+    const resolvedAvailability = (nativeMetric, field) => available(nativeMetric) || Boolean(existingAvailability[field]);
+    const resolvedCount = (nativeMetric, existingCount) => available(nativeMetric) ? nativeMetric.value : existingCount;
     const metricAvailability = {
       comments: resolvedAvailability(metrics.comments, 'comments'),
       reactions: resolvedAvailability(metrics.reactions, 'reactions'),
@@ -139,11 +140,13 @@ export function enrichSocialThreadsWithNativeMetrics(threads = [], snapshots = [
     const reactionCount = resolvedCount(metrics.reactions, thread.reaction_count);
     const shareCount = resolvedCount(metrics.shares, thread.share_count);
     const viewCount = resolvedCount(metrics.views, thread.view_count);
-    const replyCount = metrics.comments ? 0 : thread.reply_count;
-    const hasNativeInteraction = [metrics.comments, metrics.reactions, metrics.shares].some(Boolean);
-    const engagementTotal = hasNativeInteraction
+    const replyCount = available(metrics.comments) ? 0 : thread.reply_count;
+    const nativeInteractionMetrics = [metrics.comments, metrics.reactions, metrics.shares];
+    const hasNativeInteraction = nativeInteractionMetrics.some(Boolean);
+    const hasCompleteNativeInteraction = nativeInteractionMetrics.every(available);
+    const engagementTotal = hasCompleteNativeInteraction
       ? [commentCount, replyCount, reactionCount, shareCount].map(finiteValue).filter((value) => value !== null).reduce((sum, value) => sum + value, 0)
-      : thread.engagement_total;
+      : hasNativeInteraction ? null : thread.engagement_total;
     return {
       ...thread,
       comment_count: commentCount,
@@ -155,6 +158,7 @@ export function enrichSocialThreadsWithNativeMetrics(threads = [], snapshots = [
       provider_metadata: {
         ...providerMetadata,
         metric_availability: metricAvailability,
+        native_interaction_coverage: hasNativeInteraction ? (hasCompleteNativeInteraction ? 'complete' : 'partial') : 'none',
         native_metrics: metrics,
       },
     };
@@ -165,6 +169,23 @@ function utcDate(value) {
   const date = new Date(value);
   if (!Number.isFinite(date.getTime())) return null;
   return date.toLocaleDateString('en-US', { month: 'short', day: 'numeric', year: 'numeric', timeZone: 'UTC' });
+}
+
+export function nativeSocialMetricWindowLabel(metricValue) {
+  if (!metricValue) return 'Source period unavailable';
+  const effective = utcDate(metricValue.effectiveAt);
+  if (metricValue.period === 'lifetime') return 'Lifetime metric';
+  if (metricValue.period === 'days_28') return effective ? `28 days ending ${effective}` : '28-day metric';
+  if (metricValue.period === 'week') return effective ? `7 days ending ${effective}` : '7-day metric';
+  if (metricValue.metricVariant === 'time_series' && metricValue.period === 'day') return effective ? `Daily value ending ${effective}` : 'Daily value';
+  const start = timestamp(metricValue.periodStartAt);
+  const end = timestamp(metricValue.periodEndAt);
+  if (start !== null && end !== null && end >= start) {
+    const days = Math.max(1, Math.round((end - start) / 86_400_000));
+    return `${days} days ending ${utcDate(metricValue.periodEndAt)}`;
+  }
+  if (metricValue.period === 'day') return effective ? `Day ending ${effective}` : 'Daily metric';
+  return effective ? `Ending ${effective}` : 'Source period unavailable';
 }
 
 function windowLabel(row, fallbackDays = null) {
@@ -198,61 +219,77 @@ function netFollowsMetric(row) {
   return { ...baseMetric, value: row.availability === 'available' && Number.isFinite(value) ? value : null, follows: followers, unfollows: unfollowers };
 }
 
+function summarizeAccountRows(rows, platform) {
+  const find = (providerMetricName, period = null, metricVariant = null) => newestRow(rows.filter((row) => row.provider_metric_name === providerMetricName
+    && (!period || row.period === period)
+    && (!metricVariant || row.metric_variant === metricVariant)));
+  const identity = newestRow(rows)?.account_identity || {};
+  if (platform === 'facebook') {
+    const facebookPeriod = ['days_28', 'week', 'day'].find((period) => ['page_media_view', 'page_total_media_view_unique', 'page_post_engagements'].some((name) => find(name, period))) || null;
+    const views = facebookPeriod ? find('page_media_view', facebookPeriod) : null;
+    const uniqueViewers = facebookPeriod ? find('page_total_media_view_unique', facebookPeriod) : null;
+    const engagements = facebookPeriod ? find('page_post_engagements', facebookPeriod) : null;
+    const anchor = views || uniqueViewers || engagements;
+    return anchor ? {
+      platform,
+      accountName: identity.name || null,
+      accountHandle: identity.handle || null,
+      accountProfileUrl: identity.profileUrl || null,
+      windowLabel: windowLabel(anchor, 28),
+      latestObservedAt: anchor.observed_at || null,
+      views: metric(views), uniqueViewers: metric(uniqueViewers), engagements: metric(engagements),
+      reach: null, totalInteractions: null, profileViews: null, profileLinkTaps: null, websiteClicks: null, netFollowerChange: null,
+    } : null;
+  }
+  if (platform === 'instagram') {
+    const views = find('views', null, 'total_value');
+    const reach = find('reach', null, 'time_series');
+    const interactions = find('total_interactions', null, 'total_value');
+    const profileViews = find('profile_views', null, 'total_value');
+    const anchor = views || interactions || profileViews || reach;
+    return anchor ? {
+      platform,
+      accountName: identity.name || null,
+      accountHandle: identity.handle || null,
+      accountProfileUrl: identity.profileUrl || null,
+      windowLabel: anchor === reach ? `Daily value ending ${utcDate(reach.effective_at)}` : windowLabel(anchor, 7),
+      latestObservedAt: anchor.observed_at || null,
+      views: metric(views), uniqueViewers: null, engagements: null, reach: metric(reach),
+      reachWindowLabel: reach ? `Daily value ending ${utcDate(reach.effective_at)}` : null,
+      totalInteractions: metric(interactions), profileViews: metric(profileViews),
+      profileLinkTaps: metric(find('profile_links_taps', null, 'total_value')),
+      websiteClicks: metric(find('website_clicks', null, 'total_value')),
+      netFollowerChange: netFollowsMetric(find('follows_and_unfollows', null, 'total_value')),
+    } : null;
+  }
+  return null;
+}
+
 export function summarizeOwnedSocialAccountMetrics(snapshots = [], { asOf = null } = {}) {
   const accountRows = (snapshots || []).filter((row) => row?.metric_scope === 'account');
   const latest = [...latestRows(accountRows, stableMetricIdentity, asOf).values()];
-  const selectedLinkByPlatform = Object.fromEntries(['facebook', 'instagram'].map((platform) => {
-    const candidate = newestRow(latest.filter((row) => row.platform === platform));
-    return [platform, candidate?.provider_account_link_id || null];
-  }));
-  const find = (platform, providerMetricName, period = null, metricVariant = null) => {
-    const candidates = latest.filter((row) => row.platform === platform
-      && (row.provider_account_link_id || null) === selectedLinkByPlatform[platform]
-      && row.provider_metric_name === providerMetricName
-      && (!period || row.period === period)
-      && (!metricVariant || row.metric_variant === metricVariant));
-    return newestRow(candidates);
-  };
-  const facebookPeriod = ['days_28', 'week', 'day'].find((period) => ['page_media_view', 'page_total_media_view_unique', 'page_post_engagements'].some((name) => find('facebook', name, period))) || null;
-  const facebookViews = facebookPeriod ? find('facebook', 'page_media_view', facebookPeriod) : null;
-  const facebookUniqueViewers = facebookPeriod ? find('facebook', 'page_total_media_view_unique', facebookPeriod) : null;
-  const facebookEngagements = facebookPeriod ? find('facebook', 'page_post_engagements', facebookPeriod) : null;
-  const facebookAnchor = facebookViews || facebookUniqueViewers || facebookEngagements;
-  const facebook = facebookAnchor ? {
-    windowLabel: windowLabel(facebookAnchor, 28),
-    latestObservedAt: facebookAnchor.observed_at || null,
-    views: metric(facebookViews),
-    uniqueViewers: metric(facebookUniqueViewers),
-    engagements: metric(facebookEngagements),
-    reach: null,
-    totalInteractions: null,
-    profileViews: null,
-    profileLinkTaps: null,
-    websiteClicks: null,
-    netFollowerChange: null,
-  } : null;
-  const instagramViews = find('instagram', 'views', null, 'total_value');
-  const instagramReach = find('instagram', 'reach', null, 'time_series');
-  const instagramInteractions = find('instagram', 'total_interactions', null, 'total_value');
-  const instagramProfileViews = find('instagram', 'profile_views', null, 'total_value');
-  const instagramAnchor = instagramViews || instagramInteractions || instagramProfileViews || instagramReach;
-  const instagram = instagramAnchor ? {
-    windowLabel: instagramAnchor === instagramReach ? `Daily value ending ${utcDate(instagramReach.effective_at)}` : windowLabel(instagramAnchor, 7),
-    latestObservedAt: instagramAnchor.observed_at || null,
-    views: metric(instagramViews),
-    uniqueViewers: null,
-    engagements: null,
-    reach: metric(instagramReach),
-    reachWindowLabel: instagramReach ? `Daily value ending ${utcDate(instagramReach.effective_at)}` : null,
-    totalInteractions: metric(instagramInteractions),
-    profileViews: metric(instagramProfileViews),
-    profileLinkTaps: metric(find('instagram', 'profile_links_taps', null, 'total_value')),
-    websiteClicks: metric(find('instagram', 'website_clicks', null, 'total_value')),
-    netFollowerChange: netFollowsMetric(find('instagram', 'follows_and_unfollows', null, 'total_value')),
-  } : null;
+  const grouped = new Map();
+  for (const row of latest) {
+    const key = `${row.provider_account_link_id || 'legacy'}:${row.platform || 'unknown'}`;
+    const current = grouped.get(key) || [];
+    current.push(row);
+    grouped.set(key, current);
+  }
+  const accounts = [...grouped.values()].map((rows) => summarizeAccountRows(rows, rows[0]?.platform)).filter(Boolean).sort((a, b) => {
+    const platform = String(a.platform).localeCompare(String(b.platform));
+    if (platform) return platform;
+    return String(a.accountName || a.accountHandle || '').localeCompare(String(b.accountName || b.accountHandle || ''));
+  }).map((account, index) => ({ ...account, accountKey: `${account.platform}:${account.accountHandle || account.accountName || index}` }));
+  const platforms = {};
+  for (const platform of ['facebook', 'instagram']) {
+    const matching = accounts.filter((account) => account.platform === platform);
+    if (matching.length === 1) platforms[platform] = matching[0];
+  }
   return {
-    platforms: { ...(facebook ? { facebook } : {}), ...(instagram ? { instagram } : {}) },
+    accounts,
+    platforms,
     combinedReachOrViewers: null,
-    platformCount: [facebook, instagram].filter(Boolean).length,
+    platformCount: new Set(accounts.map((account) => account.platform)).size,
+    accountCount: accounts.length,
   };
 }

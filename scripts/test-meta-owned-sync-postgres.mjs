@@ -26,10 +26,12 @@ await withSocialDatabase('meta-owned-sync', async ({ sql, expectFailure, session
   const base = await readFile(new URL('../supabase/meta_social_integration.sql', import.meta.url), 'utf8');
   const migration = await readFile(new URL('../supabase/migrations/20260813224000_meta_owned_social_sync.sql', import.meta.url), 'utf8');
   const insightsMigration = await readFile(new URL('../supabase/migrations/20260814223000_meta_owned_social_insights.sql', import.meta.url), 'utf8');
+  const latestMetricMigration = await readFile(new URL('../supabase/migrations/20260819223000_social_metric_latest_view.sql', import.meta.url), 'utf8');
   const finalCurrentState = await readFile(new URL('../supabase/manual/canary_meta_database_final_current_state.sql', import.meta.url), 'utf8');
   sql(base);
   sql(migration);
   sql(insightsMigration);
+  sql(latestMetricMigration);
   sql(finalCurrentState);
   sql(`
     insert into public.districts(id,name) values ('district-meta','District Meta');
@@ -84,11 +86,17 @@ await withSocialDatabase('meta-owned-sync', async ({ sql, expectFailure, session
   }).replaceAll("'", "''");
   const snapshotId = sql(`copy (select public.canary_upsert_meta_metric_snapshot('${linkId}','${threadId}','${metric}'::jsonb)) to stdout;`).trim();
   assert.ok(snapshotId);
+  const newerMetric = JSON.stringify({
+    metric_scope:'content',provider_object_id:'post-1',provider_metric_name:'post_media_view',normalized_metric_name:'views',period:'lifetime',source_scope:'organic',availability:'available',metric_value:600,effective_at:'2026-08-15T00:00:00Z',provider_metadata:{graph_version:'v25.0'},
+  }).replaceAll("'", "''");
+  sql(`select public.canary_upsert_meta_metric_snapshot('${linkId}','${threadId}','${newerMetric}'::jsonb);`);
+  assert.equal(sql(`copy (select count(*)||'|'||max(metric_value) from public.canary_latest_social_metric_snapshots where provider_account_link_id='${linkId}' and provider_metric_name='post_media_view') to stdout;`, { role:'service_role' }).trim().split('\n').at(-1), '1|600');
+  expectFailure(`select * from public.canary_latest_social_metric_snapshots;`, /permission denied/i, { role:'authenticated' });
   const metricBatch = `[${metric}]`;
   assert.equal(sql(`copy (select public.canary_upsert_meta_metric_snapshots('${linkId}','${threadId}','${metricBatch}'::jsonb)) to stdout;`, { role:'service_role' }).trim().split('\n').at(-1), '1');
   expectFailure(`select public.canary_upsert_meta_metric_snapshots('${linkId}','${threadId}','${metricBatch}'::jsonb);`, /permission denied/i, { role:'authenticated' });
   sql(`select public.canary_upsert_meta_metric_snapshot('${linkId}','${threadId}','${metric}'::jsonb);`);
-  assert.equal(sql(`copy (select count(*) from public.social_provider_metric_snapshots where provider_account_link_id='${linkId}' and provider_metric_name='post_media_view') to stdout;`).trim(), '1');
+  assert.equal(sql(`copy (select count(*) from public.social_provider_metric_snapshots where provider_account_link_id='${linkId}' and provider_metric_name='post_media_view') to stdout;`).trim(), '2','history retains both effective periods while the dashboard view exposes one latest row');
   const updatedMetric = JSON.stringify({ ...JSON.parse(metric.replaceAll("''", "'")), metric_value:500 }).replaceAll("'", "''");
   sql(`select public.canary_upsert_meta_metric_snapshot('${linkId}','${threadId}','${updatedMetric}'::jsonb);`);
   assert.equal(sql(`copy (select metric_value::text from public.social_provider_metric_snapshots where id='${snapshotId}') to stdout;`).trim(), '500');

@@ -1,6 +1,8 @@
 import assert from 'node:assert/strict';
 import { readFileSync } from 'node:fs';
-import { enrichSocialThreadsWithNativeMetrics, summarizeOwnedSocialAccountMetrics } from '../src/lib/socialMetrics.mjs';
+import { enrichSocialThreadsWithNativeMetrics, nativeSocialMetricWindowLabel, summarizeOwnedSocialAccountMetrics } from '../src/lib/socialMetrics.mjs';
+import { buildSocialResults } from '../src/lib/social.mjs';
+import { socialReportComparableInteractionTotal, socialReportInteractionTotal } from '../src/lib/socialReport.mjs';
 
 const threadFacebook={id:'thread-fb',district_id:'district-1',platform:'facebook',comment_count:0,reply_count:5,reaction_count:0,share_count:0,view_count:0,provider_metadata:{metric_availability:{comments:false,reactions:false,shares:false,views:false}}};
 const threadInstagram={id:'thread-ig',district_id:'district-1',platform:'instagram',comment_count:0,reaction_count:0,share_count:0,view_count:0,provider_metadata:{metric_availability:{comments:true,reactions:true,shares:false,views:false}}};
@@ -44,12 +46,26 @@ const historical=enrichSocialThreadsWithNativeMetrics([threadFacebook],contentRo
 assert.equal(historical[0].view_count,100);
 const staleThread={...threadFacebook,view_count:999,provider_metadata:{metric_availability:{comments:false,reactions:false,shares:false,views:true}}};
 const unavailableLatest={...contentRows[1],availability:'unavailable',metric_value:null,effective_at:'2026-08-15T00:00:00Z',observed_at:'2026-08-15T12:00:00Z'};
-const unavailableEnriched=enrichSocialThreadsWithNativeMetrics([staleThread],[...contentRows,unavailableLatest]);
-assert.equal(unavailableEnriched[0].provider_metadata.metric_availability.views,false,'latest unavailable snapshots must not resurrect stale availability');
-assert.equal(unavailableEnriched[0].view_count,0,'latest unavailable snapshots must clear stale display counters');
+const unavailableActionLatest={...contentRows[5],availability:'unavailable',metric_value:null,breakdown:{},effective_at:'2026-08-15T00:00:00Z',observed_at:'2026-08-15T12:00:00Z'};
+const unavailableEnriched=enrichSocialThreadsWithNativeMetrics([staleThread],[...contentRows,unavailableLatest,unavailableActionLatest]);
+assert.equal(unavailableEnriched[0].provider_metadata.metric_availability.views,true,'unavailable native snapshots must preserve existing canonical availability');
+assert.equal(unavailableEnriched[0].view_count,999,'unavailable native snapshots must not overwrite an existing canonical counter with zero');
 assert.equal(unavailableEnriched[0].provider_metadata.native_metrics.views.availability,'unavailable');
+assert.equal(unavailableEnriched[0].reply_count,5,'unavailable native comments must not clear existing replies');
+const partialNativeThread={...threadFacebook,comment_count:9,reply_count:1,reaction_count:20,share_count:4,engagement_total:34,provider_metadata:{metric_availability:{comments:true,reactions:true,shares:true,views:false}}};
+const partialAction={...contentRows[5],availability:'unavailable',metric_value:null,breakdown:{},effective_at:'2026-08-15T00:00:00Z',observed_at:'2026-08-15T12:00:00Z'};
+const partialEnriched=enrichSocialThreadsWithNativeMetrics([partialNativeThread],[contentRows[4],partialAction]);
+assert.equal(partialEnriched[0].reaction_count,7);
+assert.equal(partialEnriched[0].comment_count,9);
+assert.equal(partialEnriched[0].share_count,4);
+assert.equal(partialEnriched[0].engagement_total,null,'partial native coverage must not create a mixed-source engagement total');
+assert.equal(partialEnriched[0].provider_metadata.native_interaction_coverage,'partial');
+const [partialResult]=buildSocialResults(partialEnriched);
+assert.equal(socialReportInteractionTotal(partialResult),7,'reported ranking totals must use only available native interaction components');
+assert.equal(socialReportComparableInteractionTotal(partialResult),null,'partial native coverage must not enter comparable aggregates');
+assert.equal(partialResult.hasComparableInteractionData,false);
 
-const accountBase={district_id:'district-1',provider:'meta',metric_scope:'account',social_thread_id:null,availability:'available',breakdown:{},source_scope:'unknown',observed_at:'2026-08-14T12:00:00Z'};
+const accountBase={district_id:'district-1',provider_account_link_id:'link-default',account_identity:{name:'EIC Test',handle:'eictest',profileUrl:'https://example.test/eictest'},provider:'meta',metric_scope:'account',social_thread_id:null,availability:'available',breakdown:{},source_scope:'unknown',observed_at:'2026-08-14T12:00:00Z'};
 const accountRows=[
  {...accountBase,platform:'facebook',provider_metric_name:'page_media_view',normalized_metric_name:'views',metric_variant:'default',period:'days_28',metric_value:192454,effective_at:'2026-08-13T07:00:00Z'},
  {...accountBase,platform:'facebook',provider_metric_name:'page_total_media_view_unique',normalized_metric_name:'unique_viewers',metric_variant:'default',period:'days_28',metric_value:74795,source_scope:'total',effective_at:'2026-08-13T07:00:00Z'},
@@ -70,6 +86,8 @@ assert.equal(dailyFacebook.platforms.facebook.views.value,192454,'daily Facebook
 assert.equal(dailyFacebook.platforms.facebook.windowLabel,'Day ending Aug 13, 2026');
 assert.equal(accountSummary.platforms.instagram.views.value,1311);
 assert.equal(accountSummary.platforms.instagram.reach.value,171);
+assert.equal(accountSummary.platforms.instagram.reach.metricVariant,'time_series');
+assert.equal(nativeSocialMetricWindowLabel(accountSummary.platforms.instagram.reach),'Daily value ending Aug 13, 2026','rendered metric-window output must preserve Instagram time-series semantics');
 assert.equal(accountSummary.platforms.instagram.netFollowerChange.value,3);
 assert.equal(accountSummary.platforms.instagram.windowLabel,'7 days ending Aug 14, 2026');
 assert.equal(accountSummary.combinedReachOrViewers,null,'cross-platform audiences must never be summed');
@@ -80,11 +98,13 @@ const profileOnly=summarizeOwnedSocialAccountMetrics(accountRows.filter((row)=>r
 assert.equal(profileOnly.platforms.instagram.profileViews.value,7,'available account metrics must render even when views are absent');
 const variantCollision=summarizeOwnedSocialAccountMetrics([...accountRows,{...accountRows[3],metric_variant:'time_series',metric_value:999,effective_at:'2026-08-15T00:00:00Z',observed_at:'2026-08-15T12:00:00Z'}]);
 assert.equal(variantCollision.platforms.instagram.views.value,1311,'account summaries must select the intended total_value variant');
-const linkA=accountRows.filter((row)=>row.platform==='facebook').map((row)=>({...row,provider_account_link_id:'link-a'}));
-const linkB={...accountRows[0],provider_account_link_id:'link-b',metric_value:42,effective_at:'2026-08-15T00:00:00Z',observed_at:'2026-08-15T12:00:00Z'};
+const linkA=accountRows.filter((row)=>row.platform==='facebook').map((row)=>({...row,provider_account_link_id:'link-a',account_identity:{name:'Facebook A',handle:'facebooka'}}));
+const linkB={...accountRows[0],provider_account_link_id:'link-b',account_identity:{name:'Facebook B',handle:'facebookb'},metric_value:42,effective_at:'2026-08-15T00:00:00Z',observed_at:'2026-08-15T12:00:00Z'};
 const reconnectSummary=summarizeOwnedSocialAccountMetrics([...linkA,linkB]);
-assert.equal(reconnectSummary.platforms.facebook.views.value,42);
-assert.equal(reconnectSummary.platforms.facebook.uniqueViewers,null,'account metrics from different provider links must not be mixed');
+assert.equal(reconnectSummary.accounts.length,2,'each active authorized account must retain its own row');
+assert.deepEqual(reconnectSummary.accounts.map((account)=>[account.accountName,account.views.value]),[['Facebook A',192454],['Facebook B',42]]);
+assert.equal(reconnectSummary.platforms.facebook,undefined,'multiple accounts on one platform must not collapse into an anonymous platform summary');
+assert.equal(reconnectSummary.accounts[1].uniqueViewers,null,'account metrics from different provider links must not be mixed');
 
 const dataSource=readFileSync(new URL('../src/lib/data.js',import.meta.url),'utf8');
 const snapshotQuerySource=dataSource.slice(dataSource.indexOf('export async function getSocialMetricSnapshots'),dataSource.indexOf('export async function readAllSocialReviewEvents'));
@@ -92,5 +112,8 @@ assert.match(snapshotQuerySource,/if \(districtId\) query = query\.eq\('district
 assert.match(snapshotQuerySource,/\.range\(from, from \+ SOCIAL_METRIC_SNAPSHOT_PAGE_SIZE - 1\)/,'snapshot reads must paginate deterministically');
 assert.match(snapshotQuerySource,/\.eq\('provider', 'meta'\)\.eq\('active', true\)/,'dashboard snapshots must be limited to active Meta account links');
 assert.match(snapshotQuerySource,/\.in\('provider_account_link_id', linkBatch\)/,'snapshot reads must bind rows to active provider links');
+assert.match(snapshotQuerySource,/\.from\('canary_latest_social_metric_snapshots'\)/,'dashboard reads must use the server-side latest-snapshot projection rather than full history');
+assert.match(snapshotQuerySource,/social_provider_assets/,'account identity must be loaded for distinct account rows');
+assert.doesNotMatch(snapshotQuerySource,/\.from\('social_provider_metric_snapshots'\)/,'dashboard must not paginate the unbounded snapshot history table');
 
 console.log('Native Social reporting metric tests passed.');

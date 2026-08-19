@@ -125,12 +125,25 @@ export function metricAvailabilityCoverage(results, metric) {
 }
 
 export function socialReportInteractionTotal(result) {
+  const nativeMetrics = result?.providerMetadata?.native_metrics;
+  if (nativeMetrics && typeof nativeMetrics === 'object') {
+    const reported = ['reactions', 'comments', 'shares']
+      .map((name) => nativeMetrics[name])
+      .filter((metric) => metric && typeof metric === 'object');
+    if (reported.length) {
+      const values = reported
+        .filter((metric) => metric.availability === 'available' && metric.value !== null && metric.value !== undefined)
+        .map((metric) => finiteMetric(metric.value));
+      return values.length ? values.reduce((sum, value) => sum + value, 0) : null;
+    }
+  }
   const availableMetrics = INTERACTION_METRICS.filter(([metric]) => result?.metricAvailability?.[metric] === true);
   if (!availableMetrics.length) return null;
   return availableMetrics.reduce((sum, [, field]) => sum + finiteMetric(result?.[field]), 0);
 }
 
 export function socialReportComparableInteractionTotal(result) {
+  if (result?.providerMetadata?.native_interaction_coverage === 'partial') return null;
   const complete = ['reactions', 'comments', 'shares'].every((metric) => result?.metricAvailability?.[metric] === true);
   if (!complete) return null;
   return INTERACTION_METRICS.reduce((sum, [, field]) => sum + finiteMetric(result?.[field]), 0);

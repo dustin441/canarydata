@@ -228,19 +228,40 @@ export async function getSocialThreads(districtId = null, includeReview = false)
 
 export async function getSocialMetricSnapshots(districtId = null) {
   const supabase = createAdminClient();
-  let linkQuery = supabase.from('social_provider_account_links').select('id').eq('provider', 'meta').eq('active', true);
+  let linkQuery = supabase.from('social_provider_account_links').select('id,district_id,provider_asset_id').eq('provider', 'meta').eq('active', true);
   if (districtId) linkQuery = linkQuery.eq('district_id', districtId);
   const { data: activeLinks, error: linkError } = await linkQuery;
   if (linkError) throw linkError;
   const activeLinkIds = (activeLinks ?? []).map((link) => link.id).filter(Boolean);
   if (!activeLinkIds.length) return [];
 
+  const accountIdentityByLink = new Map();
+  for (let linkOffset = 0; linkOffset < activeLinks.length; linkOffset += SOCIAL_METRIC_LINK_BATCH_SIZE) {
+    const linkBatch = activeLinks.slice(linkOffset, linkOffset + SOCIAL_METRIC_LINK_BATCH_SIZE);
+    const assetIds = linkBatch.map((link) => link.provider_asset_id).filter(Boolean);
+    if (!assetIds.length) continue;
+    let assetQuery = supabase.from('social_provider_assets').select('id,name,handle,profile_url,platform').in('id', assetIds);
+    if (districtId) assetQuery = assetQuery.eq('district_id', districtId);
+    const { data: assets, error: assetError } = await assetQuery;
+    if (assetError) throw assetError;
+    const assetById = new Map((assets ?? []).map((asset) => [asset.id, asset]));
+    for (const link of linkBatch) {
+      const asset = assetById.get(link.provider_asset_id);
+      accountIdentityByLink.set(link.id, {
+        name: asset?.name || null,
+        handle: asset?.handle || null,
+        profileUrl: asset?.profile_url || null,
+        platform: asset?.platform || null,
+      });
+    }
+  }
+
   const snapshots = [];
   for (let linkOffset = 0; linkOffset < activeLinkIds.length; linkOffset += SOCIAL_METRIC_LINK_BATCH_SIZE) {
     const linkBatch = activeLinkIds.slice(linkOffset, linkOffset + SOCIAL_METRIC_LINK_BATCH_SIZE);
     for (let from = 0; ; from += SOCIAL_METRIC_SNAPSHOT_PAGE_SIZE) {
       let query = supabase
-        .from('social_provider_metric_snapshots')
+        .from('canary_latest_social_metric_snapshots')
         .select(SOCIAL_METRIC_SNAPSHOT_COLUMNS)
         .in('provider_account_link_id', linkBatch)
         .order('effective_at', { ascending: false })
@@ -250,7 +271,7 @@ export async function getSocialMetricSnapshots(districtId = null) {
       const { data, error } = await query;
       if (error) throw error;
       const page = data ?? [];
-      snapshots.push(...page);
+      snapshots.push(...page.map((row) => ({ ...row, account_identity: accountIdentityByLink.get(row.provider_account_link_id) || null })));
       if (page.length < SOCIAL_METRIC_SNAPSHOT_PAGE_SIZE) break;
     }
   }
