@@ -27,6 +27,7 @@ await withSocialDatabase('meta-owned-sync', async ({ sql, expectFailure, session
   const migration = await readFile(new URL('../supabase/migrations/20260813224000_meta_owned_social_sync.sql', import.meta.url), 'utf8');
   const insightsMigration = await readFile(new URL('../supabase/migrations/20260814223000_meta_owned_social_insights.sql', import.meta.url), 'utf8');
   const latestMetricMigration = await readFile(new URL('../supabase/migrations/20260819223000_social_metric_latest_view.sql', import.meta.url), 'utf8');
+  const latestMetricRollback = await readFile(new URL('../supabase/rollbacks/20260819223000_social_metric_latest_view_down.sql', import.meta.url), 'utf8');
   const finalCurrentState = await readFile(new URL('../supabase/manual/canary_meta_database_final_current_state.sql', import.meta.url), 'utf8');
   sql(base);
   sql(migration);
@@ -92,6 +93,9 @@ await withSocialDatabase('meta-owned-sync', async ({ sql, expectFailure, session
   sql(`select public.canary_upsert_meta_metric_snapshot('${linkId}','${threadId}','${newerMetric}'::jsonb);`);
   assert.equal(sql(`copy (select count(*)||'|'||max(metric_value) from public.canary_latest_social_metric_snapshots where provider_account_link_id='${linkId}' and provider_metric_name='post_media_view') to stdout;`, { role:'service_role' }).trim().split('\n').at(-1), '1|600');
   expectFailure(`select * from public.canary_latest_social_metric_snapshots;`, /permission denied/i, { role:'authenticated' });
+  sql(latestMetricRollback);
+  assert.equal(sql(`copy (select to_regclass('public.canary_latest_social_metric_snapshots') is null and to_regclass('public.social_provider_metric_snapshots_latest_idx') is null) to stdout;`).trim(),'t','latest metric read projection must roll back cleanly');
+  sql(latestMetricMigration);
   const metricBatch = `[${metric}]`;
   assert.equal(sql(`copy (select public.canary_upsert_meta_metric_snapshots('${linkId}','${threadId}','${metricBatch}'::jsonb)) to stdout;`, { role:'service_role' }).trim().split('\n').at(-1), '1');
   expectFailure(`select public.canary_upsert_meta_metric_snapshots('${linkId}','${threadId}','${metricBatch}'::jsonb);`, /permission denied/i, { role:'authenticated' });
