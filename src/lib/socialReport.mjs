@@ -119,7 +119,7 @@ export function isEligibleSocialReportPost(result, window) {
 
 export function metricAvailabilityCoverage(results, metric) {
   return {
-    available: results.filter((result) => result?.metricAvailability?.[metric] === true).length,
+    available: results.filter((result) => socialReportMetricValue(result, metric) !== null).length,
     total: results.length,
   };
 }
@@ -217,16 +217,15 @@ export function summarizeSocialReport(results) {
   const platformBreakdown = [...platformCounts.entries()]
     .map(([platform, count]) => ({ platform, count }))
     .sort((a, b) => b.count - a.count || a.platform.localeCompare(b.platform));
-  const reportedViews = results.reduce((sum, result) => (
-    result?.metricAvailability?.views === true ? sum + finiteMetric(result.viewCount) : sum
-  ), 0);
+  const reportedViewValues = results.map((result) => socialReportMetricValue(result, 'views')).filter((value) => value !== null);
+  const reportedViews = reportedViewValues.length ? reportedViewValues.reduce((sum, value) => sum + value, 0) : null;
 
   return {
     officialPosts: results.length,
     totalInteractions,
     interactionsAvailable: interactionTotals.length,
     averageInteractions: interactionTotals.length ? totalInteractions / interactionTotals.length : null,
-    reportedViews: metricAvailabilityCoverage(results, 'views').available ? reportedViews : null,
+    reportedViews,
     viewsCoverage: metricAvailabilityCoverage(results, 'views'),
     reactionsCoverage: metricAvailabilityCoverage(results, 'reactions'),
     commentsCoverage: metricAvailabilityCoverage(results, 'comments'),

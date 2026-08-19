@@ -2,7 +2,7 @@ import assert from 'node:assert/strict';
 import { readFileSync } from 'node:fs';
 import { enrichSocialThreadsWithNativeMetrics, nativeSocialMetricWindowLabel, summarizeOwnedSocialAccountMetrics } from '../src/lib/socialMetrics.mjs';
 import { buildSocialResults } from '../src/lib/social.mjs';
-import { socialReportComparableInteractionTotal, socialReportInteractionTotal, socialReportMetricValue } from '../src/lib/socialReport.mjs';
+import { socialReportComparableInteractionTotal, socialReportInteractionTotal, socialReportMetricValue, summarizeSocialReport } from '../src/lib/socialReport.mjs';
 
 const threadFacebook={id:'thread-fb',district_id:'district-1',platform:'facebook',comment_count:0,reply_count:5,reaction_count:0,share_count:0,view_count:0,provider_metadata:{metric_availability:{comments:false,reactions:false,shares:false,views:false}}};
 const threadInstagram={id:'thread-ig',district_id:'district-1',platform:'instagram',comment_count:0,reaction_count:0,share_count:0,view_count:0,provider_metadata:{metric_availability:{comments:true,reactions:true,shares:false,views:false}}};
@@ -52,6 +52,10 @@ assert.equal(unavailableEnriched[0].provider_metadata.metric_availability.views,
 assert.equal(unavailableEnriched[0].view_count,999,'unavailable native snapshots must not overwrite an existing canonical counter with zero');
 assert.equal(unavailableEnriched[0].provider_metadata.native_metrics.views.availability,'unavailable');
 assert.equal(unavailableEnriched[0].reply_count,5,'unavailable native comments must not clear existing replies');
+const [unavailableResult]=buildSocialResults(unavailableEnriched);
+assert.equal(socialReportMetricValue(unavailableResult,'views'),null,'report rows must not fall back to canonical views when a native view snapshot is explicitly unavailable');
+assert.equal(summarizeSocialReport([unavailableResult]).reportedViews,null,'reported-view scorecards must use the same native-first contract as rows and CSV');
+assert.deepEqual(summarizeSocialReport([unavailableResult]).viewsCoverage,{available:0,total:1});
 const partialNativeThread={...threadFacebook,comment_count:9,reply_count:1,reaction_count:20,share_count:4,engagement_total:34,provider_metadata:{metric_availability:{comments:true,reactions:true,shares:true,views:false}}};
 const partialAction={...contentRows[5],availability:'unavailable',metric_value:null,breakdown:{},effective_at:'2026-08-15T00:00:00Z',observed_at:'2026-08-15T12:00:00Z'};
 const partialEnriched=enrichSocialThreadsWithNativeMetrics([partialNativeThread],[contentRows[4],partialAction]);
