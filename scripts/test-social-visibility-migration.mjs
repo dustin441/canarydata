@@ -19,6 +19,7 @@ const csv=(header,value)=>`${header}\r\n"${JSON.stringify(value).replaceAll('"',
 const canonicalJson=(value)=>value===null||typeof value!=='object'?JSON.stringify(value):Array.isArray(value)?`[${value.map(canonicalJson).join(',')}]`:`{${Object.keys(value).sort().map((key)=>`${JSON.stringify(key)}:${canonicalJson(value[key])}`).join(',')}}`;
 const sha256=(value)=>createHash('sha256').update(value).digest('hex');
 const reseal=(artifact)=>{artifact.manifest.artifactSha256=null;artifact.manifest.artifactSha256=sha256(canonicalJson(artifact));return artifact;};
+const canonicalPgTimestamp=(value)=>String(value).replace(/\.(\d{1,6})Z$/,(_,fraction)=>`.${fraction.padEnd(6,'0')}Z`);
 let started=false;
 try{
  run('docker',['run','--detach','--rm','--name',container,'--mount','type=tmpfs,destination=/var/lib/postgresql/data,tmpfs-size=536870912','-e','POSTGRES_PASSWORD=test-only',image]);started=true;
@@ -333,7 +334,7 @@ try{
  assert.equal(psql(`select visibility_status from social_threads where id='${qaId}';`).stdout.trim(),'review');
  assert.equal(psql("select jsonb_build_object('b',(select count(*) from social_review_batches),'e',(select count(*) from social_review_events),'l',(select string_agg(id::text||':'||batch_id::text||':'||social_thread_id::text,',' order by id) from social_review_events));").stdout.trim(),auditBefore);
  const restoredRows=parseJson(psql(`select jsonb_agg(jsonb_build_object('id',id::text,'district_id',district_id,'relationship_type',relationship_type,'visibility_status',visibility_status,'review_version',review_version,'reviewed_at',case when reviewed_at is null then null else to_char(reviewed_at at time zone 'UTC','YYYY-MM-DD"T"HH24:MI:SS.US"Z"') end,'reviewed_by',reviewed_by::text,'created_at',to_char(created_at at time zone 'UTC','YYYY-MM-DD"T"HH24:MI:SS.US"Z"'),'updated_at',to_char(updated_at at time zone 'UTC','YYYY-MM-DD"T"HH24:MI:SS.US"Z"')) order by id) from public.social_threads where created_at<='2026-08-05T12:00:00Z';`).stdout);
- const expectedRestoredRows=backup.rows.map(({canonical_checksum_sha256,...row})=>row.id==='50000000-0000-0000-0000-000000000002'?{...row,updated_at:evidence.changedRows.find((entry)=>entry.id===row.id).row.updated_at.replace('+00:00','Z')}:row);
+ const expectedRestoredRows=backup.rows.map(({canonical_checksum_sha256,...row})=>row.id==='50000000-0000-0000-0000-000000000002'?{...row,updated_at:canonicalPgTimestamp(evidence.changedRows.find((entry)=>entry.id===row.id).row.updated_at.replace('+00:00','Z'))}:row);
  assert.deepEqual(restoredRows,expectedRestoredRows);
  const refreshedRestored=parseJson(psql(`select jsonb_build_object('headline',headline,'body',body,'comment_count',comment_count,'provider_metadata',provider_metadata,'visibility_status',visibility_status,'review_version',review_version,'reviewed_at',to_char(reviewed_at at time zone 'UTC','YYYY-MM-DD"T"HH24:MI:SS.US"Z"'),'reviewed_by',reviewed_by::text) from public.social_threads where id='50000000-0000-0000-0000-000000000002';`).stdout);
  assert.deepEqual(refreshedRestored,{headline:'refreshed backed headline',body:'refreshed backed body',comment_count:42,provider_metadata:{refresh:'task5-routine'},visibility_status:'approved',review_version:1,reviewed_at:'2026-08-02T00:00:00.000000Z',reviewed_by:'aaaaaaaa-aaaa-aaaa-aaaa-aaaaaaaaaaaa'});
