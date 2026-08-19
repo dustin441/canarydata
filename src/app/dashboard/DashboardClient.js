@@ -9,7 +9,7 @@ import { createEmbeddedCanaryCheckout, confirmEmbeddedCanaryCheckout, saveBillin
 import { compareStrategicAlignmentRows } from '@/lib/strategicAlignmentSort.mjs';
 import { CORE_TAGS, canonicalTags } from '@/lib/canonicalTags.mjs';
 import { calculateSocialEngagementRate, rankTopSocialResults, resolveSocialFollowerCount, safeSocialMediaUrl, safeSocialUrl, socialDateFilterMatches, socialRelationshipFilterMatches, summarizeSocialActions, summarizeSocialResults } from '@/lib/social.mjs';
-import { calculateSocialMetricChange, dateInputValue, groupTopReportPostsByPlatform, isEligibleSocialReportPost, neutralizeSpreadsheetFormula, rankSocialReportTopPerformers, resolveSocialReportComparisonWindow, resolveSocialReportWindow, selectOfficialSocialReportPosts, socialReportInteractionTotal, socialReportMetricValue, summarizeSocialContentFormats, summarizeSocialReport } from '@/lib/socialReport.mjs';
+import { calculateSocialMetricChange, dateInputValue, groupTopReportPostsByPlatform, isEligibleSocialReportPost, neutralizeSpreadsheetFormula, rankSocialReportTopPerformers, resolveSocialReportComparisonWindow, resolveSocialReportWindow, selectOfficialSocialReportPosts, socialReportComparableInteractionTotal, socialReportInteractionTotal, socialReportMetricValue, summarizeSocialContentFormats, summarizeSocialReport } from '@/lib/socialReport.mjs';
 import { nativeSocialMetricWindowLabel } from '@/lib/socialMetrics.mjs';
 import { formatDisplayDate } from '@/lib/date.mjs';
 import { CUSTOMER_SEARCH_QUERY_LIMIT, activeNewsQueryCount } from '@/lib/queryPolicy.mjs';
@@ -446,10 +446,9 @@ const SOCIAL_CSV_HEADERS = [
 function socialCsvRow(result, source) {
   const followerCount = resolveSocialFollowerCount(result, source);
   const interactionTotal = socialReportInteractionTotal(result);
-  const hasCompleteInteractionMetrics = ['reactions', 'comments', 'shares']
-    .every((metric) => result?.metricAvailability?.[metric] === true);
-  const engagementRate = hasCompleteInteractionMetrics && interactionTotal !== null && Number(followerCount) > 0
-    ? (interactionTotal / Number(followerCount)) * 100
+  const comparableInteractionTotal = socialReportComparableInteractionTotal(result);
+  const engagementRate = comparableInteractionTotal !== null && Number(followerCount) > 0
+    ? (comparableInteractionTotal / Number(followerCount)) * 100
     : null;
   const metricValue = (metric) => socialReportMetricValue(result, metric) ?? 'N/A';
   return [
@@ -3055,9 +3054,9 @@ function MonthlySocialPerformance({
 
       <div className="social-monthly-kpis" aria-label="Monthly Social scorecards">
         <article><span>Official posts</span><strong>{summary.officialPosts}</strong><small>{formatSocialComparison(comparisons.posts)} vs. prior period</small></article>
-        <article><span>Comparable post interactions</span><strong>{summary.totalInteractions === null ? 'Not available' : formatSocialMetric(summary.totalInteractions)}</strong><small>Latest lifetime values · complete reactions, comments, and shares for {summary.interactionsAvailable}/{summary.officialPosts} posts</small></article>
+        <article><span>Comparable post interactions</span><strong>{summary.totalInteractions === null ? 'Not available' : formatSocialMetric(summary.totalInteractions)}</strong><small>{formatSocialComparison(comparisons.interactions)} vs. prior period · latest lifetime values · complete reactions, comments, and shares for {summary.interactionsAvailable}/{summary.officialPosts} posts</small></article>
         <article><span>Average comparable interactions</span><strong>{summary.averageInteractions === null ? 'Not available' : formatSocialMetric(summary.averageInteractions)}</strong><small>Latest lifetime values based only on posts with all three interaction components</small></article>
-        <article><span>Latest post views</span><strong>{summary.reportedViews === null ? 'Not available' : formatSocialMetric(summary.reportedViews)}</strong><small>Lifetime values for posts published in this report · available for {summary.viewsCoverage.available}/{summary.viewsCoverage.total}</small></article>
+        <article><span>Latest post views</span><strong>{summary.reportedViews === null ? 'Not available' : formatSocialMetric(summary.reportedViews)}</strong><small>{formatSocialComparison(comparisons.views)} vs. prior period · lifetime values for posts published in this report · available for {summary.viewsCoverage.available}/{summary.viewsCoverage.total}</small></article>
         <article><span>Reach / unique viewers</span><strong>{accountMetricSummary?.platformCount ? 'By platform' : 'Not available'}</strong><small>Not summed across platforms; see the native account table</small></article>
         <article><span>Latest net follows</span><strong>{instagramNetFollows?.value === null || instagramNetFollows?.value === undefined ? 'Not available' : formatSocialMetric(instagramNetFollows.value)}</strong><small>{instagramNetFollows ? `${instagramNetFollows.follows ?? 'N/A'} follows · ${instagramNetFollows.unfollows ?? 'N/A'} unfollows · ${nativeSocialWindowLabel(instagramNetFollows)}` : instagramAccounts.length > 1 ? 'See the account-specific rows below' : 'No compatible authorized account snapshot'}</small></article>
       </div>

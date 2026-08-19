@@ -2,7 +2,7 @@ import assert from 'node:assert/strict';
 import { readFileSync } from 'node:fs';
 import { enrichSocialThreadsWithNativeMetrics, nativeSocialMetricWindowLabel, summarizeOwnedSocialAccountMetrics } from '../src/lib/socialMetrics.mjs';
 import { buildSocialResults } from '../src/lib/social.mjs';
-import { socialReportComparableInteractionTotal, socialReportInteractionTotal } from '../src/lib/socialReport.mjs';
+import { socialReportComparableInteractionTotal, socialReportInteractionTotal, socialReportMetricValue } from '../src/lib/socialReport.mjs';
 
 const threadFacebook={id:'thread-fb',district_id:'district-1',platform:'facebook',comment_count:0,reply_count:5,reaction_count:0,share_count:0,view_count:0,provider_metadata:{metric_availability:{comments:false,reactions:false,shares:false,views:false}}};
 const threadInstagram={id:'thread-ig',district_id:'district-1',platform:'instagram',comment_count:0,reaction_count:0,share_count:0,view_count:0,provider_metadata:{metric_availability:{comments:true,reactions:true,shares:false,views:false}}};
@@ -62,6 +62,9 @@ assert.equal(partialEnriched[0].engagement_total,null,'partial native coverage m
 assert.equal(partialEnriched[0].provider_metadata.native_interaction_coverage,'partial');
 const [partialResult]=buildSocialResults(partialEnriched);
 assert.equal(socialReportInteractionTotal(partialResult),7,'reported ranking totals must use only available native interaction components');
+assert.equal(socialReportMetricValue(partialResult,'reactions'),7);
+assert.equal(socialReportMetricValue(partialResult,'comments'),null,'partial report rows must not pair a native-only total with canonical fallback comments');
+assert.equal(socialReportMetricValue(partialResult,'shares'),null,'partial report rows must not pair a native-only total with canonical fallback shares');
 assert.equal(socialReportComparableInteractionTotal(partialResult),null,'partial native coverage must not enter comparable aggregates');
 assert.equal(partialResult.hasComparableInteractionData,false);
 

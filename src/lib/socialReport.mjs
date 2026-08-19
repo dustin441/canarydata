@@ -150,6 +150,12 @@ export function socialReportComparableInteractionTotal(result) {
 }
 
 export function socialReportMetricValue(result, metric) {
+  const nativeMetric = result?.providerMetadata?.native_metrics?.[metric];
+  if (nativeMetric && typeof nativeMetric === 'object') {
+    return nativeMetric.availability === 'available' && nativeMetric.value !== null && nativeMetric.value !== undefined
+      ? finiteMetric(nativeMetric.value)
+      : null;
+  }
   if (result?.metricAvailability?.[metric] !== true) return null;
   if (metric === 'comments') return finiteMetric(result?.commentCount) + finiteMetric(result?.replyCount);
   const field = {

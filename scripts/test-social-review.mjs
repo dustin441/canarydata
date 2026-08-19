@@ -744,6 +744,8 @@ assert.doesNotMatch(dashboard, /formatSocialComparison\(change\)[\s\S]{0,500}for
 assert.match(dashboard, /useState\('this-month'\)/);
 assert.match(dashboard, /resolveSocialReportComparisonWindow\(topPostsPeriod/);
 assert.match(dashboard, /previousSocialReportPosts/);
+assert.match(dashboard, /formatSocialComparison\(comparisons\.interactions\)\} vs\. prior period/,'interaction comparison must render in the scorecard');
+assert.match(dashboard, /formatSocialComparison\(comparisons\.views\)\} vs\. prior period/,'view comparison must render in the scorecard');
 assert.match(dashboard, /analystNote=\{socialAnalystNote\}/);
 assert.match(dashboard, /This report includes leadership highlights and the complete eligible post table/);
 assert.match(dashboard, /<SocialReportTable results=\{allPosts\} \/>/);
@@ -789,9 +791,10 @@ assert.match(dashboard, /Top Performer rankings use provider-reported components
 for (const marker of ['Views observed at', 'Viewers / reach observed at', 'Reactions observed at', 'Comments observed at', 'Shares observed at', 'Clicks observed at', 'Saves observed at', 'Reposts observed at']) assert.ok(dashboard.includes(marker), `Social CSV must include per-metric timestamp: ${marker}`);
 for (const marker of ['Views availability', 'Viewers / reach availability', 'Reactions availability', 'Comments availability', 'Shares availability', 'Clicks availability', 'Saves availability', 'Reposts availability']) assert.ok(dashboard.includes(marker), `Social CSV must include per-metric availability: ${marker}`);
 assert.match(dashboard, /metricValue\('comments'\)/);
+assert.match(dashboard, /const comparableInteractionTotal = socialReportComparableInteractionTotal\(result\)/,'CSV engagement rate must use only comparable interaction totals');
 assert.match(dashboard, /interactionTotal \?\? 'N\/A'/);
 assert.match(dashboard, /Comments \/ Replies/);
-assert.match(dashboard, /hasCompleteInteractionMetrics/);
+assert.match(dashboard, /comparableInteractionTotal !== null && Number\(followerCount\) > 0/);
 assert.match(dashboard, /neutralizeSpreadsheetFormula\(rawText\)/);
 assert.match(dashboard, /const articleUrl = safeExternalHttpUrl\(article\.link\)/);
 assert.match(dashboard, /Available for \{reportScores\.length\} of \{totalMentions\} mentions/);

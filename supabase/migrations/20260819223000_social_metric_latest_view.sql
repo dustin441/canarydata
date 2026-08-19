@@ -1,8 +1,7 @@
-begin;
-set local lock_timeout = '10s';
-set local statement_timeout = '5min';
+set lock_timeout = '10s';
+set statement_timeout = '5min';
 
-create index if not exists social_provider_metric_snapshots_latest_idx
+create index concurrently if not exists social_provider_metric_snapshots_latest_idx
   on public.social_provider_metric_snapshots (
     provider_account_link_id,
     provider_object_id,
@@ -14,6 +13,8 @@ create index if not exists social_provider_metric_snapshots_latest_idx
     observed_at desc,
     id
   );
+
+begin;
 
 create or replace view public.canary_latest_social_metric_snapshots
 with (security_invoker = true)
