@@ -125,6 +125,12 @@ export function metricAvailabilityCoverage(results, metric) {
 }
 
 export function socialReportInteractionTotal(result) {
+  const availableMetrics = INTERACTION_METRICS.filter(([metric]) => result?.metricAvailability?.[metric] === true);
+  if (!availableMetrics.length) return null;
+  return availableMetrics.reduce((sum, [, field]) => sum + finiteMetric(result?.[field]), 0);
+}
+
+export function socialReportComparableInteractionTotal(result) {
   const complete = ['reactions', 'comments', 'shares'].every((metric) => result?.metricAvailability?.[metric] === true);
   if (!complete) return null;
   return INTERACTION_METRICS.reduce((sum, [, field]) => sum + finiteMetric(result?.[field]), 0);
@@ -180,7 +186,7 @@ export function sortSocialReportDetails(results) {
 }
 
 export function summarizeSocialReport(results) {
-  const interactionTotals = results.map(socialReportInteractionTotal).filter((value) => value !== null);
+  const interactionTotals = results.map(socialReportComparableInteractionTotal).filter((value) => value !== null);
   const totalInteractions = interactionTotals.length
     ? interactionTotals.reduce((sum, value) => sum + value, 0)
     : null;
@@ -226,7 +232,7 @@ export function summarizeSocialContentFormats(results) {
   }
   return order.map((format) => {
     const posts = groups.get(format);
-    const interactionTotals = posts.map(socialReportInteractionTotal).filter((value) => value !== null);
+    const interactionTotals = posts.map(socialReportComparableInteractionTotal).filter((value) => value !== null);
     return {
       format,
       posts: posts.length,
@@ -249,11 +255,12 @@ export function groupTopReportPostsByPlatform(results, limitPerPlatform = 3) {
     return a.localeCompare(b);
   });
 
-  return platforms.map((platform) => ({
-    platform,
-    posts: rankSocialReportTopPerformers(
-      eligible.filter((result) => result.platform === platform),
-      limitPerPlatform,
-    ),
-  })).filter((group) => group.posts.length > 0);
+  return platforms.map((platform) => {
+    const platformPosts = eligible.filter((result) => result.platform === platform);
+    return {
+      platform,
+      rankingBasis: platformPosts.some((result) => socialReportComparableInteractionTotal(result) !== null) ? 'mixed-coverage' : 'partial-only',
+      posts: rankSocialReportTopPerformers(platformPosts, limitPerPlatform),
+    };
+  }).filter((group) => group.posts.length > 0);
 }

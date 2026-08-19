@@ -1361,10 +1361,10 @@ function BirdEyeView({ articles, strategicGovernance, hasSelectedDistrict, selec
       </div>
 
       <section className="board-report-section birdseye-social-section">
-        <div className="birdseye-section-heading"><span>Official district channels</span><h2>Top 3 official social posts</h2><p>Active, owned posts from verified official sources in the report date range. Only posts with complete reported reactions, comments, and shares are ranked, followed by newest date and stable record ID.</p></div>
+        <div className="birdseye-section-heading"><span>Official district channels</span><h2>Top 3 official social posts</h2><p>Active, owned posts from verified official sources in the report date range, ranked by provider-reported interactions. Missing metrics remain unavailable and are never treated as zero.</p></div>
         {socialReportPosts.length
           ? <div className="board-report-social">{socialReportPosts.map((result, index) => <SocialReportCard key={result.id} result={result} rank={index + 1} />)}</div>
-          : <p>No official social posts with complete reported reactions, comments, and shares are available for ranking in this report date range.</p>}
+          : <p>No official social posts with reported interaction metrics are available for ranking in this report date range.</p>}
       </section>
 
       <section className="birdseye-evidence-page">
@@ -2897,8 +2897,8 @@ function SocialReportView({ districtName, reportWindow, filterContext, posts, an
       {analystNote?.trim() && <section className="social-report-section social-report-analyst-note"><div className="social-report-section-heading"><h2>Social Media Brief</h2><p>Human-reviewed context for leadership and board discussion.</p></div><p>{analystNote.trim()}</p></section>}
       <section className="social-report-scorecards" aria-label="Executive scorecards">
         <article><span>Official posts published</span><strong>{summary.officialPosts}</strong><small>Active owned posts</small></article>
-        <article><span>Total public interactions</span><strong>{summary.totalInteractions === null ? 'Not available' : formatSocialMetric(summary.totalInteractions)}</strong><small>{interactionCoverage} · {interactionMetricCoverage} · latest lifetime snapshots</small></article>
-        <article><span>Average reported interactions</span><strong>{summary.averageInteractions === null ? 'Not available' : formatSocialMetric(summary.averageInteractions)}</strong><small>{interactionCoverage} · latest lifetime snapshots</small></article>
+        <article><span>Comparable public interactions</span><strong>{summary.totalInteractions === null ? 'Not available' : formatSocialMetric(summary.totalInteractions)}</strong><small>{interactionCoverage} · {interactionMetricCoverage} · latest lifetime snapshots</small></article>
+        <article><span>Average comparable interactions</span><strong>{summary.averageInteractions === null ? 'Not available' : formatSocialMetric(summary.averageInteractions)}</strong><small>{interactionCoverage} · latest lifetime snapshots</small></article>
         <article><span>Reported views</span><strong>{summary.reportedViews === null ? 'Not available' : formatSocialMetric(summary.reportedViews)}</strong><small>{viewCoverage} · latest lifetime snapshots</small></article>
         <article><span>Platforms</span><strong>{summary.platformCount || 'Not available'}</strong><small>{platformBreakdown || 'No platform data available'}</small></article>
       </section>
@@ -2906,13 +2906,14 @@ function SocialReportView({ districtName, reportWindow, filterContext, posts, an
       {posts.length ? (
         <>
           <section className="social-report-section social-report-top-performers">
-            <div className="social-report-section-heading"><h2>Top Performers</h2><p>Top 3 per platform among posts with complete reported reactions, comments, and shares, ranked by those interactions, then newest date and stable record ID.</p></div>
+            <div className="social-report-section-heading"><h2>Top Performers</h2><p>Top 3 per platform ranked by provider-reported reactions, comments, and shares, then newest date and stable record ID. Missing components remain N/A and are never treated as zero.</p></div>
             {topPerformerGroups.length ? topPerformerGroups.map((group) => (
               <section className="social-report-platform-table" key={group.platform}>
                 <h3>{formatSourceLabel(group.platform)}</h3>
+                {group.rankingBasis === 'partial-only' && <p>This provider does not report all three interaction components for these posts, so ranking uses only the components it reports.</p>}
                 <SocialReportTable results={group.posts} ranked />
               </section>
-            )) : <p>No official posts have complete reported reactions, comments, and shares for Top Performer ranking in this reporting window.</p>}
+            )) : <p>No official posts have provider-reported interaction metrics for Top Performer ranking in this reporting window.</p>}
           </section>
           <section className="social-report-section social-report-detail social-report-detail-new-page">
             <div className="social-report-section-heading"><h2>Complete Post Evidence</h2><p>Every eligible official post in the selected reporting window, newest first, with source links and available public metrics.</p></div>
@@ -2920,7 +2921,7 @@ function SocialReportView({ districtName, reportWindow, filterContext, posts, an
           </section>
           <aside className="social-report-data-notes">
             <strong>Data notes</strong>
-            <span>This report includes leadership highlights and the complete eligible post table. Interaction totals, averages, and Top Performer rankings include only posts with complete reported reactions, comments, and shares; the scorecards disclose the contributing-post denominator. The CSV provides the same post-level evidence plus native viewers/reach, clicks, saves, attribution scope, and observation time. Post metrics are latest lifetime values for posts published in the report window. Account metrics retain the source windows shown above. “Not available” means the provider did not supply that metric.</span>
+            <span>This report includes leadership highlights and the complete eligible post table. Comparable totals and averages include only posts with complete reported reactions, comments, and shares; the scorecards disclose that denominator. Top Performer rankings use provider-reported components and leave missing values N/A rather than treating them as zero. The CSV provides the same post-level evidence plus native viewers/reach, clicks, saves, attribution scope, and observation time. Post metrics are latest lifetime values for posts published in the report window. Account metrics retain the source windows shown above. “Not available” means the provider did not supply that metric.</span>
           </aside>
         </>
       ) : (
@@ -3065,8 +3066,8 @@ function MonthlySocialPerformance({
 
       <div className="social-monthly-kpis" aria-label="Monthly Social scorecards">
         <article><span>Official posts</span><strong>{summary.officialPosts}</strong><small>{formatSocialComparison(comparisons.posts)} vs. prior period</small></article>
-        <article><span>Latest post interactions</span><strong>{summary.totalInteractions === null ? 'Not available' : formatSocialMetric(summary.totalInteractions)}</strong><small>Lifetime values for posts published in this report · available for {summary.interactionsAvailable}/{summary.officialPosts}</small></article>
-        <article><span>Average latest interactions</span><strong>{summary.averageInteractions === null ? 'Not available' : formatSocialMetric(summary.averageInteractions)}</strong><small>Lifetime values based only on posts with available interaction metrics</small></article>
+        <article><span>Comparable post interactions</span><strong>{summary.totalInteractions === null ? 'Not available' : formatSocialMetric(summary.totalInteractions)}</strong><small>Latest lifetime values · complete reactions, comments, and shares for {summary.interactionsAvailable}/{summary.officialPosts} posts</small></article>
+        <article><span>Average comparable interactions</span><strong>{summary.averageInteractions === null ? 'Not available' : formatSocialMetric(summary.averageInteractions)}</strong><small>Latest lifetime values based only on posts with all three interaction components</small></article>
         <article><span>Latest post views</span><strong>{summary.reportedViews === null ? 'Not available' : formatSocialMetric(summary.reportedViews)}</strong><small>Lifetime values for posts published in this report · available for {summary.viewsCoverage.available}/{summary.viewsCoverage.total}</small></article>
         <article><span>Reach / unique viewers</span><strong>{accountMetricSummary?.platformCount ? 'By platform' : 'Not available'}</strong><small>Not summed across platforms; see the native account table</small></article>
         <article><span>Latest net follows</span><strong>{instagramNetFollows?.value === null || instagramNetFollows?.value === undefined ? 'Not available' : formatSocialMetric(instagramNetFollows.value)}</strong><small>{instagramNetFollows ? `${instagramNetFollows.follows ?? 'N/A'} follows · ${instagramNetFollows.unfollows ?? 'N/A'} unfollows · ${accountMetricSummary.platforms.instagram.windowLabel}` : 'No compatible authorized account snapshot'}</small></article>
@@ -3076,17 +3077,17 @@ function MonthlySocialPerformance({
 
       <div className="social-monthly-analysis-grid">
         <section>
-          <div className="social-monthly-section-heading"><h3>Platform performance</h3><p>Post-level metrics currently available from verified official sources.</p></div>
+          <div className="social-monthly-section-heading"><h3>Platform performance</h3><p>Comparable interaction totals use only posts with complete reactions, comments, and shares. Views use every post where that metric is available.</p></div>
           <div className="social-monthly-table-wrap"><table><thead><tr><th>Platform</th><th>Posts</th><th>Interactions</th><th>Avg. interactions</th><th>Views</th></tr></thead><tbody>{platforms.length ? platforms.map((row) => <tr key={row.platform}><td>{formatSourceLabel(row.platform)}</td><td>{row.officialPosts}</td><td>{row.totalInteractions === null ? 'N/A' : formatSocialMetric(row.totalInteractions)}</td><td>{row.averageInteractions === null ? 'N/A' : formatSocialMetric(row.averageInteractions)}</td><td>{row.reportedViews === null ? 'N/A' : formatSocialMetric(row.reportedViews)}</td></tr>) : <tr><td colSpan={5}>No official posts are available for this period.</td></tr>}</tbody></table></div>
         </section>
         <section>
-          <div className="social-monthly-section-heading"><h3>Content format</h3><p>Use this to compare video, imagery, and text/link publishing patterns.</p></div>
+          <div className="social-monthly-section-heading"><h3>Content format</h3><p>Compare video, imagery, and text/link publishing patterns. Interaction totals use only posts with complete reactions, comments, and shares.</p></div>
           <div className="social-monthly-table-wrap"><table><thead><tr><th>Format</th><th>Posts</th><th>Interactions</th><th>Avg. interactions</th></tr></thead><tbody>{contentFormats.length ? contentFormats.map((row) => <tr key={row.format}><td>{row.format}</td><td>{row.posts}</td><td>{row.totalInteractions === null ? 'N/A' : formatSocialMetric(row.totalInteractions)}</td><td>{row.averageInteractions === null ? 'N/A' : formatSocialMetric(row.averageInteractions)}</td></tr>) : <tr><td colSpan={4}>No content-format rows are available.</td></tr>}</tbody></table></div>
         </section>
       </div>
 
       <section className="social-monthly-top-posts">
-        <div className="social-monthly-section-heading"><h3>Leadership highlights</h3><p>Top six official posts, ranked by available public interactions. These are the posts included in the concise monthly conversation.</p></div>
+        <div className="social-monthly-section-heading"><h3>Leadership highlights</h3><p>Top six official posts ranked by provider-reported public interactions. Missing components remain N/A and are never treated as zero.</p></div>
         {topPosts.length ? <div className="board-report-social">{topPosts.map((post, index) => <SocialReportCard key={post.id} result={post} rank={index + 1} />)}</div> : <div className="social-empty-inline">No report-eligible official posts match this period and campaign filter.</div>}
       </section>
 

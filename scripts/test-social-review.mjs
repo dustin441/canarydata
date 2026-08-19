@@ -12,6 +12,7 @@ import {
   neutralizeSpreadsheetFormula,
   rankSocialReportTopPerformers,
   selectOfficialSocialReportPosts,
+  socialReportComparableInteractionTotal,
   socialReportInteractionTotal,
   socialReportMetricValue,
   sortSocialReportDetails,
@@ -109,8 +110,9 @@ assert.equal(isEligibleSocialReportPost(reportPosts[6], reportWindow), false);
 const eligibleReportPosts = reportPosts.filter((post) => isEligibleSocialReportPost(post, reportWindow));
 assert.deepEqual(metricAvailabilityCoverage(eligibleReportPosts, 'views'), { available: 2, total: 4 });
 assert.deepEqual(metricAvailabilityCoverage(eligibleReportPosts, 'shares'), { available: 2, total: 4 });
-assert.equal(socialReportInteractionTotal(eligibleReportPosts[2]), null, 'partial interaction components must not be labeled as a total');
-assert.deepEqual(rankSocialReportTopPerformers(eligibleReportPosts, 3).map((post) => post.id), ['fb-high', 'ig-tie-b']);
+assert.equal(socialReportInteractionTotal(eligibleReportPosts[2]), 13, 'reported interaction ranking may use available components without inventing missing values');
+assert.equal(socialReportComparableInteractionTotal(eligibleReportPosts[2]), null, 'partial interaction components must not enter comparable totals');
+assert.deepEqual(rankSocialReportTopPerformers(eligibleReportPosts, 3).map((post) => post.id), ['fb-high', 'ig-tie-a', 'ig-tie-b']);
 assert.deepEqual(sortSocialReportDetails(eligibleReportPosts).map((post) => post.id), ['fb-no-metrics', 'ig-tie-a', 'ig-tie-b', 'fb-high']);
 
 const platformTopPerformers = groupTopReportPostsByPlatform([
@@ -133,9 +135,9 @@ const platformTopPerformers = groupTopReportPostsByPlatform([
     metricAvailability: { reactions: true, comments: true, shares: true },
   })),
 ]);
-assert.deepEqual(platformTopPerformers.map(({ platform, posts }) => [platform, posts.map((post) => post.id)]), [
-  ['facebook', ['fb-0', 'fb-1', 'fb-2']],
-  ['instagram', ['ig-0', 'ig-1', 'ig-2']],
+assert.deepEqual(platformTopPerformers.map(({ platform, rankingBasis, posts }) => [platform, rankingBasis, posts.map((post) => post.id)]), [
+  ['facebook', 'mixed-coverage', ['fb-0', 'fb-1', 'fb-2']],
+  ['instagram', 'mixed-coverage', ['ig-0', 'ig-1', 'ig-2']],
 ]);
 assert.deepEqual(groupTopReportPostsByPlatform([{
   id: 'partial-only-facebook',
@@ -147,7 +149,9 @@ assert.deepEqual(groupTopReportPostsByPlatform([{
   commentCount: 2,
   shareCount: 0,
   metricAvailability: { reactions: true, comments: true, shares: false },
-}]), [], 'partial-only platform groups must be removed so the truthful ranking empty state renders');
+}]).map(({ platform, rankingBasis, posts }) => [platform, rankingBasis, posts.map((post) => post.id)]), [
+  ['facebook', 'partial-only', ['partial-only-facebook']],
+], 'partial-only providers still need a useful ranking with explicit coverage disclosure');
 
 const reportSummary = summarizeSocialReport(eligibleReportPosts);
 assert.equal(reportSummary.officialPosts, 4);
@@ -195,7 +199,7 @@ const officialCandidates = [
 ];
 assert.deepEqual(
   selectOfficialSocialReportPosts(officialCandidates, officialSources, 'district-a', reportWindow, 3).map((post) => post.id),
-  ['fb-high', 'ig-tie-b'],
+  ['fb-high', 'ig-tie-a', 'ig-tie-b'],
 );
 
 const [sql, actions, dashboard, styles, data, melodi] = await Promise.all([
@@ -699,8 +703,8 @@ for (const marker of [
   'Social Media Performance Report',
   'Executive scorecards',
   'Official posts published',
-  'Total public interactions',
-  'Average reported interactions',
+  'Comparable public interactions',
+  'Average comparable interactions',
   'Reported views',
   'Available for',
   'Top Performers',
@@ -764,8 +768,8 @@ assert.doesNotMatch(dashboard, /function handleExportPdf/);
 assert.match(dashboard, /function BirdEyeView\(\{[\s\S]*districtId[\s\S]*districtName[\s\S]*socialResults[\s\S]*socialSources/);
 assert.match(dashboard, /selectOfficialSocialReportPosts\([\s\S]*socialResults[\s\S]*socialSources[\s\S]*districtId[\s\S]*reportWindow[\s\S]*3/);
 assert.match(dashboard, /Top 3 official social posts/);
-assert.match(dashboard, /Only posts with complete reported reactions, comments, and shares are ranked/);
-assert.match(dashboard, /No official social posts with complete reported reactions, comments, and shares are available for ranking/);
+assert.match(dashboard, /ranked by provider-reported interactions/);
+assert.match(dashboard, /Missing metrics remain unavailable and are never treated as zero/);
 assert.match(dashboard, /socialReportPosts\.map\(\(result, index\)/);
 assert.match(dashboard, /canary-social-performance-/);
 assert.match(dashboard, /socialReportPosts\.map\(\(result\) => socialCsvRow/);
@@ -775,9 +779,10 @@ assert.match(dashboard, /nativeSocialScopeLabel\(nativeSocialMetric\(result, 'vi
 assert.match(dashboard, /nativeSocialWindowLabel\(metric\)/,'native account cells must show each metric source period');
 assert.match(dashboard, /<strong>Metric-specific<\/strong><small>See each metric cell<\/small>/,'account rows must not imply a shared source window');
 assert.match(dashboard, /Complete reactions, comments, and shares for \$\{summary\.interactionsAvailable\} of \$\{summary\.officialPosts\} posts/,'interaction totals and averages must disclose the complete-metric denominator');
-assert.match(dashboard, /Top 3 per platform among posts with complete reported reactions, comments, and shares/,'Top Performer ranking must disclose complete-metric eligibility');
-assert.match(dashboard, /No official posts have complete reported reactions, comments, and shares for Top Performer ranking/,'partial-only report sets need a truthful ranking empty state');
-assert.match(dashboard, /Interaction totals, averages, and Top Performer rankings include only posts with complete reported reactions, comments, and shares/,'report notes must explain complete-metric inclusion');
+assert.match(dashboard, /Top 3 per platform ranked by provider-reported reactions, comments, and shares/,'Top Performer ranking must disclose its metric basis');
+assert.match(dashboard, /group\.rankingBasis === 'partial-only'/,'partial-only platforms need explicit fallback disclosure');
+assert.match(dashboard, /Comparable totals and averages include only posts with complete reported reactions, comments, and shares/,'report notes must explain comparable aggregate inclusion');
+assert.match(dashboard, /Top Performer rankings use provider-reported components and leave missing values N\/A rather than treating them as zero/,'report notes must explain partial ranking semantics');
 for (const marker of ['Views observed at', 'Viewers / reach observed at', 'Reactions observed at', 'Comments observed at', 'Shares observed at', 'Clicks observed at', 'Saves observed at', 'Reposts observed at']) assert.ok(dashboard.includes(marker), `Social CSV must include per-metric timestamp: ${marker}`);
 for (const marker of ['Views availability', 'Viewers / reach availability', 'Reactions availability', 'Comments availability', 'Shares availability', 'Clicks availability', 'Saves availability', 'Reposts availability']) assert.ok(dashboard.includes(marker), `Social CSV must include per-metric availability: ${marker}`);
 assert.match(dashboard, /metricValue\('comments'\)/);
