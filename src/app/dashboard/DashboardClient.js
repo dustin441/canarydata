@@ -165,6 +165,25 @@ function nativeSocialObservedLabel(metric) {
   return Number.isFinite(date.getTime()) ? `Observed ${date.toLocaleDateString('en-US', { month: 'short', day: 'numeric', year: 'numeric', timeZone: 'UTC' })}` : 'Observation time unavailable';
 }
 
+function nativeSocialWindowLabel(metric) {
+  if (!metric) return 'Source period unavailable';
+  const effective = new Date(metric.effectiveAt || '');
+  const ending = Number.isFinite(effective.getTime()) ? effective.toLocaleDateString('en-US', { month: 'short', day: 'numeric', year: 'numeric', timeZone: 'UTC' }) : null;
+  if (metric.period === 'lifetime') return 'Lifetime metric';
+  if (metric.period === 'days_28') return ending ? `28 days ending ${ending}` : '28-day metric';
+  if (metric.period === 'week') return ending ? `7 days ending ${ending}` : '7-day metric';
+  if (metric.metricVariant === 'time_series' && metric.period === 'day') return ending ? `Daily value ending ${ending}` : 'Daily value';
+  const start = new Date(metric.periodStartAt || '').getTime();
+  const end = new Date(metric.periodEndAt || '').getTime();
+  if (Number.isFinite(start) && Number.isFinite(end) && end >= start) {
+    const days = Math.max(1, Math.round((end - start) / 86_400_000));
+    const periodEnd = new Date(end).toLocaleDateString('en-US', { month: 'short', day: 'numeric', year: 'numeric', timeZone: 'UTC' });
+    return `${days} days ending ${periodEnd}`;
+  }
+  if (metric.period === 'day') return ending ? `Day ending ${ending}` : 'Daily metric';
+  return ending ? `Ending ${ending}` : 'Source period unavailable';
+}
+
 function proxiedSocialMediaUrl(value) {
   const safeUrl = safeSocialMediaUrl(value);
   return safeUrl ? `/api/social-media?url=${encodeURIComponent(safeUrl)}` : '';
@@ -1342,10 +1361,10 @@ function BirdEyeView({ articles, strategicGovernance, hasSelectedDistrict, selec
       </div>
 
       <section className="board-report-section birdseye-social-section">
-        <div className="birdseye-section-heading"><span>Official district channels</span><h2>Top 3 official social posts</h2><p>Active, owned posts from verified official sources in the report date range, ranked by available public interactions, then newest date and stable record ID.</p></div>
+        <div className="birdseye-section-heading"><span>Official district channels</span><h2>Top 3 official social posts</h2><p>Active, owned posts from verified official sources in the report date range. Only posts with complete reported reactions, comments, and shares are ranked, followed by newest date and stable record ID.</p></div>
         {socialReportPosts.length
           ? <div className="board-report-social">{socialReportPosts.map((result, index) => <SocialReportCard key={result.id} result={result} rank={index + 1} />)}</div>
-          : <p>No eligible official social posts are available for this report date range.</p>}
+          : <p>No official social posts with complete reported reactions, comments, and shares are available for ranking in this report date range.</p>}
       </section>
 
       <section className="birdseye-evidence-page">
@@ -2819,9 +2838,9 @@ function SocialReportTable({ results, ranked = false }) {
 
 function NativeAccountMetricCell({ metric, detail = '' }) {
   if (!metric) return <span className="social-native-na">N/A</span>;
-  if (metric.availability !== 'available' || metric.value === null || metric.value === undefined || !Number.isFinite(Number(metric.value))) return <span className="social-native-metric social-native-na"><strong>N/A</strong><small>{metric.availability || 'unavailable'}</small><small>{nativeSocialObservedLabel(metric)}</small></span>;
+  if (metric.availability !== 'available' || metric.value === null || metric.value === undefined || !Number.isFinite(Number(metric.value))) return <span className="social-native-metric social-native-na"><strong>N/A</strong><small>{metric.availability || 'unavailable'}</small><small>{nativeSocialWindowLabel(metric)}</small><small>{nativeSocialObservedLabel(metric)}</small></span>;
   const scope = nativeSocialScopeLabel(metric);
-  return <span className="social-native-metric"><strong>{formatSocialMetric(metric.value)}</strong><small>{detail || scope}</small>{detail && <small>{scope}</small>}<small>{nativeSocialObservedLabel(metric)}</small></span>;
+  return <span className="social-native-metric"><strong>{formatSocialMetric(metric.value)}</strong><small>{detail || scope}</small>{detail && <small>{scope}</small>}<small>{nativeSocialWindowLabel(metric)}</small><small>{nativeSocialObservedLabel(metric)}</small></span>;
 }
 
 function NativeAccountMetrics({ summary }) {
@@ -2839,12 +2858,12 @@ function NativeAccountMetrics({ summary }) {
           <tbody>{rows.map(([platform, row]) => (
             <tr key={`native-account-${platform}`}>
               <td>{formatSourceLabel(platform)}</td>
-              <td><span className="social-native-metric"><strong>{row.windowLabel}</strong><small>Latest authorized snapshot</small></span></td>
+              <td><span className="social-native-metric"><strong>Metric-specific</strong><small>See each metric cell</small></span></td>
               <td><NativeAccountMetricCell metric={row.views} /></td>
-              <td><NativeAccountMetricCell metric={row.uniqueViewers || row.reach} detail={row.reachWindowLabel || ''} /></td>
+              <td><NativeAccountMetricCell metric={row.uniqueViewers || row.reach} /></td>
               <td><NativeAccountMetricCell metric={row.engagements || row.totalInteractions} /></td>
               <td><NativeAccountMetricCell metric={row.profileViews} /></td>
-              <td>{row.profileLinkTaps || row.websiteClicks ? <span className="social-native-metric"><strong>Profile {row.profileLinkTaps?.value ?? 'N/A'}</strong><small>Website {row.websiteClicks?.value ?? 'N/A'} · attribution not separated</small><small>Profile {nativeSocialObservedLabel(row.profileLinkTaps)} · Website {nativeSocialObservedLabel(row.websiteClicks)}</small></span> : <span className="social-native-na">N/A</span>}</td>
+              <td>{row.profileLinkTaps || row.websiteClicks ? <span className="social-native-metric"><small>Profile links</small><NativeAccountMetricCell metric={row.profileLinkTaps} /><small>Website clicks</small><NativeAccountMetricCell metric={row.websiteClicks} /></span> : <span className="social-native-na">N/A</span>}</td>
               <td><NativeAccountMetricCell metric={row.netFollowerChange} detail={row.netFollowerChange ? `${row.netFollowerChange.follows ?? 'N/A'} follows · ${row.netFollowerChange.unfollows ?? 'N/A'} unfollows` : ''} /></td>
             </tr>
           ))}</tbody>
@@ -2863,7 +2882,7 @@ function SocialReportView({ districtName, reportWindow, filterContext, posts, an
     return dateDifference || String(a.id).localeCompare(String(b.id));
   });
   const platformBreakdown = summary.platformBreakdown.map(({ platform, count }) => `${formatSourceLabel(platform)} ${count}`).join(' · ');
-  const interactionCoverage = `Any interaction metric available for ${summary.interactionsAvailable} of ${summary.officialPosts} posts`;
+  const interactionCoverage = `Complete reactions, comments, and shares for ${summary.interactionsAvailable} of ${summary.officialPosts} posts`;
   const interactionMetricCoverage = `Reactions ${summary.reactionsCoverage.available}/${summary.reactionsCoverage.total} · Comments ${summary.commentsCoverage.available}/${summary.commentsCoverage.total} · Shares ${summary.sharesCoverage.available}/${summary.sharesCoverage.total}`;
   const viewCoverage = `Available for ${summary.viewsCoverage.available} of ${summary.viewsCoverage.total} posts`;
   return (
@@ -2878,7 +2897,7 @@ function SocialReportView({ districtName, reportWindow, filterContext, posts, an
       {analystNote?.trim() && <section className="social-report-section social-report-analyst-note"><div className="social-report-section-heading"><h2>Social Media Brief</h2><p>Human-reviewed context for leadership and board discussion.</p></div><p>{analystNote.trim()}</p></section>}
       <section className="social-report-scorecards" aria-label="Executive scorecards">
         <article><span>Official posts published</span><strong>{summary.officialPosts}</strong><small>Active owned posts</small></article>
-        <article><span>Total public interactions</span><strong>{summary.totalInteractions === null ? 'Not available' : formatSocialMetric(summary.totalInteractions)}</strong><small>{interactionMetricCoverage} · latest lifetime snapshots</small></article>
+        <article><span>Total public interactions</span><strong>{summary.totalInteractions === null ? 'Not available' : formatSocialMetric(summary.totalInteractions)}</strong><small>{interactionCoverage} · {interactionMetricCoverage} · latest lifetime snapshots</small></article>
         <article><span>Average reported interactions</span><strong>{summary.averageInteractions === null ? 'Not available' : formatSocialMetric(summary.averageInteractions)}</strong><small>{interactionCoverage} · latest lifetime snapshots</small></article>
         <article><span>Reported views</span><strong>{summary.reportedViews === null ? 'Not available' : formatSocialMetric(summary.reportedViews)}</strong><small>{viewCoverage} · latest lifetime snapshots</small></article>
         <article><span>Platforms</span><strong>{summary.platformCount || 'Not available'}</strong><small>{platformBreakdown || 'No platform data available'}</small></article>
@@ -2887,13 +2906,13 @@ function SocialReportView({ districtName, reportWindow, filterContext, posts, an
       {posts.length ? (
         <>
           <section className="social-report-section social-report-top-performers">
-            <div className="social-report-section-heading"><h2>Top Performers</h2><p>Top 3 per platform, ranked by reported public interactions, then newest date and stable record ID.</p></div>
-            {topPerformerGroups.map((group) => (
+            <div className="social-report-section-heading"><h2>Top Performers</h2><p>Top 3 per platform among posts with complete reported reactions, comments, and shares, ranked by those interactions, then newest date and stable record ID.</p></div>
+            {topPerformerGroups.length ? topPerformerGroups.map((group) => (
               <section className="social-report-platform-table" key={group.platform}>
                 <h3>{formatSourceLabel(group.platform)}</h3>
                 <SocialReportTable results={group.posts} ranked />
               </section>
-            ))}
+            )) : <p>No official posts have complete reported reactions, comments, and shares for Top Performer ranking in this reporting window.</p>}
           </section>
           <section className="social-report-section social-report-detail social-report-detail-new-page">
             <div className="social-report-section-heading"><h2>Complete Post Evidence</h2><p>Every eligible official post in the selected reporting window, newest first, with source links and available public metrics.</p></div>
@@ -2901,7 +2920,7 @@ function SocialReportView({ districtName, reportWindow, filterContext, posts, an
           </section>
           <aside className="social-report-data-notes">
             <strong>Data notes</strong>
-            <span>This report includes leadership highlights and the complete eligible post table. The CSV provides the same post-level evidence plus native viewers/reach, clicks, saves, attribution scope, and observation time. Post metrics are latest lifetime values for posts published in the report window. Account metrics retain the source windows shown above. “Not available” means the provider did not supply that metric.</span>
+            <span>This report includes leadership highlights and the complete eligible post table. Interaction totals, averages, and Top Performer rankings include only posts with complete reported reactions, comments, and shares; the scorecards disclose the contributing-post denominator. The CSV provides the same post-level evidence plus native viewers/reach, clicks, saves, attribution scope, and observation time. Post metrics are latest lifetime values for posts published in the report window. Account metrics retain the source windows shown above. “Not available” means the provider did not supply that metric.</span>
           </aside>
         </>
       ) : (

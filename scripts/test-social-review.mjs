@@ -12,6 +12,7 @@ import {
   neutralizeSpreadsheetFormula,
   rankSocialReportTopPerformers,
   selectOfficialSocialReportPosts,
+  socialReportInteractionTotal,
   socialReportMetricValue,
   sortSocialReportDetails,
   summarizeSocialContentFormats,
@@ -108,7 +109,8 @@ assert.equal(isEligibleSocialReportPost(reportPosts[6], reportWindow), false);
 const eligibleReportPosts = reportPosts.filter((post) => isEligibleSocialReportPost(post, reportWindow));
 assert.deepEqual(metricAvailabilityCoverage(eligibleReportPosts, 'views'), { available: 2, total: 4 });
 assert.deepEqual(metricAvailabilityCoverage(eligibleReportPosts, 'shares'), { available: 2, total: 4 });
-assert.deepEqual(rankSocialReportTopPerformers(eligibleReportPosts, 3).map((post) => post.id), ['fb-high', 'ig-tie-a', 'ig-tie-b']);
+assert.equal(socialReportInteractionTotal(eligibleReportPosts[2]), null, 'partial interaction components must not be labeled as a total');
+assert.deepEqual(rankSocialReportTopPerformers(eligibleReportPosts, 3).map((post) => post.id), ['fb-high', 'ig-tie-b']);
 assert.deepEqual(sortSocialReportDetails(eligibleReportPosts).map((post) => post.id), ['fb-no-metrics', 'ig-tie-a', 'ig-tie-b', 'fb-high']);
 
 const platformTopPerformers = groupTopReportPostsByPlatform([
@@ -118,8 +120,8 @@ const platformTopPerformers = groupTopReportPostsByPlatform([
     date: `2026-07-${String(16 + index).padStart(2, '0')}T12:00:00Z`,
     visibilityStatus: 'active',
     relationshipType: 'owned',
-    reactionCount: 100 - index,
-    metricAvailability: { reactions: true },
+    reactionCount: 100 - index, commentCount: 0, shareCount: 0,
+    metricAvailability: { reactions: true, comments: true, shares: true },
   })),
   ...Array.from({ length: 4 }, (_, index) => ({
     id: `ig-${index}`,
@@ -127,20 +129,31 @@ const platformTopPerformers = groupTopReportPostsByPlatform([
     date: `2026-07-${String(16 + index).padStart(2, '0')}T12:00:00Z`,
     visibilityStatus: 'active',
     relationshipType: 'owned',
-    reactionCount: 20 - index,
-    metricAvailability: { reactions: true },
+    reactionCount: 20 - index, commentCount: 0, shareCount: 0,
+    metricAvailability: { reactions: true, comments: true, shares: true },
   })),
 ]);
 assert.deepEqual(platformTopPerformers.map(({ platform, posts }) => [platform, posts.map((post) => post.id)]), [
   ['facebook', ['fb-0', 'fb-1', 'fb-2']],
   ['instagram', ['ig-0', 'ig-1', 'ig-2']],
 ]);
+assert.deepEqual(groupTopReportPostsByPlatform([{
+  id: 'partial-only-facebook',
+  platform: 'facebook',
+  date: '2026-07-20T12:00:00Z',
+  visibilityStatus: 'active',
+  relationshipType: 'owned',
+  reactionCount: 10,
+  commentCount: 2,
+  shareCount: 0,
+  metricAvailability: { reactions: true, comments: true, shares: false },
+}]), [], 'partial-only platform groups must be removed so the truthful ranking empty state renders');
 
 const reportSummary = summarizeSocialReport(eligibleReportPosts);
 assert.equal(reportSummary.officialPosts, 4);
-assert.equal(reportSummary.totalInteractions, 51);
-assert.equal(reportSummary.interactionsAvailable, 3);
-assert.equal(reportSummary.averageInteractions, 17);
+assert.equal(reportSummary.totalInteractions, 38);
+assert.equal(reportSummary.interactionsAvailable, 2);
+assert.equal(reportSummary.averageInteractions, 19);
 assert.equal(reportSummary.reportedViews, 150);
 assert.deepEqual(reportSummary.viewsCoverage, { available: 2, total: 4 });
 assert.deepEqual(reportSummary.reactionsCoverage, { available: 3, total: 4 });
@@ -157,7 +170,7 @@ assert.deepEqual(summarizeSocialContentFormats([
   { ...eligibleReportPosts[2], id: 'mixed-case-reel', mediaType: 'Reel', mediaUrl: 'https://cdninstagram.com/reel.jpg' },
   { ...eligibleReportPosts[3], mediaType: null, mediaUrl: '' },
 ]).map(({ format, posts, totalInteractions }) => ({ format, posts, totalInteractions })), [
-  { format: 'Video / Reel', posts: 2, totalInteractions: 38 },
+  { format: 'Video / Reel', posts: 2, totalInteractions: 25 },
   { format: 'Image / Photo', posts: 1, totalInteractions: 13 },
   { format: 'Text / Link', posts: 1, totalInteractions: null },
 ]);
@@ -182,7 +195,7 @@ const officialCandidates = [
 ];
 assert.deepEqual(
   selectOfficialSocialReportPosts(officialCandidates, officialSources, 'district-a', reportWindow, 3).map((post) => post.id),
-  ['fb-high', 'ig-tie-a', 'ig-tie-b'],
+  ['fb-high', 'ig-tie-b'],
 );
 
 const [sql, actions, dashboard, styles, data, melodi] = await Promise.all([
@@ -751,12 +764,20 @@ assert.doesNotMatch(dashboard, /function handleExportPdf/);
 assert.match(dashboard, /function BirdEyeView\(\{[\s\S]*districtId[\s\S]*districtName[\s\S]*socialResults[\s\S]*socialSources/);
 assert.match(dashboard, /selectOfficialSocialReportPosts\([\s\S]*socialResults[\s\S]*socialSources[\s\S]*districtId[\s\S]*reportWindow[\s\S]*3/);
 assert.match(dashboard, /Top 3 official social posts/);
+assert.match(dashboard, /Only posts with complete reported reactions, comments, and shares are ranked/);
+assert.match(dashboard, /No official social posts with complete reported reactions, comments, and shares are available for ranking/);
 assert.match(dashboard, /socialReportPosts\.map\(\(result, index\)/);
 assert.match(dashboard, /canary-social-performance-/);
 assert.match(dashboard, /socialReportPosts\.map\(\(result\) => socialCsvRow/);
 assert.doesNotMatch(dashboard, /latestObservedAt/);
 assert.match(dashboard, /metric\.value !== null && metric\.value !== undefined/,'native metric display must not coerce null values to zero');
 assert.match(dashboard, /nativeSocialScopeLabel\(nativeSocialMetric\(result, 'views'\)\)/,'CSV attribution scope must use human-facing labels');
+assert.match(dashboard, /nativeSocialWindowLabel\(metric\)/,'native account cells must show each metric source period');
+assert.match(dashboard, /<strong>Metric-specific<\/strong><small>See each metric cell<\/small>/,'account rows must not imply a shared source window');
+assert.match(dashboard, /Complete reactions, comments, and shares for \$\{summary\.interactionsAvailable\} of \$\{summary\.officialPosts\} posts/,'interaction totals and averages must disclose the complete-metric denominator');
+assert.match(dashboard, /Top 3 per platform among posts with complete reported reactions, comments, and shares/,'Top Performer ranking must disclose complete-metric eligibility');
+assert.match(dashboard, /No official posts have complete reported reactions, comments, and shares for Top Performer ranking/,'partial-only report sets need a truthful ranking empty state');
+assert.match(dashboard, /Interaction totals, averages, and Top Performer rankings include only posts with complete reported reactions, comments, and shares/,'report notes must explain complete-metric inclusion');
 for (const marker of ['Views observed at', 'Viewers / reach observed at', 'Reactions observed at', 'Comments observed at', 'Shares observed at', 'Clicks observed at', 'Saves observed at', 'Reposts observed at']) assert.ok(dashboard.includes(marker), `Social CSV must include per-metric timestamp: ${marker}`);
 for (const marker of ['Views availability', 'Viewers / reach availability', 'Reactions availability', 'Comments availability', 'Shares availability', 'Clicks availability', 'Saves availability', 'Reposts availability']) assert.ok(dashboard.includes(marker), `Social CSV must include per-metric availability: ${marker}`);
 assert.match(dashboard, /metricValue\('comments'\)/);

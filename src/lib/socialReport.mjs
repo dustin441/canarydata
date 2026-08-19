@@ -125,9 +125,9 @@ export function metricAvailabilityCoverage(results, metric) {
 }
 
 export function socialReportInteractionTotal(result) {
-  const availableMetrics = INTERACTION_METRICS.filter(([metric]) => result?.metricAvailability?.[metric] === true);
-  if (!availableMetrics.length) return null;
-  return availableMetrics.reduce((sum, [, field]) => sum + finiteMetric(result?.[field]), 0);
+  const complete = ['reactions', 'comments', 'shares'].every((metric) => result?.metricAvailability?.[metric] === true);
+  if (!complete) return null;
+  return INTERACTION_METRICS.reduce((sum, [, field]) => sum + finiteMetric(result?.[field]), 0);
 }
 
 export function socialReportMetricValue(result, metric) {
@@ -148,7 +148,7 @@ export function neutralizeSpreadsheetFormula(value) {
 
 export function rankSocialReportTopPerformers(results, limit = 10) {
   const safeLimit = Math.max(0, Number(limit) || 0);
-  return results.slice().sort((a, b) => {
+  return results.filter((result) => socialReportInteractionTotal(result) !== null).sort((a, b) => {
     const interactionDifference = (socialReportInteractionTotal(b) ?? -1) - (socialReportInteractionTotal(a) ?? -1);
     if (interactionDifference) return interactionDifference;
     const dateDifference = (reportTimestamp(b) ?? -1) - (reportTimestamp(a) ?? -1);
@@ -255,5 +255,5 @@ export function groupTopReportPostsByPlatform(results, limitPerPlatform = 3) {
       eligible.filter((result) => result.platform === platform),
       limitPerPlatform,
     ),
-  }));
+  })).filter((group) => group.posts.length > 0);
 }
