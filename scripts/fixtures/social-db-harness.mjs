@@ -89,7 +89,12 @@ export async function withSocialDatabase(label, test) {
   const container = `canary-social-${label}-${process.pid}-${randomBytes(4).toString('hex')}`;
   let started = false;
   try {
-    run('docker', ['run', '--detach', '--rm', '--name', container, '-e', `POSTGRES_PASSWORD=${PASSWORD}`, IMAGE]);
+    run('docker', [
+      'run', '--detach', '--rm', '--name', container,
+      '--mount', 'type=tmpfs,destination=/var/lib/postgresql/data,tmpfs-size=536870912',
+      '-e', `POSTGRES_PASSWORD=${PASSWORD}`,
+      IMAGE,
+    ]);
     started = true;
     let ready = false;
     let consecutiveReady = 0;

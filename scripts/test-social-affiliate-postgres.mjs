@@ -8,7 +8,7 @@ const run=(args,options={})=>{const r=spawnSync(args[0],args.slice(1),{encoding:
 const sql=async(path)=>{const input=await readFile(path,'utf8');let last;for(let attempt=0;attempt<10;attempt++){last=run(['docker','exec','-i',container,'psql','-v','ON_ERROR_STOP=1','-U','postgres','-d','postgres'],{input,allowFailure:true});if(last.status===0)return last;await new Promise(r=>setTimeout(r,500));}throw new Error(`Fixture SQL failed\n${last?.stdout}\n${last?.stderr}`);};
 const query=(statement,allowFailure=false)=>run(['docker','exec','-i',container,'psql','-At','-v','ON_ERROR_STOP=1','-U','postgres','-d','postgres','-c',statement],{allowFailure});
 try{
- run(['docker','run','--rm','-d','--name',container,'-e','POSTGRES_PASSWORD=fixture-only','postgres:16-alpine']);
+ run(['docker','run','--rm','-d','--name',container,'--mount','type=tmpfs,destination=/var/lib/postgresql/data,tmpfs-size=536870912','-e','POSTGRES_PASSWORD=fixture-only','postgres:16-alpine']);
  let ready=false;for(let i=0;i<40;i++){const p=spawnSync('docker',['exec',container,'psql','-At','-U','postgres','-d','postgres','-c','select 1;'],{encoding:'utf8'});if(p.status===0&&p.stdout.trim()==='1'){ready=true;break;}await new Promise(r=>setTimeout(r,500));}assert.equal(ready,true);
  await sql(new URL('./fixtures/social-affiliate-pre.sql',import.meta.url));
  await sql(new URL('../supabase/migrations/20260812013000_social_claimed_affiliates.sql',import.meta.url));

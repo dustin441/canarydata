@@ -139,7 +139,7 @@ export async function runCompatibilityMatrix({ mode = 'compatibility' } = {}) {
 
     spawn('docker', ['info']);
     await phase('start_disposable_postgresql', async () => {
-      spawn('docker', ['run', '--detach', '--rm', '--name', container, '-e', `POSTGRES_PASSWORD=${PASSWORD}`, IMAGE]);
+      spawn('docker', ['run', '--detach', '--rm', '--name', container, '--mount', 'type=tmpfs,destination=/var/lib/postgresql/data,tmpfs-size=536870912', '-e', `POSTGRES_PASSWORD=${PASSWORD}`, IMAGE]);
       started = true;
       let ready = false;
       for (let attempt = 0; attempt < 80; attempt += 1) {

@@ -21,8 +21,8 @@ const sha256=(value)=>createHash('sha256').update(value).digest('hex');
 const reseal=(artifact)=>{artifact.manifest.artifactSha256=null;artifact.manifest.artifactSha256=sha256(canonicalJson(artifact));return artifact;};
 let started=false;
 try{
- run('docker',['run','--detach','--rm','--name',container,'-e','POSTGRES_PASSWORD=test-only',image]);started=true;
- for(let i=0;i<60;i+=1){const ready=spawnSync('docker',['exec',container,'psql','-X','-qAt','-U','postgres','-d','postgres','-c','select 1'],{encoding:'utf8'});if(ready.status===0)break;await new Promise((resolve)=>setTimeout(resolve,250));if(i===59)throw new Error(`PostgreSQL not ready: ${ready.stderr}`);}
+ run('docker',['run','--detach','--rm','--name',container,'--mount','type=tmpfs,destination=/var/lib/postgresql/data,tmpfs-size=536870912','-e','POSTGRES_PASSWORD=test-only',image]);started=true;
+ for(let i=0,consecutiveReady=0;i<60;i+=1){const ready=spawnSync('docker',['exec',container,'psql','-X','-qAt','-U','postgres','-d','postgres','-c','select 1'],{encoding:'utf8'});consecutiveReady=ready.status===0?consecutiveReady+1:0;if(consecutiveReady>=2)break;await new Promise((resolve)=>setTimeout(resolve,250));if(i===59)throw new Error(`PostgreSQL not ready: ${ready.stderr}`);}
  const [fixture,capturedN1,task4,forward,down,verify,verifyRestored,captureEvidenceSql]=await Promise.all([
   file('scripts/fixtures/social-n1.sql'),file('scripts/fixtures/social-n1-production-captured.sql'),file('supabase/migrations/20260804193000_social_visibility_lifecycle.sql'),file('supabase/migrations/20260805120000_social_visibility_active.sql'),file('supabase/rollbacks/20260805120000_social_visibility_active_down.sql'),file('supabase/verify_social_visibility_contract.sql'),file('supabase/verify_social_restored_n1.sql'),file('supabase/capture_social_rollback_evidence_readonly.sql')]);
  psql(fixture);psql(capturedN1);
