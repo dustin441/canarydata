@@ -76,7 +76,7 @@ assert.doesNotMatch(middleware, /startsWith\(['"]\/api\/cron|\/api\/cron\/meta-e
 assert.match(manualRoute, /Native Meta synchronization is not released\./);
 assert.match(manualRoute, /status: 503/);
 assert.doesNotMatch(manualRoute, /syncSelectedMetaAssets/);
-assert.deepEqual(vercel.crons, [{ path: '/api/cron/meta-eic-sync', schedule: '15 * * * *' }]);
+assert.deepEqual(vercel.crons, [{ path: '/api/cron/meta-eic-sync', schedule: '15 14 * * *' }]);
 
 assert.equal(syncService.validateContentMetricRefreshDays(undefined), 14);
 assert.equal(syncService.validateContentMetricRefreshDays(1), 1);

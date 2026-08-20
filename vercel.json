@@ -2,7 +2,7 @@
   "crons": [
     {
       "path": "/api/cron/meta-eic-sync",
-      "schedule": "15 * * * *"
+      "schedule": "15 14 * * *"
     }
   ]
 }
