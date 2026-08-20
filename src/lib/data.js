@@ -168,8 +168,60 @@ const SOCIAL_THREAD_PAGE_SIZE = 1000;
 const SOCIAL_METRIC_SNAPSHOT_COLUMNS = 'id, district_id, provider_account_link_id, social_thread_id, provider, platform, metric_scope, provider_object_id, provider_metric_name, normalized_metric_name, metric_variant, period, period_start_at, period_end_at, source_scope, availability, metric_value, breakdown, effective_at, observed_at';
 const SOCIAL_METRIC_SNAPSHOT_PAGE_SIZE = 1000;
 const SOCIAL_METRIC_LINK_BATCH_SIZE = 100;
+const SOCIAL_METRIC_HISTORY_DAYS = 95;
 const SOCIAL_REVIEW_EVENT_COLUMNS = 'id, batch_id, district_id, social_thread_id, actor_user_id, action, before_state, after_state, resulting_version, created_at';
 const SOCIAL_REVIEW_EVENT_PAGE_SIZE = 1000;
+
+export function buildEligibleSocialMetricLinkScope(links = [], assets = []) {
+  const assetByDistrictAndId = new Map((assets ?? [])
+    .filter((asset) => asset?.id && asset?.district_id && asset.active === true && asset.selected === true)
+    .map((asset) => [`${asset.district_id}:${asset.id}`, asset]));
+  const eligibleLinkIds = [];
+  const accountIdentityByLink = new Map();
+
+  for (const link of links ?? []) {
+    if (!link?.id || !link?.district_id || !link?.provider_asset_id) continue;
+    const asset = assetByDistrictAndId.get(`${link.district_id}:${link.provider_asset_id}`);
+    if (!asset) continue;
+    eligibleLinkIds.push(link.id);
+    accountIdentityByLink.set(link.id, {
+      name: asset.name || null,
+      handle: asset.handle || null,
+      profileUrl: asset.profile_url || null,
+      platform: asset.platform || null,
+    });
+  }
+
+  return { eligibleLinkIds, accountIdentityByLink };
+}
+
+async function loadEligibleSocialMetricLinkScope(supabase, activeLinks, districtId = null) {
+  const eligibleLinkIds = [];
+  const accountIdentityByLink = new Map();
+
+  for (let linkOffset = 0; linkOffset < activeLinks.length; linkOffset += SOCIAL_METRIC_LINK_BATCH_SIZE) {
+    const linkBatch = activeLinks.slice(linkOffset, linkOffset + SOCIAL_METRIC_LINK_BATCH_SIZE);
+    const assetIds = [...new Set(linkBatch.map((link) => link.provider_asset_id).filter(Boolean))];
+    if (!assetIds.length) continue;
+    let assetQuery = supabase
+      .from('social_provider_assets')
+      .select('id,district_id,name,handle,profile_url,platform,active,selected')
+      .eq('active', true)
+      .eq('selected', true)
+      .in('id', assetIds);
+    if (districtId) assetQuery = assetQuery.eq('district_id', districtId);
+    const { data: assets, error: assetError } = await assetQuery;
+    if (assetError) throw assetError;
+
+    const eligibleBatch = buildEligibleSocialMetricLinkScope(linkBatch, assets);
+    eligibleLinkIds.push(...eligibleBatch.eligibleLinkIds);
+    for (const [linkId, identity] of eligibleBatch.accountIdentityByLink) {
+      accountIdentityByLink.set(linkId, identity);
+    }
+  }
+
+  return { eligibleLinkIds, accountIdentityByLink };
+}
 
 export async function getSocialThreads(districtId = null, includeReview = false) {
   const supabase = createAdminClient();
@@ -228,37 +280,30 @@ export async function getSocialThreads(districtId = null, includeReview = false)
 
 export async function getSocialMetricSnapshots(districtId = null) {
   const supabase = createAdminClient();
-  let linkQuery = supabase.from('social_provider_account_links').select('id,district_id,provider_asset_id').eq('provider', 'meta').eq('active', true);
-  if (districtId) linkQuery = linkQuery.eq('district_id', districtId);
-  const { data: activeLinks, error: linkError } = await linkQuery;
-  if (linkError) throw linkError;
-  const activeLinkIds = (activeLinks ?? []).map((link) => link.id).filter(Boolean);
-  if (!activeLinkIds.length) return [];
-
-  const accountIdentityByLink = new Map();
-  for (let linkOffset = 0; linkOffset < activeLinks.length; linkOffset += SOCIAL_METRIC_LINK_BATCH_SIZE) {
-    const linkBatch = activeLinks.slice(linkOffset, linkOffset + SOCIAL_METRIC_LINK_BATCH_SIZE);
-    const assetIds = linkBatch.map((link) => link.provider_asset_id).filter(Boolean);
-    if (!assetIds.length) continue;
-    let assetQuery = supabase.from('social_provider_assets').select('id,name,handle,profile_url,platform').in('id', assetIds);
-    if (districtId) assetQuery = assetQuery.eq('district_id', districtId);
-    const { data: assets, error: assetError } = await assetQuery;
-    if (assetError) throw assetError;
-    const assetById = new Map((assets ?? []).map((asset) => [asset.id, asset]));
-    for (const link of linkBatch) {
-      const asset = assetById.get(link.provider_asset_id);
-      accountIdentityByLink.set(link.id, {
-        name: asset?.name || null,
-        handle: asset?.handle || null,
-        profileUrl: asset?.profile_url || null,
-        platform: asset?.platform || null,
-      });
-    }
+  const activeLinks = [];
+  for (let from = 0; ; from += SOCIAL_METRIC_SNAPSHOT_PAGE_SIZE) {
+    let linkQuery = supabase
+      .from('social_provider_account_links')
+      .select('id,district_id,provider_asset_id')
+      .eq('provider', 'meta')
+      .eq('active', true)
+      .order('id', { ascending: true })
+      .range(from, from + SOCIAL_METRIC_SNAPSHOT_PAGE_SIZE - 1);
+    if (districtId) linkQuery = linkQuery.eq('district_id', districtId);
+    const { data, error: linkError } = await linkQuery;
+    if (linkError) throw linkError;
+    const page = data ?? [];
+    activeLinks.push(...page);
+    if (page.length < SOCIAL_METRIC_SNAPSHOT_PAGE_SIZE) break;
   }
+  if (!activeLinks.length) return [];
+
+  const { eligibleLinkIds, accountIdentityByLink } = await loadEligibleSocialMetricLinkScope(supabase, activeLinks, districtId);
+  if (!eligibleLinkIds.length) return [];
 
   const snapshots = [];
-  for (let linkOffset = 0; linkOffset < activeLinkIds.length; linkOffset += SOCIAL_METRIC_LINK_BATCH_SIZE) {
-    const linkBatch = activeLinkIds.slice(linkOffset, linkOffset + SOCIAL_METRIC_LINK_BATCH_SIZE);
+  for (let linkOffset = 0; linkOffset < eligibleLinkIds.length; linkOffset += SOCIAL_METRIC_LINK_BATCH_SIZE) {
+    const linkBatch = eligibleLinkIds.slice(linkOffset, linkOffset + SOCIAL_METRIC_LINK_BATCH_SIZE);
     for (let from = 0; ; from += SOCIAL_METRIC_SNAPSHOT_PAGE_SIZE) {
       let query = supabase
         .from('canary_latest_social_metric_snapshots')
@@ -276,6 +321,64 @@ export async function getSocialMetricSnapshots(districtId = null) {
     }
   }
   return snapshots;
+}
+
+export async function getSocialMetricHistory(districtId, asOf = new Date()) {
+  if (!districtId || districtId === 'All') return [];
+  const requestedAsOf = new Date(asOf);
+  if (!Number.isFinite(requestedAsOf.getTime())) throw new Error('A valid Social metric history as-of date is required.');
+  const historyEnd = new Date(Date.UTC(
+    requestedAsOf.getUTCFullYear(),
+    requestedAsOf.getUTCMonth(),
+    requestedAsOf.getUTCDate(),
+  ));
+  const historyStart = new Date(historyEnd.getTime() - (SOCIAL_METRIC_HISTORY_DAYS * 86_400_000));
+  const supabase = createAdminClient();
+  const activeLinks = [];
+  for (let from = 0; ; from += SOCIAL_METRIC_SNAPSHOT_PAGE_SIZE) {
+    const { data, error } = await supabase
+      .from('social_provider_account_links')
+      .select('id,district_id,provider_asset_id')
+      .eq('provider', 'meta').eq('active', true)
+      .eq('district_id', districtId)
+      .order('id', { ascending: true })
+      .range(from, from + SOCIAL_METRIC_SNAPSHOT_PAGE_SIZE - 1);
+    if (error) throw error;
+    const page = data ?? [];
+    activeLinks.push(...page);
+    if (page.length < SOCIAL_METRIC_SNAPSHOT_PAGE_SIZE) break;
+  }
+  if (!activeLinks.length) return [];
+
+  const { eligibleLinkIds, accountIdentityByLink } = await loadEligibleSocialMetricLinkScope(supabase, activeLinks, districtId);
+  if (!eligibleLinkIds.length) return [];
+
+  const history = [];
+  for (let linkOffset = 0; linkOffset < eligibleLinkIds.length; linkOffset += SOCIAL_METRIC_LINK_BATCH_SIZE) {
+    const linkBatch = eligibleLinkIds.slice(linkOffset, linkOffset + SOCIAL_METRIC_LINK_BATCH_SIZE);
+    for (let from = 0; ; from += SOCIAL_METRIC_SNAPSHOT_PAGE_SIZE) {
+      const { data, error } = await supabase
+        .from('social_provider_metric_snapshots')
+        .select(SOCIAL_METRIC_SNAPSHOT_COLUMNS)
+        .eq('district_id', districtId)
+        .eq('metric_scope', 'account')
+        .in('provider_account_link_id', linkBatch)
+        .gte('effective_at', historyStart.toISOString())
+        .lt('effective_at', historyEnd.toISOString())
+        .order('effective_at', { ascending: true })
+        .order('observed_at', { ascending: true })
+        .order('id', { ascending: true })
+        .range(from, from + SOCIAL_METRIC_SNAPSHOT_PAGE_SIZE - 1);
+      if (error) throw error;
+      const page = data ?? [];
+      history.push(...page.map((row) => ({
+        ...row,
+        account_identity: accountIdentityByLink.get(row.provider_account_link_id) || null,
+      })));
+      if (page.length < SOCIAL_METRIC_SNAPSHOT_PAGE_SIZE) break;
+    }
+  }
+  return history;
 }
 
 export async function readAllSocialReviewEvents(supabase, districtId = null) {

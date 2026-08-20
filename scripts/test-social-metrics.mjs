@@ -114,13 +114,44 @@ assert.equal(reconnectSummary.platforms.facebook,undefined,'multiple accounts on
 assert.equal(reconnectSummary.accounts[1].uniqueViewers,null,'account metrics from different provider links must not be mixed');
 
 const dataSource=readFileSync(new URL('../src/lib/data.js',import.meta.url),'utf8');
-const snapshotQuerySource=dataSource.slice(dataSource.indexOf('export async function getSocialMetricSnapshots'),dataSource.indexOf('export async function readAllSocialReviewEvents'));
+const eligibilityHelperSource=dataSource.slice(dataSource.indexOf('export function buildEligibleSocialMetricLinkScope'),dataSource.indexOf('async function loadEligibleSocialMetricLinkScope'));
+const buildEligibleSocialMetricLinkScope=Function(`${eligibilityHelperSource.replace('export function','function')}\nreturn buildEligibleSocialMetricLinkScope;`)();
+const eligibility=buildEligibleSocialMetricLinkScope([
+  {id:'eligible-d1',district_id:'district-1',provider_asset_id:'shared-asset'},
+  {id:'eligible-d2',district_id:'district-2',provider_asset_id:'shared-asset'},
+  {id:'inactive-link',district_id:'district-1',provider_asset_id:'inactive-asset'},
+  {id:'unselected-link',district_id:'district-1',provider_asset_id:'unselected-asset'},
+  {id:'missing-link',district_id:'district-1',provider_asset_id:'missing-asset'},
+  {id:'wrong-tenant-link',district_id:'district-3',provider_asset_id:'shared-asset'},
+  {id:'missing-asset-id',district_id:'district-1',provider_asset_id:null},
+],[
+  {id:'shared-asset',district_id:'district-1',active:true,selected:true,name:'District One',handle:'one',profile_url:'https://example.test/one',platform:'facebook',provider_metadata:{secret:true}},
+  {id:'shared-asset',district_id:'district-2',active:true,selected:true,name:'District Two',handle:'two',profile_url:'https://example.test/two',platform:'instagram'},
+  {id:'inactive-asset',district_id:'district-1',active:false,selected:true,name:'Inactive'},
+  {id:'unselected-asset',district_id:'district-1',active:true,selected:false,name:'Unselected'},
+]);
+assert.deepEqual(eligibility.eligibleLinkIds,['eligible-d1','eligible-d2'],'only links backed by a same-district active selected asset are eligible');
+assert.deepEqual(eligibility.accountIdentityByLink.get('eligible-d1'),{name:'District One',handle:'one',profileUrl:'https://example.test/one',platform:'facebook'},'identity is sanitized and comes from the link tenant');
+assert.equal(eligibility.accountIdentityByLink.get('eligible-d2').name,'District Two','a shared asset id cannot cross tenant identity boundaries');
+for (const rejectedLinkId of ['inactive-link','unselected-link','missing-link','wrong-tenant-link','missing-asset-id']) {
+  assert.equal(eligibility.accountIdentityByLink.has(rejectedLinkId),false,`${rejectedLinkId} cannot flow to a snapshot identity`);
+}
+assert.doesNotMatch(JSON.stringify([...eligibility.accountIdentityByLink.values()]),/provider_metadata|secret/,'account identity remains sanitized');
+
+const eligibilityLoaderSource=dataSource.slice(dataSource.indexOf('async function loadEligibleSocialMetricLinkScope'),dataSource.indexOf('export async function getSocialThreads'));
+assert.match(eligibilityLoaderSource,/\.select\('id,district_id,name,handle,profile_url,platform,active,selected'\)/,'asset lookups retain district and eligibility fields');
+assert.match(eligibilityLoaderSource,/\.eq\('active', true\)[\s\S]*?\.eq\('selected', true\)/,'asset lookups require active selected assets');
+assert.match(eligibilityLoaderSource,/buildEligibleSocialMetricLinkScope\(linkBatch, assets\)/,'eligible link ids are built only from successful asset lookups');
+const snapshotQuerySource=dataSource.slice(dataSource.indexOf('export async function getSocialMetricSnapshots'),dataSource.indexOf('export async function getSocialMetricHistory'));
 assert.match(snapshotQuerySource,/if \(districtId\) query = query\.eq\('district_id', districtId\)/,'snapshot reads must be district scoped');
 assert.match(snapshotQuerySource,/\.range\(from, from \+ SOCIAL_METRIC_SNAPSHOT_PAGE_SIZE - 1\)/,'snapshot reads must paginate deterministically');
-assert.match(snapshotQuerySource,/\.eq\('provider', 'meta'\)\.eq\('active', true\)/,'dashboard snapshots must be limited to active Meta account links');
+assert.match(snapshotQuerySource,/\.eq\('provider', 'meta'\)[\s\S]*?\.eq\('active', true\)/,'dashboard snapshots must be limited to active Meta account links');
 assert.match(snapshotQuerySource,/\.in\('provider_account_link_id', linkBatch\)/,'snapshot reads must bind rows to active provider links');
 assert.match(snapshotQuerySource,/\.from\('canary_latest_social_metric_snapshots'\)/,'dashboard reads must use the server-side latest-snapshot projection rather than full history');
-assert.match(snapshotQuerySource,/social_provider_assets/,'account identity must be loaded for distinct account rows');
+assert.match(snapshotQuerySource,/loadEligibleSocialMetricLinkScope\(supabase, activeLinks, districtId\)/,'snapshot account scope must come from the selected-asset lookup');
+assert.match(snapshotQuerySource,/if \(!eligibleLinkIds\.length\) return \[\]/,'snapshot reads stop when no selected backing assets exist');
+assert.match(snapshotQuerySource,/eligibleLinkIds\.slice\(linkOffset, linkOffset \+ SOCIAL_METRIC_LINK_BATCH_SIZE\)/,'snapshot row queries batch only eligible link ids');
+assert.doesNotMatch(snapshotQuerySource,/activeLinkIds/,'all active links must never become the snapshot query scope');
 assert.doesNotMatch(snapshotQuerySource,/\.from\('social_provider_metric_snapshots'\)/,'dashboard must not paginate the unbounded snapshot history table');
 
 console.log('Native Social reporting metric tests passed.');
