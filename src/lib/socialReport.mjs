@@ -30,7 +30,7 @@ export function resolveSocialReportWindow(period, asOf, customStart = '', custom
     rangeEnd = customEnd ? new Date(`${customEnd}T23:59:59.999Z`) : end;
     label = customStart || customEnd ? `Custom ${customStart || 'beginning'} to ${customEnd || 'today'}` : 'Custom range';
   } else {
-    start = new Date(end.getTime() - (30 * 24 * 60 * 60 * 1000));
+    start = new Date(Date.UTC(year, month, end.getUTCDate() - 29));
   }
 
   return { start, end: rangeEnd, label, startInput: dateInputValue(start), endInput: dateInputValue(rangeEnd) };
@@ -66,6 +66,13 @@ export function resolveSocialReportComparisonWindow(period, asOf, customStart = 
     start = new Date(Date.UTC(selectedMonthStart.getUTCFullYear(), selectedMonthStart.getUTCMonth() - 1, 1));
     rangeEnd = new Date(Date.UTC(selectedMonthStart.getUTCFullYear(), selectedMonthStart.getUTCMonth(), 1) - 1);
     label = start.toLocaleDateString('en-US', { month: 'long', year: 'numeric', timeZone: 'UTC' });
+  } else if (period === 'last-30-days') {
+    rangeEnd = new Date(current.start.getTime() - 1);
+    start = new Date(Date.UTC(
+      current.start.getUTCFullYear(),
+      current.start.getUTCMonth(),
+      current.start.getUTCDate() - 30,
+    ));
   } else {
     const duration = current.end.getTime() - current.start.getTime();
     rangeEnd = new Date(current.start.getTime() - 1);
@@ -219,6 +226,15 @@ export function summarizeSocialReport(results) {
     .sort((a, b) => b.count - a.count || a.platform.localeCompare(b.platform));
   const reportedViewValues = results.map((result) => socialReportMetricValue(result, 'views')).filter((value) => value !== null);
   const reportedViews = reportedViewValues.length ? reportedViewValues.reduce((sum, value) => sum + value, 0) : null;
+  const interactionRateRows = results.map((result) => ({
+    interactions: socialReportComparableInteractionTotal(result),
+    views: socialReportMetricValue(result, 'views'),
+  })).filter((row) => row.interactions !== null && row.views !== null && row.views > 0);
+  const interactionRateInteractions = interactionRateRows.reduce((sum, row) => sum + row.interactions, 0);
+  const interactionRateViews = interactionRateRows.reduce((sum, row) => sum + row.views, 0);
+  const interactionRate = interactionRateRows.length && interactionRateViews > 0
+    ? (interactionRateInteractions / interactionRateViews) * 100
+    : null;
 
   return {
     officialPosts: results.length,
@@ -226,6 +242,10 @@ export function summarizeSocialReport(results) {
     interactionsAvailable: interactionTotals.length,
     averageInteractions: interactionTotals.length ? totalInteractions / interactionTotals.length : null,
     reportedViews,
+    interactionRate,
+    interactionRateInteractions,
+    interactionRateViews,
+    interactionRateCoverage: { available: interactionRateRows.length, total: results.length },
     viewsCoverage: metricAvailabilityCoverage(results, 'views'),
     reactionsCoverage: metricAvailabilityCoverage(results, 'reactions'),
     commentsCoverage: metricAvailabilityCoverage(results, 'comments'),

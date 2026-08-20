@@ -308,7 +308,7 @@ assert.match(dashboardSource, /SOCIAL_CSV_HEADERS/);
 assert.match(dashboardSource, /function exportOfficialSocialCsv\(\)/);
 assert.match(dashboardSource, /function exportPublicConversationCsv\(\)/);
 assert.match(dashboardSource, /function exportSocialPdf\(\)/);
-assert.match(dashboardSource, /useState\('this-month'\)/, 'Social reporting must default to the current month to date');
+assert.match(dashboardSource, /useState\('last-30-days'\)/, 'Social reporting must default to the trailing 30 calendar days');
 assert.match(dashboardSource, /social-report-card-meta[\s\S]{0,300}social-platform-label/, 'Top Post cards must show a platform chip');
 assert.match(dashboardSource, /<h2>Complete Post Evidence<\/h2>[\s\S]{0,300}<SocialReportTable results=\{allPosts\}/, 'the Social PDF must contain the complete eligible post table');
 assert.doesNotMatch(dashboardSource, /kindergarten registration and staff back-to-school preparation/, 'seasonally incompatible briefing guidance must not return');

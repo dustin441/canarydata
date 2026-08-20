@@ -436,19 +436,19 @@ const BIRD_EYE_CSV_COLUMNS = ALL_COLUMNS.filter((column) =>
 
 const SOCIAL_CSV_HEADERS = [
   'Date', 'District', 'Platform', 'Classification', 'Account', 'Post', 'Source URL', 'Media type',
-  'Reactions', 'Comments / Replies', 'Shares', 'Views', 'Viewers / reach', 'Clicks', 'Saves', 'Reposts', 'Total public interactions', 'Engagement rate (complete interaction metrics only)',
+  'Reactions', 'Comments / Replies', 'Shares', 'Views', 'Viewers / reach', 'Clicks', 'Saves', 'Reposts', 'Total public interactions', 'Interaction rate (complete interactions ÷ reported views)',
   'Views observed at', 'Viewers / reach observed at', 'Reactions observed at', 'Comments observed at', 'Shares observed at', 'Clicks observed at', 'Saves observed at', 'Reposts observed at',
   'Views availability', 'Viewers / reach availability', 'Reactions availability', 'Comments availability', 'Shares availability', 'Clicks availability', 'Saves availability', 'Reposts availability',
   'Views attribution scope', 'Viewers / reach attribution scope', 'Reactions attribution scope', 'Comments attribution scope', 'Shares attribution scope', 'Clicks attribution scope', 'Saves attribution scope', 'Reposts attribution scope',
   'Review state', 'Strategic priorities', 'Recommended action',
 ];
 
-function socialCsvRow(result, source) {
-  const followerCount = resolveSocialFollowerCount(result, source);
+function socialCsvRow(result) {
   const interactionTotal = socialReportInteractionTotal(result);
   const comparableInteractionTotal = socialReportComparableInteractionTotal(result);
-  const engagementRate = comparableInteractionTotal !== null && Number(followerCount) > 0
-    ? (comparableInteractionTotal / Number(followerCount)) * 100
+  const reportedViews = socialReportMetricValue(result, 'views');
+  const interactionRate = comparableInteractionTotal !== null && Number(reportedViews) > 0
+    ? (comparableInteractionTotal / Number(reportedViews)) * 100
     : null;
   const metricValue = (metric) => socialReportMetricValue(result, metric) ?? 'N/A';
   return [
@@ -469,7 +469,7 @@ function socialCsvRow(result, source) {
     nativeSocialMetricValue(result, 'saves') ?? 'N/A',
     nativeSocialMetricValue(result, 'reposts') ?? 'N/A',
     interactionTotal ?? 'N/A',
-    engagementRate === null || engagementRate === undefined ? 'N/A' : `${engagementRate.toFixed(2)}%`,
+    interactionRate === null || interactionRate === undefined ? 'N/A' : `${interactionRate.toFixed(2)}%`,
     nativeSocialMetric(result, 'views')?.observedAt || 'N/A',
     nativeSocialMetric(result, 'uniqueViewers')?.observedAt || 'N/A',
     nativeSocialMetric(result, 'reactions')?.observedAt || 'N/A',
@@ -2838,7 +2838,7 @@ function NativeAccountMetrics({ summary }) {
     <section className="social-native-account-metrics" aria-label="Latest native account metrics">
       <div className="social-monthly-section-heading">
         <h3>Latest native account snapshot</h3>
-        <p>Platform-specific source windows are shown separately. Reach and unique-viewer audiences are not added across platforms.</p>
+        <p>Platform-specific source windows are shown separately. Reach and unique-viewer audiences are not added across platforms. Changing the report dates recalculates post scorecards, comparisons, highlights, tables, PDF, and CSV; this account table remains the latest provider snapshot for each labeled source window.</p>
       </div>
       <div className="social-monthly-table-wrap">
         <table>
@@ -2873,6 +2873,8 @@ function SocialReportView({ districtName, reportWindow, filterContext, posts, an
   const interactionCoverage = `Complete reactions, comments, and shares for ${summary.interactionsAvailable} of ${summary.officialPosts} posts`;
   const interactionMetricCoverage = `Reactions ${summary.reactionsCoverage.available}/${summary.reactionsCoverage.total} · Comments ${summary.commentsCoverage.available}/${summary.commentsCoverage.total} · Shares ${summary.sharesCoverage.available}/${summary.sharesCoverage.total}`;
   const viewCoverage = `Available for ${summary.viewsCoverage.available} of ${summary.viewsCoverage.total} posts`;
+  const instagramAccounts = (accountMetricSummary?.accounts || []).filter((account) => account.platform === 'instagram');
+  const instagramNetFollows = instagramAccounts.length === 1 ? instagramAccounts[0].netFollowerChange : null;
   return (
     <section className="social-report" aria-label={`${districtName} Social Report`}>
       <header className="social-report-header">
@@ -2884,11 +2886,11 @@ function SocialReportView({ districtName, reportWindow, filterContext, posts, an
       </header>
       {analystNote?.trim() && <section className="social-report-section social-report-analyst-note"><div className="social-report-section-heading"><h2>Social Media Brief</h2><p>Human-reviewed context for leadership and board discussion.</p></div><p>{analystNote.trim()}</p></section>}
       <section className="social-report-scorecards" aria-label="Executive scorecards">
-        <article><span>Official posts published</span><strong>{summary.officialPosts}</strong><small>Active owned posts</small></article>
+        <article><span>Reported views</span><strong>{summary.reportedViews === null ? 'Not available' : formatSocialMetric(summary.reportedViews)}</strong><small>{viewCoverage} · latest lifetime provider views; this connection does not supply one shared impressions total</small></article>
         <article><span>Comparable public interactions</span><strong>{summary.totalInteractions === null ? 'Not available' : formatSocialMetric(summary.totalInteractions)}</strong><small>{interactionCoverage} · {interactionMetricCoverage} · latest lifetime snapshots</small></article>
-        <article><span>Average comparable interactions</span><strong>{summary.averageInteractions === null ? 'Not available' : formatSocialMetric(summary.averageInteractions)}</strong><small>{interactionCoverage} · latest lifetime snapshots</small></article>
-        <article><span>Reported views</span><strong>{summary.reportedViews === null ? 'Not available' : formatSocialMetric(summary.reportedViews)}</strong><small>{viewCoverage} · latest lifetime snapshots</small></article>
-        <article><span>Platforms</span><strong>{summary.platformCount || 'Not available'}</strong><small>{platformBreakdown || 'No platform data available'}</small></article>
+        <article><span>Post interaction rate</span><strong>{formatSocialRate(summary.interactionRate)}</strong><small>Latest lifetime public interactions ÷ reported lifetime views for {summary.interactionRateCoverage.available}/{summary.interactionRateCoverage.total} posts published in this report window</small></article>
+        <article><span>Latest net follows</span><strong>{instagramNetFollows?.value === null || instagramNetFollows?.value === undefined ? 'Not available' : formatSocialMetric(instagramNetFollows.value)}</strong><small>{instagramNetFollows ? `${instagramNetFollows.follows ?? 'N/A'} follows · ${instagramNetFollows.unfollows ?? 'N/A'} unfollows · ${nativeSocialWindowLabel(instagramNetFollows)}` : 'Latest labeled Instagram source window; not controlled by post dates'}</small></article>
+        <article><span>Official posts published</span><strong>{summary.officialPosts}</strong><small>Active owned posts · {platformBreakdown || 'No platform data available'}</small></article>
       </section>
       <NativeAccountMetrics summary={accountMetricSummary} />
       {posts.length ? (
@@ -3016,6 +3018,13 @@ function MonthlySocialPerformance({
     if (postTableSort === 'oldest') return new Date(a.date).getTime() - new Date(b.date).getTime();
     return new Date(b.date).getTime() - new Date(a.date).getTime();
   });
+  const changePeriod = (nextPeriod) => {
+    if (nextPeriod === 'custom' && !customStart && !customEnd) {
+      setCustomStart(reportWindow.startInput);
+      setCustomEnd(reportWindow.endInput);
+    }
+    setPeriod(nextPeriod);
+  };
 
   return (
     <section className="social-monthly-performance" id="social-monthly-performance" aria-label="Monthly Social Performance">
@@ -3039,7 +3048,7 @@ function MonthlySocialPerformance({
       </details>
 
       <div className="social-monthly-controls">
-        <label><span>Reporting period</span><select value={period} onChange={(event) => setPeriod(event.target.value)}>
+        <label><span>Reporting period</span><select value={period} onChange={(event) => changePeriod(event.target.value)}>
           <option value="this-month">Current month to date</option>
           <option value="previous-month">Latest completed month</option>
           <option value="last-30-days">Last 30 days</option>
@@ -3052,14 +3061,15 @@ function MonthlySocialPerformance({
         <div className="social-monthly-period-label"><span>Comparison</span><strong>{comparisonWindow.label}</strong><small>{comparisonWindow.startInput} to {comparisonWindow.endInput}</small></div>
       </div>
       {period === 'custom' && <div className="social-top-custom-range"><label><span>From</span><input type="date" value={customStart} max={customEnd || reportWindow.endInput} onChange={(event) => setCustomStart(event.target.value)} /></label><label><span>To</span><input type="date" value={customEnd} min={customStart || undefined} max={dateInputValue(new Date())} onChange={(event) => setCustomEnd(event.target.value)} /></label></div>}
+      <p className="social-date-window-note">Changing the report dates recalculates post scorecards, comparisons, highlights, the complete post table, PDF, and CSV. The native account table below remains the latest provider snapshot and shows its own source window.</p>
 
       <div className="social-monthly-kpis" aria-label="Monthly Social scorecards">
-        <article><span>Official posts</span><strong>{summary.officialPosts}</strong><small>{formatSocialComparison(comparisons.posts)} vs. prior period</small></article>
+        <article><span>Reported views</span><strong>{summary.reportedViews === null ? 'Not available' : formatSocialMetric(summary.reportedViews)}</strong><small>{formatSocialComparison(comparisons.views)} vs. prior period · latest lifetime provider views; this connection does not supply one shared impressions total · available for {summary.viewsCoverage.available}/{summary.viewsCoverage.total}</small></article>
         <article><span>Comparable post interactions</span><strong>{summary.totalInteractions === null ? 'Not available' : formatSocialMetric(summary.totalInteractions)}</strong><small>{formatSocialComparison(comparisons.interactions)} vs. prior period · latest lifetime values · complete reactions, comments, and shares for {summary.interactionsAvailable}/{summary.officialPosts} posts</small></article>
-        <article><span>Average comparable interactions</span><strong>{summary.averageInteractions === null ? 'Not available' : formatSocialMetric(summary.averageInteractions)}</strong><small>Latest lifetime values based only on posts with all three interaction components</small></article>
-        <article><span>Latest post views</span><strong>{summary.reportedViews === null ? 'Not available' : formatSocialMetric(summary.reportedViews)}</strong><small>{formatSocialComparison(comparisons.views)} vs. prior period · lifetime values for posts published in this report · available for {summary.viewsCoverage.available}/{summary.viewsCoverage.total}</small></article>
-        <article><span>Reach / unique viewers</span><strong>{accountMetricSummary?.platformCount ? 'By platform' : 'Not available'}</strong><small>Not summed across platforms; see the native account table</small></article>
+        <article><span>Post interaction rate</span><strong>{formatSocialRate(summary.interactionRate)}</strong><small>Latest lifetime public interactions ÷ reported lifetime views for {summary.interactionRateCoverage.available}/{summary.interactionRateCoverage.total} posts published in this report window</small></article>
         <article><span>Latest net follows</span><strong>{instagramNetFollows?.value === null || instagramNetFollows?.value === undefined ? 'Not available' : formatSocialMetric(instagramNetFollows.value)}</strong><small>{instagramNetFollows ? `${instagramNetFollows.follows ?? 'N/A'} follows · ${instagramNetFollows.unfollows ?? 'N/A'} unfollows · ${nativeSocialWindowLabel(instagramNetFollows)}` : instagramAccounts.length > 1 ? 'See the account-specific rows below' : 'No compatible authorized account snapshot'}</small></article>
+        <article><span>Reach / unique viewers</span><strong>{accountMetricSummary?.platformCount ? 'By platform' : 'Not available'}</strong><small>Latest provider source windows; audiences are not summed across platforms</small></article>
+        <article><span>Official posts</span><strong>{summary.officialPosts}</strong><small>{formatSocialComparison(comparisons.posts)} vs. prior period</small></article>
       </div>
 
       <NativeAccountMetrics summary={accountMetricSummary} />
@@ -3163,7 +3173,7 @@ export function SocialView({ socialResults, legacySocialResults = [], socialSour
     return () => window.clearTimeout(timer);
   }, []);
   const [topPostsAsOf] = useState(() => Date.now());
-  const [topPostsPeriod, setTopPostsPeriod] = useState('this-month');
+  const [topPostsPeriod, setTopPostsPeriod] = useState('last-30-days');
   const [topPostsCustomStart, setTopPostsCustomStart] = useState('');
   const [topPostsCustomEnd, setTopPostsCustomEnd] = useState('');
 
@@ -3295,10 +3305,7 @@ export function SocialView({ socialResults, legacySocialResults = [], socialSour
     downloadCsv(
       `canary-social-performance-${districtFilter === 'All' ? 'all-districts' : districtFilter}-${topPostsWindow.startInput}-to-${topPostsWindow.endInput}.csv`,
       SOCIAL_CSV_HEADERS,
-      socialReportPosts.map((result) => socialCsvRow(
-        result,
-        sourceForResult(result),
-      )),
+      socialReportPosts.map((result) => socialCsvRow(result)),
     );
   }
 
@@ -3306,7 +3313,7 @@ export function SocialView({ socialResults, legacySocialResults = [], socialSour
     downloadCsv(
       `canary-public-conversation-${districtFilter === 'All' ? 'all-districts' : districtFilter}-${socialDateStart || 'all-dates'}-to-${socialDateEnd || 'latest'}.csv`,
       SOCIAL_CSV_HEADERS,
-      visibleResults.map((result) => socialCsvRow(result, sourceForResult(result))),
+      visibleResults.map((result) => socialCsvRow(result)),
     );
   }
 

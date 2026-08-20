@@ -68,6 +68,13 @@ assert.equal(monthToDateComparison.end.toISOString(), '2026-06-24T18:00:00.000Z'
 const shortPriorMonthComparison = resolveSocialReportComparisonWindow('this-month', Date.UTC(2026, 2, 31, 18));
 assert.equal(shortPriorMonthComparison.end.toISOString(), '2026-02-28T18:00:00.000Z');
 assert.equal(shortPriorMonthComparison.end.getTime() - shortPriorMonthComparison.start.getTime(), resolveSocialReportWindow('this-month', Date.UTC(2026, 2, 31, 18)).end.getTime() - resolveSocialReportWindow('this-month', Date.UTC(2026, 2, 31, 18)).start.getTime());
+const trailingThirtyDays = resolveSocialReportWindow('last-30-days', Date.UTC(2026, 7, 20, 18));
+assert.deepEqual([trailingThirtyDays.startInput, trailingThirtyDays.endInput], ['2026-07-22', '2026-08-20']);
+assert.equal(trailingThirtyDays.label, 'Last 30 days');
+const trailingThirtyComparison = resolveSocialReportComparisonWindow('last-30-days', Date.UTC(2026, 7, 20, 18));
+assert.deepEqual([trailingThirtyComparison.startInput, trailingThirtyComparison.endInput], ['2026-06-22', '2026-07-21']);
+assert.equal(trailingThirtyComparison.start.toISOString(), '2026-06-22T00:00:00.000Z');
+assert.equal(trailingThirtyComparison.end.toISOString(), '2026-07-21T23:59:59.999Z');
 assert.deepEqual(calculateSocialMetricChange(12, 10), { absolute: 2, percent: 20 });
 assert.deepEqual(calculateSocialMetricChange(3, 0), { absolute: 3, percent: null });
 assert.equal(calculateSocialMetricChange(null, 10), null);
@@ -159,6 +166,8 @@ assert.equal(reportSummary.totalInteractions, 38);
 assert.equal(reportSummary.interactionsAvailable, 2);
 assert.equal(reportSummary.averageInteractions, 19);
 assert.equal(reportSummary.reportedViews, 150);
+assert.equal(reportSummary.interactionRate, 25,'interaction rate must use only posts with both complete interactions and a reported view denominator');
+assert.deepEqual(reportSummary.interactionRateCoverage,{available:1,total:4});
 assert.deepEqual(reportSummary.viewsCoverage, { available: 2, total: 4 });
 assert.deepEqual(reportSummary.reactionsCoverage, { available: 3, total: 4 });
 assert.deepEqual(reportSummary.commentsCoverage, { available: 3, total: 4 });
@@ -182,6 +191,11 @@ const unavailableSummary = summarizeSocialReport([eligibleReportPosts.find((post
 assert.equal(unavailableSummary.totalInteractions, null);
 assert.equal(unavailableSummary.averageInteractions, null);
 assert.equal(unavailableSummary.reportedViews, null);
+const narrowCustomWindow = resolveSocialReportWindow('custom', Date.UTC(2026, 6, 24), '2026-07-21', '2026-07-21');
+const narrowCustomSummary = summarizeSocialReport(reportPosts.filter((post) => isEligibleSocialReportPost(post, narrowCustomWindow)));
+assert.equal(narrowCustomSummary.officialPosts, 2,'custom report dates must recalculate the eligible official-post population');
+assert.equal(narrowCustomSummary.reportedViews, 50,'custom report dates must recalculate reported-view scorecards');
+assert.equal(narrowCustomSummary.totalInteractions, 13,'custom report dates must recalculate comparable-interaction scorecards');
 
 const officialSources = [
   { id: 'official-fb', district_id: 'district-a', platform: 'facebook', active: true, handle: 'districta' },
@@ -704,7 +718,8 @@ for (const marker of [
   'Executive scorecards',
   'Official posts published',
   'Comparable public interactions',
-  'Average comparable interactions',
+  'Post interaction rate',
+  'Latest net follows',
   'Reported views',
   'Available for',
   'Top Performers',
@@ -742,7 +757,12 @@ assert.match(dashboard, /socialPageTab === 'feed'/);
 assert.doesNotMatch(dashboard, /isAdmin \|\| summary\.ambient > 0/);
 assert.match(dashboard, /function formatSocialComparison\(change\)[\s\S]*Intl\.NumberFormat\('en-US'/);
 assert.doesNotMatch(dashboard, /formatSocialComparison\(change\)[\s\S]{0,500}formatSocialMetric\(change\.absolute\)/);
-assert.match(dashboard, /useState\('this-month'\)/);
+assert.match(dashboard, /useState\('last-30-days'\)/);
+assert.match(dashboard, /Post interaction rate/);
+assert.match(dashboard, /does not supply one shared impressions total/i);
+assert.match(dashboard, /Changing the report dates recalculates post scorecards, comparisons, highlights, tables, PDF, and CSV/i);
+assert.match(dashboard, /setCustomStart\(reportWindow\.startInput\)/);
+assert.match(dashboard, /setCustomEnd\(reportWindow\.endInput\)/);
 assert.match(dashboard, /resolveSocialReportComparisonWindow\(topPostsPeriod/);
 assert.match(dashboard, /previousSocialReportPosts/);
 assert.match(dashboard, /formatSocialComparison\(comparisons\.interactions\)\} vs\. prior period/,'interaction comparison must render in the scorecard');
@@ -792,10 +812,12 @@ assert.match(dashboard, /Top Performer rankings use provider-reported components
 for (const marker of ['Views observed at', 'Viewers / reach observed at', 'Reactions observed at', 'Comments observed at', 'Shares observed at', 'Clicks observed at', 'Saves observed at', 'Reposts observed at']) assert.ok(dashboard.includes(marker), `Social CSV must include per-metric timestamp: ${marker}`);
 for (const marker of ['Views availability', 'Viewers / reach availability', 'Reactions availability', 'Comments availability', 'Shares availability', 'Clicks availability', 'Saves availability', 'Reposts availability']) assert.ok(dashboard.includes(marker), `Social CSV must include per-metric availability: ${marker}`);
 assert.match(dashboard, /metricValue\('comments'\)/);
-assert.match(dashboard, /const comparableInteractionTotal = socialReportComparableInteractionTotal\(result\)/,'CSV engagement rate must use only comparable interaction totals');
+assert.match(dashboard, /const comparableInteractionTotal = socialReportComparableInteractionTotal\(result\)/,'CSV interaction rate must use only comparable interaction totals');
 assert.match(dashboard, /interactionTotal \?\? 'N\/A'/);
 assert.match(dashboard, /Comments \/ Replies/);
-assert.match(dashboard, /comparableInteractionTotal !== null && Number\(followerCount\) > 0/);
+assert.match(dashboard, /Interaction rate \(complete interactions ÷ reported views\)/);
+assert.match(dashboard, /comparableInteractionTotal !== null && Number\(reportedViews\) > 0/);
+assert.match(dashboard, /comparableInteractionTotal \/ Number\(reportedViews\)/);
 assert.match(dashboard, /neutralizeSpreadsheetFormula\(rawText\)/);
 assert.match(dashboard, /const articleUrl = safeExternalHttpUrl\(article\.link\)/);
 assert.match(dashboard, /Available for \{reportScores\.length\} of \{totalMentions\} mentions/);
