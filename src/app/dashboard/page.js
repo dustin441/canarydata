@@ -1,4 +1,4 @@
-import { getArticles, getDistricts, getQueries, getClients, getExcludedStories, getStoryCorrectionEvents, getSocialSources, getSocialThreads, getSocialMetricSnapshots, getRecentSocialReviewEvents, getStrategicProfiles, getStrategicPriorities, getCollectionHealth, getSocialCollectionHealth } from '@/lib/data';
+import { getArticles, getDistricts, getQueries, getClients, getExcludedStories, getStoryCorrectionEvents, getSocialSources, getSocialThreads, getSocialMetricSnapshots, getSocialMetricHistory, getRecentSocialReviewEvents, getStrategicProfiles, getStrategicPriorities, getCollectionHealth, getSocialCollectionHealth } from '@/lib/data';
 import { createClient } from '@/lib/supabase/server';
 import { createAdminClient } from '@/lib/supabase/admin';
 import DashboardClient from './DashboardClient';
@@ -7,6 +7,7 @@ import { getAuthenticatedBillingContext } from '@/lib/billing';
 import { formatAnnualPriceLabel, INTRODUCTORY_ANNUAL_PRICE_CENTS, resolveCanaryPricing } from '@/lib/pricing';
 import { redirect } from 'next/navigation';
 import { metaIntegrationEnabledForDistrict, metaIntegrationPilotConfigured } from '@/lib/meta-integration.mjs';
+import { buildSocialDailySeries } from '@/lib/socialPerformance.mjs';
 
 const DASHBOARD_DATA_TIMEOUT_MS = 6500;
 
@@ -87,13 +88,14 @@ export default async function DashboardPage({ searchParams }) {
     loadDashboardDataset('Social sources', () => getSocialSources(dataDistrictId), []),
     loadDashboardDataset('Social results', () => getSocialThreads(dataDistrictId, isAdmin), []),
     loadDashboardDataset('Native Social metrics', () => getSocialMetricSnapshots(dataDistrictId), []),
+    dataDistrictId ? loadDashboardDataset('Native Social history', () => getSocialMetricHistory(dataDistrictId), []) : Promise.resolve({ data: [], warning: null }),
     isAdmin ? loadDashboardDataset('Social correction history', () => getRecentSocialReviewEvents(dataDistrictId), []) : Promise.resolve({ data: [], warning: null }),
     loadDashboardDataset('Strategic profiles', () => getStrategicProfiles(dataDistrictId), []),
     loadDashboardDataset('Strategic priorities', () => getStrategicPriorities(dataDistrictId), []),
     loadDashboardDataset('Collection health', () => getCollectionHealth(districts, dataDistrictId), []),
     loadDashboardDataset('Social collection health', () => getSocialCollectionHealth(districts, dataDistrictId), []),
   ]);
-  const [articles, queries, clients, excludedStories, correctionEvents, socialSources, socialThreads, socialMetricSnapshots, socialReviewEvents, strategicProfiles, strategicPriorities, collectionHealth, socialCollectionHealth] = dataLoads.map((result) => result.data);
+  const [articles, queries, clients, excludedStories, correctionEvents, socialSources, socialThreads, socialMetricSnapshots, socialMetricHistory, socialReviewEvents, strategicProfiles, strategicPriorities, collectionHealth, socialCollectionHealth] = dataLoads.map((result) => result.data);
   const enrichedSocialThreads = enrichSocialThreadsWithNativeMetrics(socialThreads, socialMetricSnapshots);
   const socialAccountMetricSummaries = Object.fromEntries(
     [...new Set(socialMetricSnapshots.map((row) => row.district_id).filter(Boolean))].map((districtId) => [
@@ -101,6 +103,9 @@ export default async function DashboardPage({ searchParams }) {
       summarizeOwnedSocialAccountMetrics(socialMetricSnapshots.filter((row) => row.district_id === districtId)),
     ]),
   );
+  const socialPerformanceHistory = dataDistrictId
+    ? { [dataDistrictId]: buildSocialDailySeries(socialMetricHistory.filter((row) => row.district_id === dataDistrictId)) }
+    : {};
   const billingLoad = userDistrictId
     ? await loadDashboardDataset('Billing status', getAuthenticatedBillingContext, null)
     : { data: null, warning: null };
@@ -157,6 +162,7 @@ export default async function DashboardPage({ searchParams }) {
       socialSources={socialSources}
       socialThreads={enrichedSocialThreads}
       socialAccountMetricSummaries={socialAccountMetricSummaries}
+      socialPerformanceHistory={socialPerformanceHistory}
       socialReviewEvents={socialReviewEvents}
       isAdmin={isAdmin}
       strategicProfiles={strategicProfiles}

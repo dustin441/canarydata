@@ -410,10 +410,11 @@ function findButton(tree, label) {
 }
 
 async function compileSocialViewForInteractionTest(source, reviewSocialThreadMock) {
-  const [socialModule, socialReportModule, dateModule] = await Promise.all([
+  const [socialModule, socialReportModule, dateModule, socialPerformanceModule] = await Promise.all([
     import('../src/lib/social.mjs'),
     import('../src/lib/socialReport.mjs'),
     import('../src/lib/date.mjs'),
+    import('../src/lib/socialPerformance.mjs'),
   ]);
   const renderer = createHookRenderer();
   const hostComponent = ({ children, ...props }) => renderer.jsxRuntime.jsx('stub', { ...props, children });
@@ -440,6 +441,7 @@ async function compileSocialViewForInteractionTest(source, reviewSocialThreadMoc
     '@/lib/strategicGovernance.mjs': { buildStrategicGovernance: () => ({}) },
     '@/lib/reportingDataset.mjs': { buildReportingDataset: () => ({}), filterReportingDataset: () => ({}) },
     '@/lib/articleSearch.mjs': { articleMatchesSearch: () => true },
+    '@/lib/socialPerformance.mjs': socialPerformanceModule,
     recharts: new Proxy({}, { get: () => hostComponent }),
   };
   const bindings = await loadBindings();

@@ -60,6 +60,32 @@ function sanitizedIdentity(row) {
   };
 }
 
+function validatedDailySeriesPoint(point) {
+  if (!point || typeof point !== 'object' || Array.isArray(point)) return null;
+  if (typeof point.accountKey !== 'string' || !point.accountKey.trim()) return null;
+  if (point.platform !== normalized(point.platform) || !['facebook', 'instagram'].includes(point.platform)) return null;
+  if (typeof point.metric !== 'string' || !point.metric || point.metric !== normalized(point.metric)) return null;
+  if (point.period !== 'day' || typeof point.date !== 'string' || utcDay(point.date) !== point.date) return null;
+  if (typeof point.value !== 'number' || !Number.isFinite(point.value)) return null;
+  if (!point.accountIdentity || typeof point.accountIdentity !== 'object' || Array.isArray(point.accountIdentity)) return null;
+  const identity = point.accountIdentity;
+  if (![identity.name, identity.handle, identity.profileUrl]
+    .every((value) => value === null || typeof value === 'string')) return null;
+  return {
+    accountKey: point.accountKey,
+    accountIdentity: {
+      name: identity.name || null,
+      handle: identity.handle || null,
+      profileUrl: identity.profileUrl || null,
+    },
+    platform: point.platform,
+    metric: point.metric,
+    period: 'day',
+    date: point.date,
+    value: point.value,
+  };
+}
+
 export function buildSocialDailySeries(rows = []) {
   const byDay = new Map();
   for (const row of rows || []) {
@@ -85,15 +111,13 @@ export function buildSocialDailySeries(rows = []) {
     || a.date.localeCompare(b.date));
 }
 
-function windowDates(window) {
+function windowDescriptor(window) {
   const start = utcDay(window?.start);
   const end = utcDay(window?.end);
-  if (!start || !end || start > end) return { start, end, dates: [] };
-  const dates = [];
-  for (let day = timestamp(`${start}T00:00:00.000Z`), last = timestamp(`${end}T00:00:00.000Z`); day <= last; day += DAY_MS) {
-    dates.push(new Date(day).toISOString().slice(0, 10));
-  }
-  return { start, end, dates };
+  if (!start || !end || start > end) return { start, end, expectedDays: 0 };
+  const startAt = timestamp(`${start}T00:00:00.000Z`);
+  const endAt = timestamp(`${end}T00:00:00.000Z`);
+  return { start, end, expectedDays: Math.floor((endAt - startAt) / DAY_MS) + 1 };
 }
 
 function coverage(points) {
@@ -102,16 +126,15 @@ function coverage(points) {
   return { start: dates[0], end: dates.at(-1) };
 }
 
-function windowSummary(points, window) {
-  const selected = windowDates(window);
+function windowSummary(points, selected) {
   const observedDates = new Set(points.map((point) => point.date));
   return {
     window: { start: selected.start, end: selected.end },
     coverage: coverage(points),
     dates: [...observedDates].sort(),
-    expectedDays: selected.dates.length,
+    expectedDays: selected.expectedDays,
     observedDays: observedDates.size,
-    complete: selected.dates.length >= MINIMUM_POINTS && selected.dates.every((date) => observedDates.has(date)),
+    complete: selected.expectedDays >= MINIMUM_POINTS && observedDates.size === selected.expectedDays,
   };
 }
 
@@ -142,8 +165,8 @@ function sourceMetadata(platform, metric, label, currentSummary, comparisonSumma
 }
 
 function emptyTrend(metric, label, platform, currentWindow, comparisonWindow) {
-  const currentSummary = windowSummary([], currentWindow);
-  const comparisonSummary = windowSummary([], comparisonWindow);
+  const currentSummary = windowSummary([], windowDescriptor(currentWindow));
+  const comparisonSummary = windowSummary([], windowDescriptor(comparisonWindow));
   return {
     metric,
     label,
@@ -177,20 +200,21 @@ export function classifySocialTrend(currentValue, comparisonValue, currentPoints
   return { absoluteChange, percentChange, status };
 }
 
-function inWindow(point, window) {
-  const selected = windowDates(window);
+function inWindow(point, selected) {
   return selected.start !== null && selected.end !== null && point.date >= selected.start && point.date <= selected.end;
 }
 
 function trendFor(points, metric, label, platform, currentWindow, comparisonWindow) {
   if (!metric) return emptyTrend(null, label, platform, currentWindow, comparisonWindow);
   const metricPoints = points.filter((point) => point.metric === metric);
-  const current = metricPoints.filter((point) => inWindow(point, currentWindow));
-  const comparison = metricPoints.filter((point) => inWindow(point, comparisonWindow));
+  const currentDescriptor = windowDescriptor(currentWindow);
+  const comparisonDescriptor = windowDescriptor(comparisonWindow);
+  const current = metricPoints.filter((point) => inWindow(point, currentDescriptor));
+  const comparison = metricPoints.filter((point) => inWindow(point, comparisonDescriptor));
   const currentValue = current.length ? current.reduce((sum, point) => sum + point.value, 0) : null;
   const comparisonValue = comparison.length ? comparison.reduce((sum, point) => sum + point.value, 0) : null;
-  const currentSummary = windowSummary(current, currentWindow);
-  const comparisonSummary = windowSummary(comparison, comparisonWindow);
+  const currentSummary = windowSummary(current, currentDescriptor);
+  const comparisonSummary = windowSummary(comparison, comparisonDescriptor);
   return {
     metric,
     label,
@@ -230,10 +254,12 @@ function overallStatus(statuses) {
   return 'steady';
 }
 
-export function buildSocialPerformance(rows = [], { currentWindow, comparisonWindow } = {}) {
-  const series = buildSocialDailySeries(rows);
+export function buildSocialPerformanceFromDailySeries(series = [], { currentWindow, comparisonWindow } = {}) {
+  const validatedSeries = (Array.isArray(series) ? series : [])
+    .map(validatedDailySeriesPoint)
+    .filter(Boolean);
   const grouped = new Map();
-  for (const point of series) {
+  for (const point of validatedSeries) {
     const key = `${point.accountKey}:${point.platform}`;
     const current = grouped.get(key) || [];
     current.push(point);
@@ -259,7 +285,7 @@ export function buildSocialPerformance(rows = [], { currentWindow, comparisonWin
     .map((dimension) => dimension.status)
     .filter((status) => status !== 'insufficient_history');
   return {
-    coverage: coverage(series),
+    coverage: coverage(validatedSeries),
     windows: {
       current: { start: utcDay(currentWindow?.start), end: utcDay(currentWindow?.end) },
       comparison: { start: utcDay(comparisonWindow?.start), end: utcDay(comparisonWindow?.end) },
@@ -270,6 +296,10 @@ export function buildSocialPerformance(rows = [], { currentWindow, comparisonWin
     combinedAudience: null,
     baselineExplanation: 'Native daily account metrics compare additive sums across the exact report windows. Each metric requires complete daily coverage of both selected UTC calendar windows and at least 3 daily points in each; changes above +5% improve, below -5% decline, and values within ±5% are steady. Platform audiences remain separate.',
   };
+}
+
+export function buildSocialPerformance(rows = [], options = {}) {
+  return buildSocialPerformanceFromDailySeries(buildSocialDailySeries(rows), options);
 }
 
 export const deriveNativeSocialPerformance = buildSocialPerformance;

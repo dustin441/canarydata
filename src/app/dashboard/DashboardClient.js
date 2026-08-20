@@ -17,6 +17,7 @@ import { buildCommunicationsBrief, formatCommunicationsBriefRecommendation } fro
 import { buildStrategicGovernance } from '@/lib/strategicGovernance.mjs';
 import { buildReportingDataset, filterReportingDataset } from '@/lib/reportingDataset.mjs';
 import { articleMatchesSearch } from '@/lib/articleSearch.mjs';
+import { buildSocialPerformanceFromDailySeries } from '@/lib/socialPerformance.mjs';
 
 const stripePromise = process.env.NEXT_PUBLIC_STRIPE_PUBLISHABLE_KEY
   ? loadStripe(process.env.NEXT_PUBLIC_STRIPE_PUBLISHABLE_KEY)
@@ -2995,7 +2996,9 @@ function MonthlySocialPerformance({
   onExportPdf,
   onExportCsv,
   accountMetricSummary,
+  performanceDecision,
 }) {
+  void performanceDecision;
   const [postTableSort, setPostTableSort] = useState('newest');
   const summary = summarizeSocialReport(posts);
   const previousSummary = summarizeSocialReport(previousPosts);
@@ -3136,7 +3139,7 @@ function MonthlySocialPerformance({
   );
 }
 
-export function SocialView({ socialResults, legacySocialResults = [], socialSources, socialAccountMetricSummaries = {}, socialReviewEvents = [], districtFilter, districts, campaignSearch, setCampaignSearch, isAdmin = false }) {
+export function SocialView({ socialResults, legacySocialResults = [], socialSources, socialAccountMetricSummaries = {}, socialPerformanceHistory = {}, socialReviewEvents = [], districtFilter, districts, campaignSearch, setCampaignSearch, isAdmin = false }) {
   const [socialPageTab, setSocialPageTab] = useState('overview');
   const [relationshipFilter, setRelationshipFilter] = useState('public');
   const socialSearch = campaignSearch;
@@ -3189,6 +3192,17 @@ export function SocialView({ socialResults, legacySocialResults = [], socialSour
   const comparisonPostsWindow = useMemo(
     () => resolveSocialReportComparisonWindow(topPostsPeriod, topPostsAsOf, topPostsCustomStart, topPostsCustomEnd),
     [topPostsPeriod, topPostsAsOf, topPostsCustomStart, topPostsCustomEnd],
+  );
+  const nativePerformanceSeries = useMemo(
+    () => districtFilter === 'All' ? [] : socialPerformanceHistory[districtFilter] || [],
+    [socialPerformanceHistory, districtFilter],
+  );
+  const nativePerformance = useMemo(
+    () => buildSocialPerformanceFromDailySeries(nativePerformanceSeries, {
+      currentWindow: topPostsWindow,
+      comparisonWindow: comparisonPostsWindow,
+    }),
+    [nativePerformanceSeries, topPostsWindow, comparisonPostsWindow],
   );
   const analystNoteScopeKey = `${districtFilter}|${topPostsPeriod}|${topPostsCustomStart}|${topPostsCustomEnd}|${socialSearch.trim().toLowerCase()}`;
   const socialAnalystNote = socialAnalystDrafts[analystNoteScopeKey] || '';
@@ -3377,6 +3391,7 @@ export function SocialView({ socialResults, legacySocialResults = [], socialSour
         onExportPdf={exportSocialPdf}
         onExportCsv={exportOfficialSocialCsv}
         accountMetricSummary={accountMetricSummary}
+        performanceDecision={nativePerformance}
       />
       {socialMessage && <p className="social-review-error" role="alert">{socialMessage}</p>}
       {isAdmin && legacySocialResults.length > 0 && (
@@ -3586,7 +3601,7 @@ export function SocialView({ socialResults, legacySocialResults = [], socialSour
   );
 }
 
-export default function DashboardClient({ articles, districts, queries: initialQueries, clients = [], userDistrictId, initialDistrictId = null, initialView = 'dashboard', paymentNotice = null, billingInfo = null, publicPricingLabel = 'Annual access', publicPricingIntroductory = false, excludedStories = [], correctionEvents = [], socialSources = [], socialThreads = [], socialAccountMetricSummaries = {}, socialReviewEvents = [], strategicProfiles = [], strategicPriorities = [], collectionHealth = [], socialCollectionHealth = [], dataWarnings = [], isAdmin = false, melodiEnabled = false, metaIntegrationEnabled = false, demoMode = false }) {
+export default function DashboardClient({ articles, districts, queries: initialQueries, clients = [], userDistrictId, initialDistrictId = null, initialView = 'dashboard', paymentNotice = null, billingInfo = null, publicPricingLabel = 'Annual access', publicPricingIntroductory = false, excludedStories = [], correctionEvents = [], socialSources = [], socialThreads = [], socialAccountMetricSummaries = {}, socialPerformanceHistory = {}, socialReviewEvents = [], strategicProfiles = [], strategicPriorities = [], collectionHealth = [], socialCollectionHealth = [], dataWarnings = [], isAdmin = false, melodiEnabled = false, metaIntegrationEnabled = false, demoMode = false }) {
   const defaultDistrictFilter = userDistrictId ?? initialDistrictId ?? districts[0]?.id ?? 'All';
   const [currentView, setCurrentView] = useState(initialView);
   const [search, setSearch] = useState('');
@@ -4398,6 +4413,7 @@ export default function DashboardClient({ articles, districts, queries: initialQ
               legacySocialResults={campaignSuppressedLegacySocialResults}
               socialSources={socialSources}
               socialAccountMetricSummaries={socialAccountMetricSummaries}
+              socialPerformanceHistory={socialPerformanceHistory}
               socialReviewEvents={socialReviewEvents}
               districtFilter={districtFilter}
               districts={districts}

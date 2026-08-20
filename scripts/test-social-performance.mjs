@@ -3,6 +3,7 @@ import { readFileSync, readdirSync } from 'node:fs';
 import { join } from 'node:path';
 import {
   buildSocialPerformance,
+  buildSocialPerformanceFromDailySeries,
   buildSocialDailySeries,
   classifySocialTrend,
 } from '../src/lib/socialPerformance.mjs';
@@ -61,8 +62,40 @@ const series = buildSocialDailySeries([...history, olderDuplicate, stableLosingD
 const fbViewJuly10 = series.find((point) => point.accountKey === 'fb-1' && point.metric === 'views' && point.date === '2026-07-10');
 assert.equal(fbViewJuly10.value, 120, 'same-day rows use latest observed_at, then stable ascending id');
 assert.equal(series.some((point) => point.value === 9999), false, 'rolling and total_value rows never enter arbitrary-window daily trends');
+for (const point of series) {
+  assert.deepEqual(
+    Object.keys(point).sort(),
+    ['accountIdentity', 'accountKey', 'date', 'effectiveAt', 'metric', 'observedAt', 'period', 'platform', 'value'].sort(),
+    'server daily series exposes only the sanitized client contract',
+  );
+  assert.equal(Object.hasOwn(point, 'district_id'), false);
+  assert.equal(Object.hasOwn(point, 'provider_object_id'), false);
+  assert.equal(Object.hasOwn(point, 'breakdown'), false);
+}
 
 const performance = buildSocialPerformance([...history, olderDuplicate, stableLosingDuplicate, newerDuplicate], { currentWindow, comparisonWindow });
+const performanceFromSeries = buildSocialPerformanceFromDailySeries(series, { currentWindow, comparisonWindow });
+assert.deepEqual(performanceFromSeries, performance, 'server-sanitized daily series produces the same dynamic-window decision as raw server rows');
+assert.deepEqual(
+  buildSocialPerformanceFromDailySeries(history, { currentWindow, comparisonWindow }).accounts,
+  [],
+  'the client-facing builder rejects raw snapshot rows instead of consuming provider fields',
+);
+const unsafePoint = { ...series[0], value: 'not-a-number', provider_object_id: 'must-not-pass' };
+assert.equal(
+  buildSocialPerformanceFromDailySeries([unsafePoint], { currentWindow, comparisonWindow }).accounts.length,
+  0,
+  'invalid values are safely excluded from sanitized daily series',
+);
+const broadWindowStartedAt = globalThis.performance.now();
+const broadWindowPerformance = buildSocialPerformanceFromDailySeries(series, {
+  currentWindow: { start: new Date('1900-01-01T00:00:00.000Z'), end: new Date('2099-12-31T23:59:59.999Z') },
+  comparisonWindow: { start: new Date('1700-01-01T00:00:00.000Z'), end: new Date('1899-12-31T23:59:59.999Z') },
+});
+assert.equal(broadWindowPerformance.overallStatus, 'insufficient_history');
+assert.ok(globalThis.performance.now() - broadWindowStartedAt < 250, 'large custom windows use constant-time date bounds rather than expanding every calendar date');
+const performanceSource = readFileSync(new URL('../src/lib/socialPerformance.mjs', import.meta.url), 'utf8');
+assert.doesNotMatch(performanceSource, /for\s*\([^)]*DAY_MS/, 'window completeness must not expand calendar days in a loop');
 assert.equal(performance.coverage.start, '2026-07-01');
 assert.equal(performance.coverage.end, '2026-07-10');
 assert.equal(performance.comparableCount, 5);
@@ -183,17 +216,37 @@ assert.match(historyLoader, /\.order\('effective_at', \{ ascending: true \}\)[\s
 assert.match(historyLoader, /\.range\(from, from \+ SOCIAL_METRIC_SNAPSHOT_PAGE_SIZE - 1\)/);
 assert.doesNotMatch(historyLoader, /provider_metadata/);
 
+const dashboardPageSource = readFileSync(new URL('../src/app/dashboard/page.js', import.meta.url), 'utf8');
+assert.match(dashboardPageSource, /getSocialMetricHistory/);
+assert.match(dashboardPageSource, /buildSocialDailySeries/);
+assert.match(dashboardPageSource, /dataDistrictId\s*\?\s*loadDashboardDataset\('Native Social history',\s*\(\)\s*=>\s*getSocialMetricHistory\(dataDistrictId\),\s*\[\]\)/, 'history is loaded only for one concrete data district and remains bounded by the loader');
+assert.match(dashboardPageSource, /const socialPerformanceHistory = dataDistrictId[\s\S]*?\{ \[dataDistrictId\]: buildSocialDailySeries\(socialMetricHistory\.filter\(\(row\) => row\.district_id === dataDistrictId\)\) \}[\s\S]*?: \{\};/, 'raw history is district-filtered, transformed server-side, and keyed only by the selected data district');
+assert.match(dashboardPageSource, /socialPerformanceHistory=\{socialPerformanceHistory\}/);
+assert.doesNotMatch(dashboardPageSource, /socialMetricHistory=\{/i, 'raw history must never be passed to DashboardClient');
+
+const dashboardClientSource = readFileSync(new URL('../src/app/dashboard/DashboardClient.js', import.meta.url), 'utf8');
+assert.match(dashboardClientSource, /import \{ buildSocialPerformanceFromDailySeries \} from '@\/lib\/socialPerformance\.mjs';/, 'the client imports only the sanitized-series performance builder');
+assert.doesNotMatch(dashboardClientSource, /getSocialMetricHistory|buildSocialDailySeries|social_provider_metric_snapshots/, 'the client cannot load or sanitize raw history');
+assert.match(dashboardClientSource, /socialPerformanceHistory = \{\}/, 'DashboardClient defaults missing history to an empty tenant map');
+assert.match(dashboardClientSource, /socialPerformanceHistory=\{socialPerformanceHistory\}/, 'DashboardClient passes sanitized history through to SocialView');
+assert.match(dashboardClientSource, /districtFilter === 'All'\s*\? \[\]\s*:\s*socialPerformanceHistory\[districtFilter\] \|\| \[\]/, 'All never selects a district series');
+assert.match(dashboardClientSource, /useMemo\(\s*\(\) => buildSocialPerformanceFromDailySeries\(nativePerformanceSeries, \{\s*currentWindow: topPostsWindow,\s*comparisonWindow: comparisonPostsWindow,\s*\}\),\s*\[nativePerformanceSeries, topPostsWindow, comparisonPostsWindow\]/, 'native performance updates whenever sanitized history or either dynamic report window changes');
+assert.match(dashboardClientSource, /performanceDecision=\{nativePerformance\}/, 'the dynamic decision reaches MonthlySocialPerformance without rendering a panel yet');
+
 const srcRoot = new URL('../src/', import.meta.url);
 const sourceFiles = readdirSync(srcRoot, { recursive: true, withFileTypes: true })
   .filter((entry) => entry.isFile() && /\.(?:js|jsx|mjs|ts|tsx)$/.test(entry.name))
   .map((entry) => join(entry.parentPath, entry.name));
 for (const sourceFile of sourceFiles) {
   const source = readFileSync(sourceFile, 'utf8');
-  if (!sourceFile.endsWith('/src/lib/data.js')) {
-    assert.doesNotMatch(source, /getSocialMetricHistory|social_provider_metric_snapshots/, `raw Social history must remain isolated to the server data loader: ${sourceFile}`);
+  if (!sourceFile.endsWith('/src/lib/data.js') && !sourceFile.endsWith('/src/app/dashboard/page.js')) {
+    assert.doesNotMatch(source, /getSocialMetricHistory|social_provider_metric_snapshots/, `raw Social history must remain isolated to the server loader and dashboard page: ${sourceFile}`);
   }
   if (!/^\s*['\"]use client['\"];?/m.test(source)) continue;
-  assert.doesNotMatch(source, /getSocialMetricHistory|social_provider_metric_snapshots|socialPerformance\.mjs/, `client file ${sourceFile} must not import or use raw Social history`);
+  assert.doesNotMatch(source, /getSocialMetricHistory|social_provider_metric_snapshots/, `client file ${sourceFile} must not import or use raw Social history`);
+  if (/socialPerformance\.mjs/.test(source)) {
+    assert.equal(sourceFile.endsWith('/src/app/dashboard/DashboardClient.js'), true, `only DashboardClient may consume the sanitized Social performance module: ${sourceFile}`);
+  }
 }
 
 console.log('Social native performance tests passed.');
