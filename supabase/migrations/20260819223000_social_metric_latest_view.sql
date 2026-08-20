@@ -1,7 +1,7 @@
 set lock_timeout = '10s';
 set statement_timeout = '5min';
 
-create index concurrently if not exists social_provider_metric_snapshots_latest_idx
+create index if not exists social_provider_metric_snapshots_latest_idx
   on public.social_provider_metric_snapshots (
     provider_account_link_id,
     provider_object_id,

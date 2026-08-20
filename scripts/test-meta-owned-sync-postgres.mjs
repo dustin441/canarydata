@@ -28,6 +28,8 @@ await withSocialDatabase('meta-owned-sync', async ({ sql, expectFailure, session
   const insightsMigration = await readFile(new URL('../supabase/migrations/20260814223000_meta_owned_social_insights.sql', import.meta.url), 'utf8');
   const latestMetricMigration = await readFile(new URL('../supabase/migrations/20260819223000_social_metric_latest_view.sql', import.meta.url), 'utf8');
   const latestMetricRollback = await readFile(new URL('../supabase/rollbacks/20260819223000_social_metric_latest_view_down.sql', import.meta.url), 'utf8');
+  assert.doesNotMatch(latestMetricMigration, /\bconcurrently\b/i, 'Supabase SQL Editor wraps submitted SQL in a transaction');
+  assert.doesNotMatch(latestMetricRollback, /\bconcurrently\b/i, 'rollback must also be SQL Editor compatible');
   const finalCurrentState = await readFile(new URL('../supabase/manual/canary_meta_database_final_current_state.sql', import.meta.url), 'utf8');
   sql(base);
   sql(migration);
