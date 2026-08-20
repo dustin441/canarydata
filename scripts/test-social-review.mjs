@@ -593,6 +593,20 @@ assert.equal(overviewButton.props['aria-pressed'], true);
 assert.equal(feedButton.props['aria-pressed'], false);
 assert.match(nodeText(socialTree), /Actionable official post/);
 assert.doesNotMatch(nodeText(socialTree), /Public mention should stay out of official reporting/);
+assert.match(nodeText(socialTree), /Are we improving\?Building baseline/,'absent native history renders a truthful Building baseline decision');
+assert.match(nodeText(socialTree), /Two complete like-for-like windows are required/);
+const reportingPeriodLabel = findNodes(socialTree, (node) => node.type === 'label' && nodeText(node).includes('Reporting period'))[0];
+const reportingPeriodSelect = findNodes(reportingPeriodLabel, (node) => node.type === 'select')[0];
+reportingPeriodSelect.props.onChange({ target: { value: 'custom' } });
+socialTree = renderer.render(SocialView, socialProps);
+let customDateInputs = findNodes(socialTree, (node) => node.type === 'input' && node.props?.type === 'date');
+assert.equal(customDateInputs.length, 2,'custom period interaction renders start and end inputs');
+customDateInputs[0].props.onChange({ target: { value: '2026-07-01' } });
+customDateInputs[1].props.onChange({ target: { value: '2026-07-10' } });
+socialTree = renderer.render(SocialView, socialProps);
+customDateInputs = findNodes(socialTree, (node) => node.type === 'input' && node.props?.type === 'date');
+assert.deepEqual(customDateInputs.map((input) => input.props.value), ['2026-07-01', '2026-07-10']);
+assert.match(nodeText(socialTree), /Building baseline/,'custom dates recalculate without inventing direction when history is absent');
 
 feedButton.props.onClick();
 socialTree = renderer.render(SocialView, socialProps);
@@ -740,7 +754,7 @@ assert.match(socialReportSource, /topPerformerGroups\.map/);
 assert.match(socialReportSource, /<SocialReportTable results=\{group\.posts\} ranked \/>/);
 assert.doesNotMatch(socialReportSource, /news|evidence appendix|Strategic Alignment/i);
 assert.doesNotMatch(socialReportSource, /Official Post Detail|Complete detail for every eligible post/);
-for (const marker of ['Monthly Social Performance', 'Latest completed month', 'Campaign or topic', 'Platform performance', 'Content format', 'Leadership highlights', 'All official posts', 'Sort posts', 'Open post ↗', 'Social Media Brief', 'Authorized Meta post and account snapshots are connected']) {
+for (const marker of ['Monthly Social Performance', 'Social performance', 'Are we improving?', 'Published-content cohort', 'Latest completed month', 'Campaign or topic', 'Platform performance', 'Content format', 'Leadership highlights', 'All official posts', 'Sort posts', 'Open post ↗', 'Social Media Brief', 'Authorized Meta post and account snapshots are connected']) {
   assert.ok(dashboard.includes(marker), `Monthly Social Performance must include ${marker}`);
 }
 assert.match(dashboard, /const \[postTableSort, setPostTableSort\] = useState\('newest'\)/);
@@ -767,6 +781,19 @@ assert.match(dashboard, /setCustomStart\(reportWindow\.startInput\)/);
 assert.match(dashboard, /setCustomEnd\(reportWindow\.endInput\)/);
 assert.match(dashboard, /resolveSocialReportComparisonWindow\(topPostsPeriod/);
 assert.match(dashboard, /previousSocialReportPosts/);
+assert.match(dashboard, /aria-label="Social performance decision"/);
+assert.match(dashboard, /className="social-status-text"/,'decision statuses must be visible as text rather than color alone');
+assert.match(dashboard, /Observed coverage: selected window/,'baseline cards disclose concise selected and prior observed coverage');
+assert.doesNotMatch(dashboard, /\{signal\.sourceLabel/,'executive cards must not dump provider implementation identifiers or daily-date lists');
+assert.match(dashboard, /Latest lifetime metrics for official posts published in the selected period\. Useful for content comparison, not activity received during the period\./);
+assert.match(dashboard, /<details className="social-native-account-details">[\s\S]*Data details and source windows/,'on-screen source details must be collapsed by default');
+assert.match(dashboard, /<NativeAccountMetrics summary=\{accountMetricSummary\} collapsed \/>/,'on-screen account snapshots use collapsed details');
+assert.match(dashboard, /function SocialReportView\(\{[^}]*performanceDecision[^}]*\}\)[\s\S]*<SocialExecutiveDecisionPanel decision=\{performanceDecision\}/,'PDF receives and renders the executive decision directly');
+assert.match(dashboard, /<SocialReportView[\s\S]*performanceDecision=\{socialExecutiveDecision\}/,'PDF export flow passes the same executive decision');
+assert.match(dashboard, /<SocialExecutiveDecisionPanel decision=\{performanceDecision\} reportLabel=\{reportWindow\.label\} \/>/,'screen renders the executive decision before cohort scorecards');
+assert.match(styles, /\.social-executive-dimensions[\s\S]*grid-template-columns: repeat\(4, minmax\(0, 1fr\)\)/);
+assert.match(styles, /\.social-status-text::before \{ content: 'Status: '; \}/);
+assert.match(styles, /@media print[\s\S]*\.social-report \.social-executive-decision/,'PDF has explicit executive decision styling');
 assert.match(dashboard, /formatSocialComparison\(comparisons\.interactions\)\} vs\. prior period/,'interaction comparison must render in the scorecard');
 assert.match(dashboard, /formatSocialComparison\(comparisons\.views\)\} vs\. prior period/,'view comparison must render in the scorecard');
 assert.match(dashboard, /analystNote=\{socialAnalystNote\}/);
@@ -798,6 +825,8 @@ assert.match(dashboard, /Missing metrics remain unavailable and are never treate
 assert.match(dashboard, /socialReportPosts\.map\(\(result, index\)/);
 assert.match(dashboard, /canary-social-performance-/);
 assert.match(dashboard, /socialReportPosts\.map\(\(result\) => socialCsvRow/);
+const officialCsvExportSource = dashboard.slice(dashboard.indexOf('function exportOfficialSocialCsv'), dashboard.indexOf('function exportPublicConversationCsv'));
+assert.doesNotMatch(officialCsvExportSource, /socialExecutiveDecision|performanceDecision|buildSocialExecutiveDecision/,'executive presentation data must not alter official CSV rows');
 assert.doesNotMatch(dashboard, /latestObservedAt/);
 assert.match(dashboard, /metric\.value !== null && metric\.value !== undefined/,'native metric display must not coerce null values to zero');
 assert.match(dashboard, /nativeSocialScopeLabel\(nativeSocialMetric\(result, 'views'\)\)/,'CSV attribution scope must use human-facing labels');

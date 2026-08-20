@@ -17,7 +17,7 @@ import { buildCommunicationsBrief, formatCommunicationsBriefRecommendation } fro
 import { buildStrategicGovernance } from '@/lib/strategicGovernance.mjs';
 import { buildReportingDataset, filterReportingDataset } from '@/lib/reportingDataset.mjs';
 import { articleMatchesSearch } from '@/lib/articleSearch.mjs';
-import { buildSocialPerformanceFromDailySeries } from '@/lib/socialPerformance.mjs';
+import { buildSocialExecutiveDecision, buildSocialPerformanceFromDailySeries } from '@/lib/socialPerformance.mjs';
 
 const stripePromise = process.env.NEXT_PUBLIC_STRIPE_PUBLISHABLE_KEY
   ? loadStripe(process.env.NEXT_PUBLIC_STRIPE_PUBLISHABLE_KEY)
@@ -2830,16 +2830,15 @@ function NativeAccountMetricCell({ metric, detail = '' }) {
   return <span className="social-native-metric"><strong>{formatSocialMetric(metric.value)}</strong><small>{detail || scope}</small>{detail && <small>{scope}</small>}<small>{nativeSocialWindowLabel(metric)}</small><small>{nativeSocialObservedLabel(metric)}</small></span>;
 }
 
-function NativeAccountMetrics({ summary }) {
+function NativeAccountMetrics({ summary, collapsed = false }) {
   const rows = Array.isArray(summary?.accounts) && summary.accounts.length
     ? summary.accounts.map((account) => [account.accountKey, account])
     : Object.entries(summary?.platforms || {});
-  if (!rows.length) return <aside className="social-monthly-data-readiness"><strong>Native account metrics</strong><span>No authorized account-level snapshot is available. Post reporting remains source-aware and unavailable fields stay N/A.</span></aside>;
-  return (
+  const content = rows.length ? (
     <section className="social-native-account-metrics" aria-label="Latest native account metrics">
       <div className="social-monthly-section-heading">
         <h3>Latest native account snapshot</h3>
-        <p>Platform-specific source windows are shown separately. Reach and unique-viewer audiences are not added across platforms. Changing the report dates recalculates post scorecards, comparisons, highlights, tables, PDF, and CSV; this account table remains the latest provider snapshot for each labeled source window.</p>
+        <p>This is the latest provider snapshot, not a total controlled by the selected report dates. Platform-specific and metric-specific source windows are shown separately. Reach and unique-viewer audiences are not added across platforms.</p>
       </div>
       <div className="social-monthly-table-wrap">
         <table>
@@ -2860,10 +2859,73 @@ function NativeAccountMetrics({ summary }) {
       </div>
       <p className="social-native-account-note">“Total” appears only when Meta explicitly labels the provider metric total. “Attribution not separated” means organic and paid contributions are not split and must not be presented as organic-only performance.</p>
     </section>
+  ) : <aside className="social-monthly-data-readiness"><strong>Native account metrics</strong><span>No authorized account-level snapshot is available. Post reporting remains source-aware and unavailable fields stay N/A.</span></aside>;
+  if (!collapsed) return content;
+  return (
+    <details className="social-native-account-details">
+      <summary><strong>Data details and source windows</strong><span>Latest provider snapshot; source windows may differ from selected report dates</span></summary>
+      {content}
+    </details>
   );
 }
 
-function SocialReportView({ districtName, reportWindow, filterContext, posts, analystNote, accountMetricSummary }) {
+function formatExecutivePercent(value) {
+  if (value === null || value === undefined || !Number.isFinite(Number(value))) return null;
+  const number = Number(value);
+  return `${number > 0 ? '+' : ''}${number.toFixed(0)}%`;
+}
+
+function executiveAccountLabel(signal) {
+  const identity = signal.accountIdentity || {};
+  const account = identity.name || identity.handle || 'Authorized account';
+  return `${formatSourceLabel(signal.platform)} · ${account}`;
+}
+
+function executiveCoverageLabel(signal) {
+  const range = (coverage) => coverage?.start && coverage?.end
+    ? `${coverage.start} to ${coverage.end}`
+    : 'none';
+  return `Observed coverage: selected window ${range(signal.currentCoverage)}; prior window ${range(signal.comparisonCoverage)}.`;
+}
+
+function SocialExecutiveDecisionPanel({ decision, reportLabel = '' }) {
+  if (!decision) return null;
+  return (
+    <section className={`social-executive-decision status-${decision.overallStatus}`} aria-label="Social performance decision">
+      <header>
+        <div><span className="social-eyebrow">Are we improving?</span><strong className="social-executive-status">{decision.overallLabel}</strong></div>
+        {reportLabel && <small>{reportLabel}</small>}
+      </header>
+      <p className="social-executive-summary">{decision.summary}</p>
+      <p className="social-executive-history-note">{decision.historyNote}</p>
+      <div className="social-executive-dimensions">
+        {decision.dimensions.map((dimension) => (
+          <article className={`social-executive-dimension status-${dimension.status}`} key={dimension.id}>
+            <header><h3>{dimension.label}</h3><span className="social-status-text">{dimension.statusLabel}</span></header>
+            {dimension.id === 'publishing' ? (
+              <div className="social-executive-signal">
+                <strong>Published posts</strong>
+                <span>{dimension.signals[0].currentValue} selected-period official posts vs {dimension.signals[0].comparisonValue} prior-period official posts</span>
+                <small>{dimension.statusLabel}{formatExecutivePercent(dimension.signals[0].percentChange) ? ` · ${formatExecutivePercent(dimension.signals[0].percentChange)}` : ''}. Publishing volume is descriptive only.</small>
+              </div>
+            ) : dimension.signals.length ? dimension.signals.map((signal, index) => (
+              <div className="social-executive-signal" key={`${dimension.id}-${signal.platform}-${signal.metricLabel}-${index}`}>
+                <strong>{executiveAccountLabel(signal)} · {signal.metricLabel}</strong>
+                {signal.status === 'insufficient_history' ? (
+                  <><span>Building baseline</span><small>{executiveCoverageLabel(signal)} Complete daily coverage is required in both windows.</small></>
+                ) : (
+                  <><span>{formatSocialMetric(signal.currentValue)} current vs {formatSocialMetric(signal.comparisonValue)} prior</span><small>{signal.statusLabel}{formatExecutivePercent(signal.percentChange) ? ` · ${formatExecutivePercent(signal.percentChange)}` : ''}</small></>
+                )}
+              </div>
+            )) : <p className="social-executive-empty">Building baseline · no compatible native signal is available.</p>}
+          </article>
+        ))}
+      </div>
+    </section>
+  );
+}
+
+function SocialReportView({ districtName, reportWindow, filterContext, posts, analystNote, accountMetricSummary, performanceDecision }) {
   const summary = summarizeSocialReport(posts);
   const topPerformerGroups = groupTopReportPostsByPlatform(posts, 3);
   const allPosts = [...posts].sort((a, b) => {
@@ -2886,6 +2948,8 @@ function SocialReportView({ districtName, reportWindow, filterContext, posts, an
         </dl>
       </header>
       {analystNote?.trim() && <section className="social-report-section social-report-analyst-note"><div className="social-report-section-heading"><h2>Social Media Brief</h2><p>Human-reviewed context for leadership and board discussion.</p></div><p>{analystNote.trim()}</p></section>}
+      <SocialExecutiveDecisionPanel decision={performanceDecision} reportLabel={reportWindow} />
+      <div className="social-report-section-heading social-published-cohort-heading"><h2>Published-content cohort</h2><p>Latest lifetime metrics for official posts published in the selected period. Useful for content comparison, not activity received during the period.</p></div>
       <section className="social-report-scorecards" aria-label="Executive scorecards">
         <article><span>Reported views</span><strong>{summary.reportedViews === null ? 'Not available' : formatSocialMetric(summary.reportedViews)}</strong><small>{viewCoverage} · latest lifetime provider views; this connection does not supply one shared impressions total</small></article>
         <article><span>Comparable public interactions</span><strong>{summary.totalInteractions === null ? 'Not available' : formatSocialMetric(summary.totalInteractions)}</strong><small>{interactionCoverage} · {interactionMetricCoverage} · latest lifetime snapshots</small></article>
@@ -2998,7 +3062,6 @@ function MonthlySocialPerformance({
   accountMetricSummary,
   performanceDecision,
 }) {
-  void performanceDecision;
   const [postTableSort, setPostTableSort] = useState('newest');
   const summary = summarizeSocialReport(posts);
   const previousSummary = summarizeSocialReport(previousPosts);
@@ -3033,9 +3096,9 @@ function MonthlySocialPerformance({
     <section className="social-monthly-performance" id="social-monthly-performance" aria-label="Monthly Social Performance">
       <header className="social-monthly-header">
         <div>
-          <span className="social-eyebrow">Monthly reporting</span>
-          <h2>{districtName} Social Performance</h2>
-          <p>Official district posts, month-over-month context, top content, and leadership-ready reporting. Unavailable platform metrics remain explicitly unavailable.</p>
+          <span className="social-eyebrow">Social performance</span>
+          <h2>Are we improving?</h2>
+          <p>{districtName} native account direction and official publishing evidence. Unavailable platform metrics remain explicitly unavailable.</p>
         </div>
         <div className="social-monthly-actions">
           <button type="button" className="btn btn-secondary btn-sm" onClick={onExportCsv}>Export underlying CSV</button>
@@ -3064,8 +3127,11 @@ function MonthlySocialPerformance({
         <div className="social-monthly-period-label"><span>Comparison</span><strong>{comparisonWindow.label}</strong><small>{comparisonWindow.startInput} to {comparisonWindow.endInput}</small></div>
       </div>
       {period === 'custom' && <div className="social-top-custom-range"><label><span>From</span><input type="date" value={customStart} max={customEnd || reportWindow.endInput} onChange={(event) => setCustomStart(event.target.value)} /></label><label><span>To</span><input type="date" value={customEnd} min={customStart || undefined} max={dateInputValue(new Date())} onChange={(event) => setCustomEnd(event.target.value)} /></label></div>}
-      <p className="social-date-window-note">Changing the report dates recalculates post scorecards, comparisons, highlights, the complete post table, PDF, and CSV. The native account table below remains the latest provider snapshot and shows its own source window.</p>
+      <p className="social-date-window-note">Changing the report dates recalculates post scorecards, comparisons, highlights, tables, PDF, and CSV. The native account table below remains the latest provider snapshot and shows its own source window.</p>
 
+      <SocialExecutiveDecisionPanel decision={performanceDecision} reportLabel={reportWindow.label} />
+
+      <div className="social-monthly-section-heading social-published-cohort-heading"><h3>Published-content cohort</h3><p>Latest lifetime metrics for official posts published in the selected period. Useful for content comparison, not activity received during the period.</p></div>
       <div className="social-monthly-kpis" aria-label="Monthly Social scorecards">
         <article><span>Reported views</span><strong>{summary.reportedViews === null ? 'Not available' : formatSocialMetric(summary.reportedViews)}</strong><small>{formatSocialComparison(comparisons.views)} vs. prior period · latest lifetime provider views; this connection does not supply one shared impressions total · available for {summary.viewsCoverage.available}/{summary.viewsCoverage.total}</small></article>
         <article><span>Comparable post interactions</span><strong>{summary.totalInteractions === null ? 'Not available' : formatSocialMetric(summary.totalInteractions)}</strong><small>{formatSocialComparison(comparisons.interactions)} vs. prior period · latest lifetime values · complete reactions, comments, and shares for {summary.interactionsAvailable}/{summary.officialPosts} posts</small></article>
@@ -3075,7 +3141,7 @@ function MonthlySocialPerformance({
         <article><span>Official posts</span><strong>{summary.officialPosts}</strong><small>{formatSocialComparison(comparisons.posts)} vs. prior period</small></article>
       </div>
 
-      <NativeAccountMetrics summary={accountMetricSummary} />
+      <NativeAccountMetrics summary={accountMetricSummary} collapsed />
 
       <div className="social-monthly-analysis-grid">
         <section>
@@ -3282,6 +3348,13 @@ export function SocialView({ socialResults, legacySocialResults = [], socialSour
       && verifiedOfficialSourceKeys.has(`${result.socialAccountId}:${result.districtId}:${result.platform}`)),
     [monthlyReportCandidates, comparisonPostsWindow, verifiedOfficialSourceKeys],
   );
+  const socialExecutiveDecision = useMemo(
+    () => buildSocialExecutiveDecision(nativePerformance, {
+      currentPostCount: socialReportPosts.length,
+      comparisonPostCount: previousSocialReportPosts.length,
+    }),
+    [nativePerformance, socialReportPosts, previousSocialReportPosts],
+  );
 
   const reportDistrictName = districtFilter === 'All'
     ? 'All Districts'
@@ -3361,6 +3434,7 @@ export function SocialView({ socialResults, legacySocialResults = [], socialSour
           posts={socialReportPosts}
           analystNote={socialAnalystNote}
           accountMetricSummary={accountMetricSummary}
+          performanceDecision={socialExecutiveDecision}
         />
       )}
       <nav className="social-page-tabs" aria-label="Social page sections">
@@ -3391,7 +3465,7 @@ export function SocialView({ socialResults, legacySocialResults = [], socialSour
         onExportPdf={exportSocialPdf}
         onExportCsv={exportOfficialSocialCsv}
         accountMetricSummary={accountMetricSummary}
-        performanceDecision={nativePerformance}
+        performanceDecision={socialExecutiveDecision}
       />
       {socialMessage && <p className="social-review-error" role="alert">{socialMessage}</p>}
       {isAdmin && legacySocialResults.length > 0 && (

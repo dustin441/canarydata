@@ -254,6 +254,138 @@ function overallStatus(statuses) {
   return 'steady';
 }
 
+const EXECUTIVE_STATUS_LABELS = Object.freeze({
+  improving: 'Improving',
+  declining: 'Declining',
+  mixed: 'Mixed',
+  steady: 'Steady',
+  insufficient_history: 'Building baseline',
+});
+
+function executiveStatusLabel(status) {
+  return EXECUTIVE_STATUS_LABELS[status] || EXECUTIVE_STATUS_LABELS.insufficient_history;
+}
+
+function rollupDimensionStatus(signals) {
+  const statuses = signals
+    .map((signal) => signal.status)
+    .filter((status) => status && status !== 'insufficient_history');
+  if (!statuses.length) return 'insufficient_history';
+  if (statuses.includes('improving') && statuses.includes('declining')) return 'mixed';
+  if (statuses.includes('improving')) return 'improving';
+  if (statuses.includes('declining')) return 'declining';
+  return 'steady';
+}
+
+function executiveSignal(account, dimensionKey) {
+  const trend = account?.dimensions?.[dimensionKey];
+  if (!trend) return null;
+  return {
+    platform: account.platform,
+    accountIdentity: account.accountIdentity || { name: null, handle: null, profileUrl: null },
+    metricLabel: trend.label,
+    current: trend.currentValue,
+    comparison: trend.comparisonValue,
+    percent: trend.percentChange,
+    currentValue: trend.currentValue,
+    comparisonValue: trend.comparisonValue,
+    percentChange: trend.percentChange,
+    status: trend.status || 'insufficient_history',
+    statusLabel: executiveStatusLabel(trend.status),
+    source: trend.source || null,
+    sourceLabel: trend.sourceLabel || '',
+    currentCoverage: trend.currentCoverage || { start: null, end: null },
+    comparisonCoverage: trend.comparisonCoverage || { start: null, end: null },
+  };
+}
+
+function nativeDimension(accounts, id, label) {
+  const signals = accounts.map((account) => executiveSignal(account, id)).filter(Boolean);
+  const status = rollupDimensionStatus(signals);
+  return { id, label, status, statusLabel: executiveStatusLabel(status), signals };
+}
+
+function publishingDimension(currentPostCount, comparisonPostCount) {
+  const currentValue = Math.max(0, Number.isFinite(Number(currentPostCount)) ? Number(currentPostCount) : 0);
+  const comparisonValue = Math.max(0, Number.isFinite(Number(comparisonPostCount)) ? Number(comparisonPostCount) : 0);
+  const status = comparisonValue === 0
+    ? 'no_prior_baseline'
+    : currentValue > comparisonValue
+      ? 'increased'
+      : currentValue < comparisonValue
+        ? 'decreased'
+        : 'steady';
+  const statusLabel = status === 'no_prior_baseline'
+    ? 'No prior baseline'
+    : status.charAt(0).toUpperCase() + status.slice(1);
+  const percentChange = comparisonValue > 0 ? ((currentValue - comparisonValue) / comparisonValue) * 100 : null;
+  return {
+    id: 'publishing',
+    label: 'Publishing output',
+    status,
+    statusLabel,
+    signals: [{
+      metricLabel: 'Published posts',
+      current: currentValue,
+      comparison: comparisonValue,
+      percent: percentChange,
+      currentValue,
+      comparisonValue,
+      percentChange,
+      status,
+      statusLabel,
+      source: 'official_published_post_cohort',
+    }],
+  };
+}
+
+function coverageNote(nativePerformance, buildingBaseline) {
+  const windowLabel = (window) => window?.start && window?.end
+    ? `${window.start} to ${window.end}`
+    : 'not available';
+  const currentWindow = windowLabel(nativePerformance?.windows?.current);
+  const comparisonWindow = windowLabel(nativePerformance?.windows?.comparison);
+  const observedStart = nativePerformance?.coverage?.start;
+  const observedEnd = nativePerformance?.coverage?.end;
+  const observedCoverage = observedStart && observedEnd ? `${observedStart} to ${observedEnd}` : 'not available';
+  if (buildingBaseline) {
+    return `Selected native window: ${currentWindow}. Prior comparison window: ${comparisonWindow}. Observed native history: ${observedCoverage}. Two complete like-for-like windows are required before a performance direction is reported.`;
+  }
+  return `Selected native window: ${currentWindow}. Prior comparison window: ${comparisonWindow}. Observed native history: ${observedCoverage}. Direction uses Meta account-level daily signals; platform metrics remain separate.`;
+}
+
+/**
+ * Creates the presentation-only executive decision contract. Native direction and
+ * published-post output intentionally remain independent evidence cohorts.
+ */
+export function buildSocialExecutiveDecision(nativePerformance = {}, { currentPostCount = 0, comparisonPostCount = 0 } = {}) {
+  const accounts = Array.isArray(nativePerformance?.accounts) ? nativePerformance.accounts : [];
+  const nativeStatus = Object.hasOwn(EXECUTIVE_STATUS_LABELS, nativePerformance?.overallStatus)
+    ? nativePerformance.overallStatus
+    : 'insufficient_history';
+  const comparableCount = Number.isFinite(Number(nativePerformance?.comparableCount))
+    ? Math.max(0, Number(nativePerformance.comparableCount))
+    : 0;
+  const buildingBaseline = nativeStatus === 'insufficient_history';
+  const direction = nativeStatus === 'mixed' ? 'mixed' : executiveStatusLabel(nativeStatus).toLowerCase();
+  const summary = buildingBaseline
+    ? 'Native account history is building; no performance direction is reported yet.'
+    : `Native direction is ${direction} across ${comparableCount} comparable native ${comparableCount === 1 ? 'signal' : 'signals'} in the exact selected and prior windows.`;
+  return {
+    overallStatus: nativeStatus,
+    overallLabel: executiveStatusLabel(nativeStatus),
+    comparableCount,
+    summary,
+    historyNote: coverageNote(nativePerformance, buildingBaseline),
+    dimensions: [
+      nativeDimension(accounts, 'visibility', 'Visibility'),
+      nativeDimension(accounts, 'engagement', 'Engagement'),
+      nativeDimension(accounts, 'audience', 'Audience'),
+      publishingDimension(currentPostCount, comparisonPostCount),
+    ],
+  };
+}
+
 export function buildSocialPerformanceFromDailySeries(series = [], { currentWindow, comparisonWindow } = {}) {
   const validatedSeries = (Array.isArray(series) ? series : [])
     .map(validatedDailySeriesPoint)

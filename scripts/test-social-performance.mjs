@@ -2,6 +2,7 @@ import assert from 'node:assert/strict';
 import { readFileSync, readdirSync } from 'node:fs';
 import { join } from 'node:path';
 import {
+  buildSocialExecutiveDecision,
   buildSocialPerformance,
   buildSocialPerformanceFromDailySeries,
   buildSocialDailySeries,
@@ -195,6 +196,69 @@ const steadyOverall = buildSocialPerformance([
 ], { currentWindow, comparisonWindow });
 assert.equal(steadyOverall.overallStatus, 'steady');
 
+const executive = buildSocialExecutiveDecision(performance, { currentPostCount: 12, comparisonPostCount: 8 });
+assert.equal(executive.overallLabel, 'Mixed');
+assert.deepEqual(executive.dimensions.map((dimension) => dimension.label), ['Visibility', 'Engagement', 'Audience', 'Publishing output']);
+assert.deepEqual(executive.dimensions.map((dimension) => dimension.status), ['improving', 'mixed', 'improving', 'increased']);
+assert.equal(executive.dimensions.find((dimension) => dimension.label === 'Visibility').signals.length, 2, 'platform visibility signals remain separate rows');
+assert.deepEqual(
+  executive.dimensions.find((dimension) => dimension.label === 'Visibility').signals.map((signal) => [signal.platform, signal.metricLabel, signal.currentValue]),
+  [['facebook', 'Views', 340], ['instagram', 'Reach', 150]],
+  'Facebook views and Instagram reach are preserved rather than summed',
+);
+assert.equal(executive.dimensions.find((dimension) => dimension.label === 'Publishing output').signals[0].metricLabel, 'Published posts');
+assert.equal(executive.dimensions.find((dimension) => dimension.label === 'Publishing output').statusLabel, 'Increased');
+assert.doesNotMatch(JSON.stringify(executive), /impressions|combinedAudience|audienceTotal/i, 'the executive contract has no impression or combined-audience field');
+assert.doesNotMatch(executive.summary, /because|caused|drove|due to|resulted/i, 'the deterministic summary makes no causal claim');
+assert.match(executive.summary, /direction is mixed across 5 comparable native signals/i);
+assert.match(executive.historyNote, /Selected native window: 2026-07-08 to 2026-07-10/);
+assert.match(executive.historyNote, /Prior comparison window: 2026-07-01 to 2026-07-03/);
+
+const rollupFixture = buildSocialExecutiveDecision({
+  overallStatus: 'steady',
+  comparableCount: 3,
+  accounts: [
+    { platform: 'facebook', dimensions: {
+      visibility: { label: 'Views', status: 'steady' },
+      engagement: { label: 'Engagement', status: 'declining' },
+      audience: { label: 'Audience change', status: 'insufficient_history' },
+    } },
+    { platform: 'instagram', dimensions: {
+      visibility: { label: 'Reach', status: 'steady' },
+      engagement: { label: 'Engagement', status: 'insufficient_history' },
+      audience: { label: 'Audience change', status: 'insufficient_history' },
+    } },
+  ],
+});
+assert.deepEqual(rollupFixture.dimensions.slice(0, 3).map((dimension) => dimension.status), ['steady', 'declining', 'insufficient_history'], 'dimension rollups cover all-steady, declining-only, and no-comparable cases');
+
+for (const [status, label] of [
+  ['improving', 'Improving'],
+  ['declining', 'Declining'],
+  ['mixed', 'Mixed'],
+  ['steady', 'Steady'],
+  ['insufficient_history', 'Building baseline'],
+]) {
+  assert.equal(buildSocialExecutiveDecision({ overallStatus: status, comparableCount: 2, accounts: [], coverage: { start: '2026-07-01', end: '2026-07-10' } }).overallLabel, label);
+}
+
+const baselineWithMorePosts = buildSocialExecutiveDecision(
+  { overallStatus: 'insufficient_history', comparableCount: 0, accounts: [], coverage: { start: '2026-07-08', end: '2026-07-10' } },
+  { currentPostCount: 50, comparisonPostCount: 1 },
+);
+assert.equal(baselineWithMorePosts.overallLabel, 'Building baseline', 'publishing volume cannot promote an unavailable native baseline into growth');
+assert.equal(baselineWithMorePosts.dimensions.at(-1).status, 'increased');
+assert.match(baselineWithMorePosts.historyNote, /Selected native window: not available/);
+assert.match(baselineWithMorePosts.historyNote, /Prior comparison window: not available/);
+assert.match(baselineWithMorePosts.historyNote, /Observed native history: 2026-07-08 to 2026-07-10/);
+assert.match(baselineWithMorePosts.historyNote, /Two complete like-for-like windows are required/);
+
+const noPriorPublishing = buildSocialExecutiveDecision({}, { currentPostCount: 5, comparisonPostCount: 0 }).dimensions.at(-1);
+assert.equal(noPriorPublishing.status, 'no_prior_baseline');
+assert.equal(noPriorPublishing.statusLabel, 'No prior baseline');
+assert.equal(buildSocialExecutiveDecision({}, { currentPostCount: 4, comparisonPostCount: 5 }).dimensions.at(-1).status, 'decreased');
+assert.equal(buildSocialExecutiveDecision({}, { currentPostCount: 5, comparisonPostCount: 5 }).dimensions.at(-1).status, 'steady');
+
 const dataSource = readFileSync(new URL('../src/lib/data.js', import.meta.url), 'utf8');
 assert.match(dataSource, /const SOCIAL_METRIC_HISTORY_DAYS = 95;/, 'history reads cover exactly 95 complete UTC days');
 const historyLoader = dataSource.slice(dataSource.indexOf('export async function getSocialMetricHistory'), dataSource.indexOf('export async function readAllSocialReviewEvents'));
@@ -225,13 +289,14 @@ assert.match(dashboardPageSource, /socialPerformanceHistory=\{socialPerformanceH
 assert.doesNotMatch(dashboardPageSource, /socialMetricHistory=\{/i, 'raw history must never be passed to DashboardClient');
 
 const dashboardClientSource = readFileSync(new URL('../src/app/dashboard/DashboardClient.js', import.meta.url), 'utf8');
-assert.match(dashboardClientSource, /import \{ buildSocialPerformanceFromDailySeries \} from '@\/lib\/socialPerformance\.mjs';/, 'the client imports only the sanitized-series performance builder');
+assert.match(dashboardClientSource, /import \{ buildSocialExecutiveDecision, buildSocialPerformanceFromDailySeries \} from '@\/lib\/socialPerformance\.mjs';/, 'the client imports only sanitized-series performance presentation builders');
 assert.doesNotMatch(dashboardClientSource, /getSocialMetricHistory|buildSocialDailySeries|social_provider_metric_snapshots/, 'the client cannot load or sanitize raw history');
 assert.match(dashboardClientSource, /socialPerformanceHistory = \{\}/, 'DashboardClient defaults missing history to an empty tenant map');
 assert.match(dashboardClientSource, /socialPerformanceHistory=\{socialPerformanceHistory\}/, 'DashboardClient passes sanitized history through to SocialView');
 assert.match(dashboardClientSource, /districtFilter === 'All'\s*\? \[\]\s*:\s*socialPerformanceHistory\[districtFilter\] \|\| \[\]/, 'All never selects a district series');
 assert.match(dashboardClientSource, /useMemo\(\s*\(\) => buildSocialPerformanceFromDailySeries\(nativePerformanceSeries, \{\s*currentWindow: topPostsWindow,\s*comparisonWindow: comparisonPostsWindow,\s*\}\),\s*\[nativePerformanceSeries, topPostsWindow, comparisonPostsWindow\]/, 'native performance updates whenever sanitized history or either dynamic report window changes');
-assert.match(dashboardClientSource, /performanceDecision=\{nativePerformance\}/, 'the dynamic decision reaches MonthlySocialPerformance without rendering a panel yet');
+assert.match(dashboardClientSource, /performanceDecision=\{socialExecutiveDecision\}/, 'the deterministic executive decision reaches both screen and report views');
+assert.match(dashboardClientSource, /buildSocialExecutiveDecision\(nativePerformance, \{\s*currentPostCount: socialReportPosts\.length,\s*comparisonPostCount: previousSocialReportPosts\.length/);
 
 const srcRoot = new URL('../src/', import.meta.url);
 const sourceFiles = readdirSync(srcRoot, { recursive: true, withFileTypes: true })

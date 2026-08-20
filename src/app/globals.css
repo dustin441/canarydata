@@ -1333,6 +1333,49 @@ a:hover {
 .social-native-metric > small { color: var(--text-tertiary); font-size: 0.68rem; line-height: 1.3; }
 .social-native-na { color: var(--text-tertiary); font-style: italic; }
 .social-native-account-note { margin: 12px 0 0; color: var(--text-tertiary); font-size: 0.72rem; line-height: 1.45; }
+.social-native-account-details { min-width: 0; overflow: hidden; border: 1px solid var(--border-primary); border-radius: var(--radius-lg); background: var(--bg-elevated); }
+.social-native-account-details > summary { display: flex; align-items: center; justify-content: space-between; gap: 14px; padding: 16px 18px; color: var(--text-primary); cursor: pointer; }
+.social-native-account-details > summary span { color: var(--text-tertiary); font-size: 0.75rem; text-align: right; }
+.social-native-account-details[open] > summary { border-bottom: 1px solid var(--border-primary); }
+.social-native-account-details > .social-native-account-metrics { border: 0; border-radius: 0; }
+.social-native-account-details > .social-monthly-data-readiness { margin: 16px; }
+
+.social-executive-decision { display: grid; gap: 14px; min-width: 0; padding: 20px; border: 2px solid var(--border-primary); border-radius: var(--radius-lg); background: var(--bg-elevated); }
+.social-executive-decision > header { display: flex; align-items: flex-start; justify-content: space-between; gap: 16px; }
+.social-executive-decision > header > div { display: grid; gap: 3px; }
+.social-executive-decision > header small { color: var(--text-tertiary); font-weight: 700; }
+.social-executive-status { color: var(--text-primary); font-size: clamp(1.7rem, 3vw, 2.5rem); line-height: 1; }
+.social-executive-summary { margin: 0; color: var(--text-primary); font-size: 1rem; font-weight: 700; line-height: 1.5; }
+.social-executive-history-note { margin: 0; color: var(--text-secondary); font-size: 0.78rem; line-height: 1.5; }
+.social-executive-dimensions { display: grid; grid-template-columns: repeat(4, minmax(0, 1fr)); gap: 10px; }
+.social-executive-dimension { min-width: 0; padding: 14px; border: 1px solid var(--border-primary); border-top-width: 4px; border-radius: var(--radius-md); background: var(--bg-card); }
+.social-executive-dimension > header { display: flex; align-items: flex-start; justify-content: space-between; gap: 8px; margin-bottom: 10px; }
+.social-executive-dimension h3 { margin: 0; color: var(--text-primary); font-size: 0.9rem; }
+.social-status-text { color: var(--text-secondary); font-size: 0.7rem; font-weight: 850; text-transform: uppercase; }
+.social-status-text::before { content: 'Status: '; }
+.social-executive-signal { display: grid; gap: 4px; padding: 9px 0; border-top: 1px solid var(--border-primary); }
+.social-executive-signal:first-of-type { border-top: 0; }
+.social-executive-signal strong { color: var(--text-primary); font-size: 0.75rem; line-height: 1.35; }
+.social-executive-signal span { color: var(--text-secondary); font-size: 0.75rem; line-height: 1.4; }
+.social-executive-signal small,
+.social-executive-empty { margin: 0; color: var(--text-tertiary); font-size: 0.68rem; line-height: 1.4; overflow-wrap: anywhere; }
+.social-executive-decision.status-improving,
+.social-executive-dimension.status-improving,
+.social-executive-dimension.status-increased { border-top-color: #22c55e; }
+.social-executive-decision.status-declining,
+.social-executive-dimension.status-declining,
+.social-executive-dimension.status-decreased { border-top-color: #ef4444; }
+.social-executive-decision.status-mixed,
+.social-executive-dimension.status-mixed { border-top-color: #f59e0b; }
+.social-executive-decision.status-steady,
+.social-executive-dimension.status-steady { border-top-color: #60a5fa; }
+.social-executive-decision.status-insufficient_history,
+.social-executive-dimension.status-insufficient_history,
+.social-executive-dimension.status-no_prior_baseline { border-top-color: #94a3b8; border-style: dashed; }
+.social-published-cohort-heading { padding-top: 2px; }
+.social-published-cohort-heading h2,
+.social-published-cohort-heading h3 { margin: 0; color: var(--text-primary); }
+.social-published-cohort-heading p { max-width: 760px; }
 .social-date-window-note { margin: 0; padding: 10px 12px; border-left: 3px solid var(--blue-400); border-radius: 0 var(--radius-sm) var(--radius-sm) 0; color: var(--text-secondary); background: rgba(59, 130, 246, 0.08); font-size: 0.82rem; line-height: 1.5; }
 
 .social-page-tabs {
@@ -3220,6 +3263,7 @@ input[type="date"]::-webkit-calendar-picker-indicator {
   .social-monthly-analysis-grid {
     grid-template-columns: repeat(2, minmax(0, 1fr));
   }
+  .social-executive-dimensions { grid-template-columns: repeat(2, minmax(0, 1fr)); }
 
   .social-monthly-header { flex-direction: column; }
   .social-monthly-actions { justify-content: flex-start; }
@@ -3255,6 +3299,11 @@ input[type="date"]::-webkit-calendar-picker-indicator {
   .social-monthly-kpis,
   .social-monthly-analysis-grid,
   .social-monthly-top-posts .board-report-social { grid-template-columns: minmax(0, 1fr); }
+  .social-executive-dimensions { grid-template-columns: minmax(0, 1fr); }
+  .social-executive-decision > header,
+  .social-published-cohort-heading,
+  .social-native-account-details > summary { align-items: flex-start; flex-direction: column; }
+  .social-native-account-details > summary span { text-align: left; }
   .social-monthly-controls > *,
   .social-monthly-kpis > *,
   .social-monthly-analysis-grid > *,
@@ -5701,6 +5750,21 @@ input[type="date"]::-webkit-calendar-picker-indicator {
     font-weight: 700;
     overflow-wrap: anywhere;
   }
+
+  .social-report .social-executive-decision { gap: 7px; margin: 12px 0; padding: 10px 12px; border: 1px solid #94a3b8; background: #ffffff !important; break-inside: avoid; page-break-inside: avoid; }
+  .social-report .social-executive-status { color: #0f172a !important; font-size: 22px; }
+  .social-report .social-executive-summary { color: #0f172a !important; font-size: 10px; }
+  .social-report .social-executive-history-note { color: #64748b !important; font-size: 7.5px; }
+  .social-report .social-executive-dimensions { grid-template-columns: repeat(4, minmax(0, 1fr)); gap: 6px; }
+  .social-report .social-executive-dimension { padding: 7px; background: #f8fafc !important; }
+  .social-report .social-executive-dimension h3,
+  .social-report .social-executive-signal strong { color: #0f172a !important; font-size: 7.5px; }
+  .social-report .social-status-text,
+  .social-report .social-executive-signal span,
+  .social-report .social-executive-signal small,
+  .social-report .social-executive-empty { color: #64748b !important; font-size: 6.5px; }
+  .social-report .social-executive-signal { padding: 4px 0; }
+  .social-report .social-published-cohort-heading { margin: 10px 0 5px; }
 
   .social-report-scorecards {
     display: grid;
