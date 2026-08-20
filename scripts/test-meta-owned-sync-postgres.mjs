@@ -1,4 +1,5 @@
 import assert from 'node:assert/strict';
+import { createHash } from 'node:crypto';
 import { readFile } from 'node:fs/promises';
 import { withSocialDatabase } from './fixtures/social-db-harness.mjs';
 
@@ -28,6 +29,8 @@ await withSocialDatabase('meta-owned-sync', async ({ sql, expectFailure, session
   const insightsMigration = await readFile(new URL('../supabase/migrations/20260814223000_meta_owned_social_insights.sql', import.meta.url), 'utf8');
   const latestMetricMigration = await readFile(new URL('../supabase/migrations/20260819223000_social_metric_latest_view.sql', import.meta.url), 'utf8');
   const latestMetricRollback = await readFile(new URL('../supabase/rollbacks/20260819223000_social_metric_latest_view_down.sql', import.meta.url), 'utf8');
+  const deletionFenceMigration = await readFile(new URL('../supabase/migrations/20260820200000_meta_sync_deletion_fence.sql', import.meta.url), 'utf8');
+  const deletionFenceRollback = await readFile(new URL('../supabase/rollbacks/20260820200000_meta_sync_deletion_fence_down.sql', import.meta.url), 'utf8');
   assert.doesNotMatch(latestMetricMigration, /\bconcurrently\b/i, 'Supabase SQL Editor wraps submitted SQL in a transaction');
   assert.doesNotMatch(latestMetricRollback, /\bconcurrently\b/i, 'rollback must also be SQL Editor compatible');
   const finalCurrentState = await readFile(new URL('../supabase/manual/canary_meta_database_final_current_state.sql', import.meta.url), 'utf8');
@@ -36,21 +39,29 @@ await withSocialDatabase('meta-owned-sync', async ({ sql, expectFailure, session
   sql(insightsMigration);
   sql(latestMetricMigration);
   sql(finalCurrentState);
+  sql(deletionFenceMigration);
   sql(`
     insert into public.districts(id,name) values ('district-meta','District Meta');
     insert into public.social_provider_connections(id,district_id,provider,provider_app_id,provider_user_id,status)
       values ('10000000-0000-4000-8000-000000000001','district-meta','meta','app-1','user-1','active');
     insert into public.social_provider_assets(id,district_id,connection_id,provider_asset_id,asset_type,platform,name,handle,selected,active)
       values ('20000000-0000-4000-8000-000000000001','district-meta','10000000-0000-4000-8000-000000000001','page-1','facebook_page','facebook','District Meta','districtmeta',true,true);
-    select public.canary_link_selected_meta_assets('district-meta','10000000-0000-4000-8000-000000000001');
+    select public.canary_fenced_link_selected_meta_assets('district-meta','10000000-0000-4000-8000-000000000001');
   `);
+  expectFailure(`select public.canary_link_selected_meta_assets('district-meta','10000000-0000-4000-8000-000000000001');`, /permission denied/i, { role:'service_role' });
+  sql(deletionFenceRollback);
+  sql(`select public.canary_link_selected_meta_assets('district-meta','10000000-0000-4000-8000-000000000001');`, { role:'service_role' });
+  expectFailure(`select public.canary_fenced_link_selected_meta_assets('district-meta','10000000-0000-4000-8000-000000000001');`, /does not exist/i, { role:'service_role' });
+  sql(deletionFenceMigration);
+  expectFailure(`select public.canary_link_selected_meta_assets('district-meta','10000000-0000-4000-8000-000000000001');`, /permission denied/i, { role:'service_role' });
+  sql(`select public.canary_fenced_link_selected_meta_assets('district-meta','10000000-0000-4000-8000-000000000001');`, { role:'service_role' });
   const link = sql(`copy (select id||'|'||social_account_id from public.social_provider_account_links where district_id='district-meta' and active) to stdout;`).trim();
   const [linkId, accountId] = link.split('|');
   assert.ok(linkId && accountId);
   const linker = session('meta-linker', { role: 'service_role' });
   const revoker = session('meta-revoker');
   await linker.exec('begin;');
-  await linker.exec(`select public.canary_link_selected_meta_assets('district-meta','10000000-0000-4000-8000-000000000001');`);
+  await linker.exec(`select public.canary_fenced_link_selected_meta_assets('district-meta','10000000-0000-4000-8000-000000000001');`);
   const linkerPid = await linker.pid();
   await revoker.exec('begin;');
   const revokerPid = await revoker.pid();
@@ -72,14 +83,15 @@ await withSocialDatabase('meta-owned-sync', async ({ sql, expectFailure, session
     district_id:'district-meta',social_account_id:accountId,provider:'meta',platform:'facebook',external_thread_id:'post-1',
     canonical_url:'https://facebook.test/post-1',relationship_type:'owned',body:'Original',headline:'Original',published_at:'2026-08-13T12:00:00Z',visibility_status:'active',provider_metadata:{source:'meta_graph'},
   }).replaceAll("'", "''");
-  sql(`select (public.canary_ingest_owned_social_observation('${linkId}','${payload}'::jsonb)).id;`, { role:'service_role' });
+  expectFailure(`select (public.canary_ingest_owned_social_observation('${linkId}','${payload}'::jsonb)).id;`, /permission denied/i, { role:'service_role' });
+  sql(`select (public.canary_fenced_ingest_owned_social_observation('${linkId}','${payload}'::jsonb)).id;`, { role:'service_role' });
   assert.equal(sql(`copy (select count(*) from public.social_threads where district_id='district-meta' and external_thread_id='post-1') to stdout;`).trim(), '1');
   sql(`update public.social_threads set visibility_status='excluded', reviewer_note='keep excluded', review_version=3 where district_id='district-meta' and external_thread_id='post-1';`);
   const replay = JSON.stringify({
     district_id:'district-meta',social_account_id:accountId,provider:'meta',platform:'facebook',external_thread_id:'post-1',
     canonical_url:'https://facebook.test/post-1',relationship_type:'owned',body:'Edited provider text',headline:'Edited',published_at:'2026-08-13T12:00:00Z',visibility_status:'active',provider_metadata:{source:'meta_graph',observed:2},
   }).replaceAll("'", "''");
-  sql(`select (public.canary_ingest_owned_social_observation('${linkId}','${replay}'::jsonb)).id;`, { role:'service_role' });
+  sql(`select (public.canary_fenced_ingest_owned_social_observation('${linkId}','${replay}'::jsonb)).id;`, { role:'service_role' });
   assert.equal(sql(`copy (select visibility_status||'|'||reviewer_note||'|'||review_version||'|'||body from public.social_threads where district_id='district-meta' and external_thread_id='post-1') to stdout;`).trim(), 'excluded|keep excluded|3|Edited provider text');
   assert.equal(sql(`copy (select count(*) from public.social_thread_provider_observations where district_id='district-meta') to stdout;`).trim(), '1');
   expectFailure(`insert into public.social_provider_account_links(district_id,social_account_id,provider_asset_id,provider) values ('district-a','${accountId}','20000000-0000-4000-8000-000000000001','meta');`, /foreign key|duplicate/i);
@@ -99,7 +111,8 @@ await withSocialDatabase('meta-owned-sync', async ({ sql, expectFailure, session
   assert.equal(sql(`copy (select to_regclass('public.canary_latest_social_metric_snapshots') is null and to_regclass('public.social_provider_metric_snapshots_latest_idx') is null) to stdout;`).trim(),'t','latest metric read projection must roll back cleanly');
   sql(latestMetricMigration);
   const metricBatch = `[${metric}]`;
-  assert.equal(sql(`copy (select public.canary_upsert_meta_metric_snapshots('${linkId}','${threadId}','${metricBatch}'::jsonb)) to stdout;`, { role:'service_role' }).trim().split('\n').at(-1), '1');
+  expectFailure(`select public.canary_upsert_meta_metric_snapshots('${linkId}','${threadId}','${metricBatch}'::jsonb);`, /permission denied/i, { role:'service_role' });
+  assert.equal(sql(`copy (select public.canary_fenced_upsert_meta_metric_snapshots('${linkId}','${threadId}','${metricBatch}'::jsonb)) to stdout;`, { role:'service_role' }).trim().split('\n').at(-1), '1');
   expectFailure(`select public.canary_upsert_meta_metric_snapshots('${linkId}','${threadId}','${metricBatch}'::jsonb);`, /permission denied/i, { role:'authenticated' });
   sql(`select public.canary_upsert_meta_metric_snapshot('${linkId}','${threadId}','${metric}'::jsonb);`);
   assert.equal(sql(`copy (select count(*) from public.social_provider_metric_snapshots where provider_account_link_id='${linkId}' and provider_metric_name='post_media_view') to stdout;`).trim(), '2','history retains both effective periods while the dashboard view exposes one latest row');
@@ -114,11 +127,67 @@ await withSocialDatabase('meta-owned-sync', async ({ sql, expectFailure, session
   const wrongAccountMetric = accountMetric.replace('page-1', 'page-outside');
   expectFailure(`select public.canary_upsert_meta_metric_snapshot('${linkId}',null,'${wrongAccountMetric}'::jsonb);`, /does not match the selected Meta asset/i);
   expectFailure(`select public.canary_upsert_meta_metric_snapshot('${linkId}','${threadId}','${metric}'::jsonb);`, /permission denied/i, { role:'authenticated' });
-  sql(`update public.social_provider_connections set status='revoked' where id='10000000-0000-4000-8000-000000000001';`);
-  expectFailure(`select public.canary_ingest_owned_social_observation('${linkId}','${replay}'::jsonb);`, /Active Meta connection is required/, { role:'service_role' });
-  expectFailure(`select public.canary_upsert_meta_metric_snapshots('${linkId}','${threadId}','${metricBatch}'::jsonb);`, /Active Meta connection is required/, { role:'service_role' });
-  sql(`delete from public.social_threads where district_id='district-meta'; delete from public.social_accounts where district_id='district-meta';`);
+
+  // A district disconnect owns the district OAuth lock. A fenced ingest that
+  // observed the pre-disconnect link must wait, then fail its locked recheck.
+  sql(`
+    insert into public.districts(id,name) values ('district-disconnect','District Disconnect');
+    insert into public.social_provider_connections(id,district_id,provider,provider_app_id,provider_user_id,status)
+      values ('10000000-0000-4000-8000-000000000002','district-disconnect','meta','app-1','user-2','active');
+    insert into public.social_provider_assets(id,district_id,connection_id,provider_asset_id,asset_type,platform,name,handle,selected,active)
+      values ('20000000-0000-4000-8000-000000000002','district-disconnect','10000000-0000-4000-8000-000000000002','page-2','facebook_page','facebook','Disconnect District','disconnect',true,true);
+    select public.canary_fenced_link_selected_meta_assets('district-disconnect','10000000-0000-4000-8000-000000000002');
+  `);
+  const disconnectLink = sql(`copy (select id||'|'||social_account_id from public.social_provider_account_links where district_id='district-disconnect' and active) to stdout;`).trim();
+  const [disconnectLinkId, disconnectAccountId] = disconnectLink.split('|');
+  const disconnectPayload = JSON.stringify({
+    district_id:'district-disconnect',social_account_id:disconnectAccountId,provider:'meta',platform:'facebook',external_thread_id:'post-disconnect',
+    canonical_url:'https://facebook.test/post-disconnect',relationship_type:'owned',body:'Disconnect race',published_at:'2026-08-13T12:00:00Z',visibility_status:'active',provider_metadata:{source:'meta_graph'},
+  }).replaceAll("'", "''");
+  const disconnectOwner = session('meta-disconnect-owner');
+  const disconnectWriter = session('meta-disconnect-writer', { role: 'service_role' });
+  await disconnectOwner.exec('begin;');
+  await disconnectOwner.exec(`select public.canary_disconnect_meta_connection('10000000-0000-4000-8000-000000000002','district-disconnect',false);`);
+  const disconnectOwnerPid = await disconnectOwner.pid();
+  const disconnectWriterPid = await disconnectWriter.pid();
+  const disconnectWrite = assert.rejects(
+    disconnectWriter.exec(`select (public.canary_fenced_ingest_owned_social_observation('${disconnectLinkId}','${disconnectPayload}'::jsonb)).id;`),
+    /Active tenant-bound Meta link is required after lifecycle fence/,
+  );
+  await waitForBlocked(disconnectWriterPid, disconnectOwnerPid);
+  await disconnectOwner.exec('commit;');
+  await disconnectWrite;
+  assert.equal(sql(`copy (select count(*) from public.social_threads where district_id='district-disconnect') to stdout;`).trim(), '0');
+
+  // Provider deletion owns the provider-user lock before every district lock.
+  // Both canonical writers must block, then fail after deletion commits, and
+  // neither may recreate a canonical row or metric snapshot.
+  const providerHash = createHash('sha256').update('user-1').digest('hex');
+  const deletionOwner = session('meta-deletion-owner');
+  const ingestWriter = session('meta-deletion-ingest', { role: 'service_role' });
+  const metricWriter = session('meta-deletion-metric', { role: 'service_role' });
+  await deletionOwner.exec('begin;');
+  await deletionOwner.exec(`select public.canary_complete_meta_data_deletion('user-1','${providerHash}','delete-confirmation');`);
+  const deletionOwnerPid = await deletionOwner.pid();
+  const ingestWriterPid = await ingestWriter.pid();
+  const metricWriterPid = await metricWriter.pid();
+  const blockedIngest = assert.rejects(
+    ingestWriter.exec(`select (public.canary_fenced_ingest_owned_social_observation('${linkId}','${replay}'::jsonb)).id;`),
+    /Active tenant-bound Meta link is required after lifecycle fence/,
+  );
+  const blockedMetric = assert.rejects(
+    metricWriter.exec(`select public.canary_fenced_upsert_meta_metric_snapshots('${linkId}','${threadId}','${metricBatch}'::jsonb);`),
+    /Active tenant-bound Meta link is required after lifecycle fence/,
+  );
+  await waitForBlocked(ingestWriterPid);
+  await waitForBlocked(metricWriterPid);
+  await deletionOwner.exec('commit;');
+  await blockedIngest;
+  await blockedMetric;
+  assert.equal(sql(`copy (select count(*) from public.social_provider_connections where district_id='district-meta') to stdout;`).trim(), '0');
+  assert.equal(sql(`copy (select count(*) from public.social_threads where district_id='district-meta') to stdout;`).trim(), '0');
   assert.equal(sql(`copy (select count(*) from public.social_provider_metric_snapshots where district_id='district-meta') to stdout;`).trim(), '0');
+  assert.equal(sql(`copy (select count(*) from public.social_provider_deletion_requests where provider_user_id_hash='${providerHash}' and status='completed') to stdout;`).trim(), '1');
 });
 
 console.log('Meta owned-social PostgreSQL lifecycle rehearsal passed.');

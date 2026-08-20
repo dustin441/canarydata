@@ -1,5 +1,6 @@
+import { createHash } from 'node:crypto';
 import { decryptMetaToken, debugMetaToken, metaGrantedScopes, metaGraph, metaGraphAll, metaGraphBatch, metaIntegrationEnabledForDistrict } from './meta-integration.mjs';
-import { boundedMetaSourceCutoff, mapFacebookPagePosts, mapInstagramMedia, summarizeMetaSyncOutcome, validateMetaSyncSelection } from './meta-owned-sync.mjs';
+import { boundedMetaSourceCutoff, continuedMetaSourceCutoff, mapFacebookPagePosts, mapInstagramMedia, summarizeMetaSyncOutcome, validateMetaSyncSelection } from './meta-owned-sync.mjs';
 import { facebookAccountInsightRequests, facebookContentInsightRequests, instagramAccountInsightRequests, instagramContentInsightRequests, isMetaUnsupportedMetricError, normalizeMetaInsightBatch, sevenDayInsightWindow } from './meta-insights.mjs';
 
 const PAGE_FIELDS = 'id,access_token,tasks';
@@ -12,6 +13,51 @@ function safeError(error) {
 
 function isExecutionBudgetError(error, signal) {
   return signal?.aborted || ['AbortError', 'TimeoutError'].includes(String(error?.name || ''));
+}
+
+export function validateContentMetricRefreshDays(value = 14) {
+  if (typeof value !== 'number' || !Number.isInteger(value) || value < 1 || value > 30) {
+    throw new Error('Meta content metric refresh days must be an integer from 1 through 30.');
+  }
+  return value;
+}
+
+export function shouldRefreshMetaContentInsights({ exists, hasContentMetrics = false, publishedAt, cutoff }) {
+  if (!exists || !hasContentMetrics) return true;
+  const published = new Date(publishedAt);
+  const cutoffDate = cutoff instanceof Date ? cutoff : new Date(cutoff);
+  if (Number.isNaN(published.getTime()) || Number.isNaN(cutoffDate.getTime())) return true;
+  return published.getTime() >= cutoffDate.getTime();
+}
+
+export function normalizeMetaPageContinuation(value) {
+  if (typeof value === 'string' && value) return { after: value, completed: [] };
+  if (!value || typeof value !== 'object' || Array.isArray(value)) return { after: null, completed: [] };
+  const after = typeof value.after === 'string' && value.after ? value.after : null;
+  const completed = [...new Set((Array.isArray(value.completed) ? value.completed : [])
+    .filter((item) => typeof item === 'string' && /^[0-9a-f]{64}$/.test(item)))].slice(0, 100);
+  return { after, completed };
+}
+
+export function metaPageItemIdentity(providerObjectId) {
+  return createHash('sha256').update(String(providerObjectId)).digest('hex');
+}
+
+export function remainingMetaPageItems(rows, page) {
+  const completed = new Set(page.completed);
+  return (Array.isArray(rows) ? rows : []).filter((row) => !completed.has(metaPageItemIdentity(row?.id)));
+}
+
+export function metaPageContinuationAt(page, completedIdentities = []) {
+  return {
+    after: page.after,
+    completed: [...new Set([...page.completed, ...completedIdentities])].slice(0, 100),
+  };
+}
+
+export function assertMetaNativeSyncFlags(pilotItemLimit) {
+  if (process.env.META_NATIVE_SYNC_ENABLED !== 'true') throw Object.assign(new Error('Native Meta synchronization is disabled.'), { status: 503 });
+  if (pilotItemLimit == null && process.env.META_NATIVE_SYNC_PILOT_ONLY !== 'false') throw new Error('Native Meta synchronization requires a controlled pilot item limit.');
 }
 
 async function requireOne(query, message) {
@@ -27,7 +73,7 @@ async function persistInsightBatch({ admin, link, threadId = null, platform, met
   if (fatal) throw Object.assign(new Error(fatal.error?.message || 'Meta Insights request failed.'), { code: fatal.error?.code, type: fatal.error?.type });
   const metrics = normalizeMetaInsightBatch({ platform, metricScope, providerObjectId, requests, results, observedAt });
   if (!metrics.length) return 0;
-  const { data, error } = await admin.rpc('canary_upsert_meta_metric_snapshots', {
+  const { data, error } = await admin.rpc('canary_fenced_upsert_meta_metric_snapshots', {
     p_provider_account_link_id: link.id,
     p_social_thread_id: threadId,
     p_metrics: metrics,
@@ -37,9 +83,16 @@ async function persistInsightBatch({ admin, link, threadId = null, platform, met
   return metrics.length;
 }
 
-export async function syncSelectedMetaAssets({ admin, districtId, connectionId, sourceCutoff = null, pilotItemLimit = null, platforms = null, now = () => new Date() }) {
+export async function syncSelectedMetaAssets({ admin, districtId, connectionId, sourceCutoff = null, pilotItemLimit = null, platforms = null, contentMetricRefreshDays = 14, now = () => new Date() }) {
   if (!metaIntegrationEnabledForDistrict(districtId)) throw Object.assign(new Error('Meta integration is not available for this district.'), { status: 503 });
-  if (process.env.META_NATIVE_SYNC_ENABLED !== 'true') throw Object.assign(new Error('Native Meta synchronization is disabled.'), { status: 503 });
+  const pilotLimit = pilotItemLimit == null ? null : Number(pilotItemLimit);
+  if (pilotLimit != null && (!Number.isInteger(pilotLimit) || pilotLimit < 1 || pilotLimit > 2)) throw new Error('Meta pilot item limit must be 1 or 2.');
+  assertMetaNativeSyncFlags(pilotLimit);
+  const refreshDays = validateContentMetricRefreshDays(contentMetricRefreshDays);
+  const contentMetricCutoff = new Date(now().getTime() - refreshDays * 24 * 60 * 60 * 1000);
+  if (platforms != null && !Array.isArray(platforms)) throw new Error('Meta pilot platforms must be an array.');
+  const platformFilter = platforms == null ? null : [...new Set(platforms.map(String))];
+  if (platformFilter?.some((platform) => !['facebook', 'instagram'].includes(platform))) throw new Error('Meta pilot platforms must be Facebook or Instagram.');
   const connection = await requireOne(admin.from('social_provider_connections')
     .select('id,district_id,provider_app_id,provider_user_id,status,granted_scopes,token_expires_at')
     .eq('id', connectionId).eq('district_id', districtId).eq('provider', 'meta').maybeSingle(), 'Meta connection not found.');
@@ -61,12 +114,6 @@ export async function syncSelectedMetaAssets({ admin, districtId, connectionId, 
     if (!granted.includes(required)) throw new Error(`Meta permission ${required} is required for synchronization.`);
   }
 
-  const pilotLimit = pilotItemLimit == null ? null : Number(pilotItemLimit);
-  if (pilotLimit != null && (!Number.isInteger(pilotLimit) || pilotLimit < 1 || pilotLimit > 2)) throw new Error('Meta pilot item limit must be 1 or 2.');
-  if (pilotLimit == null && process.env.META_NATIVE_SYNC_PILOT_ONLY !== 'false') throw new Error('Native Meta synchronization requires a controlled pilot item limit.');
-  if (platforms != null && !Array.isArray(platforms)) throw new Error('Meta pilot platforms must be an array.');
-  const platformFilter = platforms == null ? null : [...new Set(platforms.map(String))];
-  if (platformFilter?.some((platform) => !['facebook', 'instagram'].includes(platform))) throw new Error('Meta pilot platforms must be Facebook or Instagram.');
 
   const { data: selectedAssets, error: assetError } = await admin.from('social_provider_assets')
     .select('id,district_id,connection_id,provider_asset_id,asset_type,platform,name,handle,parent_provider_asset_id,selected,active')
@@ -78,7 +125,7 @@ export async function syncSelectedMetaAssets({ admin, districtId, connectionId, 
   if (pilotLimit && assets.length !== 1) throw new Error('A controlled Meta pilot must resolve to exactly one selected platform asset.');
   if (assets.some((asset) => asset.platform === 'facebook') && !granted.includes('read_insights')) throw new Error('Meta permission read_insights is required for Facebook reporting.');
   if (assets.some((asset) => asset.platform === 'instagram') && !granted.includes('instagram_manage_insights')) throw new Error('Meta permission instagram_manage_insights is required for Instagram reporting.');
-  const { error: linkError } = await admin.rpc('canary_link_selected_meta_assets', { p_district_id: districtId, p_connection_id: connectionId });
+  const { error: linkError } = await admin.rpc('canary_fenced_link_selected_meta_assets', { p_district_id: districtId, p_connection_id: connectionId });
   if (linkError) throw linkError;
   const { data: links, error: linksError } = await admin.from('social_provider_account_links')
     .select('id,provider_asset_id,social_account_id,active').eq('district_id', districtId).eq('provider', 'meta').eq('active', true);
@@ -91,7 +138,10 @@ export async function syncSelectedMetaAssets({ admin, districtId, connectionId, 
     .neq('status', 'running').order('started_at', { ascending: false }).limit(1).maybeSingle();
   if (previousRunError) throw previousRunError;
   const continuation = pilotLimit ? {} : previousRun?.status === 'partial' && previousRun?.next_cursor ? previousRun.next_cursor : {};
-  const boundedCutoff = boundedMetaSourceCutoff(!pilotLimit && previousRun?.status === 'partial' ? previousRun.source_cutoff : sourceCutoff, now());
+  const isContinuation = !pilotLimit && previousRun?.status === 'partial' && previousRun?.source_cutoff;
+  const boundedCutoff = isContinuation
+    ? continuedMetaSourceCutoff(previousRun.source_cutoff, now())
+    : boundedMetaSourceCutoff(sourceCutoff, now());
   const { data: runId, error: runError } = await admin.rpc('canary_claim_meta_sync_run', {
     p_district_id: districtId,
     p_connection_id: connectionId,
@@ -111,8 +161,13 @@ export async function syncSelectedMetaAssets({ admin, districtId, connectionId, 
     const pageGrants = needsPageGrant ? await metaGraphAll('me/accounts', accessToken, { fields: PAGE_FIELDS, limit: '100' }, 2, { signal: executionSignal }) : [];
     const grantByPage = new Map(pageGrants.map((page) => [String(page.id), page]));
     for (const asset of assets) {
+      const page = normalizeMetaPageContinuation(continuation[asset.id]);
+      let pageHasNext = false;
+      let pageNextAfter = null;
+      let rawIdentityById = new Map();
+      const completedThisPage = new Set(page.completed);
       if (Date.now() >= deadline) {
-        nextCursor[asset.id] = continuation[asset.id] || null;
+        if (!pilotLimit) nextCursor[asset.id] = metaPageContinuationAt(page);
         batches.push({ status: 'partial', threads: [], rejected: [], providerErrors: 0, errorCode: 'EXECUTION_BUDGET' });
         continue;
       }
@@ -123,28 +178,41 @@ export async function syncSelectedMetaAssets({ admin, districtId, connectionId, 
           const grant = grantByPage.get(String(asset.provider_asset_id));
           if (!grant?.access_token || !(grant.tasks || []).some((task) => ['ANALYZE', 'MANAGE'].includes(task))) throw new Error('The authorizing person no longer has an analytics-capable Page task.');
           assetToken = grant.access_token;
-          const payload = await metaGraph(`${asset.provider_asset_id}/published_posts`, assetToken, { fields: POST_FIELDS, limit: String(pilotLimit || 100), since: boundedCutoff, ...(continuation[asset.id] ? { after: continuation[asset.id] } : {}) }, { signal: executionSignal });
-          const rows = (Array.isArray(payload?.data) ? payload.data : []).slice(0, pilotLimit || undefined);
-          if (!pilotLimit && payload?.paging?.cursors?.after && payload?.paging?.next) nextCursor[asset.id] = payload.paging.cursors.after;
+          const payload = await metaGraph(`${asset.provider_asset_id}/published_posts`, assetToken, { fields: POST_FIELDS, limit: String(pilotLimit || 100), since: boundedCutoff, ...(page.after ? { after: page.after } : {}) }, { signal: executionSignal });
+          const providerRows = Array.isArray(payload?.data) ? payload.data : [];
+          const rows = (pilotLimit ? providerRows : remainingMetaPageItems(providerRows, page))
+            .slice(0, pilotLimit || undefined);
+          rawIdentityById = new Map(rows.map((row) => [String(row?.id), metaPageItemIdentity(row?.id)]));
+          pageHasNext = !pilotLimit && Boolean(payload?.paging?.cursors?.after && payload?.paging?.next);
+          pageNextAfter = pageHasNext ? payload.paging.cursors.after : null;
           batch = mapFacebookPagePosts({ districtId, asset, rows });
         } else {
           if (!granted.includes('instagram_basic')) throw new Error('Meta permission instagram_basic is required for the selected Instagram account.');
           const parentGrant = grantByPage.get(String(asset.parent_provider_asset_id));
           if (!parentGrant?.access_token) throw new Error('The parent Facebook Page grant is unavailable for Instagram synchronization.');
           assetToken = parentGrant.access_token;
-          const payload = await metaGraph(`${asset.provider_asset_id}/media`, assetToken, { fields: MEDIA_FIELDS, limit: String(pilotLimit || 100), since: boundedCutoff, ...(continuation[asset.id] ? { after: continuation[asset.id] } : {}) }, { signal: executionSignal });
-          const rows = (Array.isArray(payload?.data) ? payload.data : []).slice(0, pilotLimit || undefined);
-          if (!pilotLimit && payload?.paging?.cursors?.after && payload?.paging?.next) nextCursor[asset.id] = payload.paging.cursors.after;
+          const payload = await metaGraph(`${asset.provider_asset_id}/media`, assetToken, { fields: MEDIA_FIELDS, limit: String(pilotLimit || 100), since: boundedCutoff, ...(page.after ? { after: page.after } : {}) }, { signal: executionSignal });
+          const providerRows = Array.isArray(payload?.data) ? payload.data : [];
+          const rows = (pilotLimit ? providerRows : remainingMetaPageItems(providerRows, page))
+            .slice(0, pilotLimit || undefined);
+          rawIdentityById = new Map(rows.map((row) => [String(row?.id), metaPageItemIdentity(row?.id)]));
+          pageHasNext = !pilotLimit && Boolean(payload?.paging?.cursors?.after && payload?.paging?.next);
+          pageNextAfter = pageHasNext ? payload.paging.cursors.after : null;
           batch = mapInstagramMedia({ districtId, asset, rows });
         }
       } catch (error) {
         if (executionSignal.aborted) {
-          nextCursor[asset.id] = continuation[asset.id] || null;
+          if (!pilotLimit) nextCursor[asset.id] = metaPageContinuationAt(page);
           batch = { status: 'partial', threads: [], rejected: [], providerErrors: 0, errorCode: 'EXECUTION_BUDGET' };
         } else {
           batch = asset.asset_type === 'facebook_page'
             ? mapFacebookPagePosts({ districtId, asset, providerError: safeError(error) })
             : mapInstagramMedia({ districtId, asset, providerError: safeError(error) });
+        }
+      }
+      if (!pilotLimit) {
+        for (const rejected of batch.rejected || []) {
+          if (rejected?.externalId) completedThisPage.add(metaPageItemIdentity(rejected.externalId));
         }
       }
       batches.push(batch);
@@ -158,16 +226,20 @@ export async function syncSelectedMetaAssets({ admin, districtId, connectionId, 
           metricRowsWritten += await persistInsightBatch({ admin, link, platform: asset.platform, metricScope: 'account', providerObjectId: asset.provider_asset_id, requests: accountRequests, accessToken: assetToken, observedAt, signal: executionSignal });
         } catch (error) {
           if (!isExecutionBudgetError(error, executionSignal)) throw error;
-          nextCursor[asset.id] = continuation[asset.id] || null;
+          if (!pilotLimit) nextCursor[asset.id] = metaPageContinuationAt(page, [...completedThisPage]);
           batch = { ...batch, status: 'partial', errorCode: 'EXECUTION_BUDGET', threads: [] };
           batches[batches.length - 1] = batch;
           continue;
         }
       }
       let writtenCount = 0;
+      let pageInterrupted = false;
       for (const thread of batch.threads) {
+        const rawIdentity = rawIdentityById.get(String(thread.external_thread_id));
+        if (!rawIdentity) throw new Error('Meta page continuation could not resolve a normalized item.');
         if (Date.now() >= deadline) {
-          nextCursor[asset.id] = continuation[asset.id] || null;
+          if (!pilotLimit) nextCursor[asset.id] = metaPageContinuationAt(page, [...completedThisPage]);
+          pageInterrupted = true;
           batch = { ...batch, status: 'partial', errorCode: 'EXECUTION_BUDGET', threads: batch.threads.slice(0, writtenCount) };
           batches[batches.length - 1] = batch;
           break;
@@ -177,11 +249,24 @@ export async function syncSelectedMetaAssets({ admin, districtId, connectionId, 
         if (existing.error) throw existing.error;
         if (existing.data) duplicateItems += 1;
         const payload = { ...thread, social_account_id: link.social_account_id, first_seen_at: now().toISOString(), last_seen_at: now().toISOString() };
-        const { error } = await admin.rpc('canary_ingest_owned_social_observation', { p_provider_account_link_id: link.id, p_thread: payload });
+        const { error } = await admin.rpc('canary_fenced_ingest_owned_social_observation', { p_provider_account_link_id: link.id, p_thread: payload });
         if (error) throw error;
         const persistedThread = await requireOne(admin.from('social_threads').select('id').eq('district_id', districtId)
           .eq('social_account_id', link.social_account_id).eq('platform', thread.platform)
           .eq('external_thread_id', thread.external_thread_id).maybeSingle(), 'Ingested Meta thread was not found.');
+        let hasContentMetrics = false;
+        if (existing.data) {
+          const metricEvidence = await admin.from('social_provider_metric_snapshots').select('id')
+            .eq('district_id', districtId).eq('provider_account_link_id', link.id)
+            .eq('social_thread_id', persistedThread.id).eq('metric_scope', 'content').limit(1).maybeSingle();
+          if (metricEvidence.error) throw metricEvidence.error;
+          hasContentMetrics = Boolean(metricEvidence.data);
+        }
+        if (!shouldRefreshMetaContentInsights({ exists: Boolean(existing.data), hasContentMetrics, publishedAt: thread.published_at, cutoff: contentMetricCutoff })) {
+          completedThisPage.add(rawIdentity);
+          writtenCount += 1;
+          continue;
+        }
         const contentRequests = thread.platform === 'facebook'
           ? facebookContentInsightRequests(thread.external_thread_id)
           : instagramContentInsightRequests(thread.external_thread_id, { mediaProductType: thread.provider_metadata?.media_product_type });
@@ -189,12 +274,17 @@ export async function syncSelectedMetaAssets({ admin, districtId, connectionId, 
           metricRowsWritten += await persistInsightBatch({ admin, link, threadId: persistedThread.id, platform: thread.platform, metricScope: 'content', providerObjectId: thread.external_thread_id, requests: contentRequests, accessToken: assetToken, observedAt: now().toISOString(), signal: executionSignal });
         } catch (error) {
           if (!isExecutionBudgetError(error, executionSignal)) throw error;
-          nextCursor[asset.id] = continuation[asset.id] || null;
+          if (!pilotLimit) nextCursor[asset.id] = metaPageContinuationAt(page, [...completedThisPage]);
+          pageInterrupted = true;
           batch = { ...batch, status: 'partial', errorCode: 'EXECUTION_BUDGET', threads: batch.threads.slice(0, writtenCount + 1) };
           batches[batches.length - 1] = batch;
           break;
         }
+        completedThisPage.add(rawIdentity);
         writtenCount += 1;
+      }
+      if (!pilotLimit && !pageInterrupted && batch.status !== 'failed' && pageHasNext) {
+        nextCursor[asset.id] = { after: pageNextAfter, completed: [] };
       }
     }
     const summary = summarizeMetaSyncOutcome(batches);

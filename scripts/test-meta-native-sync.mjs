@@ -4,6 +4,8 @@ import fs from 'node:fs';
 const migration = fs.readFileSync(new URL('../supabase/migrations/20260813224000_meta_owned_social_sync.sql', import.meta.url), 'utf8');
 const insightsMigration = fs.readFileSync(new URL('../supabase/migrations/20260814223000_meta_owned_social_insights.sql', import.meta.url), 'utf8');
 const insightsPermissionPatch = fs.readFileSync(new URL('../supabase/migrations/20260814224500_meta_insights_restrict_row_rpc.sql', import.meta.url), 'utf8');
+const deletionFenceMigration = fs.readFileSync(new URL('../supabase/migrations/20260820200000_meta_sync_deletion_fence.sql', import.meta.url), 'utf8');
+const deletionFenceRollback = fs.readFileSync(new URL('../supabase/rollbacks/20260820200000_meta_sync_deletion_fence_down.sql', import.meta.url), 'utf8');
 const preflight = fs.readFileSync(new URL('../supabase/preflight_meta_owned_social_insights.sql', import.meta.url), 'utf8');
 const integration = fs.readFileSync(new URL('../src/lib/meta-integration.mjs', import.meta.url), 'utf8');
 const service = fs.readFileSync(new URL('../src/lib/meta-sync-service.mjs', import.meta.url), 'utf8');
@@ -59,6 +61,30 @@ assert.ok(insightsPermissionPatch.includes('grant execute on function public.can
 assert.ok(preflight.includes('cardinality(c.granted_scopes)'), 'Production Meta scopes are stored as text[].');
 assert.ok(!preflight.includes('jsonb_array_length(c.granted_scopes)'), 'Preflight must not treat text[] scopes as JSONB.');
 
+for (const name of [
+  'canary_fenced_link_selected_meta_assets',
+  'canary_fenced_ingest_owned_social_observation',
+  'canary_fenced_upsert_meta_metric_snapshots',
+]) {
+  assert.ok(deletionFenceMigration.includes(`function public.${name}`));
+  assert.ok(deletionFenceMigration.includes(`grant execute on function public.${name}`));
+  assert.ok(deletionFenceRollback.includes(`drop function public.${name}`));
+}
+assert.ok(deletionFenceMigration.includes("encode(digest(convert_to(v_connection.provider_user_id, 'UTF8'), 'sha256'), 'hex')"));
+assert.ok(deletionFenceMigration.includes("'canary-meta-provider-user:' || v_provider_user_id_hash"));
+assert.ok(deletionFenceMigration.includes("'canary-meta-oauth:' || v_connection.district_id"));
+assert.ok(deletionFenceMigration.indexOf("'canary-meta-provider-user:' || v_provider_user_id_hash") < deletionFenceMigration.indexOf("'canary-meta-oauth:' || v_connection.district_id"), 'fenced writes must lock provider identity before district OAuth lifecycle');
+assert.ok(deletionFenceMigration.includes("provider_user_id_hash = v_provider_user_id_hash"));
+assert.ok(deletionFenceMigration.includes("status = 'completed'"));
+for (const signature of [
+  'canary_link_selected_meta_assets(text, uuid)',
+  'canary_ingest_owned_social_observation(uuid, jsonb)',
+  'canary_upsert_meta_metric_snapshots(uuid, uuid, jsonb)',
+]) {
+  assert.ok(deletionFenceMigration.includes(`revoke execute on function public.${signature} from service_role`));
+  assert.ok(deletionFenceRollback.includes(`grant execute on function public.${signature} to service_role`));
+}
+
 assert.ok(service.includes("process.env.META_NATIVE_SYNC_ENABLED !== 'true'"), 'Native sync must remain disabled until migration and app readiness pass.');
 assert.ok(service.includes('debugMetaToken(accessToken, { signal: executionSignal })'), 'Every native sync must introspect its grant within the execution budget.');
 assert.ok(service.includes("String(tokenData.app_id) !== String(process.env.META_APP_ID)"));
@@ -71,14 +97,18 @@ assert.ok(service.includes("pilotLimit && assets.length !== 1"), 'The two-item p
 assert.ok(service.includes("META_NATIVE_SYNC_PILOT_ONLY !== 'false'"), 'Unbounded native sync must remain blocked by default.');
 assert.ok(service.includes("!isMetaUnsupportedMetricError(result)"), 'Only specifically identified provider metric incompatibility may converge as unsupported; auth and transient errors must fail the run.');
 assert.ok(service.includes("platformFilter.includes(asset.platform)"), 'Pilot may narrow but never broaden selected assets.');
-assert.ok(service.includes("admin.rpc('canary_upsert_meta_metric_snapshots'"));
+assert.ok(service.includes("admin.rpc('canary_fenced_upsert_meta_metric_snapshots'"));
 assert.ok(service.includes('metric_rows_written: metricRowsWritten'));
 assert.ok(integration.includes('export async function metaGraphBatch'));
 assert.ok(integration.includes("requests.length > 50"));
 assert.ok(!service.includes('comments.limit(0).summary(true)'), 'Least-privilege Page sync must not request comment data without pages_read_user_content.');
 assert.ok(!service.includes('reactions.limit(0).summary(true)'), 'Least-privilege Page sync must not request reaction data without broader access.');
 assert.ok(!service.includes('pages_read_user_content'), 'Owned-post discovery must not broaden the initial permission set.');
-assert.ok(service.includes("admin.rpc('canary_ingest_owned_social_observation'"));
+assert.ok(service.includes("admin.rpc('canary_fenced_ingest_owned_social_observation'"));
+assert.ok(service.includes("admin.rpc('canary_fenced_link_selected_meta_assets'"));
+assert.ok(!service.includes("admin.rpc('canary_link_selected_meta_assets'"));
+assert.ok(!service.includes("admin.rpc('canary_ingest_owned_social_observation'"));
+assert.ok(!service.includes("admin.rpc('canary_upsert_meta_metric_snapshots'"));
 assert.ok(service.includes(".eq('id', run.id).eq('status', 'running')"), 'Run finalization must be conditional.');
 assert.ok(service.includes('Meta synchronization failed and its run could not be finalized.'), 'Failed-run persistence must be checked instead of silently leaving a running lease.');
 assert.ok(service.includes("admin.rpc('canary_claim_meta_sync_run'"));
@@ -89,8 +119,14 @@ assert.ok(service.includes("errorCode: 'EXECUTION_BUDGET', threads: []"), 'Accou
 assert.ok(service.includes("batch.threads.slice(0, writtenCount + 1)"), 'Content Insights timeout must record the already-ingested thread and replay from the input cursor.');
 assert.ok(service.includes('{ signal: executionSignal }'), 'Every Meta request in native sync must share an abortable execution budget.');
 assert.ok(service.includes('next_cursor: nextCursor'));
-assert.ok(service.includes("previousRun?.status === 'partial' ? previousRun.source_cutoff : sourceCutoff"), 'Continuation must preserve the original bounded source cutoff.');
-assert.ok(service.includes("nextCursor[asset.id] = continuation[asset.id] || null"), 'A partial page must replay from its input cursor rather than skip unwritten rows.');
+assert.ok(service.includes('continuedMetaSourceCutoff(previousRun.source_cutoff, now())'), 'Continuation must preserve the exact original bounded source cutoff without a moving 90-day clamp.');
+assert.ok(service.includes('normalizeMetaPageContinuation(continuation[asset.id])'), 'Continuation must accept legacy provider cursors and structured completed-item identities.');
+assert.ok(service.includes('remainingMetaPageItems(providerRows, page)'), 'A partial page must skip only identities whose metric persistence completed.');
+assert.ok(service.includes('contentMetricRefreshDays = 14'), 'Recurring content metric refresh must default to fourteen days.');
+assert.ok(service.includes('value < 1 || value > 30'), 'Content metric refresh days must be bounded from one through thirty.');
+assert.ok(service.includes('exists: Boolean(existing.data)'), 'Content metric replay must distinguish existing canonical posts from newly discovered old posts.');
+assert.match(service, /canary_fenced_ingest_owned_social_observation[\s\S]*?shouldRefreshMetaContentInsights/, 'Every old duplicate must refresh its fenced canonical observation before content Insights are skipped.');
+assert.match(service, /shouldRefreshMetaContentInsights[\s\S]*?writtenCount \+= 1;[\s\S]*?continue;/, 'Skipped old duplicate metrics must still advance written progress.');
 assert.ok(route.includes('requireIntegrationActor(body?.districtId || null)'), 'Manual sync route must enforce protected explicit tenant selection.');
 assert.ok(route.includes('Native Meta synchronization is not released.'), 'Canonical writes must remain hard-disabled until deletion fencing is transactional.');
 assert.ok(!route.includes('syncSelectedMetaAssets'), 'The route must not expose an environment-only path to unfenced sync writes.');

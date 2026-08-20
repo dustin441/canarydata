@@ -33,14 +33,15 @@ export async function updateSession(request) {
     data: { user },
   } = await supabase.auth.getUser();
 
-  const isPublicMetaDeletionRoute =
+  const isSessionExemptRoute =
     request.nextUrl.pathname === '/api/integrations/meta/data-deletion'
-    || request.nextUrl.pathname === '/api/integrations/meta/data-deletion/status';
+    || request.nextUrl.pathname === '/api/integrations/meta/data-deletion/status'
+    || request.nextUrl.pathname === '/api/cron/meta-eic-sync';
 
   // If no user and not on login/signup/auth pages, redirect to login
   if (
     !user &&
-    !isPublicMetaDeletionRoute &&
+    !isSessionExemptRoute &&
     request.nextUrl.pathname !== '/' &&
     !request.nextUrl.pathname.startsWith('/demo') &&
     !request.nextUrl.pathname.startsWith('/login') &&

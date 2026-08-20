@@ -16,6 +16,15 @@ export function boundedMetaSourceCutoff(value, now = new Date()) {
   return new Date(Math.max(requested.getTime(), floor.getTime())).toISOString();
 }
 
+export function continuedMetaSourceCutoff(value, now = new Date()) {
+  const requested = new Date(value);
+  const oldestAllowed = new Date(now.getTime() - 120 * 24 * 60 * 60 * 1000);
+  if (Number.isNaN(requested.getTime()) || requested > now || requested < oldestAllowed) {
+    throw new Error('Meta continuation cutoff must remain within its fixed safe window.');
+  }
+  return requested.toISOString();
+}
+
 function metaProviderError(providerError) {
   if (!providerError) return null;
   return {

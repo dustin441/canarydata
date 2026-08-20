@@ -1,0 +1,8 @@
+{
+  "crons": [
+    {
+      "path": "/api/cron/meta-eic-sync",
+      "schedule": "15 * * * *"
+    }
+  ]
+}
