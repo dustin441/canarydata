@@ -13,15 +13,38 @@ export default function ResetPassword() {
   const [success, setSuccess] = useState(false);
 
   useEffect(() => {
-    // Basic check to ensure user is logged in
-    async function checkAuth() {
+    let active = true;
+
+    async function initializeRecoverySession() {
       const supabase = createClient();
+
+      const hash = new URLSearchParams(window.location.hash.slice(1));
+      const accessToken = hash.get('access_token');
+      const refreshToken = hash.get('refresh_token');
+      const isRecovery = hash.get('type') === 'recovery';
+
+      if (isRecovery && accessToken && refreshToken) {
+        const { error: sessionError } = await supabase.auth.setSession({
+          access_token: accessToken,
+          refresh_token: refreshToken,
+        });
+
+        if (sessionError) {
+          if (active) setError('Your password reset session has expired. Please request a new link.');
+          return;
+        }
+
+        window.history.replaceState({}, document.title, window.location.pathname);
+      }
+
       const { data: { session } } = await supabase.auth.getSession();
-      if (!session) {
+      if (active && !session) {
         setError('Your password reset session has expired. Please request a new link.');
       }
     }
-    checkAuth();
+
+    initializeRecoverySession();
+    return () => { active = false; };
   }, []);
 
   async function handleSubmit(e) {
