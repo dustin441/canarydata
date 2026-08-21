@@ -8,6 +8,35 @@ function count(value) {
   return Number.isFinite(parsed) && parsed >= 0 ? parsed : 0;
 }
 
+function facebookAttachmentMedia(row) {
+  const attachments = Array.isArray(row?.attachments?.data) ? row.attachments.data : [];
+  const candidates = attachments.flatMap((attachment) => [
+    attachment,
+    ...(Array.isArray(attachment?.subattachments?.data) ? attachment.subattachments.data : []),
+  ]);
+  const attachment = candidates.find((candidate) => candidate?.media?.image?.src) || null;
+  return {
+    mediaUrl: row?.full_picture || attachment?.media?.image?.src || null,
+    mediaType: attachment?.media_type || null,
+    carouselCount: candidates.filter((candidate) => candidate?.media?.image?.src).length,
+  };
+}
+
+function instagramMedia(row) {
+  const children = Array.isArray(row?.children?.data) ? row.children.data : [];
+  const representative = children.find((child) => child?.thumbnail_url || child?.media_url) || row || {};
+  const mediaType = row?.media_type || representative?.media_type || null;
+  const video = String(mediaType || '').toUpperCase() === 'VIDEO';
+  return {
+    mediaUrl: (video ? row?.thumbnail_url : row?.media_url)
+      || representative?.thumbnail_url
+      || representative?.media_url
+      || null,
+    videoUrl: video ? row?.media_url || null : null,
+    carouselCount: children.length,
+  };
+}
+
 export function boundedMetaSourceCutoff(value, now = new Date()) {
   const floor = new Date(now.getTime() - META_INITIAL_BACKFILL_DAYS * 24 * 60 * 60 * 1000);
   if (!value) return floor.toISOString();
@@ -34,6 +63,7 @@ function metaProviderError(providerError) {
 }
 
 function facebookItem(asset, row) {
+  const media = facebookAttachmentMedia(row);
   const commentsAvailable = row?.comments?.summary?.total_count != null || row?.comments_count != null;
   const reactionsAvailable = row?.reactions?.summary?.total_count != null || row?.reactions_count != null;
   const sharesAvailable = row?.shares?.count != null || row?.shares_count != null;
@@ -59,12 +89,17 @@ function facebookItem(asset, row) {
       provider_asset_id: asset?.id,
       provider_page_id: asset?.provider_asset_id,
       source: 'meta_graph',
+      media_url: media.mediaUrl,
+      media_type: media.mediaType,
+      carousel_count: media.carouselCount,
+      is_text_only: !media.mediaUrl,
       metric_availability: { comments: commentsAvailable, reactions: reactionsAvailable, shares: sharesAvailable, views: false },
     },
   };
 }
 
 function instagramItem(asset, row) {
+  const media = instagramMedia(row);
   const comments = count(row?.comments_count);
   const reactions = count(row?.like_count);
   return {
@@ -88,6 +123,10 @@ function instagramItem(asset, row) {
       parent_provider_page_id: asset?.parent_provider_asset_id || null,
       media_type: row?.media_type || null,
       media_product_type: row?.media_product_type || null,
+      media_url: media.mediaUrl,
+      video_url: media.videoUrl,
+      carousel_count: media.carouselCount,
+      is_text_only: !media.mediaUrl,
       source: 'meta_graph',
       metric_availability: { comments: true, reactions: true, shares: false, views: false },
     },

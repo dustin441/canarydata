@@ -21,8 +21,8 @@ export const EIC_SINCE = '2026-01-01';
 export const EIC_UNTIL = '2026-08-20';
 const CHECKPOINT_VERSION = 1;
 const PAGE_FIELDS = 'id,access_token,tasks';
-const POST_FIELDS = 'id,message,story,created_time,permalink_url,from';
-const MEDIA_FIELDS = 'id,caption,media_type,media_product_type,permalink,timestamp,username,comments_count,like_count';
+const POST_FIELDS = 'id,message,story,created_time,permalink_url,from,full_picture,attachments{media_type,media,target,url,subattachments{media_type,media,target,url}}';
+const MEDIA_FIELDS = 'id,caption,media_type,media_product_type,permalink,timestamp,username,comments_count,like_count,media_url,thumbnail_url,children{media_type,media_url,thumbnail_url}';
 const REQUIRED = ['district', 'connectionId', 'expectedProviderUserHash', 'since', 'until', 'checkpoint'];
 
 function sha256(value) {

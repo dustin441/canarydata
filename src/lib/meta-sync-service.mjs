@@ -4,8 +4,8 @@ import { boundedMetaSourceCutoff, continuedMetaSourceCutoff, mapFacebookPagePost
 import { facebookAccountInsightRequests, facebookContentInsightRequests, instagramAccountInsightRequests, instagramContentInsightRequests, isMetaUnsupportedMetricError, normalizeMetaInsightBatch, sevenDayInsightWindow } from './meta-insights.mjs';
 
 const PAGE_FIELDS = 'id,access_token,tasks';
-const POST_FIELDS = 'id,message,story,created_time,permalink_url,from';
-const MEDIA_FIELDS = 'id,caption,media_type,media_product_type,permalink,timestamp,username,comments_count,like_count';
+const POST_FIELDS = 'id,message,story,created_time,permalink_url,from,full_picture,attachments{media_type,media,target,url,subattachments{media_type,media,target,url}}';
+const MEDIA_FIELDS = 'id,caption,media_type,media_product_type,permalink,timestamp,username,comments_count,like_count,media_url,thumbnail_url,children{media_type,media_url,thumbnail_url}';
 
 function safeError(error) {
   return { code: String(error?.code || error?.type || 'META_SYNC_ERROR'), message: String(error?.message || 'Meta synchronization failed.').slice(0, 300) };

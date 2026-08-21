@@ -5482,6 +5482,8 @@ input[type="date"]::-webkit-calendar-picker-indicator {
 .board-report-social .social-report-media-fallback { display: flex; height: 100%; align-items: center; justify-content: center; flex-direction: column; color: var(--text-secondary); }
 .board-report-social .social-report-card-copy { display: grid; gap: 7px; padding: 12px; }
 .board-report-social .social-report-card-copy p { margin: 0; color: var(--text-secondary); font-size: 0.76rem; line-height: 1.45; }
+.board-report-social .social-report-card-copy .social-report-why { padding: 8px 10px; border-left: 3px solid var(--canary-yellow); background: rgba(245, 197, 24, 0.08); color: var(--text-primary); }
+.board-report-social .social-report-card-copy .social-report-why strong { color: var(--canary-yellow); }
 .birdseye-evidence-page { margin-top: 20px; }
 
 @media (max-width: 900px) {

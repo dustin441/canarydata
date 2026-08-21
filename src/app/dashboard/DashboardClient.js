@@ -2732,6 +2732,13 @@ function SocialReportCard({ result, rank }) {
   const sourceUrl = safeSocialUrl(result.url);
   const [failedThumbnailUrl, setFailedThumbnailUrl] = useState('');
   const thumbnailAvailable = Boolean(thumbnailUrl && failedThumbnailUrl !== thumbnailUrl);
+  const reportedInteractions = socialReportInteractionTotal(result);
+  const reportedViews = socialReportMetricValue(result, 'views');
+  const whyItMatters = reportedInteractions > 0
+    ? `${rank === 1 ? 'Highest' : `#${rank}`} reported-interaction result in this selected period${reportedViews === null ? '.' : `, with ${formatSocialMetric(reportedViews)} reported views.`}`
+    : reportedViews > 0
+      ? `${formatSocialMetric(reportedViews)} reported views, but no reported public interactions. Treat this as reach context, not a top-engagement result.`
+      : 'Included because it is one of the newest posts with reported interaction fields; it does not yet show measurable audience response.';
   return (
     <article className="social-report-card">
       <div className={`social-report-media${thumbnailAvailable ? ' has-thumbnail' : ''}`}>
@@ -2743,7 +2750,7 @@ function SocialReportCard({ result, rank }) {
             <img className="social-report-media-image" src={renderedThumbnailUrl} alt={result.headline || 'Official district social post'} onError={() => setFailedThumbnailUrl(thumbnailUrl)} />
           </>
         ) : (
-          <div className="social-report-media-fallback"><strong>{thumbnailUrl ? 'Thumbnail unavailable' : 'Text-only post'}</strong><span>No safe thumbnail available</span></div>
+          <div className="social-report-media-fallback"><strong>{result.isTextOnly ? 'Text-only post' : 'Media unavailable'}</strong><span>{result.isTextOnly ? 'No media was published' : 'No safe thumbnail is available in the current source data'}</span></div>
         )}
       </div>
       <div className="social-report-card-copy">
@@ -2752,7 +2759,8 @@ function SocialReportCard({ result, rank }) {
           <span>#{rank} · {formatDisplayDate(result.date)}</span>
         </div>
         <strong>{result.headline || result.summary || 'Official district social post'}</strong>
-        <p><span>{socialReportInteractionTotal(result) === null ? 'Not available' : `${formatSocialMetric(socialReportInteractionTotal(result))} public interactions`}</span> · <span><SocialReportMetric result={result} metric="reactions" /> reactions</span> · <span><SocialReportMetric result={result} metric="comments" /> comments / replies</span> · <span><SocialReportMetric result={result} metric="shares" /> shares</span></p>
+        <p><span>{reportedInteractions === null ? 'Not available' : `${formatSocialMetric(reportedInteractions)} reported interactions`}</span> · <span><SocialReportMetric result={result} metric="reactions" /> reactions</span> · <span><SocialReportMetric result={result} metric="comments" /> comments / replies</span> · <span><SocialReportMetric result={result} metric="shares" /> shares</span></p>
+        <p className="social-report-why"><strong>Why it matters:</strong> {whyItMatters}</p>
         {sourceUrl ? <a href={sourceUrl} target="_blank" rel="noopener noreferrer">View source</a> : <span>Source link unavailable in the collected record.</span>}
       </div>
     </article>

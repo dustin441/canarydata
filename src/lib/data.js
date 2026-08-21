@@ -1,6 +1,7 @@
 import { createAdminClient } from '@/lib/supabase/admin';
 import { buildCollectionHealth, buildSocialCollectionHealth } from '@/lib/collectionHealth.mjs';
 import { buildSocialAffiliatePreview } from '@/lib/social-affiliate-preview';
+import { mergeSocialProviderObservationMetadata } from '@/lib/social.mjs';
 
 const ARTICLE_COLUMNS = 'id, created_at, date, headline, summary, source, source_type, canary_score, tags, notes, is_earned_media, is_perched, link, district_id, innovation_reason, recommendation, source_query, canonical_url, visibility_status, manual_override, correction_version';
 const ARTICLE_PAGE_SIZE = 1000;
@@ -165,6 +166,7 @@ export async function getSocialAffiliatePreviews(districtId, claims = null) {
 
 const SOCIAL_THREAD_COLUMNS = 'id, district_id, social_account_id, provider, platform, external_thread_id, canonical_url, relationship_type, author_name, author_handle, headline, body, summary, recommendation, published_at, comment_count, reply_count, reaction_count, share_count, view_count, engagement_total, sentiment, risk_level, canary_score, tags, strategic_alignment, matched_terms, match_reason, identity_confidence, visibility_status, reviewer_note, review_version, reviewed_at, reviewed_by, provider_metadata, created_at, updated_at';
 const SOCIAL_THREAD_PAGE_SIZE = 1000;
+const SOCIAL_PROVIDER_OBSERVATION_PAGE_SIZE = 1000;
 const SOCIAL_METRIC_SNAPSHOT_COLUMNS = 'id, district_id, provider_account_link_id, social_thread_id, provider, platform, metric_scope, provider_object_id, provider_metric_name, normalized_metric_name, metric_variant, period, period_start_at, period_end_at, source_scope, availability, metric_value, breakdown, effective_at, observed_at';
 const SOCIAL_METRIC_SNAPSHOT_PAGE_SIZE = 1000;
 const SOCIAL_METRIC_LINK_BATCH_SIZE = 100;
@@ -223,6 +225,27 @@ async function loadEligibleSocialMetricLinkScope(supabase, activeLinks, district
   return { eligibleLinkIds, accountIdentityByLink };
 }
 
+export async function readAllSocialProviderObservations(supabase, threadIds = []) {
+  const ids = [...new Set((threadIds || []).filter(Boolean))];
+  if (!ids.length) return [];
+  const observations = [];
+  for (let from = 0; ; from += SOCIAL_PROVIDER_OBSERVATION_PAGE_SIZE) {
+    const { data, error } = await supabase
+      .from('social_thread_provider_observations')
+      .select('id, social_thread_id, provider_metadata, observed_at')
+      .in('social_thread_id', ids)
+      .eq('provider', 'meta')
+      .order('observed_at', { ascending: false })
+      .order('id', { ascending: false })
+      .range(from, from + SOCIAL_PROVIDER_OBSERVATION_PAGE_SIZE - 1);
+    if (error) throw error;
+    const page = data ?? [];
+    observations.push(...page);
+    if (page.length < SOCIAL_PROVIDER_OBSERVATION_PAGE_SIZE) break;
+  }
+  return observations;
+}
+
 export async function getSocialThreads(districtId = null, includeReview = false) {
   const supabase = createAdminClient();
   const threads = [];
@@ -272,7 +295,17 @@ export async function getSocialThreads(districtId = null, includeReview = false)
     commentsByThread.set(comment.social_thread_id, current);
   });
 
-  return threads.map((thread) => ({
+  const providerObservations = [];
+  for (let groupStart = 0; groupStart < threads.length; groupStart += 400) {
+    const pages = await Promise.all(Array.from({ length: 4 }, async (_, index) => {
+      const start = groupStart + (index * 100);
+      const threadIds = threads.slice(start, start + 100).map((thread) => thread.id);
+      return readAllSocialProviderObservations(supabase, threadIds);
+    }));
+    providerObservations.push(...pages.flat());
+  }
+
+  return mergeSocialProviderObservationMetadata(threads, providerObservations).map((thread) => ({
     ...thread,
     social_comments: commentsByThread.get(thread.id) ?? [],
   }));

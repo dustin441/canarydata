@@ -19,6 +19,7 @@ const facebook = mapFacebookPagePosts({
   rows: [{
     id: 'page-1_100', message: 'School opens Monday', created_time: '2026-08-13T12:00:00Z',
     permalink_url: 'https://www.facebook.com/district/posts/100',
+    full_picture: 'https://scontent.example.fbcdn.net/facebook-photo.jpg',
     from: { id: 'page-1', name: 'District Page' }, comments: { summary: { total_count: 4 } },
     reactions: { summary: { total_count: 9 } }, shares: { count: 2 },
   }],
@@ -44,16 +45,29 @@ assert.deepEqual(
   },
 );
 assert.equal(facebook.threads[0].provider_metadata.provider_asset_id, 'asset-page');
+assert.equal(facebook.threads[0].provider_metadata.media_url, 'https://scontent.example.fbcdn.net/facebook-photo.jpg');
+assert.equal(facebook.threads[0].provider_metadata.is_text_only, false);
 
 const instagram = mapInstagramMedia({
   districtId,
   asset: { id: 'asset-ig', provider_asset_id: 'ig-1', name: 'District Instagram', handle: 'districtschools' },
-  rows: [{ id: 'ig-media-1', caption: 'First day', timestamp: '2026-08-13T13:00:00Z', permalink: 'https://www.instagram.com/p/example/', comments_count: 3, like_count: 20, username: 'districtschools' }],
+  rows: [{ id: 'ig-media-1', caption: 'First day', timestamp: '2026-08-13T13:00:00Z', permalink: 'https://www.instagram.com/p/example/', comments_count: 3, like_count: 20, username: 'districtschools', media_type: 'VIDEO', media_url: 'https://scontent.example.cdninstagram.com/video.mp4', thumbnail_url: 'https://scontent.example.cdninstagram.com/poster.jpg' }],
 });
 assert.equal(instagram.status, 'success');
 assert.equal(instagram.threads[0].platform, 'instagram');
 assert.equal(instagram.threads[0].engagement_total, 23);
 assert.equal(instagram.threads[0].provider_metadata.metric_availability.shares, false);
+assert.equal(instagram.threads[0].provider_metadata.media_url, 'https://scontent.example.cdninstagram.com/poster.jpg');
+assert.equal(instagram.threads[0].provider_metadata.video_url, 'https://scontent.example.cdninstagram.com/video.mp4');
+assert.equal(instagram.threads[0].provider_metadata.is_text_only, false);
+
+const carousel = mapInstagramMedia({
+  districtId,
+  asset: { id: 'asset-ig', provider_asset_id: 'ig-1', name: 'District Instagram' },
+  rows: [{ id: 'ig-carousel-1', caption: 'Carousel', timestamp: '2026-08-13T13:30:00Z', permalink: 'https://www.instagram.com/p/carousel/', comments_count: 0, like_count: 1, media_type: 'CAROUSEL_ALBUM', children: { data: [{ media_type: 'IMAGE', media_url: 'https://scontent.example.cdninstagram.com/child.jpg' }] } }],
+});
+assert.equal(carousel.threads[0].provider_metadata.media_url, 'https://scontent.example.cdninstagram.com/child.jpg');
+assert.equal(carousel.threads[0].provider_metadata.carousel_count, 1);
 
 const partial = mapFacebookPagePosts({
   districtId,

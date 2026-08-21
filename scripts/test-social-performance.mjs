@@ -304,8 +304,10 @@ const sourceFiles = readdirSync(srcRoot, { recursive: true, withFileTypes: true 
   .map((entry) => join(entry.parentPath, entry.name));
 for (const sourceFile of sourceFiles) {
   const source = readFileSync(sourceFile, 'utf8');
-  if (!sourceFile.endsWith('/src/lib/data.js') && !sourceFile.endsWith('/src/app/dashboard/page.js')) {
-    assert.doesNotMatch(source, /getSocialMetricHistory|social_provider_metric_snapshots/, `raw Social history must remain isolated to the server loader and dashboard page: ${sourceFile}`);
+  if (!sourceFile.endsWith('/src/lib/data.js')
+    && !sourceFile.endsWith('/src/lib/meta-sync-service.mjs')
+    && !sourceFile.endsWith('/src/app/dashboard/page.js')) {
+    assert.doesNotMatch(source, /getSocialMetricHistory|social_provider_metric_snapshots/, `raw Social history must remain isolated to the server loader, server-side native sync, and dashboard page: ${sourceFile}`);
   }
   if (!/^\s*['\"]use client['\"];?/m.test(source)) continue;
   assert.doesNotMatch(source, /getSocialMetricHistory|social_provider_metric_snapshots/, `client file ${sourceFile} must not import or use raw Social history`);

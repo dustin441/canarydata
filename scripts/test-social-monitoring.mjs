@@ -3,6 +3,7 @@ import { readFile } from 'node:fs/promises';
 import {
   buildSocialResults,
   calculateSocialEngagementRate,
+  mergeSocialProviderObservationMetadata,
   normalizeSocialResult,
   rankTopSocialResults,
   resolveSocialFollowerCount,
@@ -87,6 +88,17 @@ assert.equal(legacy.platform, 'instagram');
 assert.equal(legacy.relationshipType, 'ambient');
 assert.equal(legacy.url, legacyArticle.link);
 assert.equal(legacy.commentCount, 0);
+
+const observedThreads = mergeSocialProviderObservationMetadata([
+  { ...canonicalThread, provider_metadata: { source: 'meta_graph', metric_availability: canonicalThread.provider_metadata.metric_availability } },
+], [
+  { social_thread_id: canonicalThread.id, observed_at: '2026-08-20T12:00:00Z', provider_metadata: { media_url: 'https://scontent-lga3-3.xx.fbcdn.net/old.jpg' } },
+  { social_thread_id: canonicalThread.id, observed_at: '2026-08-21T12:00:00Z', provider_metadata: { media_url: canonicalThread.provider_metadata.media_url, video_url: canonicalThread.provider_metadata.video_url, is_text_only: false } },
+]);
+assert.equal(observedThreads[0].provider_metadata.media_url, canonicalThread.provider_metadata.media_url);
+assert.equal(observedThreads[0].provider_metadata.video_url, canonicalThread.provider_metadata.video_url);
+assert.equal(observedThreads[0].provider_metadata.source, 'meta_graph');
+assert.equal(observedThreads[0].provider_metadata.meta_last_observed_at, '2026-08-21T12:00:00Z');
 
 const canonical = normalizeSocialResult(canonicalThread);
 assert.equal(canonical.relationshipType, 'owned');

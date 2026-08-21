@@ -1,7 +1,7 @@
 import assert from 'node:assert/strict';
 import { readFile } from 'node:fs/promises';
 import { loadBindings } from 'next/dist/build/swc/index.js';
-import { normalizeSocialResult } from '../src/lib/social.mjs';
+import { mergeSocialProviderObservationMetadata, normalizeSocialResult } from '../src/lib/social.mjs';
 import {
   calculateSocialMetricChange,
   resolveSocialReportComparisonWindow,
@@ -240,6 +240,7 @@ async function compileDataModuleForPaginationTest(source, createAdminClient) {
     '@/lib/supabase/admin': { createAdminClient },
     '@/lib/collectionHealth.mjs': { buildCollectionHealth: () => ({}) },
     '@/lib/social-affiliate-preview': { buildSocialAffiliatePreview: () => ({}) },
+    '@/lib/social.mjs': { mergeSocialProviderObservationMetadata: (threads) => threads },
   };
   const controlledRequire = (specifier) => {
     assert.ok(specifier in modules, `Unexpected module import in data harness: ${specifier}`);
@@ -288,6 +289,54 @@ for (const call of auditHarness.calls) {
   assert.deepEqual(call.orders, [['created_at', { ascending: false }], ['id', { ascending: false }]]);
   assert.deepEqual(call.predicates, [['district_id', 'district-a']]);
 }
+
+function createProviderObservationClient(rows) {
+  const calls = [];
+  return {
+    calls,
+    from(table) {
+      const call = { table, selected: null, ids: [], predicates: [], orders: [], ranges: [] };
+      calls.push(call);
+      const query = {
+        select(columns) { call.selected = columns; return query; },
+        in(column, values) { call.ids.push([column, values]); return query; },
+        eq(column, value) { call.predicates.push([column, value]); return query; },
+        order(column, options) { call.orders.push([column, options]); return query; },
+        range(from, to) { call.ranges.push([from, to]); call.from = from; call.to = to; return query; },
+        then(resolve) { return resolve({ data: rows.slice(call.from, call.to + 1), error: null }); },
+      };
+      return query;
+    },
+  };
+}
+
+const observationRows = Array.from({ length: 1004 }, (_, index) => ({
+  id: `observation-a-${String(1004 - index).padStart(4, '0')}`,
+  social_thread_id: 'thread-a',
+  observed_at: new Date(Date.UTC(2026, 7, 21, 12, 0, 0) - index * 1000).toISOString(),
+  provider_metadata: { media_url: `https://scontent.example.fbcdn.net/a-${index}.jpg` },
+}));
+observationRows.push({
+  id: 'observation-b-0001', social_thread_id: 'thread-b', observed_at: '2026-08-21T11:00:00Z',
+  provider_metadata: { media_url: 'https://scontent.example.fbcdn.net/thread-b.jpg' },
+});
+const observationHarness = createProviderObservationClient(observationRows);
+const fetchedObservations = await dataModule.readAllSocialProviderObservations(observationHarness, ['thread-a', 'thread-b']);
+assert.equal(fetchedObservations.length, 1005, 'Observation pagination must not truncate a later thread after the first 1,000 rows.');
+assert.deepEqual(observationHarness.calls.map((call) => call.ranges[0]), [[0, 999], [1000, 1999]]);
+for (const call of observationHarness.calls) {
+  assert.equal(call.table, 'social_thread_provider_observations');
+  assert.equal(call.selected, 'id, social_thread_id, provider_metadata, observed_at');
+  assert.deepEqual(call.ids, [['social_thread_id', ['thread-a', 'thread-b']]]);
+  assert.deepEqual(call.predicates, [['provider', 'meta']]);
+  assert.deepEqual(call.orders, [['observed_at', { ascending: false }], ['id', { ascending: false }]]);
+}
+const observationMergedThreads = mergeSocialProviderObservationMetadata(
+  [{ id: 'thread-a', provider_metadata: {} }, { id: 'thread-b', provider_metadata: {} }],
+  fetchedObservations,
+);
+assert.equal(observationMergedThreads[0].provider_metadata.media_url, 'https://scontent.example.fbcdn.net/a-0.jpg');
+assert.equal(observationMergedThreads[1].provider_metadata.media_url, 'https://scontent.example.fbcdn.net/thread-b.jpg');
 
 const failingAuditHarness = createSocialReviewEventsClient(auditRows, { errorFrom: 1000 });
 const failingDataModule = await compileDataModuleForPaginationTest(data, () => failingAuditHarness.client);
@@ -907,7 +956,8 @@ const socialReportCardSource = dashboard.slice(dashboard.indexOf('function Socia
 for (const metric of ['reactions', 'comments', 'shares']) {
   assert.ok(socialReportCardSource.includes(`metric="${metric}"`), `Board social cards must honor ${metric} availability`);
 }
-assert.match(socialReportCardSource, /socialReportInteractionTotal\(result\) === null \? 'Not available'/);
+assert.match(socialReportCardSource, /reportedInteractions === null \? 'Not available'/);
+assert.match(socialReportCardSource, /<strong>Why it matters:<\/strong>/);
 assert.match(styles, /\.social-report-mode > \*:not\(\.social-report\)/);
 assert.match(styles, /\.social-report-mode \.social-report/);
 assert.match(styles, /\.social-report-table thead \{ display: table-header-group; \}/);

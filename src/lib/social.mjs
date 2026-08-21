@@ -282,6 +282,29 @@ function socialResultKey(item) {
   return `${item.platform}:${item.externalThreadId || item.id}`;
 }
 
+export function mergeSocialProviderObservationMetadata(threads = [], observations = []) {
+  const latestByThread = new Map();
+  for (const observation of observations || []) {
+    if (!observation?.social_thread_id || !observation?.provider_metadata || typeof observation.provider_metadata !== 'object') continue;
+    const current = latestByThread.get(observation.social_thread_id);
+    const observedAt = new Date(observation.observed_at || 0).getTime();
+    const currentAt = new Date(current?.observed_at || 0).getTime();
+    if (!current || observedAt > currentAt) latestByThread.set(observation.social_thread_id, observation);
+  }
+  return (threads || []).map((thread) => {
+    const observation = latestByThread.get(thread?.id);
+    if (!observation) return thread;
+    return {
+      ...thread,
+      provider_metadata: {
+        ...(thread.provider_metadata && typeof thread.provider_metadata === 'object' ? thread.provider_metadata : {}),
+        ...observation.provider_metadata,
+        meta_last_observed_at: observation.observed_at || thread.provider_metadata?.meta_last_observed_at || null,
+      },
+    };
+  });
+}
+
 export function buildSocialResults(items = []) {
   const seen = new Set();
   return items
