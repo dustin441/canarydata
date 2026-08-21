@@ -1,6 +1,7 @@
 import { createClient } from '@/lib/supabase/server';
 import { createAdminClient } from '@/lib/supabase/admin';
 import { resolveCanaryPricing } from '@/lib/pricing';
+import { resolveCanaryPaymentCoverage } from '@/lib/payment-status.mjs';
 
 export async function getAuthenticatedBillingContext() {
   const supabase = await createClient();
@@ -28,20 +29,26 @@ export async function getAuthenticatedBillingContext() {
   if (email) {
     const { data } = await admin
       .from('onboarding_requests')
-      .select('id, organization_name, contact_email, payment_status, trial_status, access_status, trial_ends_at, stripe_customer_id')
+      .select('id, organization_name, contact_email, payment_status, paid_through, trial_status, access_status, trial_starts_at, trial_ends_at, stripe_customer_id')
       .eq('contact_email', email)
       .order('created_at', { ascending: false })
       .limit(1);
     onboardingRequest = data?.[0] || null;
     if (onboardingRequest) {
+      const coverage = resolveCanaryPaymentCoverage({
+        protectedStatus: protectedMetadata.payment_status,
+        protectedPaidThrough: protectedMetadata.paid_through,
+        onboardingStatus: onboardingRequest.payment_status,
+        onboardingPaidThrough: onboardingRequest.paid_through,
+      });
       onboardingRequest = {
         ...onboardingRequest,
-        payment_status: protectedMetadata.payment_status || onboardingRequest.payment_status,
+        payment_status: coverage.paymentStatus,
         trial_status: protectedMetadata.trial_status || onboardingRequest.trial_status,
         access_status: protectedMetadata.access_status || onboardingRequest.access_status,
         trial_ends_at: protectedMetadata.trial_ends_at || onboardingRequest.trial_ends_at,
         stripe_customer_id: protectedMetadata.stripe_customer_id || onboardingRequest.stripe_customer_id,
-        paid_through: protectedMetadata.paid_through || onboardingRequest.paid_through || null,
+        paid_through: coverage.paidThrough,
         trial_starts_at: protectedMetadata.trial_starts_at || onboardingRequest.trial_starts_at || null,
       };
     }

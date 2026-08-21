@@ -5,6 +5,7 @@ import { createAdminClient } from '@/lib/supabase/admin';
 import { createCanaryCheckoutSession, createCanaryEmbeddedCheckoutSession, ensureCanaryStripeCustomer, getCanaryCheckoutAmountLabel, retrieveCheckoutSession } from '@/lib/stripe';
 import { getAuthenticatedBillingContext } from '@/lib/billing';
 import { markCanaryPaymentPaid } from '@/lib/payment-state';
+import { isCanaryPaymentCovered } from '@/lib/payment-status.mjs';
 
 function requireBillingContext(context) {
   const { user, districtId, districtName, email, onboardingRequest } = context;
@@ -29,12 +30,26 @@ function requireBillingContext(context) {
     requestId: onboardingRequest?.id || '',
     customerId: user?.app_metadata?.stripe_customer_id || '',
     protectedMetadata: user?.app_metadata || {},
+    paymentStatus: onboardingRequest?.payment_status || '',
+    paidThrough: onboardingRequest?.paid_through || null,
     pricing: context.pricing,
   };
 }
 
 function getOrigin() {
   return String(process.env.CANARY_APP_ORIGIN || process.env.NEXT_PUBLIC_SITE_URL || 'https://www.canarydata.media').replace(/\/$/, '');
+}
+
+function requirePaymentAvailable(context) {
+  const protectedCovered = isCanaryPaymentCovered(
+    context.protectedMetadata?.payment_status,
+    context.protectedMetadata?.paid_through,
+  );
+  const requestCovered = isCanaryPaymentCovered(context.paymentStatus, context.paidThrough);
+  if (protectedCovered || requestCovered) {
+    throw new Error('Payment is not required for this account.');
+  }
+  return context;
 }
 
 async function persistProtectedCustomer(context) {
@@ -92,7 +107,7 @@ async function persistPendingCheckout(context, session, mode) {
 }
 
 export async function startCanaryCheckout() {
-  const context = await persistProtectedCustomer(requireBillingContext(await getAuthenticatedBillingContext()));
+  const context = await persistProtectedCustomer(requirePaymentAvailable(requireBillingContext(await getAuthenticatedBillingContext())));
   const session = await createCanaryCheckoutSession({
     organizationName: context.organizationName,
     contactEmail: context.email,
@@ -110,7 +125,7 @@ export async function startCanaryCheckout() {
 }
 
 export async function createEmbeddedCanaryCheckout() {
-  const context = await persistProtectedCustomer(requireBillingContext(await getAuthenticatedBillingContext()));
+  const context = await persistProtectedCustomer(requirePaymentAvailable(requireBillingContext(await getAuthenticatedBillingContext())));
   const session = await createCanaryEmbeddedCheckoutSession({
     organizationName: context.organizationName,
     contactEmail: context.email,

@@ -8,7 +8,8 @@ const testable = source
   .replace("import { createAdminClient } from '@/lib/supabase/admin';", 'const createAdminClient = globalThis.__paymentActions.createAdminClient;')
   .replace("import { createCanaryCheckoutSession, createCanaryEmbeddedCheckoutSession, ensureCanaryStripeCustomer, getCanaryCheckoutAmountLabel, retrieveCheckoutSession } from '@/lib/stripe';", 'const { createCanaryCheckoutSession, createCanaryEmbeddedCheckoutSession, ensureCanaryStripeCustomer, getCanaryCheckoutAmountLabel, retrieveCheckoutSession } = globalThis.__paymentActions;')
   .replace("import { getAuthenticatedBillingContext } from '@/lib/billing';", 'const getAuthenticatedBillingContext = globalThis.__paymentActions.getAuthenticatedBillingContext;')
-  .replace("import { markCanaryPaymentPaid } from '@/lib/payment-state';", 'const markCanaryPaymentPaid = globalThis.__paymentActions.markCanaryPaymentPaid;');
+  .replace("import { markCanaryPaymentPaid } from '@/lib/payment-state';", 'const markCanaryPaymentPaid = globalThis.__paymentActions.markCanaryPaymentPaid;')
+  .replace("import { isCanaryPaymentCovered } from '@/lib/payment-status.mjs';", 'const isCanaryPaymentCovered = globalThis.__paymentActions.isCanaryPaymentCovered;');
 
 const context = {
   user: { id: 'user-1', email: 'billing@district.org', app_metadata: { district_id: 'district-1' }, user_metadata: {} },
@@ -16,18 +17,20 @@ const context = {
   pricing: { amountCents: 500000 },
 };
 let updateError = { message: 'write failed' };
+let stripeCustomerCalls = 0;
 globalThis.__paymentActions = {
   redirect: () => {},
   createAdminClient: () => ({ auth: { admin: { updateUserById: async () => ({ error: updateError }) } } }),
   getAuthenticatedBillingContext: async () => context,
   createCanaryCheckoutSession: async () => ({}),
   createCanaryEmbeddedCheckoutSession: async () => ({}),
-  ensureCanaryStripeCustomer: async () => 'cus-1',
+  ensureCanaryStripeCustomer: async () => { stripeCustomerCalls += 1; return 'cus-1'; },
   getCanaryCheckoutAmountLabel: () => '$5,000 annual access',
   retrieveCheckoutSession: async () => ({}),
   markCanaryPaymentPaid: async () => ({ ok: true }),
+  isCanaryPaymentCovered: (status, paidThrough) => status === 'paid' || (status === 'complimentary' && Boolean(paidThrough) && new Date(paidThrough) > new Date()),
 };
-const { saveBillingPurchaseOrder } = await import(`data:text/javascript;base64,${Buffer.from(testable).toString('base64')}`);
+const { createEmbeddedCanaryCheckout, saveBillingPurchaseOrder, startCanaryCheckout } = await import(`data:text/javascript;base64,${Buffer.from(testable).toString('base64')}`);
 const form = new FormData();
 form.set('po_number', 'PO-1');
 await assert.rejects(() => saveBillingPurchaseOrder(form), /Unable to save billing and purchase-order details/);
@@ -35,6 +38,12 @@ updateError = null;
 const saved = await saveBillingPurchaseOrder(form);
 assert.equal(saved.ok, true);
 assert.equal(saved.poNumber, 'PO-1');
+
+context.user.app_metadata.payment_status = 'complimentary';
+context.user.app_metadata.paid_through = '2099-01-01T00:00:00Z';
+await assert.rejects(() => startCanaryCheckout(), /Payment is not required/);
+await assert.rejects(() => createEmbeddedCanaryCheckout(), /Payment is not required/);
+assert.equal(stripeCustomerCalls, 0);
 
 assert.doesNotMatch(source, /from 'next\/headers'/);
 assert.match(source, /CANARY_APP_ORIGIN/);

@@ -5,6 +5,7 @@ import DashboardClient from './DashboardClient';
 import { enrichSocialThreadsWithNativeMetrics, summarizeOwnedSocialAccountMetrics } from '@/lib/socialMetrics.mjs';
 import { getAuthenticatedBillingContext } from '@/lib/billing';
 import { formatAnnualPriceLabel, INTRODUCTORY_ANNUAL_PRICE_CENTS, resolveCanaryPricing } from '@/lib/pricing';
+import { isCanaryPaymentCovered } from '@/lib/payment-status.mjs';
 import { redirect } from 'next/navigation';
 import { metaIntegrationEnabledForDistrict, metaIntegrationPilotConfigured } from '@/lib/meta-integration.mjs';
 import { buildSocialDailySeries } from '@/lib/socialPerformance.mjs';
@@ -114,20 +115,22 @@ export default async function DashboardPage({ searchParams }) {
     .map((result) => result.warning)
     .filter(Boolean);
   const trialEndsAt = billingContext?.onboardingRequest?.trial_ends_at || billingContext?.user?.app_metadata?.trial_ends_at || null;
+  const paymentStatus = billingContext?.onboardingRequest?.payment_status || billingContext?.user?.app_metadata?.payment_status || 'pending';
+  const paidThrough = billingContext?.user?.app_metadata?.paid_through || billingContext?.onboardingRequest?.paid_through || null;
   // eslint-disable-next-line react-hooks/purity -- Server-rendered billing notice intentionally compares trial date to current time.
   const daysUntilTrialEnds = trialEndsAt ? Math.ceil((new Date(trialEndsAt).getTime() - Date.now()) / 86400000) : null;
-  const paymentNotice = userDistrictId && billingContext?.onboardingRequest?.payment_status !== 'paid' && daysUntilTrialEnds !== null
+  const paymentNotice = userDistrictId && !isCanaryPaymentCovered(paymentStatus, paidThrough) && daysUntilTrialEnds !== null
     ? {
         daysUntilTrialEnds,
         trialEndsAt,
-        paymentStatus: billingContext?.onboardingRequest?.payment_status || 'pending',
+        paymentStatus,
       }
     : null;
   const billingInfo = billingContext ? {
-    paymentStatus: billingContext.onboardingRequest?.payment_status || billingContext.user?.app_metadata?.payment_status || 'pending',
+    paymentStatus,
     trialStartsAt: billingContext.onboardingRequest?.trial_starts_at || billingContext.user?.app_metadata?.trial_starts_at || null,
     trialEndsAt,
-    paidThrough: billingContext.user?.app_metadata?.paid_through || billingContext.onboardingRequest?.paid_through || null,
+    paidThrough,
     billingOrganizationName: billingContext.user?.user_metadata?.billing_organization_name || billingContext.districtName || billingContext.onboardingRequest?.organization_name || billingContext.user?.user_metadata?.district_name || '',
     poNumber: billingContext.user?.user_metadata?.po_number || '',
     billingContactName: billingContext.user?.user_metadata?.billing_contact_name || '',

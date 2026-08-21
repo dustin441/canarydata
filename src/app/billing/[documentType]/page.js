@@ -9,6 +9,7 @@ import {
 } from '@/lib/billing-documents';
 import PrintButton from './PrintButton';
 import { INTRODUCTORY_ANNUAL_PRICE_CENTS } from '@/lib/pricing';
+import { isCanaryComplimentary, isCanaryPaymentCovered } from '@/lib/payment-status.mjs';
 
 export const metadata = {
   title: 'Canary Data Billing Document',
@@ -81,6 +82,25 @@ export default async function BillingDocumentPage({ params }) {
 
   const context = await getAuthenticatedBillingContext();
   if (!context.user) redirect(`/login?redirect_to=/billing/${documentType}`);
+
+  const paymentStatus = context.onboardingRequest?.payment_status || context.user?.app_metadata?.payment_status;
+  const paidThrough = context.user?.app_metadata?.paid_through || context.onboardingRequest?.paid_through || null;
+  const complimentaryAccess = isCanaryComplimentary(paymentStatus) && isCanaryPaymentCovered(paymentStatus, paidThrough);
+
+  if (complimentaryAccess) {
+    return (
+      <main style={{ minHeight: '100vh', background: '#f3f4f6', padding: '28px 16px', color: '#111827' }}>
+        <section style={{ maxWidth: '720px', margin: '60px auto', background: '#fff', boxShadow: '0 18px 50px rgba(15,23,42,0.14)', borderRadius: '16px', padding: '34px' }}>
+          <Image src="/canary-logo.svg" alt="Canary Data" width={210} height={58} style={{ height: '46px', width: 'auto', marginBottom: '22px' }} />
+          <h1 style={{ margin: '0 0 12px', fontSize: '1.65rem' }}>No billing document required</h1>
+          <p style={{ color: '#4b5563', lineHeight: 1.7, marginBottom: '22px' }}>
+            This district has complimentary Canary access through {formatDate(paidThrough)}. No card payment, price quote, purchase order, invoice, or receipt is required.
+          </p>
+          <a href="/dashboard" style={{ background: '#f5c518', color: '#111827', padding: '10px 14px', borderRadius: '8px', textDecoration: 'none', fontWeight: 700, fontSize: '0.9rem' }}>Back to dashboard</a>
+        </section>
+      </main>
+    );
+  }
 
   const copy = BILLING_DOCUMENT_COPY[documentType];
   const doc = buildBillingDocumentContext(context);

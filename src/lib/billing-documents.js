@@ -1,4 +1,5 @@
 import { INTRODUCTORY_ANNUAL_PRICE_CENTS, resolveCanaryPricing } from './pricing.js';
+import { isCanaryComplimentary, isCanaryPaymentCovered } from './payment-status.mjs';
 
 const CANARY_VENDOR_NAME = process.env.CANARY_VENDOR_NAME || 'Canary Data';
 const CANARY_VENDOR_ADDRESS_LINE1 = process.env.CANARY_VENDOR_ADDRESS_LINE1 || 'Vendor address to be provided';
@@ -50,12 +51,16 @@ export function billingDocumentNumbers({ districtId, email, year = new Date().ge
 export function buildBillingDocumentContext({ user, districtId, districtName, email, onboardingRequest, pricing: resolvedPricing }) {
   const metadata = user?.user_metadata || {};
   const protectedMetadata = user?.app_metadata || {};
+  const paymentStatus = protectedMetadata.payment_status || onboardingRequest?.payment_status || 'pending';
+  const protectedPaidThrough = protectedMetadata.paid_through || onboardingRequest?.paid_through || null;
+  if (isCanaryComplimentary(paymentStatus) && isCanaryPaymentCovered(paymentStatus, protectedPaidThrough)) {
+    throw new Error('Billing documents are unavailable for active complimentary accounts.');
+  }
   const pricing = resolvedPricing || resolveCanaryPricing({ protectedMetadata });
   const issuedAt = new Date();
   const dueAt = addDays(issuedAt, 30);
   const numbers = billingDocumentNumbers({ districtId, email });
   const poNumber = metadata.po_number || onboardingRequest?.po_number || '';
-  const paymentStatus = protectedMetadata.payment_status || onboardingRequest?.payment_status || 'pending';
   const paidAt = protectedMetadata.payment_paid_at || onboardingRequest?.paid_at || null;
   const paidThrough = protectedMetadata.paid_through || onboardingRequest?.paid_through || (paidAt ? addYears(new Date(paidAt), 1).toISOString() : null);
   const organizationName = metadata.billing_organization_name || districtName || onboardingRequest?.organization_name || metadata.district_name || 'School District';

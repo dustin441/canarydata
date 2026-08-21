@@ -12,6 +12,7 @@ import { calculateSocialEngagementRate, rankTopSocialResults, resolveSocialFollo
 import { calculateSocialMetricChange, dateInputValue, groupTopReportPostsByPlatform, isEligibleSocialReportPost, neutralizeSpreadsheetFormula, rankSocialReportTopPerformers, resolveSocialReportComparisonWindow, resolveSocialReportWindow, selectOfficialSocialReportPosts, socialReportComparableInteractionTotal, socialReportInteractionTotal, socialReportMetricValue, summarizeSocialContentFormats, summarizeSocialReport } from '@/lib/socialReport.mjs';
 import { nativeSocialMetricWindowLabel } from '@/lib/socialMetrics.mjs';
 import { formatDisplayDate } from '@/lib/date.mjs';
+import { isCanaryComplimentary, isCanaryPaymentCovered } from '@/lib/payment-status.mjs';
 import { CUSTOMER_SEARCH_QUERY_LIMIT, activeNewsQueryCount } from '@/lib/queryPolicy.mjs';
 import { buildCommunicationsBrief, formatCommunicationsBriefRecommendation } from '@/lib/communicationsBrief.mjs';
 import { buildStrategicGovernance } from '@/lib/strategicGovernance.mjs';
@@ -1696,6 +1697,8 @@ function SettingsView({ userDistrictId, districts, billingInfo = null, publicPri
   const assignedDistrict = userDistrictId ? districts?.find((d) => d.id === userDistrictId) : null;
   const profileName = assignedDistrict?.name ?? 'Canary Admin';
   const profileDetail = userDistrictId ? 'Client view · 1 district' : 'Admin view · all districts';
+  const paymentCovered = isCanaryPaymentCovered(billingInfo?.paymentStatus, billingInfo?.paidThrough);
+  const complimentaryAccess = isCanaryComplimentary(billingInfo?.paymentStatus) && paymentCovered;
   // Dashboard reporting scope is not administrator intent for a sensitive integration.
   const integrationDistrictId = userDistrictId || null;
   const integrationDistrict = integrationDistrictId ? districts?.find((district) => district.id === integrationDistrictId) : null;
@@ -1806,6 +1809,14 @@ function SettingsView({ userDistrictId, districts, billingInfo = null, publicPri
       {userDistrictId && (
         <div style={{ background: 'var(--bg-elevated)', border: '1px solid var(--border-secondary)', borderRadius: 'var(--radius-lg)', padding: '32px', maxWidth: '800px', marginBottom: '24px' }}>
           <h4 style={{ color: 'var(--text-primary)', marginBottom: '8px', fontSize: '1.2rem' }}>Billing Documents</h4>
+          {complimentaryAccess ? (
+            <div style={{ marginTop: '16px', padding: '16px', border: '1px solid rgba(34,197,94,0.35)', borderRadius: 'var(--radius-md)', background: 'rgba(34,197,94,0.08)', color: 'var(--text-secondary)', fontSize: '0.9rem', lineHeight: 1.6 }}>
+              <strong style={{ color: 'var(--text-primary)' }}>Complimentary access is active.</strong><br />
+              No card payment, price quote, purchase order, invoice, or receipt is required for this account.
+              {billingInfo?.paidThrough && <><br />Access through: <strong style={{ color: 'var(--text-primary)' }}>{new Date(billingInfo.paidThrough).toLocaleDateString()}</strong></>}
+            </div>
+          ) : (
+            <>
           <p style={{ color: 'var(--text-secondary)', fontSize: '0.9rem', marginBottom: '20px', lineHeight: 1.6 }}>
             Recommended school-finance flow: download the Price Quote for internal approval, download the W-9 for vendor setup, save the PO number when your district provides it, then generate the invoice for PO/check/ACH payment. The receipt becomes available after payment is confirmed.
           </p>
@@ -1867,7 +1878,7 @@ function SettingsView({ userDistrictId, districts, billingInfo = null, publicPri
             <strong style={{ color: 'var(--text-primary)' }}>Finance packet order:</strong> Price Quote → W-9 → PO # → Invoice → Receipt after payment.
           </div>
 
-          {billingInfo?.paymentStatus !== 'paid' && (
+          {!paymentCovered && (
             <div style={{ marginTop: '14px' }}>
               <button className="btn btn-primary" type="button" onClick={onPayByCard} style={{ width: '100%' }}>
                 Pay by Card
@@ -1879,14 +1890,16 @@ function SettingsView({ userDistrictId, districts, billingInfo = null, publicPri
           )}
 
           <div style={{ marginTop: '16px', padding: '14px 16px', border: '1px solid var(--border-secondary)', borderRadius: 'var(--radius-md)', color: 'var(--text-secondary)', fontSize: '0.86rem', lineHeight: 1.55 }}>
-            Status: <strong style={{ color: 'var(--text-primary)' }}>{billingInfo?.paymentStatus === 'paid' ? 'paid / active' : (billingInfo?.paymentStatus || 'pending')}</strong><br />
-            {billingInfo?.paymentStatus === 'paid' ? (
-              <>Annual access through: <strong style={{ color: 'var(--text-primary)' }}>{billingInfo?.paidThrough ? new Date(billingInfo.paidThrough).toLocaleDateString() : 'Active'}</strong><br /></>
+            Status: <strong style={{ color: 'var(--text-primary)' }}>{complimentaryAccess ? 'complimentary / active' : billingInfo?.paymentStatus === 'paid' ? 'paid / active' : (billingInfo?.paymentStatus || 'pending')}</strong><br />
+            {paymentCovered ? (
+              <>Access through: <strong style={{ color: 'var(--text-primary)' }}>{billingInfo?.paidThrough ? new Date(billingInfo.paidThrough).toLocaleDateString() : 'Active'}</strong><br /></>
             ) : (
               <>Trial ends: <strong style={{ color: 'var(--text-primary)' }}>{billingInfo?.trialEndsAt ? new Date(billingInfo.trialEndsAt).toLocaleDateString() : 'Not set'}</strong><br /></>
             )}
-            Annual access: <strong style={{ color: 'var(--text-primary)' }}>{billingInfo?.amountLabel || publicPricingLabel}</strong>
+            Annual access: <strong style={{ color: 'var(--text-primary)' }}>{complimentaryAccess ? 'Complimentary' : (billingInfo?.amountLabel || publicPricingLabel)}</strong>
           </div>
+            </>
+          )}
         </div>
       )}
 

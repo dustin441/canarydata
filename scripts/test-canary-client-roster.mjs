@@ -44,6 +44,23 @@ const expiredTrial = [{
 }];
 assert.deepEqual(entitledDistrictIds(expiredTrial, now), []);
 
+const complimentary = [{
+  app_metadata: {
+    district_id: "complimentary-school-district",
+    payment_status: "complimentary",
+    paid_through: "2027-08-18T00:00:00Z",
+    access_status: "active",
+  },
+}];
+assert.deepEqual(entitledDistrictIds(complimentary, now), ["complimentary-school-district"]);
+assert.deepEqual(entitledDistrictIds([{ app_metadata: { district_id: "missing-date", payment_status: "complimentary", access_status: "active" } }], now), []);
+assert.deepEqual(entitledDistrictIds([{ app_metadata: { district_id: "invalid-date", payment_status: "complimentary", paid_through: "not-a-date", access_status: "active" } }], now), []);
+assert.deepEqual(entitledDistrictIds([{ app_metadata: { district_id: "expired-date", payment_status: "complimentary", paid_through: "2026-08-01T00:00:00Z", access_status: "active" } }], now), []);
+
+const complimentaryManifest = structuredClone(manifest);
+complimentaryManifest.districts[districtIds[0]].type = "complimentary";
+assert.equal(validateRosterManifest(complimentaryManifest).count, count);
+
 const rows = districtIds.map((id) => ({ id, name: manifest.districts[id].name }));
 assert.equal(assertDistrictRows(manifest, rows), true);
 assert.throws(() => assertDistrictRows(manifest, rows.slice(1)), /district record mismatch|Unexpected district rows/);

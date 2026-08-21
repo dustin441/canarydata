@@ -4,6 +4,7 @@ import { redirect } from 'next/navigation';
 import { startCanaryCheckout } from './actions';
 import { getAuthenticatedBillingContext } from '@/lib/billing';
 import { getCanaryCheckoutAmountLabel } from '@/lib/stripe';
+import { isCanaryComplimentary, isCanaryPaymentCovered } from '@/lib/payment-status.mjs';
 
 export const metadata = {
   title: 'Canary Data Payment | Annual Access',
@@ -15,7 +16,10 @@ export default async function PaymentPage() {
   if (!user) redirect('/login?redirect_to=/payment');
 
   const organizationName = districtName || onboardingRequest?.organization_name || '';
-  const alreadyPaid = onboardingRequest?.payment_status === 'paid';
+  const paymentStatus = onboardingRequest?.payment_status;
+  const paidThrough = onboardingRequest?.paid_through || user?.app_metadata?.paid_through || null;
+  const paymentCovered = isCanaryPaymentCovered(paymentStatus, paidThrough);
+  const complimentary = isCanaryComplimentary(paymentStatus) && paymentCovered;
   const amountLabel = getCanaryCheckoutAmountLabel(email, user?.app_metadata || {});
 
   return (
@@ -27,9 +31,11 @@ export default async function PaymentPage() {
         </div>
 
         <div className="auth-card">
-          <h2>{alreadyPaid ? 'Payment already recorded' : 'Complete Canary Data payment'}</h2>
+          <h2>{complimentary ? 'No payment required' : paymentCovered ? 'Payment already recorded' : 'Complete Canary Data payment'}</h2>
           <p className="auth-subtitle">
-            You’re signed in, so Canary will apply this payment to the district/account tied to your login.
+            {complimentary
+              ? 'This district has complimentary Canary access. No card, invoice, or purchase order is required.'
+              : 'You’re signed in, so Canary will apply this payment to the district/account tied to your login.'}
           </p>
 
           <div style={{
@@ -42,15 +48,15 @@ export default async function PaymentPage() {
             Billing user: <span style={{ color: 'var(--text-primary)' }}>{email}</span><br />
             {districtId && <>District ID: <span style={{ color: 'var(--text-primary)' }}>{districtId}</span><br /></>}
             <br />
-            <strong style={{ color: 'var(--text-primary)' }}>{amountLabel}</strong><br />
-            Add card details in Stripe Checkout, click pay, and Canary will bring you back to the confirmation page.
+            <strong style={{ color: 'var(--text-primary)' }}>{complimentary ? 'Complimentary access' : amountLabel}</strong><br />
+            {!paymentCovered && 'Add card details in Stripe Checkout, click pay, and Canary will bring you back to the confirmation page.'}
           </div>
 
           {!organizationName ? (
             <div className="auth-error">
               <span>⚠</span> This login is not tied to a district/account yet. Contact Canary before submitting payment.
             </div>
-          ) : alreadyPaid ? (
+          ) : paymentCovered ? (
             <Link href="/dashboard" className="btn btn-primary" style={{ width: '100%', textAlign: 'center' }}>
               Return to Dashboard
             </Link>

@@ -42,8 +42,8 @@ export function validateRosterManifest(manifest) {
     if (FORBIDDEN_ORGANIZATION.test(`${districtId} ${name}`)) {
       throw new Error(`EIC or EIC-client organization is forbidden: ${districtId}`);
     }
-    if (!new Set(["paid", "trial"]).has(config?.type)) {
-      throw new Error(`District ${districtId} must be paid or trial`);
+    if (!new Set(["paid", "trial", "complimentary"]).has(config?.type)) {
+      throw new Error(`District ${districtId} must be paid, trial, or complimentary`);
     }
     const normalizedName = name.toLowerCase();
     if (names.has(normalizedName)) throw new Error(`Duplicate district name: ${name}`);
@@ -63,9 +63,10 @@ export function entitledDistrictIds(users, now = new Date()) {
     const paidThrough = parseTime(metadata.paid_through);
     const trialEnd = parseTime(metadata.trial_ends_at || metadata.trial_end);
     const paid = metadata.payment_status === "paid" && (!paidThrough || paidThrough > now);
+    const complimentary = metadata.payment_status === "complimentary" && paidThrough !== null && paidThrough > now;
     const trial = new Set(["active", "trialing"]).has(metadata.trial_status) && (!trialEnd || trialEnd > now);
     const access = !new Set(["disabled", "expired", "revoked"]).has(metadata.access_status);
-    if (access && (paid || trial)) active.add(districtId);
+    if (access && (paid || complimentary || trial)) active.add(districtId);
   }
   return [...active].sort();
 }
