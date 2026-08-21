@@ -1,30 +1,42 @@
 import { createServerClient } from '@supabase/ssr';
-import { cookies } from 'next/headers';
 import { NextResponse } from 'next/server';
 
-export async function GET(request) {
-  const { searchParams, origin } = new URL(request.url);
-  const code = searchParams.get('code');
+function safeNextPath(value) {
+  if (!value || !value.startsWith('/') || value.startsWith('//')) return '/dashboard';
+  return value;
+}
 
-  if (code) {
-    const cookieStore = await cookies();
-    const supabase = createServerClient(
-      process.env.NEXT_PUBLIC_SUPABASE_URL,
-      process.env.NEXT_PUBLIC_SUPABASE_ANON_KEY,
-      {
-        cookies: {
-          getAll() { return cookieStore.getAll(); },
-          setAll(cookiesToSet) {
-            cookiesToSet.forEach(({ name, value, options }) =>
-              cookieStore.set(name, value, options)
-            );
-          },
+export async function GET(request) {
+  const requestUrl = new URL(request.url);
+  const code = requestUrl.searchParams.get('code');
+  const nextPath = safeNextPath(requestUrl.searchParams.get('next'));
+  const response = NextResponse.redirect(new URL(nextPath, requestUrl.origin));
+
+  if (!code) return response;
+
+  const supabase = createServerClient(
+    process.env.NEXT_PUBLIC_SUPABASE_URL,
+    process.env.NEXT_PUBLIC_SUPABASE_ANON_KEY,
+    {
+      cookies: {
+        getAll() {
+          return request.cookies.getAll();
         },
-      }
-    );
-    await supabase.auth.exchangeCodeForSession(code);
+        setAll(cookiesToSet) {
+          cookiesToSet.forEach(({ name, value, options }) => {
+            response.cookies.set(name, value, options);
+          });
+        },
+      },
+    }
+  );
+
+  const { error } = await supabase.auth.exchangeCodeForSession(code);
+  if (error) {
+    const retryUrl = new URL('/forgot-password', requestUrl.origin);
+    retryUrl.searchParams.set('error', 'invalid_or_expired_link');
+    return NextResponse.redirect(retryUrl);
   }
 
-  const next = searchParams.get('next') ?? '/dashboard';
-  return NextResponse.redirect(`${origin}${next}`);
+  return response;
 }
