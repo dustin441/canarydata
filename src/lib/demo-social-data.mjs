@@ -158,8 +158,6 @@ function publicThread(fixture, anchorMs) {
         situation_summary: fixture.signal,
         action_rationale: `The fictional demo signal is classified as ${fixture.rawSentiment.toLowerCase()} and has ${fixture.engagements.toLocaleString('en-US')} public interactions.`,
         recommended_action: recommendation,
-        strategic_priority_labels: ['Family and Community Trust'],
-        strategic_alignment_reason: 'Timely, factual communication supports trust in the fictional district demo profile.',
         confidence: 0.92,
         review_status: 'review',
         model_version: 'demo-fixture-v1',

@@ -35,6 +35,8 @@ assert.equal(publicPosts.filter((post) => post.provider_metadata.is_text_only).l
 assert.equal(reportingDataset.socialResults.length, 27, 'The route must not mix legacy Social fallback rows into Lesley’s fixture package.');
 assert.equal(reportingDataset.socialResults.filter((post) => post.relationshipType !== 'owned').length, 11, 'Rendered Public Conversation must remain exactly 11 posts.');
 assert.ok(publicPosts.every((post) => post.provider_metadata.action_intelligence), 'Every public fixture must include review-only action intelligence.');
+assert.ok(publicPosts.every((post) => !(post.provider_metadata.action_intelligence.strategic_priority_labels || []).length), 'Demo Public Conversation must not introduce strategic-priority labels that are absent from live Social.');
+assert.ok(publicPosts.every((post) => !post.provider_metadata.action_intelligence.strategic_alignment_reason), 'Demo Public Conversation must not introduce demo-only strategic-alignment explanations.');
 assert.ok(threads.every((post) => post.district_id === DISTRICT_ID && post.provider === 'demo_fixture'), 'Fixtures must remain isolated to the fictional demo district.');
 assert.ok(threads.every((post) => post.canonical_url.startsWith('/demo/social/')), 'Every fixture must use an internal fictional demo permalink.');
 assert.ok(threads.every((post) => !String(post.canonical_url).includes('DEMO://')), 'Legacy DEMO:// links must not escape into the UI.');
