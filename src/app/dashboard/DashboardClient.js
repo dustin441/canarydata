@@ -174,6 +174,7 @@ function nativeSocialWindowLabel(metric) {
 
 function proxiedSocialMediaUrl(value) {
   const safeUrl = safeSocialMediaUrl(value);
+  if (safeUrl.startsWith('/demo-social/')) return safeUrl;
   return safeUrl ? `/api/social-media?url=${encodeURIComponent(safeUrl)}` : '';
 }
 
@@ -3082,6 +3083,7 @@ function MonthlySocialPerformance({
   onExportCsv,
   accountMetricSummary,
   performanceDecision,
+  demoMode = false,
 }) {
   const [postTableSort, setPostTableSort] = useState('newest');
   const summary = summarizeSocialReport(posts);
@@ -3221,12 +3223,12 @@ function MonthlySocialPerformance({
         </div>
       </section>
 
-      <aside className="social-monthly-data-readiness"><strong>Data readiness</strong><span>{accountMetricSummary?.platformCount ? 'Authorized Meta post and account snapshots are connected for the selected district. Post metrics are latest lifetime values for posts published in the report window, not interactions accrued only during that window. Account metrics retain their platform-specific source periods.' : 'No authorized Meta account snapshot is available for this view. Public or canonical post metrics may still appear where their source reports them; unavailable native fields remain N/A.'}</span></aside>
+      <aside className="social-monthly-data-readiness"><strong>Data readiness</strong><span>{accountMetricSummary?.platformCount ? (demoMode ? 'Fictional demo post and account snapshots are populated for this sample district. Dates move dynamically while sequence and source windows remain stable; no live social account is connected.' : 'Authorized Meta post and account snapshots are connected for the selected district. Post metrics are latest lifetime values for posts published in the report window, not interactions accrued only during that window. Account metrics retain their platform-specific source periods.') : 'No authorized Meta account snapshot is available for this view. Public or canonical post metrics may still appear where their source reports them; unavailable native fields remain N/A.'}</span></aside>
     </section>
   );
 }
 
-export function SocialView({ socialResults, legacySocialResults = [], socialSources, socialAccountMetricSummaries = {}, socialPerformanceHistory = {}, socialReviewEvents = [], districtFilter, districts, campaignSearch, setCampaignSearch, isAdmin = false }) {
+export function SocialView({ socialResults, legacySocialResults = [], socialSources, socialAccountMetricSummaries = {}, socialPerformanceHistory = {}, socialReviewEvents = [], districtFilter, districts, campaignSearch, setCampaignSearch, isAdmin = false, reportAsOf = null, demoMode = false }) {
   const [socialPageTab, setSocialPageTab] = useState('overview');
   const [relationshipFilter, setRelationshipFilter] = useState('public');
   const socialSearch = campaignSearch;
@@ -3262,7 +3264,10 @@ export function SocialView({ socialResults, legacySocialResults = [], socialSour
     }, 0);
     return () => window.clearTimeout(timer);
   }, []);
-  const [topPostsAsOf] = useState(() => Date.now());
+  const [topPostsAsOf] = useState(() => {
+    const supplied = new Date(reportAsOf || '').getTime();
+    return Number.isFinite(supplied) ? supplied : Date.now();
+  });
   const [topPostsPeriod, setTopPostsPeriod] = useState('last-30-days');
   const [topPostsCustomStart, setTopPostsCustomStart] = useState('');
   const [topPostsCustomEnd, setTopPostsCustomEnd] = useState('');
@@ -3487,6 +3492,7 @@ export function SocialView({ socialResults, legacySocialResults = [], socialSour
         onExportCsv={exportOfficialSocialCsv}
         accountMetricSummary={accountMetricSummary}
         performanceDecision={socialExecutiveDecision}
+        demoMode={demoMode}
       />
       {socialMessage && <p className="social-review-error" role="alert">{socialMessage}</p>}
       {isAdmin && legacySocialResults.length > 0 && (
@@ -3696,7 +3702,7 @@ export function SocialView({ socialResults, legacySocialResults = [], socialSour
   );
 }
 
-export default function DashboardClient({ articles, districts, queries: initialQueries, clients = [], userDistrictId, initialDistrictId = null, initialView = 'dashboard', paymentNotice = null, billingInfo = null, publicPricingLabel = 'Annual access', publicPricingIntroductory = false, excludedStories = [], correctionEvents = [], socialSources = [], socialThreads = [], socialAccountMetricSummaries = {}, socialPerformanceHistory = {}, socialReviewEvents = [], strategicProfiles = [], strategicPriorities = [], collectionHealth = [], socialCollectionHealth = [], dataWarnings = [], isAdmin = false, melodiEnabled = false, metaIntegrationEnabled = false, demoMode = false }) {
+export default function DashboardClient({ articles, districts, queries: initialQueries, clients = [], userDistrictId, initialDistrictId = null, initialView = 'dashboard', paymentNotice = null, billingInfo = null, publicPricingLabel = 'Annual access', publicPricingIntroductory = false, excludedStories = [], correctionEvents = [], socialSources = [], socialThreads = [], socialAccountMetricSummaries = {}, socialPerformanceHistory = {}, socialReviewEvents = [], strategicProfiles = [], strategicPriorities = [], collectionHealth = [], socialCollectionHealth = [], dataWarnings = [], isAdmin = false, melodiEnabled = false, metaIntegrationEnabled = false, demoMode = false, socialReportAsOf = null }) {
   const defaultDistrictFilter = userDistrictId ?? initialDistrictId ?? districts[0]?.id ?? 'All';
   const [currentView, setCurrentView] = useState(initialView);
   const [search, setSearch] = useState('');
@@ -4352,6 +4358,8 @@ export default function DashboardClient({ articles, districts, queries: initialQ
             <button
               className="mobile-menu-btn"
               onClick={() => setSidebarOpen((o) => !o)}
+              aria-label={sidebarOpen ? 'Close navigation menu' : 'Open navigation menu'}
+              aria-expanded={sidebarOpen}
             >
               ☰
             </button>
@@ -4515,6 +4523,8 @@ export default function DashboardClient({ articles, districts, queries: initialQ
               campaignSearch={campaignSearch}
               setCampaignSearch={setCampaignSearch}
               isAdmin={isAdmin}
+              reportAsOf={socialReportAsOf}
+              demoMode={demoMode}
             />
           )}
           {melodiEnabled && currentView === 'melodi' && (

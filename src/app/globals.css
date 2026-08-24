@@ -6098,3 +6098,51 @@ input[type="date"]::-webkit-calendar-picker-indicator {
     color: #0f172a !important;
   }
 }
+
+.demo-social-post-page {
+  min-height: 100vh;
+  padding: 48px 20px;
+  background: radial-gradient(circle at top, #173451 0, #0a1726 48%, #07111d 100%);
+}
+
+.demo-social-post-shell {
+  width: min(760px, 100%);
+  margin: 0 auto;
+  overflow: hidden;
+  border: 1px solid rgba(255, 255, 255, 0.14);
+  border-radius: 22px;
+  background: #fff;
+  box-shadow: 0 28px 80px rgba(0, 0, 0, 0.28);
+  color: #172033;
+}
+
+.demo-social-post-notice {
+  display: grid;
+  gap: 4px;
+  padding: 16px 24px;
+  background: #fff7d6;
+  border-bottom: 1px solid #f4d76b;
+  color: #594500;
+}
+
+.demo-social-post-notice span { font-size: 13px; line-height: 1.45; }
+.demo-social-post-shell > header { display: flex; align-items: flex-start; justify-content: space-between; gap: 24px; padding: 28px; }
+.demo-social-post-shell > header h1 { margin: 10px 0 4px; font-size: clamp(22px, 4vw, 32px); color: #12243a; }
+.demo-social-post-shell > header p { margin: 0; color: #64748b; }
+.demo-social-post-shell > header a { color: #8a6500; font-weight: 700; text-decoration: none; }
+.demo-social-post-media { background: #e9eef4; }
+.demo-social-post-media img { display: block; width: 100%; max-height: 680px; object-fit: contain; }
+.demo-social-post-copy { padding: 28px; margin: 0; font-size: 18px; line-height: 1.65; white-space: pre-wrap; }
+.demo-social-post-shell dl { display: grid; grid-template-columns: repeat(4, minmax(0, 1fr)); margin: 0; padding: 0 28px 28px; gap: 10px; }
+.demo-social-post-shell dl div { padding: 14px; border-radius: 12px; background: #f2f5f8; }
+.demo-social-post-shell dt { color: #64748b; font-size: 12px; }
+.demo-social-post-shell dd { margin: 5px 0 0; color: #12243a; font-size: 20px; font-weight: 800; }
+
+@media (max-width: 640px) {
+  .demo-social-post-page { padding: 0; }
+  .demo-social-post-shell { border: 0; border-radius: 0; }
+  .demo-social-post-shell > header { flex-direction: column; }
+  .demo-social-post-shell dl { grid-template-columns: repeat(2, minmax(0, 1fr)); }
+  .social-monthly-post-table-wrap { overflow-x: auto; -webkit-overflow-scrolling: touch; }
+  .social-monthly-post-table-wrap table { min-width: 960px; }
+}

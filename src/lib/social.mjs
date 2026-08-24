@@ -22,6 +22,8 @@ function conciseText(value, maxLength) {
 }
 
 export function safeSocialUrl(value) {
+  const localValue = String(value || '').trim();
+  if (/^\/demo\/social\/[A-Za-z0-9._~-]+$/.test(localValue)) return localValue;
   try {
     const url = new URL(String(value || ''));
     if (url.protocol !== 'https:' || url.username || url.password) return null;
@@ -32,6 +34,8 @@ export function safeSocialUrl(value) {
 }
 
 export function safeSocialMediaUrl(value) {
+  const localValue = String(value || '').trim();
+  if (/^\/demo-social\/[A-Za-z0-9._~-]+\.(?:webp|png|jpe?g)$/i.test(localValue)) return localValue;
   try {
     const url = new URL(String(value || ''));
     if (url.protocol !== 'https:') return '';

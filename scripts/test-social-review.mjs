@@ -485,6 +485,7 @@ async function compileSocialViewForInteractionTest(source, reviewSocialThreadMoc
     '@/lib/socialReport.mjs': socialReportModule,
     '@/lib/socialMetrics.mjs': { enrichSocialThreadsWithNativeMetrics: (threads) => threads, summarizeOwnedSocialAccountMetrics: () => ({ platforms: {}, platformCount: 0, combinedReachOrViewers: null }) },
     '@/lib/date.mjs': dateModule,
+    '@/lib/payment-status.mjs': { isCanaryComplimentary: () => false, isCanaryPaymentCovered: () => false },
     '@/lib/queryPolicy.mjs': { CUSTOMER_SEARCH_QUERY_LIMIT: 10, activeNewsQueryCount: () => 0 },
     '@/lib/communicationsBrief.mjs': { buildCommunicationsBrief: () => ({}), formatCommunicationsBriefRecommendation: () => '' },
     '@/lib/strategicGovernance.mjs': { buildStrategicGovernance: () => ({}) },

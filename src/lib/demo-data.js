@@ -12,8 +12,8 @@ export const demoQueries = [
 ];
 
 export const demoSocialSources = [
-  { id: 'demo-social-facebook', district_id: 'canary-falls-usd', platform: 'facebook', url: 'https://www.facebook.com/', handle: 'BeaconRidgeHigh', active: true },
-  { id: 'demo-social-instagram', district_id: 'canary-falls-usd', platform: 'instagram', url: 'https://www.instagram.com/', handle: 'BeaconRidgeHigh', active: true },
+  { id: 'demo-social-facebook', district_id: 'canary-falls-usd', platform: 'facebook', url: '/demo/social/demo-social-facebook', handle: 'canaryfallsusd', display_name: 'Canary Falls Unified School District', active: true, metadata: { followers_count: 18700, demo_fixture: true } },
+  { id: 'demo-social-instagram', district_id: 'canary-falls-usd', platform: 'instagram', url: '/demo/social/demo-social-instagram', handle: 'canaryfallsusd', display_name: 'Canary Falls Unified School District', active: true, metadata: { followers_count: 12850, demo_fixture: true } },
 ];
 
 export const demoArticles = [
