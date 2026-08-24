@@ -113,4 +113,48 @@ const ownedColumn = runFinalizer({
 });
 assert.equal(ownedColumn.sentiment, 0.25);
 
+const morenciRoutine = runFinalizer({
+  summary: 'Morenci Area Schools announced a routine special board meeting in the Middle School Library.',
+  local_recommendation: 'Share the notice with staff and families while protecting children and employee privacy.',
+  sentiment: -0.7,
+  risk: 'Low',
+  tags: ['Operations & Finance'],
+  author: 'Morenci Area Schools',
+  contact_info: 'N/A',
+  relevance_score: 5,
+}, {
+  ...basePrepared,
+  district_id: 'morenci-area-schools',
+  district_name: 'Morenci Area Schools',
+  title: 'Special Board of Education Meeting - July 30, 2026',
+  source: 'Morenci Area Schools',
+  link: 'https://morencibulldogs.org/article/3050403',
+  strategic_priority_profile: { district_id: 'morenci-area-schools' },
+});
+assert.equal(morenciRoutine.sentiment, 0);
+assert.equal(morenciRoutine.risk_level, 'Low');
+assert.equal(morenciRoutine.tags.join('|'), 'Operations & Finance');
+
+const auburnCapitalPlan = runFinalizer({
+  summary: 'The district announced a 10-year facilities master plan to address enrollment growth and modernize infrastructure.',
+  local_recommendation: 'Explain the project timeline and funding sources.',
+  sentiment: -0.7,
+  risk: 'Low',
+  tags: ['Operations & Finance'],
+  author: 'Reporter',
+  contact_info: 'N/A',
+  relevance_score: 5,
+}, {
+  ...basePrepared,
+  district_id: 'auburn-city-schools',
+  district_name: 'Auburn City Schools',
+  title: 'Auburn City Schools unveil $383 million expansion plan',
+  source: 'Yellowhammer News',
+  link: 'https://yellowhammernews.com/auburn-city-schools-unveil-383-million-expansion-plan/',
+  strategic_priority_profile: { district_id: 'auburn-city-schools' },
+});
+assert.equal(auburnCapitalPlan.sentiment, 0);
+assert.equal(auburnCapitalPlan.risk_level, 'Low');
+assert.equal(auburnCapitalPlan.tags.join('|'), 'Operations & Finance');
+
 console.log('Live ingestion interpretation guard checks passed.');

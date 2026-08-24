@@ -69,8 +69,31 @@ export function classifySource(candidate) {
 }
 
 export function detectSensitivePersonnelTrustIssue(fields = {}) {
-  const text = normalize([fields.headline, fields.summary, fields.recommendation, fields.risk, fields.tags].join(' '));
+  // Generic recommendations can mention staff, children, privacy, or investigations.
+  // Those instructions are not evidence that the underlying story is a trust incident.
+  const text = normalize([fields.headline, fields.summary, fields.risk, fields.tags].join(' '));
   return /(teacher|educator|staff|employee|principal|coach|school employee|high school employee).{0,120}(arrest|charged|charges|obscene|sexual|child|children|minor|internet crime|distribution|misconduct|investigation)|(?:arrest|charged|charges|obscene|sexual|child|children|minor|internet crime|distribution|misconduct|investigation).{0,120}(teacher|educator|staff|employee|principal|coach|school employee|high school employee)/i.test(text);
+}
+
+function organizationKey(value) {
+  return normalize(value).replace(/[^a-z0-9]+/g, ' ').trim();
+}
+
+function isDistrictControlledContent(fields = {}) {
+  const source = organizationKey(fields.source);
+  const district = organizationKey(fields.district_name || fields.districtName);
+  return Boolean(source && district && (source === district || source.includes(district) || district.includes(source)));
+}
+
+function isRoutineDistrictNotice(text) {
+  return /\b(special board (?:of education )?meeting|board meeting notice|employment opportunities?|job openings?|registration|supply lists?|back[- ]to[- ]school|school year|sports season|calendar|schedule|reminder|public notice)\b/i.test(text);
+}
+
+function isNeutralCapitalInvestment(text) {
+  const capital = /\b(capital|facilit(?:y|ies)|master plan|expansion|construction|renovation|rebuild(?:ing)?|new (?:high|middle|elementary) school|bond)\b/i.test(text);
+  const controversy = /\b(backlash|criticism|controversy|opposition|cost overrun|over budget|delay|lawsuit|tax increase|debt concern|voters? reject|bond fail|defeat)\b/i.test(text);
+  const affirmativeOutcome = /\b(bond|measure|referendum)\b.{0,60}\b(passed|approved|won|voter approval)\b|\b(passed|approved|won)\b.{0,60}\b(bond|measure|referendum)\b/i.test(text);
+  return capital && !controversy && !affirmativeOutcome;
 }
 
 function isSourceAuthoredContent(text) {
@@ -85,19 +108,25 @@ function isProactiveTruthTelling(text) {
 export function calibrateSentiment(rawSentiment, fields = {}) {
   let sentiment = Number(rawSentiment || 0);
   const text = normalize([
-    fields.headline, fields.summary, fields.recommendation, fields.risk, fields.tags,
+    fields.headline, fields.summary, fields.risk, fields.tags,
     fields.author, fields.source, fields.link,
   ].join(' '));
   const personalIncident = /(teacher|educator|staff|employee|principal|coach).{0,80}(bac|dui|dwi|intoxicated|drunk|fatal crash|deadly crash|crash|killed|died|death|arrest|illness)|(?:bac|dui|dwi|intoxicated|drunk|fatal crash|deadly crash|crash|killed|died|death|arrest|illness).{0,80}(teacher|educator|staff|employee|principal|coach)/i.test(text);
   const griefWithoutBlame = /\b(mourns?|mourning|death|died|killed|loss of|memorial|grief)\b/i.test(text);
   const culpability = /(district|school|board|superintendent|leadership).{0,80}(neglig|cover.?up|failed|failure|fault|liable|lawsuit|sued|policy failure|supervision|student harm|under district care|public criticism|backlash|scandal)|(neglig|cover.?up|failed|failure|fault|liable|lawsuit|sued|policy failure|supervision|student harm|under district care|public criticism|backlash|scandal).{0,80}(district|school|board|superintendent|leadership)/i.test(text);
   const sourceAuthored = isSourceAuthoredContent(text);
+  const districtControlled = isDistrictControlledContent(fields);
+  const routineDistrictNotice = districtControlled && isRoutineDistrictNotice(text);
+  const neutralCapitalInvestment = isNeutralCapitalInvestment(text);
   const proactiveTruthTelling = isProactiveTruthTelling(text);
   const sensitiveTrust = detectSensitivePersonnelTrustIssue(fields);
   if (sensitiveTrust && sentiment > -0.3) sentiment = -0.7;
   if ((personalIncident || griefWithoutBlame) && !culpability && !sensitiveTrust) {
     sentiment = Math.max(-0.1, Math.min(0.1, sentiment));
   }
+  if (neutralCapitalInvestment && !culpability && !sensitiveTrust && sentiment < 0) sentiment = 0;
+  if (routineDistrictNotice && !culpability && !sensitiveTrust) sentiment = 0;
+  else if (districtControlled && !culpability && !sensitiveTrust) sentiment = Math.max(-0.1, Math.min(0.25, sentiment));
   if (proactiveTruthTelling && !culpability && !sensitiveTrust && sentiment < 0.1) sentiment = 0.1;
   if (sourceAuthored && !culpability && !sensitiveTrust && sentiment > 0.25) sentiment = 0.25;
   return sentiment;

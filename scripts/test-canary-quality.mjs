@@ -19,9 +19,11 @@ for (const fixture of fixtures) {
         headline: fixture.input.headline,
         summary: fixture.input.summary,
         recommendation: fixture.input.recommendation,
+        risk: fixture.input.risk,
         tags: fixture.input.tags,
         author: fixture.input.author,
         source: fixture.input.source,
+        district_name: fixture.input.district_name,
         link: fixture.input.link,
       };
       assert.equal(detectSensitivePersonnelTrustIssue(fields), fixture.expected.sensitive_personnel);

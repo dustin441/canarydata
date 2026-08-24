@@ -82,6 +82,77 @@
     "expected": { "sentiment": 0.25, "sensitive_personnel": false }
   },
   {
+    "id": "morenci-routine-board-notice-is-neutral",
+    "kind": "sentiment",
+    "input": {
+      "raw_sentiment": -0.7,
+      "headline": "Special Board of Education Meeting - July 30, 2026",
+      "summary": "Morenci Area Schools announced a routine special meeting in the Middle School Library.",
+      "source": "Morenci Area Schools",
+      "district_name": "Morenci Area Schools",
+      "risk": "Low",
+      "tags": "Operations & Finance"
+    },
+    "expected": { "sentiment": 0, "sensitive_personnel": false }
+  },
+  {
+    "id": "morenci-employment-page-is-neutral-not-sensitive",
+    "kind": "sentiment",
+    "input": {
+      "raw_sentiment": -0.7,
+      "headline": "Employment Opportunities",
+      "summary": "The district lists current employment opportunities and application information.",
+      "recommendation": "Share with staff and families while protecting children and employee privacy.",
+      "source": "Morenci Area Schools",
+      "district_name": "Morenci Area Schools",
+      "risk": "Low",
+      "tags": "Operations & Finance"
+    },
+    "expected": { "sentiment": 0, "sensitive_personnel": false }
+  },
+  {
+    "id": "auburn-neutral-capital-plan-cannot-score-as-crisis",
+    "kind": "sentiment",
+    "input": {
+      "raw_sentiment": -0.7,
+      "headline": "Auburn City Schools unveil $383 million expansion plan",
+      "summary": "The district announced a 10-year facilities master plan to address enrollment growth and modernize infrastructure.",
+      "source": "Yellowhammer News",
+      "district_name": "Auburn City Schools",
+      "risk": "Low",
+      "tags": "Operations & Finance"
+    },
+    "expected": { "sentiment": 0, "sensitive_personnel": false }
+  },
+  {
+    "id": "capital-project-controversy-remains-negative",
+    "kind": "sentiment",
+    "input": {
+      "raw_sentiment": -0.7,
+      "headline": "School construction plan faces backlash over cost overruns",
+      "summary": "Residents criticized the project after it went over budget and encountered delays.",
+      "source": "Local News",
+      "district_name": "Example Schools",
+      "risk": "High",
+      "tags": "Operations & Finance"
+    },
+    "expected": { "sentiment": -0.7, "sensitive_personnel": false }
+  },
+  {
+    "id": "passed-bond-can-remain-positive",
+    "kind": "sentiment",
+    "input": {
+      "raw_sentiment": 0.65,
+      "headline": "School bond passed with voter approval",
+      "summary": "The approved bond enables planned school improvements.",
+      "source": "Local News",
+      "district_name": "Example Schools",
+      "risk": "Low",
+      "tags": "Operations & Finance Engagement"
+    },
+    "expected": { "sentiment": 0.65, "sensitive_personnel": false }
+  },
+  {
     "id": "fort-wayne-snippet-does-not-prove-incomplete-article",
     "kind": "interpretation",
     "input": {

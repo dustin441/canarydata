@@ -129,8 +129,29 @@ return $input.all().map((item, index) => {
   const source = prepared.source || meta.source?.name || (typeof meta.source === 'string' ? meta.source : '');
 
   function detectSensitivePersonnelTrustIssue(fields = {}) {
-    const haystack = [fields.headline, fields.summary, fields.recommendation, fields.risk, fields.tags].join(' ').toLowerCase();
+    const haystack = [fields.headline, fields.summary, fields.risk, fields.tags].join(' ').toLowerCase();
     return /(teacher|educator|staff|employee|principal|coach|school employee|high school employee).{0,120}(arrest|charged|charges|obscene|sexual|child|children|minor|internet crime|distribution|misconduct|investigation)|(?:arrest|charged|charges|obscene|sexual|child|children|minor|internet crime|distribution|misconduct|investigation).{0,120}(teacher|educator|staff|employee|principal|coach|school employee|high school employee)/i.test(haystack);
+  }
+
+  function organizationKey(value) {
+    return String(value || '').toLowerCase().replace(/[^a-z0-9]+/g, ' ').trim();
+  }
+
+  function isDistrictControlledContent(fields = {}) {
+    const sourceKey = organizationKey(fields.source);
+    const districtKey = organizationKey(fields.districtName);
+    return Boolean(sourceKey && districtKey && (sourceKey === districtKey || sourceKey.includes(districtKey) || districtKey.includes(sourceKey)));
+  }
+
+  function isRoutineDistrictNotice(text) {
+    return /\b(special board (?:of education )?meeting|board meeting notice|employment opportunities?|job openings?|registration|supply lists?|back[- ]to[- ]school|school year|sports season|calendar|schedule|reminder|public notice)\b/i.test(text);
+  }
+
+  function isNeutralCapitalInvestment(text) {
+    const capital = /\b(capital|facilit(?:y|ies)|master plan|expansion|construction|renovation|rebuild(?:ing)?|new (?:high|middle|elementary) school|bond)\b/i.test(text);
+    const controversy = /\b(backlash|criticism|controversy|opposition|cost overrun|over budget|delay|lawsuit|tax increase|debt concern|voters? reject|bond fail|defeat)\b/i.test(text);
+    const affirmativeOutcome = /\b(bond|measure|referendum)\b.{0,60}\b(passed|approved|won|voter approval)\b|\b(passed|approved|won)\b.{0,60}\b(bond|measure|referendum)\b/i.test(text);
+    return capital && !controversy && !affirmativeOutcome;
   }
 
   function isSourceAuthoredContent(text) {
@@ -144,15 +165,21 @@ return $input.all().map((item, index) => {
 
   function calibrateSadVsBadSentiment(rawSentiment, fields = {}) {
     let s = Number(rawSentiment || 0);
-    const haystack = [fields.headline, fields.summary, fields.recommendation, fields.risk, fields.tags, fields.author, fields.source, fields.link].join(' ').toLowerCase();
+    const haystack = [fields.headline, fields.summary, fields.risk, fields.tags, fields.author, fields.source, fields.link].join(' ').toLowerCase();
     const personalIncident = /(teacher|educator|staff|employee|principal|coach).{0,80}(bac|dui|dwi|intoxicated|drunk|fatal crash|deadly crash|crash|killed|died|death|arrest|illness)|(?:bac|dui|dwi|intoxicated|drunk|fatal crash|deadly crash|crash|killed|died|death|arrest|illness).{0,80}(teacher|educator|staff|employee|principal|coach)/i.test(haystack);
     const griefWithoutBlame = /\b(mourns?|mourning|death|died|killed|loss of|memorial|grief)\b/i.test(haystack);
     const districtCulpability = /(district|school|board|superintendent|leadership).{0,80}(neglig|cover.?up|failed|failure|fault|liable|lawsuit|sued|policy failure|supervision|misconduct under supervision|student harm|under district care|public criticism|backlash|scandal)|(neglig|cover.?up|failed|failure|fault|liable|lawsuit|sued|policy failure|supervision|student harm|under district care|public criticism|backlash|scandal).{0,80}(district|school|board|superintendent|leadership)/i.test(haystack);
+    const districtControlled = isDistrictControlledContent(fields);
+    const routineDistrictNotice = districtControlled && isRoutineDistrictNotice(haystack);
+    const neutralCapitalInvestment = isNeutralCapitalInvestment(haystack);
     const sensitivePersonnelTrustIssue = detectSensitivePersonnelTrustIssue(fields);
     if (sensitivePersonnelTrustIssue && s > -0.3) s = -0.7;
     if ((personalIncident || griefWithoutBlame) && !districtCulpability && !sensitivePersonnelTrustIssue) {
       s = Math.max(-0.1, Math.min(0.1, s));
     }
+    if (neutralCapitalInvestment && !districtCulpability && !sensitivePersonnelTrustIssue && s < 0) s = 0;
+    if (routineDistrictNotice && !districtCulpability && !sensitivePersonnelTrustIssue) s = 0;
+    else if (districtControlled && !districtCulpability && !sensitivePersonnelTrustIssue) s = Math.max(-0.1, Math.min(0.25, s));
     if (isProactiveTruthTelling(haystack) && !districtCulpability && !sensitivePersonnelTrustIssue && s < 0.1) s = 0.1;
     if (isSourceAuthoredContent(haystack) && !districtCulpability && !sensitivePersonnelTrustIssue && s > 0.25) s = 0.25;
     return s;
@@ -209,6 +236,7 @@ return $input.all().map((item, index) => {
     tags: Array.isArray(cleanJson.tags) ? cleanJson.tags.join(' ') : '',
     author: cleanJson.author,
     source,
+    districtName: prepared.district_name || meta.district_name || '',
     link,
   };
   const sentiment = calibrateSadVsBadSentiment(rawSentiment, sentimentFields);
