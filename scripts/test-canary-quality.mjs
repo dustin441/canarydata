@@ -24,6 +24,7 @@ for (const fixture of fixtures) {
         author: fixture.input.author,
         source: fixture.input.source,
         district_name: fixture.input.district_name,
+        district_id: fixture.input.district_id,
         link: fixture.input.link,
       };
       assert.equal(detectSensitivePersonnelTrustIssue(fields), fixture.expected.sensitive_personnel);

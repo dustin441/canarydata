@@ -89,7 +89,7 @@
       "headline": "Special Board of Education Meeting - July 30, 2026",
       "summary": "Morenci Area Schools announced a routine special meeting in the Middle School Library.",
       "source": "Morenci Area Schools",
-      "district_name": "Morenci Area Schools",
+      "district_id": "morenci-area-schools",
       "risk": "Low",
       "tags": "Operations & Finance"
     },
@@ -104,7 +104,7 @@
       "summary": "The district lists current employment opportunities and application information.",
       "recommendation": "Share with staff and families while protecting children and employee privacy.",
       "source": "Morenci Area Schools",
-      "district_name": "Morenci Area Schools",
+      "district_id": "morenci-area-schools",
       "risk": "Low",
       "tags": "Operations & Finance"
     },

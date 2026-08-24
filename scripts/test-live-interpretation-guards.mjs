@@ -125,7 +125,6 @@ const morenciRoutine = runFinalizer({
 }, {
   ...basePrepared,
   district_id: 'morenci-area-schools',
-  district_name: 'Morenci Area Schools',
   title: 'Special Board of Education Meeting - July 30, 2026',
   source: 'Morenci Area Schools',
   link: 'https://morencibulldogs.org/article/3050403',

@@ -139,7 +139,7 @@ return $input.all().map((item, index) => {
 
   function isDistrictControlledContent(fields = {}) {
     const sourceKey = organizationKey(fields.source);
-    const districtKey = organizationKey(fields.districtName);
+    const districtKey = organizationKey(fields.districtName || fields.districtId);
     return Boolean(sourceKey && districtKey && (sourceKey === districtKey || sourceKey.includes(districtKey) || districtKey.includes(sourceKey)));
   }
 
@@ -237,6 +237,7 @@ return $input.all().map((item, index) => {
     author: cleanJson.author,
     source,
     districtName: prepared.district_name || meta.district_name || '',
+    districtId: prepared.district_id || meta.district_id || '',
     link,
   };
   const sentiment = calibrateSadVsBadSentiment(rawSentiment, sentimentFields);

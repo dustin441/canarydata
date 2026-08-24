@@ -81,7 +81,7 @@ function organizationKey(value) {
 
 function isDistrictControlledContent(fields = {}) {
   const source = organizationKey(fields.source);
-  const district = organizationKey(fields.district_name || fields.districtName);
+  const district = organizationKey(fields.district_name || fields.districtName || fields.district_id || fields.districtId);
   return Boolean(source && district && (source === district || source.includes(district) || district.includes(source)));
 }
 
