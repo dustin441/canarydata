@@ -227,11 +227,12 @@ function accountMetricSummary(anchorMs, history) {
     reach: null, totalInteractions: null, profileViews: null, profileLinkTaps: null, websiteClicks: null, netFollowerChange: null,
   };
   const instagramReach = history.filter((row) => row.accountKey === 'demo-social-instagram' && row.metric === 'reach').at(-1)?.value ?? 0;
+  const instagramReachWeek = recent('demo-social-instagram', 'reach', 7);
   const instagramInteractions = recent('demo-social-instagram', 'total_interactions', 7);
   const instagramFollows = recent('demo-social-instagram', 'follower_change', 7);
   const instagram = {
     accountKey: 'instagram:canaryfallsusd', platform: 'instagram', accountName: DISTRICT_NAME, accountHandle: 'canaryfallsusd', accountProfileUrl: demoPostPath('demo-social-instagram'),
-    views: metricSummary(Math.round(instagramReach * 1.24), 'views', anchorMs, 'week', 7),
+    views: metricSummary(Math.round(instagramReachWeek * 1.24), 'views', anchorMs, 'week', 7),
     uniqueViewers: null, engagements: null,
     reach: metricSummary(instagramReach, 'reach', anchorMs, 'day', 1),
     totalInteractions: metricSummary(instagramInteractions, 'total_interactions', anchorMs, 'week', 7),

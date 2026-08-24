@@ -79,6 +79,14 @@ assert.equal(summary.accountCount, 2);
 assert.ok(summary.accounts.every((account) => account.platform && account.accountHandle));
 const history = fixed.socialPerformanceHistory[DISTRICT_ID];
 assert.equal(history.length, 300, 'Demo history must contain 60 complete days across five platform metrics.');
+const instagramSummary = summary.platforms.instagram;
+const instagramSevenDayReach = history
+  .filter((row) => row.accountKey === 'demo-social-instagram' && row.metric === 'reach')
+  .slice(-7)
+  .reduce((total, row) => total + row.value, 0);
+assert.equal(instagramSummary.views.value, Math.round(instagramSevenDayReach * 1.24), 'Instagram weekly views must derive from the complete seven-day reach window.');
+assert.equal(instagramSummary.views.period, 'week');
+assert.equal(Date.parse(instagramSummary.views.periodEndAt) - Date.parse(instagramSummary.views.periodStartAt), 6 * DAY_MS, 'A seven-day inclusive metric window must span six elapsed days.');
 const currentWindow = resolveSocialReportWindow('last-30-days', Date.parse(fixed.reportAsOf));
 const comparisonWindow = resolveSocialReportComparisonWindow('last-30-days', Date.parse(fixed.reportAsOf));
 const performance = buildSocialPerformanceFromDailySeries(history, { currentWindow, comparisonWindow });
