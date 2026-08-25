@@ -18,6 +18,20 @@ export default function ResetPassword() {
     async function initializeRecoverySession() {
       const supabase = createClient();
 
+      const query = new URLSearchParams(window.location.search);
+      const code = query.get('code');
+
+      if (code) {
+        const { error: exchangeError } = await supabase.auth.exchangeCodeForSession(code);
+
+        if (exchangeError) {
+          if (active) setError('Your password reset session has expired. Please request a new link.');
+          return;
+        }
+
+        window.history.replaceState({}, document.title, window.location.pathname);
+      }
+
       const hash = new URLSearchParams(window.location.hash.slice(1));
       const accessToken = hash.get('access_token');
       const refreshToken = hash.get('refresh_token');
