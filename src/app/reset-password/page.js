@@ -11,12 +11,16 @@ export default function ResetPassword() {
   const [error, setError] = useState('');
   const [loading, setLoading] = useState(false);
   const [success, setSuccess] = useState(false);
+  const [sessionReady, setSessionReady] = useState(false);
 
   useEffect(() => {
     let active = true;
 
     async function initializeRecoverySession() {
-      const supabase = createClient();
+      // This page explicitly handles recovery parameters. Disabling automatic
+      // URL detection prevents a one-time PKCE code from being exchanged twice.
+      const supabase = createClient({ auth: { detectSessionInUrl: false } });
+      let recoveryEstablished = false;
 
       const query = new URLSearchParams(window.location.search);
       const code = query.get('code');
@@ -29,6 +33,7 @@ export default function ResetPassword() {
           return;
         }
 
+        recoveryEstablished = true;
         window.history.replaceState({}, document.title, window.location.pathname);
       }
 
@@ -48,12 +53,19 @@ export default function ResetPassword() {
           return;
         }
 
+        recoveryEstablished = true;
         window.history.replaceState({}, document.title, window.location.pathname);
       }
 
+      if (!recoveryEstablished) {
+        if (active) setError('Your password reset session has expired. Please request a new link.');
+        return;
+      }
+
       const { data: { session } } = await supabase.auth.getSession();
-      if (active && !session) {
-        setError('Your password reset session has expired. Please request a new link.');
+      if (active) {
+        if (session) setSessionReady(true);
+        else setError('Your password reset session has expired. Please request a new link.');
       }
     }
 
@@ -64,6 +76,11 @@ export default function ResetPassword() {
   async function handleSubmit(e) {
     e.preventDefault();
     setError('');
+
+    if (!sessionReady) {
+      setError('Your password reset session has expired. Please request a new link.');
+      return;
+    }
 
     if (password !== confirmPassword) {
       setError('Passwords do not match');
@@ -161,7 +178,7 @@ export default function ResetPassword() {
               <button
                 type="submit"
                 className="btn btn-primary"
-                disabled={loading || !!error.includes('expired')}
+                disabled={loading || !sessionReady}
               >
                 {loading ? (
                   <span className="spinner" style={{ margin: '0 auto' }} />

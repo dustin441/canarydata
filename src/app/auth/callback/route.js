@@ -1,15 +1,11 @@
 import { createServerClient } from '@supabase/ssr';
 import { NextResponse } from 'next/server';
-
-function safeNextPath(value) {
-  if (!value || !value.startsWith('/') || value.startsWith('//')) return '/dashboard';
-  return value;
-}
+import { safeNextPath } from '@/lib/authRedirect.mjs';
 
 export async function GET(request) {
   const requestUrl = new URL(request.url);
   const code = requestUrl.searchParams.get('code');
-  const nextPath = safeNextPath(requestUrl.searchParams.get('next'));
+  const nextPath = safeNextPath(requestUrl.searchParams.get('next'), requestUrl.origin, '/dashboard');
   const response = NextResponse.redirect(new URL(nextPath, requestUrl.origin));
 
   if (!code) return response;
