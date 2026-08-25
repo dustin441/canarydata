@@ -177,10 +177,10 @@ const haltedCapitalProject = runFinalizer({
 assert.equal(haltedCapitalProject.sentiment, -0.8);
 
 const independentWatchdog = runFinalizer({
-  summary: 'The independent watchdog raised concerns about attendance data reporting.',
+  summary: 'The watchdog raises concerns about the project.',
   local_recommendation: 'Review the watchdog findings.',
   sentiment: -0.7,
-  risk: 'Medium',
+  risk: 'High',
   tags: ['Operations & Finance'],
   author: 'Reporter',
   contact_info: 'N/A',
@@ -189,9 +189,9 @@ const independentWatchdog = runFinalizer({
   ...basePrepared,
   district_id: 'example-schools',
   district_name: 'Example Schools',
-  title: 'Example Schools Watchdog raises concerns about attendance data',
+  title: 'Independent watchdog criticizes school construction spending',
   source: 'Example Schools Watchdog',
-  link: 'https://watchdog.example/attendance-data',
+  link: 'https://watchdog.example/construction-spending',
   strategic_priority_profile: { district_id: 'example-schools' },
 });
 assert.equal(independentWatchdog.sentiment, -0.7);

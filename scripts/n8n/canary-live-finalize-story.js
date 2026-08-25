@@ -149,7 +149,7 @@ return $input.all().map((item, index) => {
 
   function isNeutralCapitalInvestment(text) {
     const capital = /\b(capital|facilit(?:y|ies)|master plan|expansion|construction|renovation|rebuild(?:ing)?|new (?:high|middle|elementary) school|bond)\b/i.test(text);
-    const controversy = /\b(backlash|critici(?:sm|zed)|controvers(?:y|ial)|opposition|protest|cost (?:overrun|increase|escalation)|over budget|delay(?:ed|s)?|behind schedule|halted|stalled|suspended|unusable|unsafe|defect(?:ive|s)?|structural damage|bankrupt(?:cy)?|contractor failure|funding gap|budget shortfall|lawsuit|litigation|fraud|investigation|tax (?:increase|burden|concern)|debt concern|voters? reject(?:ed)?|bond fail(?:ed|ure)?|defeat(?:ed)?|cancel(?:ed|led|lation)|terminated|shutdown|closure)\b/i.test(text);
+    const controversy = /\b(backlash|critic(?:ism|iz(?:e|ed|es|ing)|al)?|concern(?:s|ed)?|controvers(?:y|ial)|opposition|protest|cost (?:overrun|increase|escalation)|over budget|delay(?:ed|s)?|behind schedule|halted|stalled|suspended|unusable|unsafe|defect(?:ive|s)?|structural damage|bankrupt(?:cy)?|contractor failure|funding gap|budget shortfall|lawsuit|litigation|fraud|investigation|tax (?:increase|burden|concern)|debt concern|voters? reject(?:ed)?|bond fail(?:ed|ure)?|defeat(?:ed)?|cancel(?:ed|led|lation)|terminated|shutdown|closure)\b/i.test(text);
     const affirmativeOutcome = /\b(bond|measure|referendum)\b.{0,60}\b(passed|approved|won|voter approval)\b|\b(passed|approved|won)\b.{0,60}\b(bond|measure|referendum)\b/i.test(text);
     return capital && !controversy && !affirmativeOutcome;
   }

@@ -167,6 +167,20 @@
     "expected": { "sentiment": -0.7, "sensitive_personnel": false }
   },
   {
+    "id": "watchdog-criticizes-capital-spending-remains-negative",
+    "kind": "sentiment",
+    "input": {
+      "raw_sentiment": -0.7,
+      "headline": "Independent watchdog criticizes school construction spending",
+      "summary": "The watchdog raises concerns about the project.",
+      "source": "Example Schools Watchdog",
+      "district_name": "Example Schools",
+      "risk": "High",
+      "tags": "Operations & Finance"
+    },
+    "expected": { "sentiment": -0.7, "sensitive_personnel": false }
+  },
+  {
     "id": "passed-bond-can-remain-positive",
     "kind": "sentiment",
     "input": {
