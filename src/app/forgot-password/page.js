@@ -17,9 +17,12 @@ export default function ForgotPassword() {
     setError('');
     setLoading(true);
 
-    const supabase = createClient();
+    // Password recovery links are commonly opened in a different browser or
+    // email client. The implicit flow keeps recovery self-contained in the
+    // URL fragment instead of depending on a browser-local PKCE verifier.
+    const supabase = createClient({ auth: { flowType: 'implicit' } });
     const { error: authError } = await supabase.auth.resetPasswordForEmail(email, {
-      redirectTo: `${window.location.origin}/auth/callback?next=/reset-password`,
+      redirectTo: `${window.location.origin}/reset-password`,
     });
 
     if (authError) {
