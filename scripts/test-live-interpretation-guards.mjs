@@ -156,4 +156,44 @@ assert.equal(auburnCapitalPlan.sentiment, 0);
 assert.equal(auburnCapitalPlan.risk_level, 'Low');
 assert.equal(auburnCapitalPlan.tags.join('|'), 'Operations & Finance');
 
+const haltedCapitalProject = runFinalizer({
+  summary: 'The project is indefinitely suspended after the contractor bankruptcy, leaving classrooms unusable.',
+  local_recommendation: 'Explain the disruption and recovery plan.',
+  sentiment: -0.8,
+  risk: 'High',
+  tags: ['Operations & Finance'],
+  author: 'Reporter',
+  contact_info: 'N/A',
+  relevance_score: 5,
+}, {
+  ...basePrepared,
+  district_id: 'example-schools',
+  district_name: 'Example Schools',
+  title: 'School construction halted after contractor bankruptcy',
+  source: 'Local News',
+  link: 'https://local.example/halted-school-construction',
+  strategic_priority_profile: { district_id: 'example-schools' },
+});
+assert.equal(haltedCapitalProject.sentiment, -0.8);
+
+const independentWatchdog = runFinalizer({
+  summary: 'The independent watchdog raised concerns about attendance data reporting.',
+  local_recommendation: 'Review the watchdog findings.',
+  sentiment: -0.7,
+  risk: 'Medium',
+  tags: ['Operations & Finance'],
+  author: 'Reporter',
+  contact_info: 'N/A',
+  relevance_score: 5,
+}, {
+  ...basePrepared,
+  district_id: 'example-schools',
+  district_name: 'Example Schools',
+  title: 'Example Schools Watchdog raises concerns about attendance data',
+  source: 'Example Schools Watchdog',
+  link: 'https://watchdog.example/attendance-data',
+  strategic_priority_profile: { district_id: 'example-schools' },
+});
+assert.equal(independentWatchdog.sentiment, -0.7);
+
 console.log('Live ingestion interpretation guard checks passed.');

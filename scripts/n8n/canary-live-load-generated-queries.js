@@ -11,7 +11,7 @@ return (async () => {
   authHeaders['api' + 'key'] = SUPABASE_KEY;
   authHeaders['Authori' + 'zation'] = 'Bearer ' + SUPABASE_KEY;
 
-  for (let offset = 0; offset < MAX_ROWS; offset += PAGE_SIZE) {
+  for (let offset = 0; offset <= MAX_ROWS; offset += PAGE_SIZE) {
     const page = await this.helpers.httpRequest({
       method: 'GET',
       url: `${SUPABASE_URL}/rest/v1/generated_queries`,
@@ -28,9 +28,11 @@ return (async () => {
       timeout: 30000,
     });
     if (!Array.isArray(page)) throw new Error(`generated_queries page at offset ${offset} was not an array`);
+    if (rows.length + page.length > MAX_ROWS) {
+      throw new Error(`generated_queries exceeded the ${MAX_ROWS}-row safety cap`);
+    }
     rows.push(...page);
     if (page.length < PAGE_SIZE) break;
-    if (offset + PAGE_SIZE >= MAX_ROWS) throw new Error(`generated_queries exceeded the ${MAX_ROWS}-row safety cap`);
   }
 
   if (new Set(rows.map((row) => row.id)).size !== rows.length) {

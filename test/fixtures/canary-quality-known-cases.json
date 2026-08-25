@@ -139,6 +139,34 @@
     "expected": { "sentiment": -0.7, "sensitive_personnel": false }
   },
   {
+    "id": "halted-construction-bankruptcy-remains-negative",
+    "kind": "sentiment",
+    "input": {
+      "raw_sentiment": -0.8,
+      "headline": "School construction halted after contractor bankruptcy",
+      "summary": "The project is indefinitely suspended and classrooms are unusable.",
+      "source": "Local News",
+      "district_name": "Example Schools",
+      "risk": "High",
+      "tags": "Operations & Finance"
+    },
+    "expected": { "sentiment": -0.8, "sensitive_personnel": false }
+  },
+  {
+    "id": "watchdog-source-is-not-district-controlled",
+    "kind": "sentiment",
+    "input": {
+      "raw_sentiment": -0.7,
+      "headline": "Watchdog criticizes district facilities failures",
+      "summary": "The independent watchdog reports unsafe buildings and repeated delays.",
+      "source": "Example Schools Watchdog",
+      "district_name": "Example Schools",
+      "risk": "High",
+      "tags": "Operations & Finance"
+    },
+    "expected": { "sentiment": -0.7, "sensitive_personnel": false }
+  },
+  {
     "id": "passed-bond-can-remain-positive",
     "kind": "sentiment",
     "input": {
