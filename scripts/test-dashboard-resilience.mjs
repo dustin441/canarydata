@@ -30,7 +30,7 @@ for (const label of [
 assert.match(page, /dataWarnings=\{dataWarnings\}/);
 assert.match(page, /socialCollectionHealth=\{socialCollectionHealth\}/);
 assert.match(page, /if \(isAdmin && !requestedDistrictId && districts\[0\]\?\.id\)[\s\S]*redirect\(`\/dashboard\?district=/);
-assert.match(page, /const dataDistrictId = userDistrictId \|\| \(initialDistrictId === 'All' \? null : initialDistrictId\)/);
+assert.match(page, /const dataDistrictId = isDemoReviewer[\s\S]*\? reviewerAccess\.selectedDistrictId[\s\S]*: userDistrictId \|\| \(initialDistrictId === 'All' \? null : initialDistrictId\)/);
 assert.match(page, /getArticles\(dataDistrictId\)/);
 assert.match(page, /initialDistrictId=\{initialDistrictId\}/);
 assert.match(dashboard, /Some dashboard data could not load/);

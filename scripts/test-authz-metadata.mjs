@@ -16,7 +16,9 @@ assert.match(source, /app_metadata/, 'protected app_metadata must be used for au
 
 const dashboard = await readFile(new URL('../src/app/dashboard/page.js', import.meta.url), 'utf8');
 assert.match(dashboard, /app_metadata\?\.role === 'admin'/);
-assert.match(dashboard, /if \(!userDistrictId && !isAdmin\) redirect/);
+assert.match(dashboard, /app_metadata\?\.role === 'demo_reviewer'/);
+assert.match(dashboard, /if \(!userDistrictId && !isAdmin && !isDemoReviewer\) redirect/);
+assert.match(dashboard, /resolveDemoReviewerAccess/);
 
 const actions = await readFile(new URL('../src/app/actions.js', import.meta.url), 'utf8');
 assert.match(actions, /async function requireCanaryActor/);

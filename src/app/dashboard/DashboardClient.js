@@ -3702,7 +3702,7 @@ export function SocialView({ socialResults, legacySocialResults = [], socialSour
   );
 }
 
-export default function DashboardClient({ articles, districts, queries: initialQueries, clients = [], userDistrictId, initialDistrictId = null, initialView = 'dashboard', paymentNotice = null, billingInfo = null, publicPricingLabel = 'Annual access', publicPricingIntroductory = false, excludedStories = [], correctionEvents = [], socialSources = [], socialThreads = [], socialAccountMetricSummaries = {}, socialPerformanceHistory = {}, socialReviewEvents = [], strategicProfiles = [], strategicPriorities = [], collectionHealth = [], socialCollectionHealth = [], dataWarnings = [], isAdmin = false, melodiEnabled = false, metaIntegrationEnabled = false, demoMode = false, socialReportAsOf = null }) {
+export default function DashboardClient({ articles, districts, queries: initialQueries, clients = [], userDistrictId, initialDistrictId = null, initialView = 'dashboard', paymentNotice = null, billingInfo = null, publicPricingLabel = 'Annual access', publicPricingIntroductory = false, excludedStories = [], correctionEvents = [], socialSources = [], socialThreads = [], socialAccountMetricSummaries = {}, socialPerformanceHistory = {}, socialReviewEvents = [], strategicProfiles = [], strategicPriorities = [], collectionHealth = [], socialCollectionHealth = [], dataWarnings = [], isAdmin = false, isDemoReviewer = false, reviewerDistrictCount = 0, melodiEnabled = false, metaIntegrationEnabled = false, demoMode = false, socialReportAsOf = null }) {
   const defaultDistrictFilter = userDistrictId ?? initialDistrictId ?? districts[0]?.id ?? 'All';
   const [currentView, setCurrentView] = useState(initialView);
   const [search, setSearch] = useState('');
@@ -3865,7 +3865,7 @@ export default function DashboardClient({ articles, districts, queries: initialQ
   }
 
   async function handleSaveNote() {
-    if (!noteModal) return;
+    if (!noteModal || isDemoReviewer) return;
     setNoteSaving(true);
     try {
       if (!demoMode) await saveNote(noteModal.id, noteText);
@@ -3877,6 +3877,7 @@ export default function DashboardClient({ articles, districts, queries: initialQ
   }
 
   function openExcludeModal(article) {
+    if (isDemoReviewer) return;
     setCorrectionReason('');
     setCorrectionError('');
     setCorrectionModal(article);
@@ -3908,6 +3909,7 @@ export default function DashboardClient({ articles, districts, queries: initialQ
   const [, startTransition] = useTransition();
 
   function handleEarnedMedia(article, checked) {
+    if (isDemoReviewer) return;
     setEarnedOverrides((prev) => ({ ...prev, [article.id]: checked }));
     if (demoMode) return;
     startTransition(async () => {
@@ -4162,11 +4164,15 @@ export default function DashboardClient({ articles, districts, queries: initialQ
     : selectedDistrict?.name ?? formatDistrictName(districtFilter);
   const accountDisplayName = demoMode
     ? 'Demo Account'
+    : isDemoReviewer
+      ? 'Cindy Demo Prep'
     : userDistrictId
       ? selectedDistrictName
       : 'Canary Admin';
   const accountDisplayDetail = demoMode
     ? 'Fictional demo data'
+    : isDemoReviewer
+      ? `Read-only · ${reviewerDistrictCount} districts`
     : userDistrictId
       ? 'Client view · 1 district'
       : 'Admin view · all districts';
@@ -4243,7 +4249,7 @@ export default function DashboardClient({ articles, districts, queries: initialQ
                 <span className="sidebar-link-badge">AI</span>
               </button>
             )}
-            <button
+            {!isDemoReviewer && <button
               className={`sidebar-link ${currentView === 'queries' ? 'active' : ''}`}
               onClick={() => handleNavSelect('queries')}
               style={{ width: '100%', background: 'none', border: 'none', textAlign: 'left', cursor: 'pointer' }}
@@ -4251,8 +4257,8 @@ export default function DashboardClient({ articles, districts, queries: initialQ
               <span className="sidebar-link-icon">🔍</span>
               Queries
               <span className="sidebar-link-badge">{queryCount}</span>
-            </button>
-            <button
+            </button>}
+            {!isDemoReviewer && <button
               className={`sidebar-link ${currentView === 'notes' ? 'active' : ''}`}
               onClick={() => handleNavSelect('notes')}
               style={{ width: '100%', background: 'none', border: 'none', textAlign: 'left', cursor: 'pointer' }}
@@ -4260,8 +4266,8 @@ export default function DashboardClient({ articles, districts, queries: initialQ
               <span className="sidebar-link-icon">📝</span>
               Notes
               <span className="sidebar-link-badge">{notesCount}</span>
-            </button>
-            {!demoMode && (
+            </button>}
+            {!demoMode && !isDemoReviewer && (
               <button
                 className={`sidebar-link ${currentView === 'corrections' ? 'active' : ''}`}
                 onClick={() => handleNavSelect('corrections')}
@@ -4273,7 +4279,7 @@ export default function DashboardClient({ articles, districts, queries: initialQ
               </button>
             )}
           </div>
-          {!userDistrictId && (
+          {!userDistrictId && !isDemoReviewer && (
             <div className="sidebar-section">
               <div className="sidebar-section-label">Admin</div>
               <button
@@ -4299,7 +4305,7 @@ export default function DashboardClient({ articles, districts, queries: initialQ
           )}
           {!userDistrictId && (
             <div className="sidebar-section">
-              <div className="sidebar-section-label">Districts</div>
+              <div className="sidebar-section-label">{isDemoReviewer ? 'Demo accounts' : 'Districts'}</div>
               {districts.map((d) => (
                 <button
                   key={d.id}
@@ -4327,7 +4333,7 @@ export default function DashboardClient({ articles, districts, queries: initialQ
                 Privacy Policy
               </a>
             )}
-            {!demoMode && (
+            {!demoMode && !isDemoReviewer && (
               <button
                 className={`sidebar-link ${currentView === 'settings' ? 'active' : ''}`}
                 onClick={() => handleNavSelect('settings')}
@@ -4449,9 +4455,9 @@ export default function DashboardClient({ articles, districts, queries: initialQ
                 🔒 Privacy Policy
               </a>
             )}
-            <button className="feedback-btn" onClick={() => setFeedbackOpen(true)}>
+            {!isDemoReviewer && <button className="feedback-btn" onClick={() => setFeedbackOpen(true)}>
               💬 Feedback
-            </button>
+            </button>}
           </div>
         </header>
 
@@ -4467,6 +4473,11 @@ export default function DashboardClient({ articles, districts, queries: initialQ
           {demoMode && (
             <div className="demo-mode-banner">
               <strong>Interactive demo:</strong> sample public-media intelligence for Canary Falls Unified School District. Filters, Social aggregation, columns, notes, feedback, and PDF export are enabled; changes stay in this browser session.
+            </div>
+          )}
+          {isDemoReviewer && (
+            <div className="demo-mode-banner">
+              <strong>Demo preparation access:</strong> review-only access to the assigned customer accounts. Exports are available; query, note, classification, correction, billing, integration, and account changes are disabled.
             </div>
           )}
           {!demoMode && paymentNotice && (
@@ -4995,7 +5006,7 @@ export default function DashboardClient({ articles, districts, queries: initialQ
                         <div className="headline-text" style={{ color: 'var(--text-primary)', fontWeight: 600 }}>
                           {article.headline}
                         </div>
-                        {!demoMode && (
+                        {!demoMode && !isDemoReviewer && (
                           <button
                             type="button"
                             className="expand-btn"
@@ -5090,7 +5101,11 @@ export default function DashboardClient({ articles, districts, queries: initialQ
                       {/* Earned Media */}
                       {col('earned_media') && (
                         <td style={{ textAlign: 'center' }}>
-                          <label style={{ display: 'inline-flex', alignItems: 'center', gap: '6px', cursor: 'pointer' }}>
+                          {isDemoReviewer ? (
+                            <span style={{ fontSize: '0.7rem', fontWeight: 700, color: isEarned(article) ? 'var(--canary-yellow)' : 'var(--text-tertiary)' }}>
+                              {isEarned(article) ? 'Earned' : 'Not marked'}
+                            </span>
+                          ) : <label style={{ display: 'inline-flex', alignItems: 'center', gap: '6px', cursor: 'pointer' }}>
                             <input
                               type="checkbox"
                               checked={isEarned(article)}
@@ -5101,7 +5116,7 @@ export default function DashboardClient({ articles, districts, queries: initialQ
                             <span style={{ fontSize: '0.7rem', fontWeight: 700, color: isEarned(article) ? 'var(--canary-yellow)' : 'var(--text-tertiary)' }}>
                               {isEarned(article) ? 'Earned' : 'Mark earned'}
                             </span>
-                          </label>
+                          </label>}
                         </td>
                       )}
 
@@ -5111,15 +5126,15 @@ export default function DashboardClient({ articles, districts, queries: initialQ
                           {getNoteText(article)
                             ? <>
                                 <ExpandableText text={getNoteText(article)} />
-                                <button
+                                {!isDemoReviewer && <button
                                   className="expand-btn"
                                   style={{ marginTop: '6px', opacity: 0.6 }}
                                   onClick={() => openNoteModal(article)}
                                 >
                                   Edit note
-                                </button>
+                                </button>}
                               </>
-                            : <button
+                            : isDemoReviewer ? <span style={{ color: 'var(--text-tertiary)' }}>—</span> : <button
                                 className={`note-indicator`}
                                 onClick={() => openNoteModal(article)}
                               >
@@ -5247,8 +5262,8 @@ export default function DashboardClient({ articles, districts, queries: initialQ
 
       {feedbackOpen && (
         <FeedbackModal
-          districtId={userDistrictId || (demoMode ? districtFilter : '')}
-          districtName={userDistrictId ? districts.find((d) => d.id === userDistrictId)?.name : (demoMode ? 'Canary Falls Unified School District' : null)}
+          districtId={userDistrictId || (isDemoReviewer || demoMode ? districtFilter : '')}
+          districtName={userDistrictId ? districts.find((d) => d.id === userDistrictId)?.name : (isDemoReviewer ? selectedDistrictName : demoMode ? 'Canary Falls Unified School District' : null)}
           onClose={() => setFeedbackOpen(false)}
         />
       )}

@@ -19,6 +19,9 @@ async function requireCanaryActor() {
 
   const admin = createAdminClient();
   const { data: { user } } = await admin.auth.admin.getUserById(sessionUser.id);
+  if (user?.app_metadata?.role === 'demo_reviewer') {
+    throw new Error('Demo preparation access is read-only.');
+  }
   const actor = {
     id: user?.id || sessionUser.id,
     isAdmin: user?.app_metadata?.role === 'admin',

@@ -9,6 +9,7 @@ import { isCanaryPaymentCovered } from '@/lib/payment-status.mjs';
 import { redirect } from 'next/navigation';
 import { metaIntegrationEnabledForDistrict, metaIntegrationPilotConfigured } from '@/lib/meta-integration.mjs';
 import { buildSocialDailySeries } from '@/lib/socialPerformance.mjs';
+import { resolveDemoReviewerAccess } from '@/lib/dashboard-access.mjs';
 
 const DASHBOARD_DATA_TIMEOUT_MS = 6500;
 
@@ -36,7 +37,8 @@ async function loadDashboardDataset(label, loader, fallback) {
   }
 }
 
-const DASHBOARD_VIEWS = new Set(['dashboard', 'birdseye', 'social', 'queries', 'notes', 'corrections', 'clients', 'settings', 'howto', 'melodi']);
+const DASHBOARD_VIEWS = new Set(['dashboard', 'birdseye', 'social', 'articles', 'queries', 'notes', 'corrections', 'clients', 'settings', 'howto', 'melodi']);
+const DEMO_REVIEWER_VIEWS = new Set(['dashboard', 'birdseye', 'social', 'articles', 'howto']);
 
 export default async function DashboardPage({ searchParams }) {
   // Use anon client to identify the current user from their session cookie
@@ -46,14 +48,18 @@ export default async function DashboardPage({ searchParams }) {
   // Use admin client to reliably fetch full user metadata
   let userDistrictId = null;
   let isAdmin = false;
+  let isDemoReviewer = false;
+  let protectedMetadata = {};
   let canManageIntegrations = false;
   let hasExistingMetaConnection = false;
   if (sessionUser?.id) {
     const admin = createAdminClient();
     const { data: { user } } = await admin.auth.admin.getUserById(sessionUser.id);
+    protectedMetadata = user?.app_metadata || {};
     userDistrictId = user?.app_metadata?.district_id ?? null;
     isAdmin = user?.app_metadata?.role === 'admin';
-    canManageIntegrations = isAdmin || (Array.isArray(user?.app_metadata?.permissions) && user.app_metadata.permissions.includes('manage_integrations'));
+    isDemoReviewer = user?.app_metadata?.role === 'demo_reviewer';
+    canManageIntegrations = isAdmin || (Array.isArray(protectedMetadata.permissions) && protectedMetadata.permissions.includes('manage_integrations'));
     if (canManageIntegrations) {
       let connectionQuery = admin.from('social_provider_connections').select('id').eq('provider', 'meta').limit(1);
       if (!isAdmin && userDistrictId) connectionQuery = connectionQuery.eq('district_id', userDistrictId);
@@ -63,23 +69,38 @@ export default async function DashboardPage({ searchParams }) {
   }
 
   if (!sessionUser?.id) redirect('/login?redirect_to=/dashboard');
-  if (!userDistrictId && !isAdmin) redirect('/demo?access=pending');
+  if (!userDistrictId && !isAdmin && !isDemoReviewer) redirect('/demo?access=pending');
 
   const districtLoad = await loadDashboardDataset('District list', getDistricts, []);
-  const districts = districtLoad.data;
+  const allDistricts = districtLoad.data;
   const requested = await searchParams;
   const requestedDistrictId = String(requested?.district || '');
   const requestedView = String(requested?.view || 'dashboard');
-  const initialView = DASHBOARD_VIEWS.has(requestedView) ? requestedView : 'dashboard';
+  const reviewerAccess = resolveDemoReviewerAccess({
+    metadata: protectedMetadata,
+    districts: allDistricts,
+    requestedDistrictId,
+  });
+  if (isDemoReviewer && !reviewerAccess.hasAccess) redirect('/demo?access=pending');
+  const districts = isDemoReviewer ? reviewerAccess.districts : allDistricts;
+  const initialView = (isDemoReviewer ? DEMO_REVIEWER_VIEWS : DASHBOARD_VIEWS).has(requestedView) ? requestedView : 'dashboard';
+  if (isDemoReviewer && requestedDistrictId !== reviewerAccess.selectedDistrictId) {
+    redirect(`/dashboard?district=${encodeURIComponent(reviewerAccess.selectedDistrictId)}&view=${encodeURIComponent(initialView)}`);
+  }
   if (isAdmin && !requestedDistrictId && districts[0]?.id) {
     redirect(`/dashboard?district=${encodeURIComponent(districts[0].id)}&view=${encodeURIComponent(initialView)}`);
   }
   const validRequestedDistrictId = districts.some((district) => district.id === requestedDistrictId)
     ? requestedDistrictId
     : null;
-  const initialDistrictId = userDistrictId
+  const initialDistrictId = isDemoReviewer
+    ? reviewerAccess.selectedDistrictId
+    : userDistrictId
     || (requestedDistrictId === 'All' ? 'All' : validRequestedDistrictId || districts[0]?.id || 'All');
-  const dataDistrictId = userDistrictId || (initialDistrictId === 'All' ? null : initialDistrictId);
+  const dataDistrictId = isDemoReviewer
+    ? reviewerAccess.selectedDistrictId
+    : userDistrictId || (initialDistrictId === 'All' ? null : initialDistrictId);
+  const dashboardUserDistrictId = isDemoReviewer ? null : userDistrictId;
   const dataLoads = await Promise.all([
     loadDashboardDataset('News results', () => getArticles(dataDistrictId), []),
     loadDashboardDataset('Queries', () => getQueries(dataDistrictId), []),
@@ -107,7 +128,7 @@ export default async function DashboardPage({ searchParams }) {
   const socialPerformanceHistory = dataDistrictId
     ? { [dataDistrictId]: buildSocialDailySeries(socialMetricHistory.filter((row) => row.district_id === dataDistrictId)) }
     : {};
-  const billingLoad = userDistrictId
+  const billingLoad = dashboardUserDistrictId
     ? await loadDashboardDataset('Billing status', getAuthenticatedBillingContext, null)
     : { data: null, warning: null };
   const billingContext = billingLoad.data;
@@ -119,7 +140,7 @@ export default async function DashboardPage({ searchParams }) {
   const paidThrough = billingContext?.user?.app_metadata?.paid_through || billingContext?.onboardingRequest?.paid_through || null;
   // eslint-disable-next-line react-hooks/purity -- Server-rendered billing notice intentionally compares trial date to current time.
   const daysUntilTrialEnds = trialEndsAt ? Math.ceil((new Date(trialEndsAt).getTime() - Date.now()) / 86400000) : null;
-  const paymentNotice = userDistrictId && !isCanaryPaymentCovered(paymentStatus, paidThrough) && daysUntilTrialEnds !== null
+  const paymentNotice = dashboardUserDistrictId && !isCanaryPaymentCovered(paymentStatus, paidThrough) && daysUntilTrialEnds !== null
     ? {
         daysUntilTrialEnds,
         trialEndsAt,
@@ -153,7 +174,7 @@ export default async function DashboardPage({ searchParams }) {
       districts={districts}
       queries={queries}
       clients={clients}
-      userDistrictId={userDistrictId}
+      userDistrictId={dashboardUserDistrictId}
       initialDistrictId={initialDistrictId}
       initialView={initialView}
       paymentNotice={paymentNotice}
@@ -168,12 +189,14 @@ export default async function DashboardPage({ searchParams }) {
       socialPerformanceHistory={socialPerformanceHistory}
       socialReviewEvents={socialReviewEvents}
       isAdmin={isAdmin}
+      isDemoReviewer={isDemoReviewer}
+      reviewerDistrictCount={reviewerAccess.districtIds.length}
       strategicProfiles={strategicProfiles}
       strategicPriorities={strategicPriorities}
       collectionHealth={collectionHealth}
       socialCollectionHealth={socialCollectionHealth}
       dataWarnings={dataWarnings}
-      melodiEnabled={process.env.MELODI_ENABLED === 'true' && (process.env.MELODI_QA_MODE !== 'true' || isAdmin)}
+      melodiEnabled={!isDemoReviewer && process.env.MELODI_ENABLED === 'true' && (process.env.MELODI_QA_MODE !== 'true' || isAdmin)}
       metaIntegrationEnabled={canManageIntegrations && (hasExistingMetaConnection || (isAdmin ? metaIntegrationPilotConfigured() : metaIntegrationEnabledForDistrict(userDistrictId)))}
     />
   );
