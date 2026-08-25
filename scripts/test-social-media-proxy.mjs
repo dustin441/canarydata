@@ -18,6 +18,7 @@ assert.deepEqual([...await readBoundedResponseBody(jpegResponse, 10)], [0xff,0xd
 await assert.rejects(() => readBoundedResponseBody(new Response(bytes(1,2,3,4), { headers: { 'content-length':'4' } }), 3), /social_media_too_large/);
 
 const route = await readFile(new URL('../src/app/api/social-media/route.js', import.meta.url), 'utf8');
+const dashboard = await readFile(new URL('../src/app/dashboard/DashboardClient.js', import.meta.url), 'utf8');
 assert.match(route, /safeSocialMediaUrl\(upstream\.url\)/);
 assert.match(route, /detectSocialMediaType\(buffered\)/);
 assert.match(route, /readBoundedResponseBody\(upstream\)/);
@@ -25,4 +26,7 @@ assert.match(route, /\[408, 425, 429, 500, 502, 503, 504\]/);
 assert.match(route, /status: 415/);
 assert.match(route, /status: 502/);
 assert.doesNotMatch(route, /return new Response\(upstream\.body[\s\S]*contentType\.startsWith/);
+assert.match(dashboard, /function renderedSocialMediaUrl\(value\)[\s\S]*return safeUrl \|\| '';/);
+assert.doesNotMatch(dashboard, /\/api\/social-media\?url=/);
+assert.match(dashboard, /renderedMediaUrl = renderedSocialMediaUrl\(mediaUrl\)/);
 console.log('Social media proxy resilience checks passed.');
