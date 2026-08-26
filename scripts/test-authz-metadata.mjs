@@ -58,4 +58,8 @@ assert.match(dashboardClient, /Query limit reached/);
 assert.match(dashboardClient, /Managed by Canary/);
 assert.match(dashboardClient, /role="alert"/);
 
+const middleware = await readFile(new URL('../src/lib/supabase/middleware.js', import.meta.url), 'utf8');
+assert.match(middleware, /startsWith\('\/privacy'\)/, 'the Privacy Policy must remain public');
+assert.match(middleware, /startsWith\('\/terms'\)/, 'the Terms of Service must remain public');
+
 console.log('Authorization metadata regression tests passed.');
