@@ -1,7 +1,14 @@
 import { requireIntegrationActor, integrationErrorResponse } from '@/lib/integration-auth';
-import { metaIntegrationEnabledForDistrict } from '@/lib/meta-integration.mjs';
+import { earliestMetaReconnectDeadline, metaIntegrationEnabledForDistrict } from '@/lib/meta-integration.mjs';
 
 export const runtime = 'nodejs';
+
+function presentConnections(rows) {
+  return (rows || []).map((connection) => ({
+    ...connection,
+    reconnect_deadline: earliestMetaReconnectDeadline(connection.token_expires_at, connection.data_access_expires_at),
+  }));
+}
 
 export async function GET(request) {
   try {
@@ -10,7 +17,7 @@ export async function GET(request) {
     const configured = metaIntegrationEnabledForDistrict(actor.districtId);
     const { data: connections, error: connectionError } = await admin
       .from('social_provider_connections')
-      .select('id,provider_user_name,status,token_expires_at,granted_scopes,declined_scopes,connected_at,last_validated_at,last_error_code,revoked_at')
+      .select('id,provider_user_name,status,token_expires_at,data_access_expires_at,granted_scopes,declined_scopes,connected_at,last_validated_at,last_error_code,last_error_message,revoked_at')
       .eq('district_id', actor.districtId)
       .eq('provider', 'meta')
       .order('updated_at', { ascending: false });
@@ -18,7 +25,7 @@ export async function GET(request) {
     if (!configured) {
       // Disabled-first rollback must still expose existing local connections so
       // an authorized district user can disconnect and remove stored access.
-      return Response.json({ configured: false, districtId: actor.districtId, connections: connections || [], accounts: [] }, { headers: { 'Cache-Control': 'no-store' } });
+      return Response.json({ configured: false, districtId: actor.districtId, connections: presentConnections(connections), accounts: [] }, { headers: { 'Cache-Control': 'no-store' } });
     }
 
 
@@ -52,7 +59,7 @@ export async function GET(request) {
     return Response.json({
       configured,
       districtId: actor.districtId,
-      connections: connections || [],
+      connections: presentConnections(connections),
       accounts,
     }, { headers: { 'Cache-Control': 'no-store' } });
   } catch (error) {

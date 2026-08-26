@@ -6,6 +6,11 @@ const insightsMigration = fs.readFileSync(new URL('../supabase/migrations/202608
 const insightsPermissionPatch = fs.readFileSync(new URL('../supabase/migrations/20260814224500_meta_insights_restrict_row_rpc.sql', import.meta.url), 'utf8');
 const deletionFenceMigration = fs.readFileSync(new URL('../supabase/migrations/20260820200000_meta_sync_deletion_fence.sql', import.meta.url), 'utf8');
 const deletionFenceRollback = fs.readFileSync(new URL('../supabase/rollbacks/20260820200000_meta_sync_deletion_fence_down.sql', import.meta.url), 'utf8');
+const connectionHealthMigration = fs.readFileSync(new URL('../supabase/migrations/20260826130000_meta_connection_health.sql', import.meta.url), 'utf8');
+const connectionHealthRollback = fs.readFileSync(new URL('../supabase/rollbacks/20260826130000_meta_connection_health_down.sql', import.meta.url), 'utf8');
+const hardenedLifecycleMigration = fs.readFileSync(new URL('../supabase/migrations/20260826133000_meta_deletion_and_selection_lifecycle.sql', import.meta.url), 'utf8');
+const legacyCutoverMigration = fs.readFileSync(new URL('../supabase/migrations/20260826140000_meta_legacy_rpc_cutover.sql', import.meta.url), 'utf8');
+const legacyCutoverRollback = fs.readFileSync(new URL('../supabase/rollbacks/20260826140000_meta_legacy_rpc_cutover_down.sql', import.meta.url), 'utf8');
 const preflight = fs.readFileSync(new URL('../supabase/preflight_meta_owned_social_insights.sql', import.meta.url), 'utf8');
 const integration = fs.readFileSync(new URL('../src/lib/meta-integration.mjs', import.meta.url), 'utf8');
 const service = fs.readFileSync(new URL('../src/lib/meta-sync-service.mjs', import.meta.url), 'utf8');
@@ -76,6 +81,15 @@ assert.ok(deletionFenceMigration.includes("'canary-meta-oauth:' || v_connection.
 assert.ok(deletionFenceMigration.indexOf("'canary-meta-provider-user:' || v_provider_user_id_hash") < deletionFenceMigration.indexOf("'canary-meta-oauth:' || v_connection.district_id"), 'fenced writes must lock provider identity before district OAuth lifecycle');
 assert.ok(deletionFenceMigration.includes("provider_user_id_hash = v_provider_user_id_hash"));
 assert.ok(deletionFenceMigration.includes("status = 'completed'"));
+assert.ok(connectionHealthMigration.includes('data_access_expires_at timestamptz'));
+assert.ok(connectionHealthMigration.includes('canary_finalize_meta_connection_v2'));
+assert.ok(connectionHealthMigration.includes('canary_update_meta_connection_health'));
+assert.ok(connectionHealthMigration.includes("and status = p_expected_status"), 'Health writes must use optimistic status comparison.');
+assert.ok(connectionHealthMigration.includes("and status <> 'revoked'"), 'Health writes must not restore disconnected connections.');
+assert.ok(legacyCutoverMigration.includes('revoke execute on function public.canary_finalize_meta_connection'));
+assert.ok(legacyCutoverRollback.includes('grant execute on function public.canary_finalize_meta_connection'));
+assert.ok(connectionHealthRollback.includes('drop column if exists data_access_expires_at'));
+assert.ok(connectionHealthRollback.includes('grant execute on function public.canary_finalize_meta_connection'));
 for (const signature of [
   'canary_link_selected_meta_assets(text, uuid)',
   'canary_ingest_owned_social_observation(uuid, jsonb)',
@@ -86,7 +100,14 @@ for (const signature of [
 }
 
 assert.ok(service.includes("process.env.META_NATIVE_SYNC_ENABLED !== 'true'"), 'Native sync must remain disabled until migration and app readiness pass.');
+assert.ok(service.includes("admin.rpc('canary_update_meta_connection_health'"), 'Every sync must persist recoverable grant health.');
+assert.ok(service.includes('data_access_expires_at'), 'Every sync must enforce Meta data-access expiration separately from token expiry.');
+assert.ok(service.includes("and status = p_expected_status") || connectionHealthMigration.includes("and status = p_expected_status"), 'Health transitions must not overwrite concurrent lifecycle changes.');
 assert.ok(service.includes('debugMetaToken(accessToken, { signal: executionSignal })'), 'Every native sync must introspect its grant within the execution budget.');
+assert.ok(service.includes('recoverableMetaSyncStatus(connection.status)'), 'Recoverable error connections must remain eligible for token revalidation.');
+assert.ok(service.includes("status: healthStatus"), 'Transient provider and persistence failures must preserve retry eligibility.');
+assert.ok(service.includes("errorCode: 'token_introspection_unavailable'"));
+assert.ok(service.includes("errorCode: 'sync_transient_failure'"));
 assert.ok(service.includes("String(tokenData.app_id) !== String(process.env.META_APP_ID)"));
 assert.ok(service.includes("String(tokenData.user_id) !== String(connection.provider_user_id)"));
 assert.ok(service.includes("['ANALYZE', 'MANAGE'].includes(task)"), 'Facebook Page sync must require an analytics-capable task.');
@@ -106,6 +127,16 @@ assert.ok(!service.includes('reactions.limit(0).summary(true)'), 'Least-privileg
 assert.ok(!service.includes('pages_read_user_content'), 'Owned-post discovery must not broaden the initial permission set.');
 assert.ok(service.includes("admin.rpc('canary_fenced_ingest_owned_social_observation'"));
 assert.ok(service.includes("admin.rpc('canary_fenced_link_selected_meta_assets'"));
+assert.ok(service.includes("admin.rpc('canary_fenced_link_meta_pilot_asset'"), 'Controlled pilot must activate only its exact platform asset.');
+assert.ok(hardenedLifecycleMigration.includes('canary_fenced_link_meta_pilot_asset'));
+assert.ok(hardenedLifecycleMigration.includes('p_provider_asset_id uuid'));
+assert.ok(service.indexOf('assets.length !== 1') < service.indexOf("admin.rpc('canary_fenced_link_meta_pilot_asset'"), 'Pilot selection bounds must be enforced before canonical activation.');
+assert.ok(service.includes("instagram_business_account{id}"), 'Current Page inventory must include the linked Instagram professional identity before activation.');
+assert.ok(service.includes("parentGrant?.instagram_business_account?.id"), 'Instagram activation must match the exact current linked professional account ID.');
+assert.ok(service.indexOf('validateCurrentMetaAssetGrants(assets, pageGrants)') < service.indexOf("admin.rpc('canary_fenced_link_meta_pilot_asset'"), 'Current provider grant validation must complete before canonical activation.');
+assert.ok(hardenedLifecycleMigration.includes('set search_path = public, extensions, pg_temp'));
+assert.ok(hardenedLifecycleMigration.indexOf("'canary-meta-provider-user:'||v_provider_user_id_hash") < hardenedLifecycleMigration.indexOf("'canary-meta-oauth:'||p_district_id"));
+assert.ok(service.includes("errorCode: 'provider_sync_failure'"), 'Normalized provider failures must remain visible in connection health.');
 assert.ok(!service.includes("admin.rpc('canary_link_selected_meta_assets'"));
 assert.ok(!service.includes("admin.rpc('canary_ingest_owned_social_observation'"));
 assert.ok(!service.includes("admin.rpc('canary_upsert_meta_metric_snapshots'"));
@@ -128,8 +159,10 @@ assert.ok(service.includes('exists: Boolean(existing.data)'), 'Content metric re
 assert.match(service, /canary_fenced_ingest_owned_social_observation[\s\S]*?shouldRefreshMetaContentInsights/, 'Every old duplicate must refresh its fenced canonical observation before content Insights are skipped.');
 assert.match(service, /shouldRefreshMetaContentInsights[\s\S]*?writtenCount \+= 1;[\s\S]*?continue;/, 'Skipped old duplicate metrics must still advance written progress.');
 assert.ok(route.includes('requireIntegrationActor(body?.districtId || null)'), 'Manual sync route must enforce protected explicit tenant selection.');
-assert.ok(route.includes('Native Meta synchronization is not released.'), 'Canonical writes must remain hard-disabled until deletion fencing is transactional.');
-assert.ok(!route.includes('syncSelectedMetaAssets'), 'The route must not expose an environment-only path to unfenced sync writes.');
+assert.ok(route.includes('syncSelectedMetaAssets'), 'Authorized pilot route must use the lifecycle-fenced native service.');
+assert.ok(route.includes('pilotItemLimit: 2'), 'Authorized pilot route must enforce a two-item cap.');
+assert.ok(route.includes('platforms: [platform]'), 'Authorized pilot route must run one explicitly chosen platform at a time.');
+assert.ok(!route.includes('pilotItemLimit: null'), 'Pilot route must not expose an unbounded synchronization path.');
 assert.ok(!accountsRoute.includes('canary_link_selected_meta_assets'), 'Discovery-only asset selection must not create canonical Social accounts or links.');
 assert.ok(!accountsRoute.includes('META_NATIVE_SYNC_ENABLED'), 'Discovery-only selection must not retain an environment-only canonical-write path.');
 assert.ok(!disconnectRoute.includes('revokeMetaPermissions'), 'District disconnect must not revoke an app/user-wide Meta grant.');

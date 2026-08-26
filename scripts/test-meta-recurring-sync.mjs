@@ -73,10 +73,27 @@ assert.match(route, /result\.status === ['"]failed['"] \? 503 : 200/, 'a failed 
 
 assert.match(middleware, /request\.nextUrl\.pathname === ['"]\/api\/cron\/meta-eic-sync['"]/);
 assert.doesNotMatch(middleware, /startsWith\(['"]\/api\/cron|\/api\/cron\/meta-eic-sync\//, 'Cron middleware exemption must be exact, not prefix-based.');
-assert.match(manualRoute, /Native Meta synchronization is not released\./);
-assert.match(manualRoute, /status: 503/);
-assert.doesNotMatch(manualRoute, /syncSelectedMetaAssets/);
+assert.match(manualRoute, /syncSelectedMetaAssets/);
+assert.match(manualRoute, /pilotItemLimit: 2/);
+assert.match(manualRoute, /platforms: \[platform\]/);
+assert.doesNotMatch(manualRoute, /pilotItemLimit: null/);
 assert.deepEqual(vercel.crons, [{ path: '/api/cron/meta-eic-sync', schedule: '15 14 * * *' }]);
+
+assert.equal(syncService.recoverableMetaSyncStatus('active'), true);
+assert.equal(syncService.recoverableMetaSyncStatus('needs_permissions'), true);
+assert.equal(syncService.recoverableMetaSyncStatus('error'), true, 'Transiently failed connections must be eligible for grant revalidation.');
+for (const terminalStatus of ['pending', 'expired', 'revoked']) assert.equal(syncService.recoverableMetaSyncStatus(terminalStatus), false);
+
+const facebookPilotAsset = { asset_type: 'facebook_page', provider_asset_id: 'page-1' };
+assert.throws(() => syncService.validateCurrentMetaAssetGrants([facebookPilotAsset], []), /analytics-capable grant/);
+assert.throws(() => syncService.validateCurrentMetaAssetGrants([facebookPilotAsset], [{ id:'page-1', access_token:'page-token', tasks:['CREATE_CONTENT'] }]), /analytics-capable grant/);
+const validatedPageGrants = syncService.validateCurrentMetaAssetGrants([facebookPilotAsset], [{ id:'page-1', access_token:'page-token', tasks:['ANALYZE'] }]);
+assert.equal(validatedPageGrants.get('page-1').access_token, 'page-token');
+const instagramPilotAsset = { asset_type:'instagram_account', provider_asset_id:'ig-1', parent_provider_asset_id:'page-parent' };
+assert.throws(() => syncService.validateCurrentMetaAssetGrants([instagramPilotAsset], []), /linked professional account/);
+assert.throws(() => syncService.validateCurrentMetaAssetGrants([instagramPilotAsset], [{ id:'page-parent', access_token:'page-token', instagram_business_account:{ id:'ig-other' } }]), /linked professional account/);
+const validatedInstagramGrant = syncService.validateCurrentMetaAssetGrants([instagramPilotAsset], [{ id:'page-parent', access_token:'page-token', instagram_business_account:{ id:'ig-1' } }]);
+assert.equal(validatedInstagramGrant.get('page-parent').instagram_business_account.id, 'ig-1');
 
 assert.equal(syncService.validateContentMetricRefreshDays(undefined), 14);
 assert.equal(syncService.validateContentMetricRefreshDays(1), 1);

@@ -2,15 +2,18 @@ import { createHash, createHmac, randomBytes, randomUUID, createCipheriv, create
 
 export const META_GRAPH_VERSION = process.env.META_GRAPH_VERSION || 'v25.0';
 export const META_CONFIGURATION_PERMISSIONS = Object.freeze([
-  'business_management',
   'pages_show_list',
   'pages_read_engagement',
   'instagram_basic',
+  'read_insights',
+  'instagram_manage_insights',
 ]);
 export const META_REQUIRED_SCOPES = Object.freeze([
   'pages_show_list',
   'pages_read_engagement',
   'instagram_basic',
+  'read_insights',
+  'instagram_manage_insights',
 ]);
 
 export function metaGrantedScopes(tokenData) {
@@ -290,13 +293,31 @@ export function tokenExpiry(expiresIn) {
   return new Date(Date.now() + seconds * 1000).toISOString();
 }
 
+export function metaEpochExpiry(value) {
+  const seconds = Number(value);
+  if (!Number.isFinite(seconds) || seconds <= 0) return null;
+  return new Date(seconds * 1000).toISOString();
+}
+
+export function earliestMetaReconnectDeadline(tokenExpiresAt, dataAccessExpiresAt) {
+  const deadlines = [tokenExpiresAt, dataAccessExpiresAt]
+    .filter(Boolean)
+    .map((value) => new Date(value))
+    .filter((value) => !Number.isNaN(value.getTime()));
+  if (!deadlines.length) return null;
+  return new Date(Math.min(...deadlines.map((value) => value.getTime()))).toISOString();
+}
+
 export function constantTimeEqualText(left, right) {
   const leftBuffer = Buffer.from(String(left || ''), 'utf8');
   const rightBuffer = Buffer.from(String(right || ''), 'utf8');
   return leftBuffer.length === rightBuffer.length && timingSafeEqual(leftBuffer, rightBuffer);
 }
 
-export function verifyMetaSignedRequest(signedRequest) {
+export const META_DELETION_MAX_AGE_SECONDS = 24 * 60 * 60;
+export const META_DELETION_FUTURE_SKEW_SECONDS = 5 * 60;
+
+export function verifyMetaSignedRequest(signedRequest, now = new Date(), { enforceFreshness = true } = {}) {
   const [signatureText, payloadText] = String(signedRequest || '').split('.');
   if (!signatureText || !payloadText) throw new Error('Invalid Meta signed request.');
   const signature = Buffer.from(signatureText, 'base64url');
@@ -305,10 +326,20 @@ export function verifyMetaSignedRequest(signedRequest) {
     throw new Error('Invalid Meta signed request signature.');
   }
   const payload = JSON.parse(Buffer.from(payloadText, 'base64url').toString('utf8'));
-  if (String(payload?.algorithm || '').toUpperCase() !== 'HMAC-SHA256' || !payload?.user_id) {
+  const issuedAtSeconds = Number(payload?.issued_at);
+  const nowDate = now instanceof Date ? now : new Date(now);
+  if (String(payload?.algorithm || '').toUpperCase() !== 'HMAC-SHA256' || !payload?.user_id
+    || !Number.isFinite(issuedAtSeconds) || issuedAtSeconds <= 0 || Number.isNaN(nowDate.getTime())) {
     throw new Error('Invalid Meta signed request payload.');
   }
-  return payload;
+  const ageSeconds = nowDate.getTime() / 1000 - issuedAtSeconds;
+  if (enforceFreshness && (ageSeconds > META_DELETION_MAX_AGE_SECONDS || ageSeconds < -META_DELETION_FUTURE_SKEW_SECONDS)) {
+    throw new Error('Expired Meta signed request.');
+  }
+  return {
+    ...payload,
+    signed_request_hash: createHash('sha256').update(expected).digest('hex'),
+  };
 }
 
 export function sanitizeReturnPath(value) {

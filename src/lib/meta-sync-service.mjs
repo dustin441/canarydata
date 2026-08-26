@@ -1,9 +1,9 @@
 import { createHash } from 'node:crypto';
-import { decryptMetaToken, debugMetaToken, metaGrantedScopes, metaGraph, metaGraphAll, metaGraphBatch, metaIntegrationEnabledForDistrict } from './meta-integration.mjs';
+import { META_REQUIRED_SCOPES, decryptMetaToken, debugMetaToken, metaEpochExpiry, metaGrantedScopes, metaGraph, metaGraphAll, metaGraphBatch, metaIntegrationEnabledForDistrict } from './meta-integration.mjs';
 import { boundedMetaSourceCutoff, continuedMetaSourceCutoff, mapFacebookPagePosts, mapInstagramMedia, summarizeMetaSyncOutcome, validateMetaSyncSelection } from './meta-owned-sync.mjs';
 import { facebookAccountInsightRequests, facebookContentInsightRequests, instagramAccountInsightRequests, instagramContentInsightRequests, isMetaUnsupportedMetricError, normalizeMetaInsightBatch, sevenDayInsightWindow } from './meta-insights.mjs';
 
-const PAGE_FIELDS = 'id,access_token,tasks';
+const PAGE_FIELDS = 'id,access_token,tasks,instagram_business_account{id}';
 const POST_FIELDS = 'id,message,story,created_time,permalink_url,from,full_picture,attachments{media_type,media,target,url,subattachments{media_type,media,target,url}}';
 const MEDIA_FIELDS = 'id,caption,media_type,media_product_type,permalink,timestamp,username,comments_count,like_count,media_url,thumbnail_url,children{media_type,media_url,thumbnail_url}';
 
@@ -13,6 +13,29 @@ function safeError(error) {
 
 function isExecutionBudgetError(error, signal) {
   return signal?.aborted || ['AbortError', 'TimeoutError'].includes(String(error?.name || ''));
+}
+
+export function recoverableMetaSyncStatus(status) {
+  return ['active', 'needs_permissions', 'error'].includes(String(status));
+}
+
+export function validateCurrentMetaAssetGrants(assets, pageGrants) {
+  const grantByPage = new Map((Array.isArray(pageGrants) ? pageGrants : []).map((page) => [String(page?.id), page]));
+  for (const asset of Array.isArray(assets) ? assets : []) {
+    if (asset?.asset_type === 'facebook_page') {
+      const grant = grantByPage.get(String(asset.provider_asset_id));
+      if (!grant?.access_token || !(grant.tasks || []).some((task) => ['ANALYZE', 'MANAGE'].includes(task))) {
+        throw new Error('The selected Facebook Page no longer has an analytics-capable grant.');
+      }
+    } else if (asset?.asset_type === 'instagram_account') {
+      const parentGrant = grantByPage.get(String(asset.parent_provider_asset_id));
+      if (!parentGrant?.access_token
+        || String(parentGrant?.instagram_business_account?.id || '') !== String(asset.provider_asset_id)) {
+        throw new Error('The selected Instagram account no longer matches the linked professional account on its parent Page grant.');
+      }
+    }
+  }
+  return grantByPage;
 }
 
 export function validateContentMetricRefreshDays(value = 14) {
@@ -67,6 +90,42 @@ async function requireOne(query, message) {
   return data;
 }
 
+async function persistMetaConnectionHealth({
+  admin,
+  connection,
+  expectedStatus,
+  status,
+  tokenExpiresAt = null,
+  dataAccessExpiresAt = null,
+  grantedScopes = null,
+  declinedScopes = null,
+  validatedAt = null,
+  errorCode = null,
+  errorMessage = null,
+}) {
+  const { data, error } = await admin.rpc('canary_update_meta_connection_health', {
+    p_connection_id: connection.id,
+    p_district_id: connection.district_id,
+    p_expected_status: expectedStatus,
+    p_status: status,
+    p_token_expires_at: tokenExpiresAt,
+    p_data_access_expires_at: dataAccessExpiresAt,
+    p_granted_scopes: grantedScopes,
+    p_declined_scopes: declinedScopes,
+    p_validated_at: validatedAt,
+    p_error_code: errorCode,
+    p_error_message: errorMessage,
+  });
+  if (error || data !== true) throw error || new Error('Meta connection health changed during synchronization.');
+  return status;
+}
+
+function deadlineExpired(value, now) {
+  if (!value) return false;
+  const deadline = new Date(value);
+  return !Number.isNaN(deadline.getTime()) && deadline.getTime() <= now.getTime();
+}
+
 async function persistInsightBatch({ admin, link, threadId = null, platform, metricScope, providerObjectId, requests, accessToken, observedAt, signal }) {
   const results = await metaGraphBatch(requests, accessToken, { signal });
   const fatal = results.find((result) => !result.ok && !isMetaUnsupportedMetricError(result));
@@ -94,10 +153,24 @@ export async function syncSelectedMetaAssets({ admin, districtId, connectionId, 
   const platformFilter = platforms == null ? null : [...new Set(platforms.map(String))];
   if (platformFilter?.some((platform) => !['facebook', 'instagram'].includes(platform))) throw new Error('Meta pilot platforms must be Facebook or Instagram.');
   const connection = await requireOne(admin.from('social_provider_connections')
-    .select('id,district_id,provider_app_id,provider_user_id,status,granted_scopes,token_expires_at')
+    .select('id,district_id,provider_app_id,provider_user_id,status,granted_scopes,token_expires_at,data_access_expires_at')
     .eq('id', connectionId).eq('district_id', districtId).eq('provider', 'meta').maybeSingle(), 'Meta connection not found.');
-  if (!['active', 'needs_permissions'].includes(connection.status)) throw new Error('Meta connection requires authorization before synchronization.');
+  if (!recoverableMetaSyncStatus(connection.status)) throw new Error('Meta connection requires authorization before synchronization.');
   if (String(connection.provider_app_id) !== String(process.env.META_APP_ID)) throw new Error('Meta connection was issued by a different application.');
+
+  let healthStatus = connection.status;
+  const syncNow = now();
+  if (deadlineExpired(connection.token_expires_at, syncNow) || deadlineExpired(connection.data_access_expires_at, syncNow)) {
+    healthStatus = await persistMetaConnectionHealth({
+      admin,
+      connection,
+      expectedStatus: healthStatus,
+      status: 'expired',
+      errorCode: 'authorization_expired',
+      errorMessage: 'Meta authorization reached its reconnect deadline.',
+    });
+    throw new Error('Meta authorization expired and must be reconnected.');
+  }
 
   const credential = await requireOne(admin.from('social_provider_credentials')
     .select('encrypted_access_token,key_version').eq('connection_id', connectionId).eq('district_id', districtId).maybeSingle(), 'Meta credential not found.');
@@ -106,27 +179,124 @@ export async function syncSelectedMetaAssets({ admin, districtId, connectionId, 
   const deadline = Date.now() + 45_000;
   const executionSignal = AbortSignal.timeout(45_000);
 
-  const tokenData = await debugMetaToken(accessToken, { signal: executionSignal });
-  if (tokenData?.is_valid !== true || String(tokenData.app_id) !== String(process.env.META_APP_ID)
-    || String(tokenData.user_id) !== String(connection.provider_user_id)) throw new Error('Meta authorization is no longer valid for this connection.');
-  const granted = metaGrantedScopes(tokenData);
-  for (const required of ['pages_show_list', 'pages_read_engagement']) {
-    if (!granted.includes(required)) throw new Error(`Meta permission ${required} is required for synchronization.`);
+  let tokenData;
+  try {
+    tokenData = await debugMetaToken(accessToken, { signal: executionSignal });
+  } catch (error) {
+    healthStatus = await persistMetaConnectionHealth({
+      admin,
+      connection,
+      expectedStatus: healthStatus,
+      status: healthStatus,
+      errorCode: 'token_introspection_unavailable',
+      errorMessage: 'Meta token validation is temporarily unavailable; synchronization will retry.',
+    });
+    throw error;
   }
+  if (tokenData?.is_valid !== true || String(tokenData.app_id) !== String(process.env.META_APP_ID)
+    || String(tokenData.user_id) !== String(connection.provider_user_id)) {
+    healthStatus = await persistMetaConnectionHealth({
+      admin,
+      connection,
+      expectedStatus: healthStatus,
+      status: 'error',
+      errorCode: 'grant_identity_mismatch',
+      errorMessage: 'Meta grant identity or issuing application no longer matches this connection.',
+    });
+    throw new Error('Meta authorization is no longer valid for this connection.');
+  }
+  const granted = metaGrantedScopes(tokenData);
+  const declined = META_REQUIRED_SCOPES.filter((scope) => !granted.includes(scope));
+  const tokenExpiresAt = metaEpochExpiry(tokenData?.expires_at) || connection.token_expires_at;
+  const dataAccessExpiresAt = metaEpochExpiry(tokenData?.data_access_expires_at) || connection.data_access_expires_at;
+  if (deadlineExpired(tokenExpiresAt, syncNow) || deadlineExpired(dataAccessExpiresAt, syncNow)) {
+    healthStatus = await persistMetaConnectionHealth({
+      admin,
+      connection,
+      expectedStatus: healthStatus,
+      status: 'expired',
+      tokenExpiresAt,
+      dataAccessExpiresAt,
+      grantedScopes: granted,
+      declinedScopes: declined,
+      validatedAt: syncNow.toISOString(),
+      errorCode: 'authorization_expired',
+      errorMessage: 'Meta authorization reached its reconnect deadline.',
+    });
+    throw new Error('Meta authorization expired and must be reconnected.');
+  }
+  const validatedStatus = declined.length ? 'needs_permissions' : 'active';
+  healthStatus = await persistMetaConnectionHealth({
+    admin,
+    connection,
+    expectedStatus: healthStatus,
+    status: validatedStatus,
+    tokenExpiresAt,
+    dataAccessExpiresAt,
+    grantedScopes: granted,
+    declinedScopes: declined,
+    validatedAt: syncNow.toISOString(),
+    errorCode: declined.length ? 'permissions_missing' : null,
+    errorMessage: declined.length ? `Missing required Meta permissions: ${declined.join(', ')}` : null,
+  });
+  if (declined.length) throw new Error(`Meta permissions are incomplete: ${declined.join(', ')}.`);
 
 
   const { data: selectedAssets, error: assetError } = await admin.from('social_provider_assets')
     .select('id,district_id,connection_id,provider_asset_id,asset_type,platform,name,handle,parent_provider_asset_id,selected,active')
     .eq('district_id', districtId).eq('connection_id', connectionId).eq('selected', true).eq('active', true);
   if (assetError) throw assetError;
-  validateMetaSyncSelection(selectedAssets || []);
-  const assets = (selectedAssets || []).filter((asset) => !platformFilter || platformFilter.includes(asset.platform));
-  if (!assets.length) throw new Error('No selected Meta assets match the requested pilot platforms.');
+  const allSelectedAssets = selectedAssets || [];
+  validateMetaSyncSelection(allSelectedAssets);
+  const assets = allSelectedAssets.filter((asset) => !platformFilter || platformFilter.includes(asset.platform));
+  if (pilotLimit && !assets.length) throw new Error('No selected Meta assets match the requested pilot platforms.');
   if (pilotLimit && assets.length !== 1) throw new Error('A controlled Meta pilot must resolve to exactly one selected platform asset.');
+
+  // Revalidate current provider ownership before canonical activation. Local
+  // selection alone is never sufficient evidence that the grant still owns the
+  // exact Page or linked Instagram account.
+  const needsPageGrant = assets.some((asset) => asset.asset_type === 'facebook_page' || asset.asset_type === 'instagram_account');
+  let pageGrants = [];
+  try {
+    pageGrants = needsPageGrant ? await metaGraphAll('me/accounts', accessToken, { fields: PAGE_FIELDS, limit: '100' }, 2, { signal: executionSignal }) : [];
+  } catch (error) {
+    healthStatus = await persistMetaConnectionHealth({
+      admin,
+      connection,
+      expectedStatus: healthStatus,
+      status: healthStatus,
+      errorCode: 'asset_grant_validation_unavailable',
+      errorMessage: 'Meta asset authorization validation is temporarily unavailable; synchronization remains eligible for retry.',
+    });
+    throw error;
+  }
+  let grantByPage;
+  try {
+    grantByPage = validateCurrentMetaAssetGrants(assets, pageGrants);
+  } catch (error) {
+    healthStatus = await persistMetaConnectionHealth({
+      admin,
+      connection,
+      expectedStatus: healthStatus,
+      status: 'needs_permissions',
+      errorCode: 'asset_grant_missing',
+      errorMessage: 'The selected Meta asset is no longer available to the authorized administrator.',
+    });
+    throw error;
+  }
+
+  const linkCall = pilotLimit
+    ? admin.rpc('canary_fenced_link_meta_pilot_asset', {
+      p_district_id: districtId,
+      p_connection_id: connectionId,
+      p_provider_asset_id: assets[0].id,
+    })
+    : admin.rpc('canary_fenced_link_selected_meta_assets', { p_district_id: districtId, p_connection_id: connectionId });
+  const { error: linkError } = await linkCall;
+  if (linkError) throw linkError;
+  if (!assets.length) throw new Error('No selected Meta assets match the requested pilot platforms.');
   if (assets.some((asset) => asset.platform === 'facebook') && !granted.includes('read_insights')) throw new Error('Meta permission read_insights is required for Facebook reporting.');
   if (assets.some((asset) => asset.platform === 'instagram') && !granted.includes('instagram_manage_insights')) throw new Error('Meta permission instagram_manage_insights is required for Instagram reporting.');
-  const { error: linkError } = await admin.rpc('canary_fenced_link_selected_meta_assets', { p_district_id: districtId, p_connection_id: connectionId });
-  if (linkError) throw linkError;
   const { data: links, error: linksError } = await admin.from('social_provider_account_links')
     .select('id,provider_asset_id,social_account_id,active').eq('district_id', districtId).eq('provider', 'meta').eq('active', true);
   if (linksError) throw linksError;
@@ -157,9 +327,6 @@ export async function syncSelectedMetaAssets({ admin, districtId, connectionId, 
   let duplicateItems = 0;
   let metricRowsWritten = 0;
   try {
-    const needsPageGrant = assets.some((asset) => asset.asset_type === 'facebook_page' || asset.asset_type === 'instagram_account');
-    const pageGrants = needsPageGrant ? await metaGraphAll('me/accounts', accessToken, { fields: PAGE_FIELDS, limit: '100' }, 2, { signal: executionSignal }) : [];
-    const grantByPage = new Map(pageGrants.map((page) => [String(page.id), page]));
     for (const asset of assets) {
       const page = normalizeMetaPageContinuation(continuation[asset.id]);
       let pageHasNext = false;
@@ -289,6 +456,16 @@ export async function syncSelectedMetaAssets({ admin, districtId, connectionId, 
     }
     const summary = summarizeMetaSyncOutcome(batches);
     const finalStatus = Object.keys(nextCursor).length ? 'partial' : summary.status;
+    if (summary.providerErrors > 0 || finalStatus === 'failed') {
+      healthStatus = await persistMetaConnectionHealth({
+        admin,
+        connection,
+        expectedStatus: healthStatus,
+        status: healthStatus,
+        errorCode: 'provider_sync_failure',
+        errorMessage: 'Meta reported a provider synchronization failure; the connection remains eligible for retry.',
+      });
+    }
     const { data: completed, error: completeError } = await admin.from('social_sync_runs').update({
       completed_at: now().toISOString(), status: finalStatus, accounts_succeeded: summary.accountsSucceeded,
       posts_read: summary.postsRead, provider_errors: summary.providerErrors, rejected_items: summary.rejectedItems,
@@ -298,6 +475,19 @@ export async function syncSelectedMetaAssets({ admin, districtId, connectionId, 
     return { runId: run.id, ...summary, status: finalStatus, duplicateItems, metricRowsWritten, continuationRequired: Object.keys(nextCursor).length > 0 };
   } catch (error) {
     const failedAt = now().toISOString();
+    try {
+      healthStatus = await persistMetaConnectionHealth({
+        admin,
+        connection,
+        expectedStatus: healthStatus,
+        status: healthStatus,
+        validatedAt: failedAt,
+        errorCode: 'sync_transient_failure',
+        errorMessage: 'Meta synchronization failed temporarily and will remain eligible for retry.',
+      });
+    } catch {
+      // A concurrent disconnect, deletion, or reconnect owns the lifecycle truth.
+    }
     const { data: failed, error: failureError } = await admin.from('social_sync_runs').update({
       completed_at: failedAt,
       status: 'failed',

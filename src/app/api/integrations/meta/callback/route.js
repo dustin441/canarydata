@@ -11,6 +11,7 @@ import {
   exchangeMetaCode,
   hashOauthState,
   metaGrantedScopes,
+  metaEpochExpiry,
   metaGraph,
   metaGraphAll,
   metaIntegrationEnabledForDistrict,
@@ -143,7 +144,7 @@ export async function GET(request) {
     const providerUserIdHash = createHash('sha256').update(providerUserId).digest('hex');
     const providerUserName = null;
     stage = 'connection_prepare';
-    const { data: connectionId, error: prepareError } = await admin.rpc('canary_prepare_meta_connection', {
+    const { data: connectionId, error: prepareError } = await admin.rpc('canary_prepare_meta_connection_v2', {
       p_attempt_id: consumedRows[0].oauth_attempt_id,
       p_district_id: actor.districtId,
       p_connected_by: actor.id,
@@ -162,7 +163,7 @@ export async function GET(request) {
     const tokenContext = `${connectionId}:${actor.districtId}:meta`;
     const rows = assetRows({ pages });
     stage = 'connection_finalize';
-    const { error: finalizeError } = await admin.rpc('canary_finalize_meta_connection', {
+    const { error: finalizeError } = await admin.rpc('canary_finalize_meta_connection_v2', {
       p_attempt_id: preparedAttemptId,
       p_connection_id: connectionId,
       p_district_id: actor.districtId,
@@ -173,7 +174,8 @@ export async function GET(request) {
       p_provider_user_name: providerUserName,
       p_status: declined.length ? 'needs_permissions' : 'active',
       p_token_expires_at: tokenExpiry(tokenGrant.expires_in)
-        || (tokenData?.expires_at ? new Date(Number(tokenData.expires_at) * 1000).toISOString() : null),
+        || metaEpochExpiry(tokenData?.expires_at),
+      p_data_access_expires_at: metaEpochExpiry(tokenData?.data_access_expires_at),
       p_granted_scopes: granted,
       p_declined_scopes: declined,
       p_encrypted_access_token: encryptMetaToken(accessToken, tokenContext),

@@ -34,20 +34,26 @@ const tampered = `${encrypted.slice(0, -1)}${encrypted.endsWith('A') ? 'B' : 'A'
 assert.throws(() => meta.decryptMetaToken(tampered, tokenContext), 'Tampered ciphertext must fail authentication.');
 
 assert.deepEqual(meta.META_CONFIGURATION_PERMISSIONS, [
-  'business_management',
   'pages_show_list',
   'pages_read_engagement',
   'instagram_basic',
+  'read_insights',
+  'instagram_manage_insights',
 ]);
 assert.deepEqual(meta.META_REQUIRED_SCOPES, [
   'pages_show_list',
   'pages_read_engagement',
   'instagram_basic',
+  'read_insights',
+  'instagram_manage_insights',
 ]);
-assert.ok(!meta.META_REQUIRED_SCOPES.includes('business_management'), 'Meta does not report configuration-level business_management in BISU token scopes.');
-for (const forbidden of ['ads_read', 'ads_management', 'pages_manage_posts', 'read_insights', 'instagram_manage_insights']) {
-  assert.ok(!meta.META_REQUIRED_SCOPES.includes(forbidden), `Discovery release must not request ${forbidden}.`);
+for (const forbidden of ['business_management', 'ads_read', 'ads_management', 'pages_manage_posts']) {
+  assert.ok(!meta.META_REQUIRED_SCOPES.includes(forbidden), `Read-only owned-account release must not request ${forbidden}.`);
 }
+assert.equal(meta.metaEpochExpiry(1_800_000_000), '2027-01-15T08:00:00.000Z');
+assert.equal(meta.metaEpochExpiry(0), null);
+assert.equal(meta.earliestMetaReconnectDeadline('2027-02-01T00:00:00Z', '2027-01-15T00:00:00Z'), '2027-01-15T00:00:00.000Z');
+assert.equal(meta.earliestMetaReconnectDeadline(null, null), null);
 
 const authUrl = new URL(meta.buildMetaAuthorizationUrl(state));
 assert.equal(authUrl.hostname, 'www.facebook.com');
@@ -107,10 +113,19 @@ assert.ok(!graphRequest.url.includes('appsecret_proof'), 'Revocation proofs must
 assert.equal(graphRequest.options.method, 'DELETE');
 globalThis.fetch = originalFetch;
 
-const signedPayload = Buffer.from(JSON.stringify({ algorithm: 'HMAC-SHA256', user_id: 'meta-user-1' })).toString('base64url');
+const deletionNow = new Date('2026-08-26T13:00:00.000Z');
+const signedPayload = Buffer.from(JSON.stringify({ algorithm: 'HMAC-SHA256', user_id: 'meta-user-1', issued_at: Math.floor(deletionNow.getTime() / 1000) })).toString('base64url');
 const signedSignature = (await import('node:crypto')).createHmac('sha256', process.env.META_APP_SECRET).update(signedPayload).digest('base64url');
-assert.equal(meta.verifyMetaSignedRequest(`${signedSignature}.${signedPayload}`).user_id, 'meta-user-1');
-assert.throws(() => meta.verifyMetaSignedRequest(`invalid.${signedPayload}`), 'Invalid signed requests must be rejected.');
+const verifiedSignedPayload = meta.verifyMetaSignedRequest(`${signedSignature}.${signedPayload}`, deletionNow);
+assert.equal(verifiedSignedPayload.user_id, 'meta-user-1');
+const paddedSignaturePayload = meta.verifyMetaSignedRequest(`${signedSignature}==.${signedPayload}`, deletionNow);
+assert.equal(paddedSignaturePayload.signed_request_hash, verifiedSignedPayload.signed_request_hash, 'Equivalent signature encodings must deduplicate to one canonical request identity.');
+assert.throws(() => meta.verifyMetaSignedRequest(`invalid.${signedPayload}`, deletionNow), 'Invalid signed requests must be rejected.');
+for (const issued_at of [Math.floor(deletionNow.getTime() / 1000) - meta.META_DELETION_MAX_AGE_SECONDS - 1, Math.floor(deletionNow.getTime() / 1000) + meta.META_DELETION_FUTURE_SKEW_SECONDS + 1]) {
+  const payload = Buffer.from(JSON.stringify({ algorithm: 'HMAC-SHA256', user_id: 'meta-user-1', issued_at })).toString('base64url');
+  const signature = (await import('node:crypto')).createHmac('sha256', process.env.META_APP_SECRET).update(payload).digest('base64url');
+  assert.throws(() => meta.verifyMetaSignedRequest(`${signature}.${payload}`, deletionNow), /Expired Meta signed request/);
+}
 
 const sql = fs.readFileSync(new URL('../supabase/meta_social_integration.sql', import.meta.url), 'utf8');
 for (const table of ['social_provider_oauth_states', 'social_provider_connections', 'social_provider_credentials', 'social_provider_assets', 'social_account_mappings', 'social_sync_runs', 'social_provider_deletion_requests']) {
@@ -132,8 +147,9 @@ const callback = fs.readFileSync(new URL('../src/app/api/integrations/meta/callb
 assert.ok(!callback.includes('exchangeLongLivedMetaToken'), 'BISU code exchange already returns the configured system-user token and must not use the legacy user-token extension flow.');
 assert.ok(callback.includes("admin.rpc('canary_consume_meta_oauth_state'"), 'Callback must atomically consume state.');
 assert.ok(callback.includes('canary_meta_oauth_binding'), 'Callback must require the OAuth binding cookie.');
-assert.ok(callback.includes("admin.rpc('canary_prepare_meta_connection'"), 'Callback must use a stable pending connection identity.');
-assert.ok(callback.includes("admin.rpc('canary_finalize_meta_connection'"), 'Callback persistence must be transactional.');
+assert.ok(callback.includes("admin.rpc('canary_prepare_meta_connection_v2'"), 'Callback must use the issuance-aware versioned prepare RPC.');
+assert.ok(callback.includes("admin.rpc('canary_finalize_meta_connection_v2'"), 'Callback persistence must be transactional and include data-access expiry.');
+assert.ok(callback.includes('p_data_access_expires_at'), 'Callback must persist Meta data-access expiration separately from token expiry.');
 assert.ok(!callback.includes(".from('social_provider_credentials')"), 'Callback must not write credentials outside the finalization transaction.');
 assert.ok(callback.includes("p_provider_app_id: process.env.META_APP_ID"), 'Callback must bind persisted connections to the configured Meta app.');
 assert.ok(callback.includes('encryptMetaToken(accessToken, tokenContext)'), 'User token must be encrypted with AAD before storage.');
@@ -166,7 +182,8 @@ assert.ok(actorRoute.includes('const districtId = isAdmin ? requestedDistrictId 
 const deletionRoute = fs.readFileSync(new URL('../src/app/api/integrations/meta/data-deletion/route.js', import.meta.url), 'utf8');
 assert.ok(deletionRoute.includes('export async function GET()'), 'Meta must be able to validate the public deletion callback URL without a signed deletion payload.');
 assert.ok(deletionRoute.includes("method: 'POST'"), 'Deletion callback validation must state that mutations require POST.');
-assert.ok(deletionRoute.includes("admin.rpc('canary_complete_meta_data_deletion'"), 'Meta deletion and its confirmation record must be transactional.');
+assert.ok(deletionRoute.includes("admin.rpc('canary_complete_meta_data_deletion_v2'"), 'Meta deletion, deduplication, and its confirmation record must be transactional.');
+assert.ok(deletionRoute.includes('p_signed_request_hash') && deletionRoute.includes('p_issued_at'), 'Deletion callback must bind a fresh signed request to its durable receipt.');
 assert.ok(!deletionRoute.includes(".from('social_provider_connections')"), 'Meta deletion must not delete connections outside the transaction.');
 assert.ok(deletionRoute.includes('metaDeletionConfigured()'), 'Meta deletion must depend only on deletion-specific configuration.');
 assert.ok(sql.includes('canary_complete_meta_data_deletion'), 'Meta data deletion must have a transactional RPC.');
@@ -201,19 +218,22 @@ assert.ok(!dashboardClient.includes('<span className="sidebar-link-icon">🔗</s
 assert.ok(dashboardClient.includes(": '/dashboard/integrations'}>Manage Meta connection</a>"), 'Administrator Settings navigation must enter integrations without a reporting-filter district.');
 assert.ok(!dashboardClient.includes('metaIntegrationEnabled={metaIntegrationEnabled} selectedDistrictId={districtFilter}'), 'Settings must not receive the dashboard reporting district as integration intent.');
 const lifecycleMigration = fs.readFileSync(new URL('../supabase/migrations/20260818190000_meta_oauth_attempt_lifecycle.sql', import.meta.url), 'utf8');
+const hardenedLifecycleMigration = fs.readFileSync(new URL('../supabase/migrations/20260826133000_meta_deletion_and_selection_lifecycle.sql', import.meta.url), 'utf8');
 assert.ok(lifecycleMigration.includes('lifecycle_version = lifecycle_version + 1'), 'Terminal and successful lifecycle transitions must invalidate stale callbacks.');
 assert.ok(lifecycleMigration.includes('social_provider_connection_attempts_one_pending_idx'), 'Only one pending OAuth attempt may own a district.');
 assert.ok(lifecycleMigration.includes('canary_abandon_meta_connection_attempt'), 'Migration must provide attempt-local cleanup.');
 assert.ok(lifecycleMigration.includes("raise exception 'Stale Meta OAuth callback"), 'Migration must reject stale callback interleavings.');
 assert.ok(lifecycleMigration.includes("'canary-meta-provider-user:' || p_provider_user_id_hash"), 'Callbacks and deletion must share a provider-user-global lock.');
-assert.ok(lifecycleMigration.includes('completed_at >= v_state_created_at'), 'A completed provider deletion must fence OAuth states issued before deletion.');
+assert.ok(hardenedLifecycleMigration.includes('coalesce(issued_at, completed_at) >= v_state_created_at'), 'Versioned prepare must fence by provider issuance time without redefining completion time.');
 assert.ok(lifecycleMigration.includes("raise exception 'A different Meta identity is already associated with this district'"), 'Reconnect must not erase the old provider identity needed for deletion provenance.');
-assert.ok(lifecycleMigration.includes("'completed',clock_timestamp()"), 'Deletion fences must record wall-clock completion rather than transaction start time.');
+assert.ok(hardenedLifecycleMigration.includes("'completed',clock_timestamp()"), 'V2 deletion receipts must record actual processing completion time.');
 assert.ok(callback.includes('p_provider_user_id_hash: providerUserIdHash'), 'Callback prepare/finalize must use the same provider identity hash as deletion.');
-assert.ok(syncRoute.includes('Native Meta synchronization is not released.'), 'Canonical Meta sync writes must remain hard-disabled until transactional deletion fencing exists.');
-assert.ok(!syncRoute.includes('syncSelectedMetaAssets'), 'The release route must not have an environment-only path to unfenced canonical writes.');
-assert.ok(!accountsRoute.includes('canary_link_selected_meta_assets'), 'Discovery-only asset selection must not create canonical Social rows.');
-assert.ok(statusRoute.includes('connections: connections || []'), 'Disabled-first status must retain local disconnect visibility for existing connections.');
+assert.ok(syncRoute.includes('syncSelectedMetaAssets'), 'Bounded pilot route must use transactionally deletion-fenced canonical writes.');
+assert.ok(syncRoute.includes('pilotItemLimit: 2'), 'Bounded pilot route must hard-cap each selected platform read.');
+assert.ok(syncRoute.includes('platforms: [platform]'), 'Bounded pilot route must require one explicit platform.');
+assert.ok(!syncRoute.includes('pilotItemLimit: null'), 'Customer pilot route must not expose unbounded synchronization.');
+assert.ok(!accountsRoute.includes('canary_link_selected_meta_assets'), 'Asset selection must not create canonical Social rows before an approved bounded sync.');
+assert.ok(statusRoute.includes('connections: presentConnections(connections)'), 'Disabled-first status must retain local disconnect visibility for existing connections.');
 for (const status of ['pending', 'expired', 'error']) {
   assert.ok(integrationClient.includes(`'${status}'`), `Disabled-first UI must expose disconnect for credential-bearing ${status} connections.`);
 }

@@ -31,10 +31,13 @@ await withSocialDatabase('meta-owned-sync', async ({ sql, expectFailure, session
   const latestMetricRollback = await readFile(new URL('../supabase/rollbacks/20260819223000_social_metric_latest_view_down.sql', import.meta.url), 'utf8');
   const deletionFenceMigration = await readFile(new URL('../supabase/migrations/20260820200000_meta_sync_deletion_fence.sql', import.meta.url), 'utf8');
   const deletionFenceRollback = await readFile(new URL('../supabase/rollbacks/20260820200000_meta_sync_deletion_fence_down.sql', import.meta.url), 'utf8');
+  const oauthLifecycleMigration = await readFile(new URL('../supabase/migrations/20260818190000_meta_oauth_attempt_lifecycle.sql', import.meta.url), 'utf8');
+  const hardenedLifecycleMigration = await readFile(new URL('../supabase/migrations/20260826133000_meta_deletion_and_selection_lifecycle.sql', import.meta.url), 'utf8');
   assert.doesNotMatch(latestMetricMigration, /\bconcurrently\b/i, 'Supabase SQL Editor wraps submitted SQL in a transaction');
   assert.doesNotMatch(latestMetricRollback, /\bconcurrently\b/i, 'rollback must also be SQL Editor compatible');
   const finalCurrentState = await readFile(new URL('../supabase/manual/canary_meta_database_final_current_state.sql', import.meta.url), 'utf8');
   sql(base);
+  sql(`create schema if not exists extensions; alter extension pgcrypto set schema extensions;`);
   sql(migration);
   sql(insightsMigration);
   sql(latestMetricMigration);
@@ -53,6 +56,8 @@ await withSocialDatabase('meta-owned-sync', async ({ sql, expectFailure, session
   sql(`select public.canary_link_selected_meta_assets('district-meta','10000000-0000-4000-8000-000000000001');`, { role:'service_role' });
   expectFailure(`select public.canary_fenced_link_selected_meta_assets('district-meta','10000000-0000-4000-8000-000000000001');`, /does not exist/i, { role:'service_role' });
   sql(deletionFenceMigration);
+  sql(oauthLifecycleMigration);
+  sql(hardenedLifecycleMigration);
   expectFailure(`select public.canary_link_selected_meta_assets('district-meta','10000000-0000-4000-8000-000000000001');`, /permission denied/i, { role:'service_role' });
   sql(`select public.canary_fenced_link_selected_meta_assets('district-meta','10000000-0000-4000-8000-000000000001');`, { role:'service_role' });
   const link = sql(`copy (select id||'|'||social_account_id from public.social_provider_account_links where district_id='district-meta' and active) to stdout;`).trim();
@@ -111,6 +116,7 @@ await withSocialDatabase('meta-owned-sync', async ({ sql, expectFailure, session
   assert.equal(sql(`copy (select to_regclass('public.canary_latest_social_metric_snapshots') is null and to_regclass('public.social_provider_metric_snapshots_latest_idx') is null) to stdout;`).trim(),'t','latest metric read projection must roll back cleanly');
   sql(latestMetricMigration);
   const metricBatch = `[${metric}]`;
+  expectFailure(`select public.canary_upsert_meta_metric_snapshot('${linkId}','${threadId}','${metric}'::jsonb);`, /permission denied/i, { role:'service_role' });
   expectFailure(`select public.canary_upsert_meta_metric_snapshots('${linkId}','${threadId}','${metricBatch}'::jsonb);`, /permission denied/i, { role:'service_role' });
   assert.equal(sql(`copy (select public.canary_fenced_upsert_meta_metric_snapshots('${linkId}','${threadId}','${metricBatch}'::jsonb)) to stdout;`, { role:'service_role' }).trim().split('\n').at(-1), '1');
   expectFailure(`select public.canary_upsert_meta_metric_snapshots('${linkId}','${threadId}','${metricBatch}'::jsonb);`, /permission denied/i, { role:'authenticated' });
@@ -158,6 +164,53 @@ await withSocialDatabase('meta-owned-sync', async ({ sql, expectFailure, session
   await disconnectOwner.exec('commit;');
   await disconnectWrite;
   assert.equal(sql(`copy (select count(*) from public.social_threads where district_id='district-disconnect') to stdout;`).trim(), '0');
+
+  // Saving an empty selection deactivates canonical links and accounts without
+  // requiring a later synchronization run.
+  sql(`
+    insert into public.districts(id,name) values ('district-unselect','District Unselect');
+    insert into public.social_provider_connections(id,district_id,provider,provider_app_id,provider_user_id,status,connected_at)
+      values ('10000000-0000-4000-8000-000000000003','district-unselect','meta','app-1','user-3','active',now());
+    insert into public.social_provider_assets(id,district_id,connection_id,provider_asset_id,asset_type,platform,name,handle,selected,active)
+      values ('20000000-0000-4000-8000-000000000003','district-unselect','10000000-0000-4000-8000-000000000003','page-3','facebook_page','facebook','Unselect District','unselect',true,true);
+  `);
+  sql(`select public.canary_fenced_link_selected_meta_assets('district-unselect','10000000-0000-4000-8000-000000000003');`, { role:'service_role' });
+  sql(`select public.canary_replace_meta_asset_mappings('district-unselect','{}'::uuid[],null,'District official accounts');`, { role:'service_role' });
+  assert.equal(sql(`copy (select count(*) from public.social_provider_account_links where district_id='district-unselect' and active) to stdout;`).trim(), '0');
+  assert.equal(sql(`copy (select count(*) from public.social_accounts where district_id='district-unselect' and active) to stdout;`).trim(), '0');
+
+  // A one-platform pilot activates only its exact asset and cannot create links
+  // for other selected assets on the same connection.
+  sql(`
+    insert into public.districts(id,name) values ('district-pilot-boundary','District Pilot Boundary');
+    insert into public.social_provider_connections(id,district_id,provider,provider_app_id,provider_user_id,status,connected_at)
+      values ('10000000-0000-4000-8000-000000000004','district-pilot-boundary','meta','app-1','user-4','active',now());
+    insert into public.social_provider_assets(id,district_id,connection_id,provider_asset_id,asset_type,platform,name,handle,parent_provider_asset_id,selected,active)
+      values
+        ('20000000-0000-4000-8000-000000000004','district-pilot-boundary','10000000-0000-4000-8000-000000000004','page-4','facebook_page','facebook','Pilot Facebook','pilotfb',null,true,true),
+        ('20000000-0000-4000-8000-000000000005','district-pilot-boundary','10000000-0000-4000-8000-000000000004','ig-4','instagram_account','instagram','Pilot Instagram','pilotig','page-4',true,true);
+  `);
+  sql(`select public.canary_fenced_link_meta_pilot_asset('district-pilot-boundary','10000000-0000-4000-8000-000000000004','20000000-0000-4000-8000-000000000004');`, { role:'service_role' });
+  assert.equal(sql(`copy (select count(*) from public.social_provider_account_links where district_id='district-pilot-boundary' and active) to stdout;`).trim(), '1');
+  assert.equal(sql(`copy (select count(*) from public.social_provider_account_links where provider_asset_id='20000000-0000-4000-8000-000000000005') to stdout;`).trim(), '0');
+  expectFailure(`select public.canary_fenced_link_meta_pilot_asset('district-pilot-boundary','10000000-0000-4000-8000-000000000004','20000000-0000-4000-8000-000000000003');`, /Exact selected Meta pilot asset is required/i, { role:'service_role' });
+  expectFailure(`select public.canary_fenced_link_meta_pilot_asset('district-pilot-boundary','10000000-0000-4000-8000-000000000004','20000000-0000-4000-8000-000000000005');`, /permission denied/i, { role:'authenticated' });
+  sql(`select public.canary_fenced_link_meta_pilot_asset('district-pilot-boundary','10000000-0000-4000-8000-000000000004','20000000-0000-4000-8000-000000000005');`, { role:'service_role' });
+  assert.equal(sql(`copy (select count(*) from public.social_provider_account_links where district_id='district-pilot-boundary' and active) to stdout;`).trim(), '2');
+
+  const pilotLinker = session('meta-pilot-linker', { role:'service_role' });
+  const pilotDeleter = session('meta-pilot-deleter');
+  await pilotLinker.exec('begin;');
+  await pilotLinker.exec(`select public.canary_fenced_link_meta_pilot_asset('district-pilot-boundary','10000000-0000-4000-8000-000000000004','20000000-0000-4000-8000-000000000004');`);
+  const pilotLinkerPid = await pilotLinker.pid();
+  await pilotDeleter.exec('begin;');
+  const pilotDeleterPid = await pilotDeleter.pid();
+  const pilotDeletion = pilotDeleter.exec(`select public.canary_complete_meta_data_deletion('user-4','${createHash('sha256').update('user-4').digest('hex')}','pilot-boundary-delete');`, 10000);
+  await waitForBlocked(pilotDeleterPid, pilotLinkerPid);
+  await pilotLinker.exec('commit;');
+  await pilotDeletion;
+  await pilotDeleter.exec('commit;');
+  assert.equal(sql(`copy (select count(*) from public.social_provider_connections where district_id='district-pilot-boundary') to stdout;`).trim(), '0');
 
   // Provider deletion owns the provider-user lock before every district lock.
   // Both canonical writers must block, then fail after deletion commits, and
