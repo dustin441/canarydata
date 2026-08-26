@@ -34,6 +34,7 @@ const tampered = `${encrypted.slice(0, -1)}${encrypted.endsWith('A') ? 'B' : 'A'
 assert.throws(() => meta.decryptMetaToken(tampered, tokenContext), 'Tampered ciphertext must fail authentication.');
 
 assert.deepEqual(meta.META_CONFIGURATION_PERMISSIONS, [
+  'business_management',
   'pages_show_list',
   'pages_read_engagement',
   'instagram_basic',
@@ -50,6 +51,7 @@ assert.deepEqual(meta.META_REQUIRED_SCOPES, [
 for (const forbidden of ['business_management', 'ads_read', 'ads_management', 'pages_manage_posts']) {
   assert.ok(!meta.META_REQUIRED_SCOPES.includes(forbidden), `Read-only owned-account release must not request ${forbidden}.`);
 }
+assert.ok(meta.META_CONFIGURATION_PERMISSIONS.includes('business_management'), 'The System-user Business Login configuration retains Meta\'s configuration-only dependency.');
 assert.equal(meta.metaEpochExpiry(1_800_000_000), '2027-01-15T08:00:00.000Z');
 assert.equal(meta.metaEpochExpiry(0), null);
 assert.equal(meta.earliestMetaReconnectDeadline('2027-02-01T00:00:00Z', '2027-01-15T00:00:00Z'), '2027-01-15T00:00:00.000Z');

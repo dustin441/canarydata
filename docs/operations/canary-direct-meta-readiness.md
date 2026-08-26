@@ -24,7 +24,7 @@ District-ready code is undergoing protected release verification. No external di
 
 ## Confirmed baseline defects addressed by this patch
 
-- Required permission constants now match released Facebook and Instagram reporting and remove unnecessary `business_management`.
+- Runtime-required scopes match released Facebook and Instagram reporting. The immutable System-user Business Login configuration retains Meta's `business_management` dependency separately; Canary does not call Business Manager APIs or require that permission as a token-observable data scope.
 - Meta's separate data-access deadline is persisted and exposed as the earlier reconnect deadline.
 - Token/app/user/permission health is persisted with optimistic lifecycle comparison.
 - Pending, permission-limited, expired, error, and revoked states remain visible and reconnectable.
@@ -62,7 +62,7 @@ The Meta developer console must be verified before an external user authorizes:
 - Business ownership and verification are correct
 - App domains include the Canary production domain
 - Login for Business configuration ID matches production
-- Exact configuration permissions are the approved read-only set
+- Configuration contains Meta's System-user `business_management` dependency plus exactly the five approved read-only data permissions
 - Advanced Access/App Review is approved for every required permission
 - External users outside app roles can authorize
 - OAuth redirect URI exactly matches production

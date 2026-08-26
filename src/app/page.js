@@ -337,7 +337,7 @@ export default function Home() {
       </section>
 
       <footer className={styles.footer}>
-        <p>© {new Date().getFullYear()} Canary Data. AI-Driven Brand Intelligence. &nbsp;·&nbsp; <Link href="/privacy" style={{ color: '#64748b', textDecoration: 'none' }}>Privacy Policy</Link></p>
+        <p>© {new Date().getFullYear()} Canary Data. AI-Driven Brand Intelligence. &nbsp;·&nbsp; <Link href="/privacy" style={{ color: '#64748b', textDecoration: 'none' }}>Privacy Policy</Link> &nbsp;·&nbsp; <Link href="/terms" style={{ color: '#64748b', textDecoration: 'none' }}>Terms of Service</Link></p>
       </footer>
     </div>
   );

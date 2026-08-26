@@ -59,7 +59,7 @@ export default function PrivacyPolicy() {
           Privacy Policy
         </h1>
         <p style={{ color: '#64748b', fontSize: '0.95rem', marginBottom: '3.5rem' }}>
-          Effective Date: June 5, 2026 &nbsp;·&nbsp; Last Updated: July 25, 2026
+          Effective Date: June 5, 2026 &nbsp;·&nbsp; Last Updated: August 26, 2026
         </p>
 
         {sections.map((section) => (
@@ -103,7 +103,7 @@ export default function PrivacyPolicy() {
         color: '#64748b',
         fontSize: '0.9rem',
       }}>
-        <p>© {new Date().getFullYear()} Canary Data. &nbsp;·&nbsp; <Link href="/" style={{ color: '#64748b', textDecoration: 'none' }}>Home</Link></p>
+        <p>© {new Date().getFullYear()} Canary Data. &nbsp;·&nbsp; <Link href="/terms" style={{ color: '#64748b', textDecoration: 'none' }}>Terms of Service</Link> &nbsp;·&nbsp; <Link href="/" style={{ color: '#64748b', textDecoration: 'none' }}>Home</Link></p>
       </footer>
     </div>
   );
@@ -128,7 +128,7 @@ const sections = [
           <li style={itemStyle}><strong style={strongStyle}>Account information:</strong> name, email address, organization, role, and other information provided during signup or account support.</li>
           <li style={itemStyle}><strong style={strongStyle}>District configuration:</strong> district names, schools, geographic parameters, search terms, monitored public sources, and public social accounts or hashtags designated for monitoring.</li>
           <li style={itemStyle}><strong style={strongStyle}>Publicly accessible content:</strong> news articles, public websites, public posts, metadata, and links retrieved from publicly available sources on a customer&apos;s behalf.</li>
-          <li style={itemStyle}><strong style={strongStyle}>Connected Meta account data:</strong> when an authorized district user connects Meta, we receive the Facebook Pages and connected Instagram professional accounts that person is permitted to access; granted permissions; owned posts and media; and the identifiers needed to keep those assets mapped to the correct district. We do not request permission to publish posts, manage comments or messages, access advertising accounts, or read native Insights in this release.</li>
+          <li style={itemStyle}><strong style={strongStyle}>Connected Meta account data:</strong> when an authorized district user connects Meta, we receive the Facebook Pages and connected Instagram professional accounts that person is permitted to access; granted permissions; selected owned posts and media; available organic Page and Instagram performance insights; and the identifiers needed to keep those assets mapped to the correct district. We do not request permission to publish posts, manage comments or messages, access advertising accounts, manage campaigns, or spend advertising budget.</li>
           <li style={itemStyle}><strong style={strongStyle}>Platform outputs:</strong> summaries, sentiment scores, risk levels, recommendations, tags, reports, exports, and other derivative analysis generated for the customer.</li>
           <li style={itemStyle}><strong style={strongStyle}>Usage and security data:</strong> access logs, IP address, browser type, pages visited, authentication events, and similar technical data used for security, auditing, troubleshooting, and performance.</li>
         </ul>
@@ -145,7 +145,7 @@ const sections = [
           <li style={itemStyle}>Operate, maintain, and deliver the Canary Data dashboard, reports, alerts, and support services.</li>
           <li style={itemStyle}>Authenticate users, secure accounts, enforce district-level access controls, and protect customer workspaces.</li>
           <li style={itemStyle}>Retrieve, filter, summarize, classify, and present publicly accessible media and social content selected by or relevant to the customer&apos;s configuration.</li>
-          <li style={itemStyle}>Read owned posts and media from customer-authorized Facebook Pages and connected Instagram professional accounts and present that content in district-controlled reporting. Canary does not use this connection to publish, reply, manage messages or comments, access advertising accounts, alter campaigns, or spend advertising budget.</li>
+          <li style={itemStyle}>Read selected owned posts, media, and available organic performance insights from customer-authorized Facebook Pages and connected Instagram professional accounts and present that information in district-controlled reporting. Canary does not use this connection to publish, reply, manage messages or comments, access advertising accounts, alter campaigns, or spend advertising budget.</li>
           <li style={itemStyle}>Generate communications-focused analysis, including sentiment, reputation risk, recommendations, and report exports.</li>
           <li style={itemStyle}>Communicate about account setup, service operations, invoices, security, support, and product updates.</li>
           <li style={itemStyle}>Improve platform reliability, accuracy, and safety without selling customer data or using one customer&apos;s confidential configuration or outputs to market to another customer.</li>
@@ -157,7 +157,7 @@ const sections = [
     title: '4. Public Data and Monitoring Boundaries',
     content: (
       <>
-        <p style={{ marginBottom: '1rem' }}>Canary Data is a public media and digital monitoring tool. Our intent is to surface information a district communications team could reasonably find in publicly accessible media or public social channels, not to surveil private communities. When a customer separately connects Meta, Canary also reads owned posts and media from the Facebook Pages and connected Instagram professional accounts that user explicitly selects.</p>
+        <p style={{ marginBottom: '1rem' }}>Canary Data is a public media and digital monitoring tool. Our intent is to surface information a district communications team could reasonably find in publicly accessible media or public social channels, not to surveil private communities. When a customer separately connects Meta, Canary also reads selected owned posts, media, and available organic performance insights from the Facebook Pages and connected Instagram professional accounts that user explicitly selects.</p>
         <ul style={listStyle}>
           <li style={itemStyle}>We do not intentionally access closed groups, private social media accounts, private parent or employee communities, or password-protected spaces.</li>
           <li style={itemStyle}>We monitor public social signals only when they are publicly accessible and relevant to a customer&apos;s configured district, schools, leaders, sources, or search terms.</li>

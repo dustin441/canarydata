@@ -1,7 +1,11 @@
 import { createHash, createHmac, randomBytes, randomUUID, createCipheriv, createDecipheriv, timingSafeEqual } from 'node:crypto';
 
 export const META_GRAPH_VERSION = process.env.META_GRAPH_VERSION || 'v25.0';
+// Meta requires business_management in this immutable Business Login System-user
+// configuration. Canary does not call Business Manager APIs and does not treat
+// it as a runtime-required data scope.
 export const META_CONFIGURATION_PERMISSIONS = Object.freeze([
+  'business_management',
   'pages_show_list',
   'pages_read_engagement',
   'instagram_basic',

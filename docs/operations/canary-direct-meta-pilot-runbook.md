@@ -11,7 +11,7 @@ Do not begin district authorization until all of the following are true:
 - Migrations `20260826130000_meta_connection_health.sql` and `20260826133000_meta_deletion_and_selection_lifecycle.sql` have passed rehearsal and production verification.
 - Post-deploy cutover migration `20260826140000_meta_legacy_rpc_cutover.sql` is reserved until the v2 deployment is healthy.
 - `npm run test:meta`, `npm run test:authz`, targeted ESLint, `npm run build`, and the production dependency audit pass.
-- Meta is Live and the Login for Business configuration grants only the approved read-only permissions.
+- Meta is Live and Login for Business shows exactly six approved configuration entries: configuration-only `business_management` plus the five runtime-required read-only data scopes.
 - The district and Meta administrator are explicitly authorized in writing.
 - The exact Facebook Page and linked Instagram professional account are recorded before OAuth.
 - The temporary actor lane and any paid provider schedule for those exact assets are identified.
@@ -43,7 +43,9 @@ The intended read-only release permissions are:
 - `read_insights`
 - `instagram_manage_insights`
 
-Do not proceed if consent requests publishing, messaging, moderation, advertising, or `business_management` access. Capture the permission names shown by Meta, not credential values.
+The immutable Business Integration System User configuration also includes `business_management`, which Meta requires for this token model. Canary does not call Business Manager APIs and does not treat it as a runtime-required data scope.
+
+Do not proceed if consent requests publishing, messaging, moderation, advertising, or any permission beyond these six configuration entries. Capture the permission names shown by Meta, not credential values.
 
 ## Pre-mutation evidence
 
@@ -65,7 +67,7 @@ Store counts and IDs only. Do not copy provider content, customer data, tokens, 
 1. Sign in as an authorized Canary district integration manager.
 2. Confirm the integrations page is bound to the explicit district.
 3. Start Meta authorization from that district only.
-4. Confirm Meta displays the expected Canary Data app and read-only permissions.
+4. Confirm Meta displays the expected Canary Data app and exactly the approved six-entry configuration: configuration-only `business_management` plus the five runtime-required read-only data scopes.
 5. Complete authorization as the approved Meta administrator.
 6. On callback, verify the connection is visible for the same district only.
 7. Verify provider identity, token deadline, data-access deadline, permission health, and last validation are present without exposing credentials.
