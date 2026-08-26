@@ -17,10 +17,10 @@ export default function ForgotPassword() {
     setError('');
     setLoading(true);
 
-    // Password recovery links are commonly opened in a different browser or
-    // email client. The implicit flow keeps recovery self-contained in the
-    // URL fragment instead of depending on a browser-local PKCE verifier.
-    const supabase = createClient({ auth: { flowType: 'implicit' } });
+    // Recovery emails contain a short code instead of a one-time auth link.
+    // This prevents enterprise email scanners from consuming the recovery
+    // token before the customer can use it.
+    const supabase = createClient();
     const { error: authError } = await supabase.auth.resetPasswordForEmail(email, {
       redirectTo: `${window.location.origin}/reset-password`,
     });
@@ -47,7 +47,7 @@ export default function ForgotPassword() {
         <div className="auth-card">
           <h2>Reset password</h2>
           <p className="auth-subtitle">
-            Enter your email to receive a password reset link.
+            Enter your email to receive an 8-digit recovery code.
           </p>
 
           {error && (
@@ -61,14 +61,14 @@ export default function ForgotPassword() {
               <div style={{ fontSize: '2.5rem', marginBottom: '16px' }}>✉️</div>
               <h3 style={{ color: 'var(--text-primary)', marginBottom: '10px' }}>Check your email</h3>
               <p style={{ color: 'var(--text-secondary)', fontSize: '0.9rem', lineHeight: '1.5' }}>
-                We&apos;ve sent a password reset link to <strong>{email}</strong>.
+                We&apos;ve sent a recovery code to <strong>{email}</strong>. The code expires in one hour.
               </p>
-              <button 
-                onClick={() => router.push('/login')} 
-                className="btn btn-secondary" 
+              <button
+                onClick={() => router.push('/reset-password')}
+                className="btn btn-primary"
                 style={{ marginTop: '24px', width: '100%' }}
               >
-                Back to Login
+                Enter Recovery Code
               </button>
             </div>
           ) : (
@@ -95,7 +95,7 @@ export default function ForgotPassword() {
                 {loading ? (
                   <span className="spinner" style={{ margin: '0 auto' }} />
                 ) : (
-                  'Send Reset Link'
+                  'Send Recovery Code'
                 )}
               </button>
               

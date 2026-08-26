@@ -6,79 +6,73 @@ import { useRouter } from 'next/navigation';
 
 export default function ResetPassword() {
   const router = useRouter();
+  const [email, setEmail] = useState('');
+  const [recoveryCode, setRecoveryCode] = useState('');
   const [password, setPassword] = useState('');
   const [confirmPassword, setConfirmPassword] = useState('');
   const [error, setError] = useState('');
   const [loading, setLoading] = useState(false);
   const [success, setSuccess] = useState(false);
   const [sessionReady, setSessionReady] = useState(false);
+  const [recoveryUserId, setRecoveryUserId] = useState('');
 
   useEffect(() => {
     let active = true;
 
-    async function initializeRecoverySession() {
-      // This page explicitly handles recovery parameters. Disabling automatic
-      // URL detection prevents a one-time PKCE code from being exchanged twice.
-      const supabase = createClient({ auth: { detectSessionInUrl: false } });
-      let recoveryEstablished = false;
+    // createBrowserClient owns PKCE and legacy hash parsing. Only the
+    // PASSWORD_RECOVERY event proves that a URL-created session may change a
+    // password; an ordinary SIGNED_IN session must never unlock this page.
+    const supabase = createClient();
+    const { data: { subscription } } = supabase.auth.onAuthStateChange((event, session) => {
+      if (!active || event !== 'PASSWORD_RECOVERY' || !session?.user?.id) return;
+      setRecoveryUserId(session.user.id);
+      setSessionReady(true);
+      setError('');
+      window.history.replaceState({}, document.title, window.location.pathname);
+    });
 
-      const query = new URLSearchParams(window.location.search);
-      const code = query.get('code');
+    return () => {
+      active = false;
+      subscription.unsubscribe();
+    };
+  }, []);
 
-      if (code) {
-        const { error: exchangeError } = await supabase.auth.exchangeCodeForSession(code);
+  async function handleVerifyCode(e) {
+    e.preventDefault();
+    setError('');
 
-        if (exchangeError) {
-          if (active) setError('Your password reset session has expired. Please request a new link.');
-          return;
-        }
-
-        recoveryEstablished = true;
-        window.history.replaceState({}, document.title, window.location.pathname);
-      }
-
-      const hash = new URLSearchParams(window.location.hash.slice(1));
-      const accessToken = hash.get('access_token');
-      const refreshToken = hash.get('refresh_token');
-      const isRecovery = hash.get('type') === 'recovery';
-
-      if (isRecovery && accessToken && refreshToken) {
-        const { error: sessionError } = await supabase.auth.setSession({
-          access_token: accessToken,
-          refresh_token: refreshToken,
-        });
-
-        if (sessionError) {
-          if (active) setError('Your password reset session has expired. Please request a new link.');
-          return;
-        }
-
-        recoveryEstablished = true;
-        window.history.replaceState({}, document.title, window.location.pathname);
-      }
-
-      if (!recoveryEstablished) {
-        if (active) setError('Your password reset session has expired. Please request a new link.');
-        return;
-      }
-
-      const { data: { session } } = await supabase.auth.getSession();
-      if (active) {
-        if (session) setSessionReady(true);
-        else setError('Your password reset session has expired. Please request a new link.');
-      }
+    if (!email.trim() || !/^\d{8}$/.test(recoveryCode.trim())) {
+      setError('Enter your email address and the 8-digit recovery code.');
+      return;
     }
 
-    initializeRecoverySession();
-    return () => { active = false; };
-  }, []);
+    setLoading(true);
+    const supabase = createClient({ auth: { detectSessionInUrl: false } });
+    const { data, error: verifyError } = await supabase.auth.verifyOtp({
+      email: email.trim(),
+      token: recoveryCode.trim(),
+      type: 'recovery',
+    });
+
+    if (verifyError || !data.session) {
+      setError('That recovery code is invalid or expired. Request a new code and try again.');
+      setLoading(false);
+      return;
+    }
+
+    setRecoveryCode('');
+    setRecoveryUserId(data.session.user.id);
+    setSessionReady(true);
+    setLoading(false);
+    window.history.replaceState({}, document.title, window.location.pathname);
+  }
 
   async function handleSubmit(e) {
     e.preventDefault();
     setError('');
 
-    if (!sessionReady) {
-      setError('Your password reset session has expired. Please request a new link.');
+    if (!sessionReady || !recoveryUserId) {
+      setError('Verify a recovery code before choosing a new password.');
       return;
     }
 
@@ -95,6 +89,15 @@ export default function ResetPassword() {
     setLoading(true);
 
     const supabase = createClient();
+    const { data: { user }, error: userError } = await supabase.auth.getUser();
+    if (userError || !user || user.id !== recoveryUserId) {
+      setSessionReady(false);
+      setRecoveryUserId('');
+      setError('Your recovery session changed or expired. Request a new code and try again.');
+      setLoading(false);
+      return;
+    }
+
     const { error: authError } = await supabase.auth.updateUser({
       password: password,
     });
@@ -107,8 +110,7 @@ export default function ResetPassword() {
 
     setSuccess(true);
     setLoading(false);
-    
-    // Redirect to dashboard after a short delay
+
     setTimeout(() => {
       router.push('/dashboard');
       router.refresh();
@@ -125,9 +127,11 @@ export default function ResetPassword() {
         </div>
 
         <div className="auth-card">
-          <h2>Update password</h2>
+          <h2>{sessionReady ? 'Update password' : 'Verify recovery code'}</h2>
           <p className="auth-subtitle">
-            Enter your new password below to secure your account.
+            {sessionReady
+              ? 'Enter your new password below to secure your account.'
+              : 'Enter the email address and 8-digit code from your recovery email.'}
           </p>
 
           {error && (
@@ -145,6 +149,52 @@ export default function ResetPassword() {
               </p>
               <div className="spinner" style={{ margin: '20px auto 0' }} />
             </div>
+          ) : !sessionReady ? (
+            <form onSubmit={handleVerifyCode}>
+              <div className="form-group">
+                <label htmlFor="email">Email Address</label>
+                <input
+                  id="email"
+                  type="email"
+                  className="form-input"
+                  placeholder="you@organization.org"
+                  value={email}
+                  onChange={(e) => setEmail(e.target.value)}
+                  required
+                  autoComplete="email"
+                />
+              </div>
+
+              <div className="form-group">
+                <label htmlFor="recovery-code">Recovery Code</label>
+                <input
+                  id="recovery-code"
+                  type="text"
+                  inputMode="numeric"
+                  pattern="[0-9]{8}"
+                  maxLength={8}
+                  className="form-input"
+                  placeholder="12345678"
+                  value={recoveryCode}
+                  onChange={(e) => setRecoveryCode(e.target.value.replace(/\D/g, '').slice(0, 8))}
+                  required
+                  autoComplete="one-time-code"
+                />
+              </div>
+
+              <button className="btn btn-primary" disabled={loading}>
+                {loading ? <span className="spinner" style={{ margin: '0 auto' }} /> : 'Verify Code'}
+              </button>
+
+              <button
+                type="button"
+                onClick={() => router.push('/forgot-password')}
+                className="btn btn-secondary"
+                style={{ width: '100%', marginTop: '12px' }}
+              >
+                Request New Code
+              </button>
+            </form>
           ) : (
             <form onSubmit={handleSubmit}>
               <div className="form-group">
@@ -186,18 +236,6 @@ export default function ResetPassword() {
                   'Update Password'
                 )}
               </button>
-              
-              {error.includes('expired') && (
-                <div style={{ textAlign: 'center', marginTop: '20px' }}>
-                  <button 
-                    onClick={() => router.push('/forgot-password')} 
-                    className="btn btn-secondary" 
-                    style={{ width: '100%' }}
-                  >
-                    Request New Link
-                  </button>
-                </div>
-              )}
             </form>
           )}
         </div>

@@ -9,8 +9,10 @@ const client = await readFile(new URL('../src/lib/supabase/client.js', import.me
 
 assert.match(client, /export function createClient\(options\)/);
 assert.match(client, /NEXT_PUBLIC_SUPABASE_ANON_KEY,\s*options/);
-assert.match(forgot, /createClient\(\{ auth: \{ flowType: 'implicit' \} \}\)/);
+assert.match(forgot, /const supabase = createClient\(\)/);
 assert.match(forgot, /redirectTo:\s*`\$\{window\.location\.origin\}\/reset-password`/);
+assert.match(forgot, /8-digit recovery code/);
+assert.match(forgot, /router\.push\('\/reset-password'\)/);
 assert.match(callback, /exchangeCodeForSession\(code\)/, 'server callback must exchange the PKCE code');
 assert.match(callback, /safeNextPath/, 'callback redirect must remain same-origin and path constrained');
 const origin = 'https://canary.example';
@@ -18,11 +20,14 @@ assert.equal(safeNextPath('/reset-password?from=email', origin, '/dashboard'), '
 assert.equal(safeNextPath('//evil.example', origin, '/dashboard'), '/dashboard');
 assert.equal(safeNextPath('/\\evil.example', origin, '/dashboard'), '/dashboard');
 assert.equal(safeNextPath('https://evil.example', origin, '/dashboard'), '/dashboard');
-assert.match(reset, /query\.get\('code'\)/, 'reset page must accept already-issued direct PKCE links');
-assert.match(reset, /exchangeCodeForSession\(code\)/, 'direct PKCE links must exchange their code');
-assert.match(reset, /detectSessionInUrl:\s*false/, 'explicit PKCE exchange must disable automatic code detection');
-assert.match(reset, /hash\.get\('access_token'\)/, 'legacy hash recovery links must remain supported');
-assert.match(reset, /if \(!recoveryEstablished\)/, 'ordinary sessions must not authorize the recovery page');
+assert.match(reset, /onAuthStateChange/, 'the reset page must use the SDK recovery event for URL sessions');
+assert.match(reset, /event !== 'PASSWORD_RECOVERY'/, 'ordinary sign-in sessions must not unlock password recovery');
+assert.doesNotMatch(reset, /exchangeCodeForSession/, 'the page must not double-exchange SDK-managed PKCE codes');
+assert.doesNotMatch(reset, /setSession\(/, 'the page must not treat arbitrary URL tokens as recovery proof');
+assert.match(reset, /verifyOtp\(\{/, 'recovery codes must be verified through Supabase Auth');
+assert.match(reset, /type:\s*'recovery'/, 'the code verifier must use the recovery OTP type');
+assert.match(reset, /\^\\d\{8\}\$/, 'the recovery form must require the configured 8-digit code');
+assert.match(reset, /user\.id !== recoveryUserId/, 'the password update must preserve recovery-session provenance');
 assert.match(reset, /disabled=\{loading \|\| !sessionReady\}/, 'submit must remain disabled until recovery is ready');
 assert.match(reset, /supabase\.auth\.updateUser/, 'password update must require the recovered session');
 
