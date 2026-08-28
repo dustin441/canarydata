@@ -130,8 +130,8 @@ export default async function DashboardPage({ searchParams }) {
     isAdmin ? loadDashboardDataset('Social correction history', () => getRecentSocialReviewEvents(dataDistrictId), []) : Promise.resolve({ data: [], warning: null }),
     loadDashboardDataset('Strategic profiles', () => getStrategicProfiles(dataDistrictId), []),
     loadDashboardDataset('Strategic priorities', () => getStrategicPriorities(dataDistrictId), []),
-    loadDashboardDataset('Collection health', () => getCollectionHealth(districts, dataDistrictId), []),
-    loadDashboardDataset('Social collection health', () => getSocialCollectionHealth(districts, dataDistrictId), []),
+    isAdmin ? loadDashboardDataset('Collection health', () => getCollectionHealth(districts, dataDistrictId), []) : Promise.resolve({ data: [], warning: null }),
+    isAdmin ? loadDashboardDataset('Social collection health', () => getSocialCollectionHealth(districts, dataDistrictId), []) : Promise.resolve({ data: [], warning: null }),
   ]);
   const [articles, queries, clients, excludedStories, correctionEvents, socialSources, socialThreads, socialMetricSnapshots, socialMetricHistory, socialReviewEvents, strategicProfiles, strategicPriorities, collectionHealth, socialCollectionHealth] = dataLoads.map((result) => result.data);
   const enrichedSocialThreads = enrichSocialThreadsWithNativeMetrics(socialThreads, socialMetricSnapshots);

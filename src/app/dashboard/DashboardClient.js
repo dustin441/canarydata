@@ -4124,9 +4124,13 @@ export default function DashboardClient({ articles, districts, queries: initialQ
     () => socialCollectionHealth.find((item) => item.districtId === districtFilter) ?? null,
     [socialCollectionHealth, districtFilter],
   );
-  const collectionHealthClass = selectedCollectionHealth?.status === 'critical'
+  const showOperationalCollectionHealth = isAdmin && !demoMode;
+  const collectionHealthClass = showOperationalCollectionHealth && selectedCollectionHealth?.status === 'critical'
     ? 'negative'
-    : selectedCollectionHealth?.status === 'warning' ? 'warning' : 'positive';
+    : showOperationalCollectionHealth && selectedCollectionHealth?.status === 'warning' ? 'warning' : 'positive';
+  const collectionStatusLabel = showOperationalCollectionHealth
+    ? (selectedCollectionHealth?.label ?? 'Collection status unavailable')
+    : 'Based on active filters';
 
   const { mentionTrend, sentimentTrend, sourceBreakdown } = useMemo(
     () => buildChartData(chartArticles),
@@ -4639,7 +4643,7 @@ export default function DashboardClient({ articles, districts, queries: initialQ
               </div>
               <div className="kpi-value">{chartArticles.length}</div>
               <span className={`kpi-change ${collectionHealthClass}`}>
-                {selectedCollectionHealth?.label ?? 'Collection status unavailable'}
+                {collectionStatusLabel}
               </span>
             </div>
 
@@ -4713,32 +4717,34 @@ export default function DashboardClient({ articles, districts, queries: initialQ
               </button>
             </header>
 
-            <div className={`collection-health-banner ${selectedCollectionHealth?.status ?? 'unknown'}`}>
-              <div>
-                <span>News collection health</span>
-                <strong>{selectedCollectionHealth?.label ?? 'Status unavailable'}</strong>
-                <p>{selectedCollectionHealth?.detail ?? 'No collection-health evidence is available for this district.'}</p>
+            {showOperationalCollectionHealth && (<>
+              <div className={`collection-health-banner ${selectedCollectionHealth?.status ?? 'unknown'}`}>
+                <div>
+                  <span>News collection health</span>
+                  <strong>{selectedCollectionHealth?.label ?? 'Status unavailable'}</strong>
+                  <p>{selectedCollectionHealth?.detail ?? 'No collection-health evidence is available for this district.'}</p>
+                </div>
+                <dl>
+                  <div><dt>Latest collection evidence</dt><dd>{selectedCollectionHealth?.latestActivityAt ? formatDate(selectedCollectionHealth.latestActivityAt) : 'Not available'}</dd></div>
+                  <div><dt>Raw results, 7 days</dt><dd>{selectedCollectionHealth?.rawResults7d ?? 'N/A'}</dd></div>
+                  <div><dt>New stories, 14 days</dt><dd>{selectedCollectionHealth?.acceptedStories14d ?? 'N/A'}</dd></div>
+                </dl>
               </div>
-              <dl>
-                <div><dt>Latest collection evidence</dt><dd>{selectedCollectionHealth?.latestActivityAt ? formatDate(selectedCollectionHealth.latestActivityAt) : 'Not available'}</dd></div>
-                <div><dt>Raw results, 7 days</dt><dd>{selectedCollectionHealth?.rawResults7d ?? 'N/A'}</dd></div>
-                <div><dt>New stories, 14 days</dt><dd>{selectedCollectionHealth?.acceptedStories14d ?? 'N/A'}</dd></div>
-              </dl>
-            </div>
 
-            <div className={`collection-health-banner ${selectedSocialCollectionHealth?.status ?? 'unknown'}`}>
-              <div>
-                <span>Public Social collection health</span>
-                <strong>{selectedSocialCollectionHealth?.label ?? 'Status unavailable'}</strong>
-                <p>{selectedSocialCollectionHealth?.detail ?? 'No Public Social collection-health evidence is available for this district.'}</p>
+              <div className={`collection-health-banner ${selectedSocialCollectionHealth?.status ?? 'unknown'}`}>
+                <div>
+                  <span>Public Social collection health</span>
+                  <strong>{selectedSocialCollectionHealth?.label ?? 'Status unavailable'}</strong>
+                  <p>{selectedSocialCollectionHealth?.detail ?? 'No Public Social collection-health evidence is available for this district.'}</p>
+                </div>
+                <dl>
+                  <div><dt>Latest terminal run</dt><dd>{selectedSocialCollectionHealth?.latestActivityAt ? formatDate(selectedSocialCollectionHealth.latestActivityAt) : 'Not available'}</dd></div>
+                  <div><dt>Raw items checked</dt><dd>{selectedSocialCollectionHealth?.latestRawItems ?? 'N/A'}</dd></div>
+                  <div><dt>Candidates staged</dt><dd>{selectedSocialCollectionHealth?.latestAcceptedCandidates ?? 'N/A'}</dd></div>
+                  <div><dt>Official accounts</dt><dd>{selectedSocialCollectionHealth?.officialAccountCount ?? 'N/A'}</dd></div>
+                </dl>
               </div>
-              <dl>
-                <div><dt>Latest terminal run</dt><dd>{selectedSocialCollectionHealth?.latestActivityAt ? formatDate(selectedSocialCollectionHealth.latestActivityAt) : 'Not available'}</dd></div>
-                <div><dt>Raw items checked</dt><dd>{selectedSocialCollectionHealth?.latestRawItems ?? 'N/A'}</dd></div>
-                <div><dt>Candidates staged</dt><dd>{selectedSocialCollectionHealth?.latestAcceptedCandidates ?? 'N/A'}</dd></div>
-                <div><dt>Official accounts</dt><dd>{selectedSocialCollectionHealth?.officialAccountCount ?? 'N/A'}</dd></div>
-              </dl>
-            </div>
+            </>)}
 
             <div className="communications-brief-metrics">
               <div><span>Newest media mention</span><strong>{communicationsBrief.latestDate ? formatDate(communicationsBrief.latestDate) : 'No coverage'}</strong></div>
