@@ -10,6 +10,8 @@ import { redirect } from 'next/navigation';
 import { metaIntegrationEnabledForDistrict, metaIntegrationPilotConfigured } from '@/lib/meta-integration.mjs';
 import { buildSocialDailySeries } from '@/lib/socialPerformance.mjs';
 import { resolveDemoReviewerAccess } from '@/lib/dashboard-access.mjs';
+import { loadCanaryAccountAccess } from '@/lib/account-access';
+import TrialEnded from './TrialEnded';
 
 const DASHBOARD_DATA_TIMEOUT_MS = 6500;
 
@@ -52,24 +54,38 @@ export default async function DashboardPage({ searchParams }) {
   let protectedMetadata = {};
   let canManageIntegrations = false;
   let hasExistingMetaConnection = false;
+  let adminClient = null;
+  let verifiedUser = null;
   if (sessionUser?.id) {
-    const admin = createAdminClient();
-    const { data: { user } } = await admin.auth.admin.getUserById(sessionUser.id);
+    adminClient = createAdminClient();
+    const { data: { user } } = await adminClient.auth.admin.getUserById(sessionUser.id);
+    verifiedUser = user;
     protectedMetadata = user?.app_metadata || {};
     userDistrictId = user?.app_metadata?.district_id ?? null;
     isAdmin = user?.app_metadata?.role === 'admin';
     isDemoReviewer = user?.app_metadata?.role === 'demo_reviewer';
     canManageIntegrations = isAdmin || (Array.isArray(protectedMetadata.permissions) && protectedMetadata.permissions.includes('manage_integrations'));
-    if (canManageIntegrations) {
-      let connectionQuery = admin.from('social_provider_connections').select('id').eq('provider', 'meta').limit(1);
-      if (!isAdmin && userDistrictId) connectionQuery = connectionQuery.eq('district_id', userDistrictId);
-      const { data: existingMetaConnections } = await connectionQuery;
-      hasExistingMetaConnection = Boolean(existingMetaConnections?.length);
-    }
   }
 
   if (!sessionUser?.id) redirect('/login?redirect_to=/dashboard');
   if (!userDistrictId && !isAdmin && !isDemoReviewer) redirect('/demo?access=pending');
+
+  const accountAccess = await loadCanaryAccountAccess({ user: verifiedUser, admin: adminClient });
+  if (!accountAccess.allowed) {
+    return (
+      <TrialEnded
+        districtName={verifiedUser?.user_metadata?.district_name || userDistrictId || 'Canary Data'}
+        trialEndsAt={accountAccess.trialEndsAt}
+        accessRevoked={accountAccess.reason === 'account_revoked'}
+      />
+    );
+  }
+  if (canManageIntegrations) {
+    let connectionQuery = adminClient.from('social_provider_connections').select('id').eq('provider', 'meta').limit(1);
+    if (!isAdmin && userDistrictId) connectionQuery = connectionQuery.eq('district_id', userDistrictId);
+    const { data: existingMetaConnections } = await connectionQuery;
+    hasExistingMetaConnection = Boolean(existingMetaConnections?.length);
+  }
 
   const districtLoad = await loadDashboardDataset('District list', getDistricts, []);
   const allDistricts = districtLoad.data;

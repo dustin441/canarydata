@@ -30,6 +30,17 @@ try {
   assert.throws(() => resolveCheckoutExpiration(expiringIntro, new Date('2026-08-31T23:40:00-07:00')), /temporarily unavailable/);
   assert.equal(resolveCheckoutExpiration(paid, new Date('2026-08-31T23:40:00-07:00')), null);
 
+  const nspraMetadata = {
+    pricing_offer_code: 'nspra_2026', pricing_offer_status: 'eligible', pricing_offer_source: 'nspra_2026_finite_list',
+    pricing_offer_granted_at: '2026-08-28T12:00:00Z', pricing_offer_expires_at: '2026-10-01T00:00:00-07:00',
+  };
+  const nspra = resolveCheckoutLineItem('nspra@district.org', nspraMetadata, new Date('2026-09-30T12:00:00-07:00'));
+  assert.equal(nspra.priceCents, 149900);
+  assert.equal(nspra.pricing.reason, 'nspra_2026_eligible_offer');
+  assert.equal(resolveCheckoutExpiration(nspra, new Date('2026-09-30T12:00:00-07:00')), Date.parse('2026-10-01T00:00:00-07:00') / 1000);
+  assert.throws(() => resolveCheckoutExpiration(nspra, new Date('2026-09-30T23:40:00-07:00')), /temporarily unavailable/);
+  assert.equal(resolveCheckoutLineItem('nspra@district.org', nspraMetadata, new Date('2026-10-01T00:00:00-07:00')).priceCents, 500000);
+
   assert.throws(() => resolveCheckoutLineItem('pricing-test@canarydata.media', {}, new Date('2026-09-20T00:00:00-07:00')), /not a protected Canary test account/);
   const test = resolveCheckoutLineItem('pricing-test@canarydata.media', { is_test_account: true }, new Date('2026-09-20T00:00:00-07:00'));
   assert.equal(test.priceCents, 100);
@@ -83,6 +94,53 @@ try {
     },
   }, { paidAt: '2026-09-10T00:00:00-07:00' });
   assert.equal(committedIntro.paidAmountCents, 149900);
+
+  const nspraSnapshot = resolvePaymentPricingSnapshot({
+    id: 'cs_nspra', amount_total: 149900, currency: 'usd', metadata: {
+      canary_amount_cents: '149900', canary_renewal_amount_cents: '149900', canary_currency: 'usd',
+      canary_pricing_policy_version: '2026-09-01-v1', canary_pricing_reason: 'nspra_2026_eligible_offer',
+      canary_pricing_locked: 'true', canary_pricing_locked_at: '2026-08-28T12:00:00Z',
+      canary_pricing_expires_at: '2026-10-01T00:00:00-07:00', canary_pricing_offer_code: 'nspra_2026',
+    },
+  }, { paidAt: '2026-09-30T20:00:00-07:00' });
+  assert.equal(nspraSnapshot.paidAmountCents, 149900);
+  assert.equal(nspraSnapshot.renewalAmountCents, 149900);
+  assert.equal(nspraSnapshot.expiresAt, '2026-10-01T00:00:00-07:00');
+  assert.throws(() => resolvePaymentPricingSnapshot({
+    id: 'cs_nspra_late', amount_total: 149900, currency: 'usd', metadata: {
+      canary_amount_cents: '149900', canary_renewal_amount_cents: '149900', canary_currency: 'usd',
+      canary_pricing_policy_version: '2026-09-01-v1', canary_pricing_reason: 'nspra_2026_eligible_offer',
+      canary_pricing_locked: 'true', canary_pricing_locked_at: '2026-08-28T12:00:00Z',
+      canary_pricing_expires_at: '2026-10-01T00:00:00-07:00',
+    },
+  }, { paidAt: '2026-10-01T00:00:00-07:00' }), /NSPRA offer expired/);
+  const qualifiedNspraSnapshot = {
+    canary_pricing_policy_version: '2026-09-01-v1', canary_pricing_reason: 'nspra_2026_valid_po',
+    canary_pricing_locked: 'true', canary_pricing_locked_at: '2026-09-30T20:00:00-07:00',
+    canary_pricing_lock_reason: 'nspra_2026_valid_po', canary_pricing_po_status: 'received', canary_pricing_po_number: 'PO-2026-1',
+    canary_pricing_offer_code: 'nspra_2026', canary_pricing_offer_status: 'qualified', canary_pricing_offer_source: 'nspra_2026_finite_list',
+    canary_pricing_expires_at: '2026-10-01T00:00:00-07:00', canary_pricing_eligibility_reference: 'sheet-row-2',
+  };
+  const qualifiedNspraPo = resolvePaymentPricingSnapshot({
+    id: 'cs_nspra_po', amount_total: 149900, currency: 'usd', metadata: {
+      canary_amount_cents: '149900', canary_renewal_amount_cents: '149900', canary_currency: 'usd',
+      ...qualifiedNspraSnapshot,
+    },
+  }, { paidAt: '2026-10-15T00:00:00-07:00' });
+  assert.equal(qualifiedNspraPo.paidAmountCents, 149900);
+  assert.throws(() => resolvePaymentPricingSnapshot({
+    id: 'cs_nspra_po_late_lock', amount_total: 149900, currency: 'usd', metadata: {
+      canary_amount_cents: '149900', canary_renewal_amount_cents: '149900', canary_currency: 'usd',
+      ...qualifiedNspraSnapshot, canary_pricing_locked_at: '2026-10-01T00:00:00-07:00',
+    },
+  }, { paidAt: '2026-10-15T00:00:00-07:00' }), /pre-deadline NSPRA PO lock/);
+  assert.throws(() => resolvePaymentPricingSnapshot({
+    id: 'cs_nspra_po_sparse', amount_total: 149900, currency: 'usd', metadata: {
+      canary_amount_cents: '149900', canary_renewal_amount_cents: '149900', canary_currency: 'usd',
+      canary_pricing_policy_version: '2026-09-01-v1', canary_pricing_reason: 'nspra_2026_valid_po',
+      canary_pricing_locked: 'true', canary_pricing_locked_at: '2026-09-30T20:00:00-07:00',
+    },
+  }, { paidAt: '2026-10-15T00:00:00-07:00' }), /pre-deadline NSPRA PO lock/);
 
   assert.throws(() => resolvePaymentPricingSnapshot({
     id: 'cs_unversioned_late', amount_total: 149900, currency: 'usd', metadata: {},

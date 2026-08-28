@@ -6,10 +6,14 @@ import { createCanaryCheckoutSession, createCanaryEmbeddedCheckoutSession, ensur
 import { getAuthenticatedBillingContext } from '@/lib/billing';
 import { markCanaryPaymentPaid } from '@/lib/payment-state';
 import { isCanaryPaymentCovered } from '@/lib/payment-status.mjs';
+import { isCanaryAccountHardDenied } from '@/lib/trial-access.mjs';
 
 function requireBillingContext(context) {
   const { user, districtId, districtName, email, onboardingRequest } = context;
   if (!user) redirect('/login?redirect_to=/payment');
+  if (context.accountAccess?.reason === 'account_revoked' || isCanaryAccountHardDenied(user.app_metadata || {})) {
+    throw new Error('Payment cannot reactivate a disabled Canary account. Contact Canary Data for help.');
+  }
 
   const organizationName = districtName || onboardingRequest?.organization_name || '';
   if (!organizationName) {
@@ -60,28 +64,39 @@ async function persistProtectedCustomer(context) {
     districtId: context.districtId,
   });
   const admin = createAdminClient();
-  const { data: savedProtected, error: saveError } = await admin.rpc('patch_canary_protected_app_metadata', {
+  const { data: savedProtected, error: saveError } = await admin.rpc('bind_canary_stripe_customer', {
     p_auth_user_id: context.user.id,
     p_district_id: context.districtId,
+    p_expected_email: context.email,
+    p_request_id: context.requestId,
     p_expected_customer_id: context.customerId,
-    p_expected_app_metadata: null,
-    p_patch: { stripe_customer_id: customerId },
+    p_customer_id: customerId,
+    p_expected_app_metadata: context.protectedMetadata,
   });
   if (saveError || savedProtected?.stripe_customer_id !== customerId || savedProtected?.district_id !== context.districtId) {
     throw new Error('Protected Stripe Customer transactional readback verification failed.');
   }
-  if (context.requestId) {
-    const { data, error } = await admin
-      .from('onboarding_requests')
-      .update({ stripe_customer_id: customerId })
-      .eq('id', context.requestId)
-      .eq('contact_email', context.email)
-      .select('id, stripe_customer_id');
-    if (error || data?.length !== 1 || data[0].stripe_customer_id !== customerId) {
-      throw new Error('Unable to verify the onboarding Stripe Customer binding.');
-    }
-  }
   return { ...context, customerId, protectedMetadata: savedProtected };
+}
+
+async function reusablePendingCheckout(context, mode) {
+  const pendingId = String(context.protectedMetadata?.stripe_pending_checkout_session_id || '');
+  const pendingMode = String(context.protectedMetadata?.stripe_pending_checkout_mode || '');
+  const pendingExpiresAt = Date.parse(String(context.protectedMetadata?.stripe_pending_checkout_expires_at || ''));
+  if (!pendingId || pendingMode !== mode || !Number.isFinite(pendingExpiresAt) || pendingExpiresAt <= Date.now() + 60_000) return null;
+  const session = await retrieveCheckoutSession(pendingId);
+  const customerId = typeof session?.customer === 'object' ? session.customer?.id : session?.customer;
+  const owned = session?.metadata?.user_id === context.user.id
+    && session?.metadata?.district_id === context.districtId
+    && String(customerId || '') === context.customerId;
+  const expectedUiMode = mode === 'embedded' ? 'embedded_page' : 'hosted_page';
+  const usable = owned && session?.mode === 'payment' && session?.ui_mode === expectedUiMode
+    && session?.status === 'open' && session?.payment_status !== 'paid'
+    && Number(session?.expires_at) * 1000 > Date.now() + 60_000;
+  if (!usable) return null;
+  if (mode === 'hosted' && !session.url) return null;
+  if (mode === 'embedded' && !session.client_secret) return null;
+  return session;
 }
 
 async function persistPendingCheckout(context, session, mode) {
@@ -96,7 +111,7 @@ async function persistPendingCheckout(context, session, mode) {
     p_auth_user_id: context.user.id,
     p_district_id: context.districtId,
     p_expected_customer_id: context.customerId,
-    p_expected_app_metadata: null,
+    p_expected_app_metadata: context.protectedMetadata,
     p_patch: pendingPatch,
   });
   if (error || savedProtected?.stripe_customer_id !== context.customerId
@@ -108,7 +123,8 @@ async function persistPendingCheckout(context, session, mode) {
 
 export async function startCanaryCheckout() {
   const context = await persistProtectedCustomer(requirePaymentAvailable(requireBillingContext(await getAuthenticatedBillingContext())));
-  const session = await createCanaryCheckoutSession({
+  let session = await reusablePendingCheckout(context, 'hosted');
+  if (!session) session = await createCanaryCheckoutSession({
     organizationName: context.organizationName,
     contactEmail: context.email,
     requestId: context.requestId,
@@ -117,16 +133,18 @@ export async function startCanaryCheckout() {
     customerId: context.customerId,
     protectedMetadata: context.protectedMetadata,
     origin: getOrigin(),
+    previousSessionId: context.protectedMetadata?.stripe_pending_checkout_session_id || '',
   });
 
   if (!session?.url) throw new Error('Stripe did not return a checkout URL.');
-  await persistPendingCheckout(context, session, 'hosted');
+  if (session.id !== context.protectedMetadata?.stripe_pending_checkout_session_id) await persistPendingCheckout(context, session, 'hosted');
   redirect(session.url);
 }
 
 export async function createEmbeddedCanaryCheckout() {
   const context = await persistProtectedCustomer(requirePaymentAvailable(requireBillingContext(await getAuthenticatedBillingContext())));
-  const session = await createCanaryEmbeddedCheckoutSession({
+  let session = await reusablePendingCheckout(context, 'embedded');
+  if (!session) session = await createCanaryEmbeddedCheckoutSession({
     organizationName: context.organizationName,
     contactEmail: context.email,
     requestId: context.requestId,
@@ -134,12 +152,13 @@ export async function createEmbeddedCanaryCheckout() {
     userId: context.user.id,
     customerId: context.customerId,
     protectedMetadata: context.protectedMetadata,
+    previousSessionId: context.protectedMetadata?.stripe_pending_checkout_session_id || '',
   });
 
   if (!session?.client_secret || !session?.id) {
     throw new Error('Stripe did not return an embedded checkout session.');
   }
-  await persistPendingCheckout(context, session, 'embedded');
+  if (session.id !== context.protectedMetadata?.stripe_pending_checkout_session_id) await persistPendingCheckout(context, session, 'embedded');
 
   return {
     sessionId: session.id,

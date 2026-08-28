@@ -11,6 +11,7 @@ import { isIP } from 'node:net';
 import { createHash, randomUUID } from 'node:crypto';
 import { assertStrategicPlanFileSize } from '@/lib/onboarding-upload.mjs';
 import { buildSocialCorrectionRpcArgs, requireSocialCorrectionExpectedVersion } from '@/lib/socialLifecycle.mjs';
+import { requireCanaryAccountAccess } from '@/lib/account-access';
 
 async function requireCanaryActor() {
   const sessionClient = await createServerClient();
@@ -22,6 +23,7 @@ async function requireCanaryActor() {
   if (user?.app_metadata?.role === 'demo_reviewer') {
     throw new Error('Demo preparation access is read-only.');
   }
+  await requireCanaryAccountAccess({ user, admin });
   const actor = {
     id: user?.id || sessionUser.id,
     isAdmin: user?.app_metadata?.role === 'admin',

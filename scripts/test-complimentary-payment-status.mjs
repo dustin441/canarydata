@@ -5,6 +5,8 @@ import { buildBillingDocumentContext } from '../src/lib/billing-documents.js';
 
 const now = new Date('2026-08-21T00:00:00Z');
 assert.equal(isCanaryPaymentCovered('paid', null, now), true);
+assert.equal(isCanaryPaymentCovered('paid', '2027-08-18T00:00:00Z', now), true);
+assert.equal(isCanaryPaymentCovered('paid', '2026-08-20T00:00:00Z', now), false);
 assert.equal(isCanaryPaymentCovered('complimentary', '2027-08-18T00:00:00Z', now), true);
 assert.equal(isCanaryPaymentCovered('complimentary', '2026-08-20T00:00:00Z', now), false);
 assert.equal(isCanaryPaymentCovered('complimentary', null, now), false);

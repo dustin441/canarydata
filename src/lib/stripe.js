@@ -107,13 +107,15 @@ export function getCanaryCheckoutAmountLabel(contactEmail, protectedMetadata = {
 }
 
 export function resolveCheckoutExpiration(lineItem, now = new Date()) {
-  if (lineItem.isTestPurchase || lineItem.priceCents !== INTRODUCTORY_ANNUAL_PRICE_CENTS || lineItem.pricing?.locked) return null;
+  if (lineItem.isTestPurchase || lineItem.priceCents !== INTRODUCTORY_ANNUAL_PRICE_CENTS) return null;
   const nowMs = now instanceof Date ? now.getTime() : Date.parse(String(now));
-  const cutoffMs = Date.parse(PRICING_CUTOFF_AT);
+  const pricingDeadline = lineItem.pricing?.expiresAt || (lineItem.pricing?.locked ? null : PRICING_CUTOFF_AT);
+  if (!pricingDeadline) return null;
+  const cutoffMs = Date.parse(pricingDeadline);
   const remainingMs = cutoffMs - nowMs;
   if (!Number.isFinite(remainingMs) || remainingMs <= 0) return null;
   if (remainingMs < 30 * 60 * 1000) {
-    throw new Error('Card checkout is temporarily unavailable during the September 1 pricing transition. Contact Canary to complete payment before the deadline.');
+    throw new Error('Card checkout is temporarily unavailable during this pricing deadline. Contact Canary to complete payment before the deadline.');
   }
   if (remainingMs <= 24 * 60 * 60 * 1000) return Math.floor(cutoffMs / 1000);
   return null;
@@ -136,6 +138,14 @@ function checkoutMetadataParams({ organizationName, contactEmail, requestId, dis
     'metadata[canary_pricing_reason]': pricing.reason || 'test-purchase',
     'metadata[canary_pricing_locked]': pricing.locked ? 'true' : 'false',
     'metadata[canary_pricing_locked_at]': pricing.lockedAt || '',
+    'metadata[canary_pricing_expires_at]': pricing.expiresAt || '',
+    'metadata[canary_pricing_offer_code]': pricing.offerCode || '',
+    'metadata[canary_pricing_offer_status]': pricing.offerStatus || '',
+    'metadata[canary_pricing_offer_source]': pricing.offerSource || '',
+    'metadata[canary_pricing_eligibility_reference]': pricing.eligibilityReference || '',
+    'metadata[canary_pricing_lock_reason]': pricing.lockReason || '',
+    'metadata[canary_pricing_po_status]': pricing.poStatus || '',
+    'metadata[canary_pricing_po_number]': pricing.poNumber || '',
     'metadata[canary_estimate_number]': numbers.estimateNumber,
     'metadata[canary_invoice_number]': numbers.invoiceNumber,
     'metadata[canary_receipt_number]': numbers.receiptNumber,
@@ -152,6 +162,14 @@ function checkoutMetadataParams({ organizationName, contactEmail, requestId, dis
     'payment_intent_data[metadata][canary_pricing_reason]': pricing.reason || 'test-purchase',
     'payment_intent_data[metadata][canary_pricing_locked]': pricing.locked ? 'true' : 'false',
     'payment_intent_data[metadata][canary_pricing_locked_at]': pricing.lockedAt || '',
+    'payment_intent_data[metadata][canary_pricing_expires_at]': pricing.expiresAt || '',
+    'payment_intent_data[metadata][canary_pricing_offer_code]': pricing.offerCode || '',
+    'payment_intent_data[metadata][canary_pricing_offer_status]': pricing.offerStatus || '',
+    'payment_intent_data[metadata][canary_pricing_offer_source]': pricing.offerSource || '',
+    'payment_intent_data[metadata][canary_pricing_eligibility_reference]': pricing.eligibilityReference || '',
+    'payment_intent_data[metadata][canary_pricing_lock_reason]': pricing.lockReason || '',
+    'payment_intent_data[metadata][canary_pricing_po_status]': pricing.poStatus || '',
+    'payment_intent_data[metadata][canary_pricing_po_number]': pricing.poNumber || '',
     'payment_intent_data[metadata][canary_estimate_number]': numbers.estimateNumber,
     'payment_intent_data[metadata][canary_invoice_number]': numbers.invoiceNumber,
     'payment_intent_data[metadata][canary_receipt_number]': numbers.receiptNumber,
@@ -200,7 +218,7 @@ export async function ensureCanaryStripeCustomer({ contactEmail, customerId, use
   return resolvedCustomerId;
 }
 
-function checkoutIdempotencyKey(mode, { userId, districtId, customerId, lineItem }) {
+function checkoutIdempotencyKey(mode, { userId, districtId, customerId, lineItem, previousSessionId = '' }) {
   return stableStripeKey(`checkout-${mode}-v1`, [
     userId,
     districtId,
@@ -208,10 +226,11 @@ function checkoutIdempotencyKey(mode, { userId, districtId, customerId, lineItem
     lineItem.priceCents,
     lineItem.pricing?.policyVersion || 'test-purchase',
     lineItem.pricing?.reason || 'test-purchase',
+    previousSessionId || 'initial',
   ]);
 }
 
-export async function createCanaryCheckoutSession({ organizationName, contactEmail, requestId, districtId, userId, customerId, protectedMetadata = {}, origin }) {
+export async function createCanaryCheckoutSession({ organizationName, contactEmail, requestId, districtId, userId, customerId, protectedMetadata = {}, origin, previousSessionId = '' }) {
   if (!customerId || !districtId || !userId) throw new Error('Protected Canary Customer ownership is required before Checkout.');
   const cleanOrigin = String(origin || 'https://www.canarydata.media').replace(/\/$/, '');
   const now = new Date();
@@ -221,7 +240,7 @@ export async function createCanaryCheckoutSession({ organizationName, contactEma
 
   return stripeRequest('/checkout/sessions', {
     method: 'POST',
-    idempotencyKey: checkoutIdempotencyKey('hosted', { userId, districtId, customerId, lineItem }),
+    idempotencyKey: checkoutIdempotencyKey('hosted', { userId, districtId, customerId, lineItem, previousSessionId }),
     body: encodeForm({
       mode: 'payment',
       customer: customerId,
@@ -235,7 +254,7 @@ export async function createCanaryCheckoutSession({ organizationName, contactEma
   });
 }
 
-export async function createCanaryEmbeddedCheckoutSession({ organizationName, contactEmail, requestId, districtId, userId, customerId, protectedMetadata = {} }) {
+export async function createCanaryEmbeddedCheckoutSession({ organizationName, contactEmail, requestId, districtId, userId, customerId, protectedMetadata = {}, previousSessionId = '' }) {
   if (!customerId || !districtId || !userId) throw new Error('Protected Canary Customer ownership is required before Checkout.');
   const now = new Date();
   const lineItem = resolveCheckoutLineItem(contactEmail, protectedMetadata, now);
@@ -244,7 +263,7 @@ export async function createCanaryEmbeddedCheckoutSession({ organizationName, co
 
   return stripeRequest('/checkout/sessions', {
     method: 'POST',
-    idempotencyKey: checkoutIdempotencyKey('embedded', { userId, districtId, customerId, lineItem }),
+    idempotencyKey: checkoutIdempotencyKey('embedded', { userId, districtId, customerId, lineItem, previousSessionId }),
     body: encodeForm({
       mode: 'payment',
       ui_mode: 'embedded_page',

@@ -2,6 +2,7 @@ import { createClient } from '@/lib/supabase/server';
 import { createAdminClient } from '@/lib/supabase/admin';
 import { resolveCanaryPricing } from '@/lib/pricing';
 import { resolveCanaryPaymentCoverage } from '@/lib/payment-status.mjs';
+import { loadCanaryAccountAccess } from '@/lib/account-access';
 
 export async function getAuthenticatedBillingContext() {
   const supabase = await createClient();
@@ -9,11 +10,17 @@ export async function getAuthenticatedBillingContext() {
   if (!sessionUser?.id) return { user: null, districtId: null, districtName: null, email: null, onboardingRequest: null };
 
   const admin = createAdminClient();
-  const { data: { user } } = await admin.auth.admin.getUserById(sessionUser.id);
-  const protectedMetadata = { ...(sessionUser?.app_metadata || {}), ...(user?.app_metadata || {}) };
-  const displayMetadata = { ...(sessionUser?.user_metadata || {}), ...(user?.user_metadata || {}) };
+  const { data: freshUserResult, error: freshUserError } = await admin.auth.admin.getUserById(sessionUser.id);
+  const user = freshUserResult?.user;
+  if (freshUserError || !user?.id) {
+    throw new Error('Unable to verify current protected Canary account access.');
+  }
+  const protectedMetadata = { ...(user.app_metadata || {}) };
+  const displayMetadata = { ...(user.user_metadata || {}) };
   const districtId = protectedMetadata.district_id || null;
-  const email = (user?.email || sessionUser?.email || '').toLowerCase();
+  const email = String(user.email || '').toLowerCase();
+  const billingUser = user;
+  const accountAccess = await loadCanaryAccountAccess({ user: billingUser, admin });
 
   let districtName = displayMetadata.district_name || '';
   if (districtId) {
@@ -25,16 +32,8 @@ export async function getAuthenticatedBillingContext() {
     districtName = district?.name || districtName || districtId;
   }
 
-  let onboardingRequest = null;
-  if (email) {
-    const { data } = await admin
-      .from('onboarding_requests')
-      .select('id, organization_name, contact_email, payment_status, paid_through, trial_status, access_status, trial_starts_at, trial_ends_at, stripe_customer_id')
-      .eq('contact_email', email)
-      .order('created_at', { ascending: false })
-      .limit(1);
-    onboardingRequest = data?.[0] || null;
-    if (onboardingRequest) {
+  let onboardingRequest = accountAccess.onboardingRequest || null;
+  if (onboardingRequest) {
       const coverage = resolveCanaryPaymentCoverage({
         protectedStatus: protectedMetadata.payment_status,
         protectedPaidThrough: protectedMetadata.paid_through,
@@ -51,7 +50,6 @@ export async function getAuthenticatedBillingContext() {
         paid_through: coverage.paidThrough,
         trial_starts_at: protectedMetadata.trial_starts_at || onboardingRequest.trial_starts_at || null,
       };
-    }
   }
 
   if (!onboardingRequest && (protectedMetadata.trial_ends_at || protectedMetadata.payment_status || protectedMetadata.trial_status)) {
@@ -69,7 +67,6 @@ export async function getAuthenticatedBillingContext() {
     };
   }
 
-  const billingUser = user || sessionUser;
   const pricing = resolveCanaryPricing({ protectedMetadata: billingUser?.app_metadata || protectedMetadata });
-  return { user: billingUser, districtId, districtName, email, onboardingRequest, pricing };
+  return { user: billingUser, districtId, districtName, email, onboardingRequest, pricing, accountAccess };
 }

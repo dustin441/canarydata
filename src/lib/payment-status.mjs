@@ -6,7 +6,7 @@ function validFutureDate(value, now) {
 
 export function isCanaryPaymentCovered(status, paidThrough, now = new Date()) {
   const normalized = String(status || '').toLowerCase();
-  if (normalized === 'paid') return true;
+  if (normalized === 'paid') return paidThrough ? validFutureDate(paidThrough, now) : true;
   return normalized === 'complimentary' && validFutureDate(paidThrough, now);
 }
 

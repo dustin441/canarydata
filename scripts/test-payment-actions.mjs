@@ -9,7 +9,8 @@ const testable = source
   .replace("import { createCanaryCheckoutSession, createCanaryEmbeddedCheckoutSession, ensureCanaryStripeCustomer, getCanaryCheckoutAmountLabel, retrieveCheckoutSession } from '@/lib/stripe';", 'const { createCanaryCheckoutSession, createCanaryEmbeddedCheckoutSession, ensureCanaryStripeCustomer, getCanaryCheckoutAmountLabel, retrieveCheckoutSession } = globalThis.__paymentActions;')
   .replace("import { getAuthenticatedBillingContext } from '@/lib/billing';", 'const getAuthenticatedBillingContext = globalThis.__paymentActions.getAuthenticatedBillingContext;')
   .replace("import { markCanaryPaymentPaid } from '@/lib/payment-state';", 'const markCanaryPaymentPaid = globalThis.__paymentActions.markCanaryPaymentPaid;')
-  .replace("import { isCanaryPaymentCovered } from '@/lib/payment-status.mjs';", 'const isCanaryPaymentCovered = globalThis.__paymentActions.isCanaryPaymentCovered;');
+  .replace("import { isCanaryPaymentCovered } from '@/lib/payment-status.mjs';", 'const isCanaryPaymentCovered = globalThis.__paymentActions.isCanaryPaymentCovered;')
+  .replace("import { isCanaryAccountHardDenied } from '@/lib/trial-access.mjs';", 'const isCanaryAccountHardDenied = globalThis.__paymentActions.isCanaryAccountHardDenied;');
 
 const context = {
   user: { id: 'user-1', email: 'billing@district.org', app_metadata: { district_id: 'district-1' }, user_metadata: {} },
@@ -29,6 +30,7 @@ globalThis.__paymentActions = {
   retrieveCheckoutSession: async () => ({}),
   markCanaryPaymentPaid: async () => ({ ok: true }),
   isCanaryPaymentCovered: (status, paidThrough) => status === 'paid' || (status === 'complimentary' && Boolean(paidThrough) && new Date(paidThrough) > new Date()),
+  isCanaryAccountHardDenied: (metadata) => metadata?.account_enabled === false || ['revoked', 'disabled', 'suspended_security', 'terminated'].includes(metadata?.access_status),
 };
 const { createEmbeddedCanaryCheckout, saveBillingPurchaseOrder, startCanaryCheckout } = await import(`data:text/javascript;base64,${Buffer.from(testable).toString('base64')}`);
 const form = new FormData();
@@ -44,10 +46,21 @@ context.user.app_metadata.paid_through = '2099-01-01T00:00:00Z';
 await assert.rejects(() => startCanaryCheckout(), /Payment is not required/);
 await assert.rejects(() => createEmbeddedCanaryCheckout(), /Payment is not required/);
 assert.equal(stripeCustomerCalls, 0);
+context.user.app_metadata = { district_id: 'district-1', payment_status: 'pending', access_status: 'revoked' };
+await assert.rejects(() => startCanaryCheckout(), /cannot reactivate a disabled Canary account/);
+await assert.rejects(() => createEmbeddedCanaryCheckout(), /cannot reactivate a disabled Canary account/);
+await assert.rejects(() => saveBillingPurchaseOrder(form), /cannot reactivate a disabled Canary account/);
+context.user.app_metadata = { district_id: 'district-1', payment_status: 'pending', access_status: 'active' };
+context.accountAccess = { allowed: false, reason: 'account_revoked' };
+await assert.rejects(() => startCanaryCheckout(), /cannot reactivate a disabled Canary account/);
+delete context.accountAccess;
 
 assert.doesNotMatch(source, /from 'next\/headers'/);
 assert.match(source, /CANARY_APP_ORIGIN/);
 assert.match(source, /patch_canary_protected_app_metadata/);
+assert.match(source, /bind_canary_stripe_customer/);
+assert.match(source, /mode === 'embedded' \? 'embedded_page' : 'hosted_page'/);
+assert.match(source, /session\?\.mode === 'payment'/);
 assert.match(source, /Protected Stripe Customer transactional readback verification failed/);
 assert.match(source, /Pending Stripe Checkout transactional readback verification failed/);
 

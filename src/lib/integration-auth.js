@@ -1,5 +1,6 @@
 import { createClient as createServerClient } from '@/lib/supabase/server';
 import { createAdminClient } from '@/lib/supabase/admin';
+import { requireCanaryAccountAccess } from '@/lib/account-access';
 
 export async function requireIntegrationActor(requestedDistrictId = null) {
   const sessionClient = await createServerClient();
@@ -20,6 +21,7 @@ export async function requireIntegrationActor(requestedDistrictId = null) {
 
   const appMetadata = user.app_metadata || {};
   const isAdmin = appMetadata.role === 'admin';
+  await requireCanaryAccountAccess({ user, admin });
   const permissions = Array.isArray(appMetadata.permissions) ? appMetadata.permissions : [];
   const canManageIntegrations = isAdmin || permissions.includes('manage_integrations');
   const assignedDistrictId = appMetadata.district_id || null;

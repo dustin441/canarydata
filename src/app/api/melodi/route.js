@@ -3,6 +3,7 @@ import { NextResponse } from 'next/server';
 import { createClient as createSessionClient } from '@/lib/supabase/server';
 import { createAdminClient } from '@/lib/supabase/admin';
 import { safeMelodiSourceUrl, selectMelodiContext, stableMelodiCitationId, validateMelodiAnswer } from '@/lib/melodi.mjs';
+import { loadCanaryAccountAccess } from '@/lib/account-access';
 
 export const runtime = 'nodejs';
 export const maxDuration = 60;
@@ -126,6 +127,8 @@ export async function POST(request) {
     if (userError || !userRecord?.user) return NextResponse.json({ error: 'Unable to verify Canary access.' }, { status: 403 });
     const metadata = userRecord.user.app_metadata || {};
     const isAdmin = metadata.role === 'admin';
+    const accountAccess = await loadCanaryAccountAccess({ user: userRecord.user, admin });
+    if (!accountAccess.allowed) return NextResponse.json({ error: 'Your Canary access period has ended.' }, { status: 403 });
     const assignedDistrictId = metadata.district_id || null;
     if (process.env.MELODI_QA_MODE === 'true' && !isAdmin) {
       return NextResponse.json({ error: 'MELODI is currently available to Canary reviewers only.' }, { status: 403 });

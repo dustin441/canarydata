@@ -109,6 +109,7 @@ async function compileActionsHarness({
       validateSearchQueryText: (value) => value,
     },
     '@/lib/onboarding-upload.mjs': { assertStrategicPlanFileSize() {} },
+    '@/lib/account-access': { requireCanaryAccountAccess: async () => ({ allowed: true }) },
     '@/lib/socialLifecycle.mjs': lifecycle,
   };
   const bindings = await loadBindings();

@@ -5,6 +5,7 @@ import { startCanaryCheckout } from './actions';
 import { getAuthenticatedBillingContext } from '@/lib/billing';
 import { getCanaryCheckoutAmountLabel } from '@/lib/stripe';
 import { isCanaryComplimentary, isCanaryPaymentCovered } from '@/lib/payment-status.mjs';
+import { isCanaryAccountHardDenied } from '@/lib/trial-access.mjs';
 
 export const metadata = {
   title: 'Canary Data Payment | Annual Access',
@@ -12,12 +13,13 @@ export const metadata = {
 };
 
 export default async function PaymentPage() {
-  const { user, districtId, districtName, email, onboardingRequest } = await getAuthenticatedBillingContext();
+  const { user, districtId, districtName, email, onboardingRequest, accountAccess } = await getAuthenticatedBillingContext();
   if (!user) redirect('/login?redirect_to=/payment');
+  if (accountAccess?.reason === 'account_revoked' || isCanaryAccountHardDenied(user.app_metadata || {})) redirect('/dashboard');
 
   const organizationName = districtName || onboardingRequest?.organization_name || '';
-  const paymentStatus = onboardingRequest?.payment_status;
-  const paidThrough = onboardingRequest?.paid_through || user?.app_metadata?.paid_through || null;
+  const paymentStatus = user?.app_metadata?.payment_status || onboardingRequest?.payment_status;
+  const paidThrough = user?.app_metadata?.paid_through || onboardingRequest?.paid_through || null;
   const paymentCovered = isCanaryPaymentCovered(paymentStatus, paidThrough);
   const complimentary = isCanaryComplimentary(paymentStatus) && paymentCovered;
   const amountLabel = getCanaryCheckoutAmountLabel(email, user?.app_metadata || {});

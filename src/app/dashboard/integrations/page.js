@@ -3,6 +3,7 @@ import { createClient } from '@/lib/supabase/server';
 import { createAdminClient } from '@/lib/supabase/admin';
 import { getDistricts } from '@/lib/data';
 import MetaIntegrationClient from './MetaIntegrationClient';
+import { loadCanaryAccountAccess } from '@/lib/account-access';
 
 export default async function IntegrationsPage({ searchParams }) {
   const params = await searchParams;
@@ -13,6 +14,8 @@ export default async function IntegrationsPage({ searchParams }) {
   const admin = createAdminClient();
   const { data: { user } } = await admin.auth.admin.getUserById(sessionUser.id);
   const isAdmin = user?.app_metadata?.role === 'admin';
+  const access = await loadCanaryAccountAccess({ user, admin });
+  if (!access.allowed) redirect('/dashboard');
   const permissions = Array.isArray(user?.app_metadata?.permissions) ? user.app_metadata.permissions : [];
   if (!isAdmin && !permissions.includes('manage_integrations')) redirect('/dashboard');
   const assignedDistrictId = user?.app_metadata?.district_id || null;

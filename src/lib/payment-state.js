@@ -1,6 +1,7 @@
 import { createAdminClient } from '@/lib/supabase/admin';
 import { resolvePaymentPricingSnapshot } from './payment-pricing.js';
 import { INTRODUCTORY_ANNUAL_PRICE_CENTS, PRICING_CUTOFF_AT, PRICING_POLICY_VERSION, resolveCanaryPricing } from './pricing.js';
+import { isCanaryAccountHardDenied } from './trial-access.mjs';
 
 function toIsoDate(value) {
   const date = value instanceof Date ? value : new Date(value);
@@ -26,12 +27,15 @@ async function validateOnboardingOwnership(supabase, { requestId, userEmail, org
   if (!requestId) return null;
   const { data: onboarding, error } = await supabase
     .from('onboarding_requests')
-    .select('id, contact_email, organization_name')
+    .select('id, contact_email, organization_name, access_status')
     .eq('id', requestId)
     .eq('contact_email', userEmail)
     .maybeSingle();
   if (error || !onboarding) {
     throw new Error(`Stripe session ${sessionId} onboarding request does not match its protected Canary user.`);
+  }
+  if (isCanaryAccountHardDenied({ access_status: onboarding.access_status })) {
+    throw new Error(`Stripe session ${sessionId} cannot reactivate a disabled Canary onboarding account.`);
   }
   const expectedOrganization = String(organizationName || '').trim();
   if (expectedOrganization && String(onboarding.organization_name || '').trim() !== expectedOrganization) {
@@ -55,11 +59,50 @@ export async function markCanaryPaymentPaid({ session, eventId = '' } = {}) {
   if (!userId) return { ok: false, reason: 'missing_user_id' };
 
   const supabase = createAdminClient();
+  const sessionDistrictId = String(session.metadata?.district_id || '');
+  const replayCustomer = sessionCustomer(session);
+  const { data: existingFulfillment, error: existingError } = await supabase
+    .from('canary_payment_fulfillments')
+    .select('checkout_session_id, stripe_event_id, auth_user_id, district_id, stripe_customer_id, result')
+    .eq('checkout_session_id', session.id)
+    .maybeSingle();
+  if (existingError) throw new Error(`Unable to verify prior fulfillment for Stripe session ${session.id}.`);
+  if (existingFulfillment) {
+    const ownedReplay = String(existingFulfillment.auth_user_id) === userId
+      && String(existingFulfillment.district_id) === sessionDistrictId
+      && String(existingFulfillment.stripe_customer_id) === String(replayCustomer?.id || '');
+    if (!ownedReplay || (existingFulfillment.stripe_event_id && eventId && existingFulfillment.stripe_event_id !== eventId)) {
+      throw new Error(`Stripe session ${session.id} prior fulfillment ownership does not match this event.`);
+    }
+    if (!eventId) return { ...(existingFulfillment.result || {}), alreadyProcessed: true };
+    const chargePaidAt = sessionChargeTimestamp(session);
+    if (!chargePaidAt) throw new Error(`Stripe session ${session.id} is missing an authoritative expanded charge timestamp.`);
+    const { data: replayResult, error: replayError } = await supabase.rpc('fulfill_canary_stripe_payment', {
+      p_checkout_session_id: session.id,
+      p_stripe_event_id: String(eventId),
+      p_auth_user_id: userId,
+      p_expected_email: String(session.metadata?.contact_email || '').trim().toLowerCase(),
+      p_district_id: sessionDistrictId,
+      p_customer_id: String(replayCustomer?.id || ''),
+      p_request_id: String(session.metadata?.canary_request_id || ''),
+      p_organization_name: String(session.metadata?.organization_name || '').trim(),
+      p_charge_paid_at: chargePaidAt,
+      p_is_test_purchase: session.metadata?.canary_test_purchase === 'true',
+      p_expected_app_metadata: {},
+      p_app_patch: {},
+      p_user_patch: {},
+    });
+    if (replayError || !replayResult?.ok) throw new Error(`Unable to atomically claim replay event for Stripe session ${session.id}.`);
+    return replayResult;
+  }
   const { data: userResult, error: userError } = await supabase.auth.admin.getUserById(userId);
   const user = userResult?.user;
   if (userError || !user) throw new Error(`Unable to load Canary billing user for Stripe session ${session.id}.`);
 
   const existingProtected = user.app_metadata || {};
+  if (isCanaryAccountHardDenied(existingProtected)) {
+    throw new Error(`Stripe session ${session.id} cannot reactivate a disabled Canary account.`);
+  }
   const existingDisplay = user.user_metadata || {};
   const userEmail = String(user.email || '').trim().toLowerCase();
   const sessionEmail = String(session.metadata?.contact_email || '').trim().toLowerCase();
@@ -68,7 +111,6 @@ export async function markCanaryPaymentPaid({ session, eventId = '' } = {}) {
   }
 
   const protectedDistrictId = String(existingProtected.district_id || '');
-  const sessionDistrictId = String(session.metadata?.district_id || '');
   if (!protectedDistrictId || !sessionDistrictId || sessionDistrictId !== protectedDistrictId) {
     throw new Error(`Stripe session ${session.id} district does not match its protected Canary user.`);
   }
@@ -123,7 +165,10 @@ export async function markCanaryPaymentPaid({ session, eventId = '' } = {}) {
     };
   } else {
     const accountPricing = resolveCanaryPricing({ protectedMetadata: existingProtected, now: new Date(chargePaidAt) });
-    if (accountPricing.amountCents !== snapshot.paidAmountCents || accountPricing.renewalAmountCents !== snapshot.renewalAmountCents) {
+    const legacySnapshot = snapshot.policyVersion === 'legacy-pre-cutoff-payment';
+    if (accountPricing.amountCents !== snapshot.paidAmountCents
+      || accountPricing.renewalAmountCents !== snapshot.renewalAmountCents
+      || (!legacySnapshot && String(accountPricing.reason || '') !== String(snapshot.reason || ''))) {
       throw new Error(`Stripe session ${session.id} pricing does not match the protected Canary account entitlement.`);
     }
     if (snapshot.paidAmountCents === INTRODUCTORY_ANNUAL_PRICE_CENTS

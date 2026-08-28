@@ -10,6 +10,7 @@ import {
 import PrintButton from './PrintButton';
 import { INTRODUCTORY_ANNUAL_PRICE_CENTS } from '@/lib/pricing';
 import { isCanaryComplimentary, isCanaryPaymentCovered } from '@/lib/payment-status.mjs';
+import { isCanaryAccountHardDenied } from '@/lib/trial-access.mjs';
 
 export const metadata = {
   title: 'Canary Data Billing Document',
@@ -82,8 +83,9 @@ export default async function BillingDocumentPage({ params }) {
 
   const context = await getAuthenticatedBillingContext();
   if (!context.user) redirect(`/login?redirect_to=/billing/${documentType}`);
+  if (context.accountAccess?.reason === 'account_revoked' || isCanaryAccountHardDenied(context.user.app_metadata || {})) redirect('/dashboard');
 
-  const paymentStatus = context.onboardingRequest?.payment_status || context.user?.app_metadata?.payment_status;
+  const paymentStatus = context.user?.app_metadata?.payment_status || context.onboardingRequest?.payment_status;
   const paidThrough = context.user?.app_metadata?.paid_through || context.onboardingRequest?.paid_through || null;
   const complimentaryAccess = isCanaryComplimentary(paymentStatus) && isCanaryPaymentCovered(paymentStatus, paidThrough);
 

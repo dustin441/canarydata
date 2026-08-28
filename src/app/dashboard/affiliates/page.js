@@ -4,10 +4,12 @@ import { createAdminClient } from '@/lib/supabase/admin';
 import { getDistricts, getPendingSocialDiscoveryCandidates, getSocialAffiliateAccounts, getSocialAffiliateClaims, getSocialAffiliatePreviews } from '@/lib/data';
 import AffiliateAccountsClient from './AffiliateAccountsClient';
 import SocialDiscoveryReviewClient from './SocialDiscoveryReviewClient';
+import { loadCanaryAccountAccess } from '@/lib/account-access';
 export default async function AffiliateAccountsPage({searchParams}){
  const params=await searchParams;const session=await createClient();const{data:{user:sessionUser}}=await session.auth.getUser();
  if(!sessionUser?.id)redirect('/login?redirect_to=/dashboard/affiliates');
  const admin=createAdminClient();const{data:{user}}=await admin.auth.admin.getUserById(sessionUser.id);if(user?.app_metadata?.role!=='admin')redirect('/dashboard');
+ const access=await loadCanaryAccountAccess({user,admin});if(!access.allowed)redirect('/dashboard');
  const districts=await getDistricts();const requested=typeof params?.districtId==='string'?params.districtId:null;const districtId=requested&&districts.some(d=>d.id===requested)?requested:null;const district=districts.find(d=>d.id===districtId);
  const [accounts,claims,discovery]=districtId?await Promise.all([getSocialAffiliateAccounts(districtId),getSocialAffiliateClaims(districtId),getPendingSocialDiscoveryCandidates(districtId)]):[[],[],{available:false,candidates:[]}];
  const previews=districtId?await getSocialAffiliatePreviews(districtId,claims):[];

@@ -54,6 +54,15 @@ assert.equal(checkout.body.customer, 'cus_owned_1');
 assert.equal(checkout.body['payment_method_types[0]'], 'card');
 assert.equal(checkout.body.customer_creation, undefined);
 assert.equal(checkout.body.success_url, 'https://www.canarydata.media/payment/success?session_id={CHECKOUT_SESSION_ID}');
+const initialCheckoutKey = checkout.options.headers['Idempotency-Key'];
+calls.length = 0;
+await createCanaryCheckoutSession({
+  organizationName: 'District 1', contactEmail: owner.contactEmail, requestId: 'req-1',
+  districtId: owner.districtId, userId: owner.userId, customerId: 'cus_owned_1', protectedMetadata: {},
+  origin: 'https://www.canarydata.media', previousSessionId: 'cs_expired_1',
+});
+const replacementCheckout = calls.find((call) => call.path === '/v1/checkout/sessions');
+assert.notEqual(replacementCheckout.options.headers['Idempotency-Key'], initialCheckoutKey, 'an expired pending Session must produce a fresh replacement key');
 
 await assert.rejects(
   () => createCanaryCheckoutSession({ ...owner, contactEmail: owner.contactEmail, customerId: '', protectedMetadata: {}, origin: 'https://www.canarydata.media' }),

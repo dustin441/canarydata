@@ -9,18 +9,25 @@ const source = await readFile(new URL('../src/lib/payment-state.js', import.meta
 const testable = source
   .replace("import { createAdminClient } from '@/lib/supabase/admin';", 'const createAdminClient = () => globalThis.__paymentStateAdmin;')
   .replace("import { resolvePaymentPricingSnapshot } from './payment-pricing.js';", 'const resolvePaymentPricingSnapshot = globalThis.__resolvePaymentPricingSnapshot;')
-  .replace("import { INTRODUCTORY_ANNUAL_PRICE_CENTS, PRICING_CUTOFF_AT, PRICING_POLICY_VERSION, resolveCanaryPricing } from './pricing.js';", 'const { INTRODUCTORY_ANNUAL_PRICE_CENTS, PRICING_CUTOFF_AT, PRICING_POLICY_VERSION, resolveCanaryPricing } = globalThis.__pricing;');
+  .replace("import { INTRODUCTORY_ANNUAL_PRICE_CENTS, PRICING_CUTOFF_AT, PRICING_POLICY_VERSION, resolveCanaryPricing } from './pricing.js';", 'const { INTRODUCTORY_ANNUAL_PRICE_CENTS, PRICING_CUTOFF_AT, PRICING_POLICY_VERSION, resolveCanaryPricing } = globalThis.__pricing;')
+  .replace("import { isCanaryAccountHardDenied } from './trial-access.mjs';", 'const isCanaryAccountHardDenied = globalThis.__isCanaryAccountHardDenied;');
+globalThis.__isCanaryAccountHardDenied = (metadata) => metadata?.account_enabled === false || ['revoked', 'disabled', 'suspended_security', 'terminated'].includes(metadata?.access_status);
 globalThis.__resolvePaymentPricingSnapshot = resolvePaymentPricingSnapshot;
 globalThis.__pricing = { INTRODUCTORY_ANNUAL_PRICE_CENTS, PRICING_CUTOFF_AT, PRICING_POLICY_VERSION, resolveCanaryPricing };
 const { markCanaryPaymentPaid } = await import(`data:text/javascript;base64,${Buffer.from(testable).toString('base64')}`);
 
-function adminFor(user, { onboarding = null, onboardingError = null, rpcResult = { ok: true, alreadyProcessed: false, onboardingUpdated: false, testPurchase: true }, rpcError = null } = {}) {
+function adminFor(user, { onboarding = null, onboardingError = null, existingFulfillment = null, fulfillmentError = null, rpcResult = { ok: true, alreadyProcessed: false, onboardingUpdated: false, testPurchase: true }, rpcError = null } = {}) {
   const rpcCalls = [];
   const authUpdates = [];
-  const chain = {
-    select: () => chain,
-    eq: () => chain,
-    maybeSingle: async () => ({ data: onboarding, error: onboardingError }),
+  const chainFor = (table) => {
+    const chain = {
+      select: () => chain,
+      eq: () => chain,
+      maybeSingle: async () => table === 'canary_payment_fulfillments'
+        ? ({ data: existingFulfillment, error: fulfillmentError })
+        : ({ data: onboarding, error: onboardingError }),
+    };
+    return chain;
   };
   return {
     rpcCalls,
@@ -29,7 +36,7 @@ function adminFor(user, { onboarding = null, onboardingError = null, rpcResult =
       getUserById: async () => ({ data: { user }, error: null }),
       updateUserById: async (_id, payload) => { authUpdates.push(payload); return { error: null }; },
     } },
-    from: () => chain,
+    from: (table) => chainFor(table),
     rpc: async (name, params) => { rpcCalls.push({ name, params }); return { data: rpcResult, error: rpcError }; },
   };
 }
@@ -38,8 +45,10 @@ function sessionFor({
   owner = 'user-1', district = 'district-1', includeCharge = true,
   paidAt = '2026-08-31T12:00:00-07:00', testPurchase = true,
   requestId = '', sessionId = 'cs_test_1', amount = testPurchase ? 100 : 149900,
+  pricingReason = testPurchase ? 'test-purchase' : 'pre_cutoff_introductory_rate',
+  pricingLocked = false, pricingLockedAt = '', pricingExpiresAt = '',
 } = {}) {
-  const reason = testPurchase ? 'test-purchase' : 'pre_cutoff_introductory_rate';
+  const reason = pricingReason;
   return {
     id: sessionId,
     mode: 'payment',
@@ -66,7 +75,9 @@ function sessionFor({
       canary_currency: 'usd',
       canary_pricing_policy_version: testPurchase ? 'test-purchase' : '2026-09-01-v1',
       canary_pricing_reason: reason,
-      canary_pricing_locked: 'false',
+      canary_pricing_locked: pricingLocked ? 'true' : 'false',
+      canary_pricing_locked_at: pricingLockedAt,
+      canary_pricing_expires_at: pricingExpiresAt,
     },
   };
 }
@@ -96,6 +107,20 @@ assert.equal(testAdmin.rpcCalls[0].params.p_stripe_event_id, 'evt_test_1');
 assert.deepEqual(testAdmin.rpcCalls[0].params.p_expected_app_metadata, existing);
 assert.equal(testAdmin.rpcCalls[0].params.p_app_patch.payment_status, undefined);
 assert.equal(testAdmin.rpcCalls[0].params.p_app_patch.last_test_purchase_amount_cents, 100);
+
+const revokedUser = { ...user, app_metadata: { ...existing, account_enabled: false, access_status: 'revoked' } };
+const revokedAdmin = adminFor(revokedUser);
+globalThis.__paymentStateAdmin = revokedAdmin;
+await assert.rejects(() => markCanaryPaymentPaid({ session: sessionFor(), eventId: 'evt_revoked' }), /cannot reactivate a disabled Canary account/);
+assert.equal(revokedAdmin.rpcCalls.length, 0, 'disabled account fulfillment must fail before mutation');
+const revokedReplayAdmin = adminFor(revokedUser, { existingFulfillment: {
+  checkout_session_id: 'cs_test_1', stripe_event_id: 'evt_original', auth_user_id: 'user-1',
+  district_id: 'district-1', stripe_customer_id: 'cus_test_1', result: { ok: true, alreadyProcessed: false },
+}, rpcResult: { ok: true, alreadyProcessed: true } });
+globalThis.__paymentStateAdmin = revokedReplayAdmin;
+const revokedReplay = await markCanaryPaymentPaid({ session: sessionFor(), eventId: 'evt_original' });
+assert.equal(revokedReplay.alreadyProcessed, true, 'a later revocation must not turn a completed fulfillment replay into a webhook failure');
+assert.equal(revokedReplayAdmin.rpcCalls.length, 1, 'webhook replay must atomically claim or verify its Stripe event ID');
 
 for (const [label, badSession, pattern] of [
   ['missing owner', sessionFor({ owner: '' }), /customer is not owned/],
@@ -148,6 +173,31 @@ assert.equal(normalAdmin.rpcCalls.length, 1);
 assert.equal(normalAdmin.authUpdates.length, 0);
 assert.equal(normalAdmin.rpcCalls[0].params.p_request_id, 'req-1');
 assert.deepEqual(normalAdmin.rpcCalls[0].params.p_expected_app_metadata, normalUser.app_metadata);
+const revokedOnboardingAdmin = adminFor(normalUser, { onboarding: { ...onboarding, access_status: 'revoked' } });
+globalThis.__paymentStateAdmin = revokedOnboardingAdmin;
+await assert.rejects(() => markCanaryPaymentPaid({ session: sessionFor({ testPurchase: false, requestId: 'req-1' }) }), /cannot reactivate a disabled Canary onboarding account/);
+assert.equal(revokedOnboardingAdmin.rpcCalls.length, 0);
+
+const nspraProtected = {
+  district_id: 'district-1', stripe_customer_id: 'cus_test_1',
+  pricing_offer_code: 'nspra_2026', pricing_offer_status: 'eligible', pricing_offer_source: 'nspra_2026_finite_list',
+  pricing_offer_granted_at: '2026-08-28T12:00:00Z', pricing_offer_expires_at: '2026-10-01T00:00:00-07:00',
+};
+const nspraUser = { ...user, app_metadata: nspraProtected };
+const nspraAdmin = adminFor(nspraUser, {
+  rpcResult: { ok: true, alreadyProcessed: false, onboardingUpdated: false, testPurchase: false, paidAt: '2026-09-30T20:00:00.000Z', paidThrough: '2027-09-30T20:00:00.000Z' },
+});
+globalThis.__paymentStateAdmin = nspraAdmin;
+await markCanaryPaymentPaid({ session: sessionFor({
+  testPurchase: false, sessionId: 'cs_nspra', paidAt: '2026-09-30T13:00:00-07:00',
+  pricingReason: 'nspra_2026_eligible_offer', pricingLocked: true,
+  pricingLockedAt: '2026-08-28T12:00:00Z', pricingExpiresAt: '2026-10-01T00:00:00-07:00',
+}) });
+const nspraPatch = nspraAdmin.rpcCalls[0].params.p_app_patch;
+assert.equal(nspraPatch.annual_price_cents, 149900);
+assert.equal(nspraPatch.renewal_price_cents, 149900);
+assert.equal(nspraPatch.pricing_entitlement_reason, 'nspra_2026_eligible_offer');
+assert.equal(nspraPatch.pricing_lock_status, 'approved');
 
 const legacySession = sessionFor({ testPurchase: false, sessionId: 'cs_legacy_1', paidAt: '2026-08-31T12:00:00-07:00' });
 for (const key of ['canary_amount_cents', 'canary_renewal_amount_cents', 'canary_currency', 'canary_pricing_policy_version', 'canary_pricing_reason', 'canary_pricing_locked']) {
