@@ -5,6 +5,7 @@ import Link from 'next/link';
 import Image from 'next/image';
 import { discoverOnboardingProfile, submitOnboardingRequest } from '@/app/actions';
 import { assertStrategicPlanFileSize } from '@/lib/onboarding-upload.mjs';
+import { assertConfirmedOnboardingProfileQuality } from '@/lib/onboarding-discovery-quality.mjs';
 
 const fieldStyle = { marginBottom: '1rem' };
 const DRAFT_FIELDS = [
@@ -66,6 +67,7 @@ export default function Onboarding() {
     setLoading(true);
 
     try {
+      assertConfirmedOnboardingProfileQuality(draft);
       const formData = new FormData();
       appendObjectToFormData(formData, intake);
       formData.append('confirmed_profile', JSON.stringify(draft));

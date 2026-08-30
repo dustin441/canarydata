@@ -10,6 +10,7 @@ import { lookup } from 'node:dns/promises';
 import { isIP } from 'node:net';
 import { createHash, randomUUID } from 'node:crypto';
 import { assertStrategicPlanFileSize } from '@/lib/onboarding-upload.mjs';
+import { assertConfirmedOnboardingProfileQuality, findMeaningfulSnippets, sanitizeStrategicDocumentText } from '@/lib/onboarding-discovery-quality.mjs';
 import { buildSocialCorrectionRpcArgs, requireSocialCorrectionExpectedVersion } from '@/lib/socialLifecycle.mjs';
 import { requireCanaryAccountAccess } from '@/lib/account-access';
 
@@ -174,27 +175,6 @@ function compactText(value, maxLength = 900) {
   return String(value || '').replace(/\s+/g, ' ').trim().slice(0, maxLength).trim();
 }
 
-function findNearbySnippets(text, terms, max = 3) {
-  const lower = String(text || '').toLowerCase();
-  const snippets = [];
-  for (const term of terms) {
-    let cursor = 0;
-    while (snippets.length < max) {
-      const idx = lower.indexOf(term.toLowerCase(), cursor);
-      if (idx < 0) break;
-      const start = Math.max(0, idx - 120);
-      const end = Math.min(text.length, idx + 760);
-      const snippet = compactText(text.slice(start, end));
-      if (snippet && !snippets.some((existing) => existing.includes(snippet.slice(0, 120)))) {
-        snippets.push(snippet);
-      }
-      cursor = idx + term.length;
-    }
-    if (snippets.length >= max) break;
-  }
-  return snippets;
-}
-
 function extractSocialLinksFromPages(pages, baseUrl) {
   const links = new Set();
   const domains = /(facebook\.com|instagram\.com|twitter\.com|x\.com|tiktok\.com|youtube\.com|linkedin\.com)/i;
@@ -351,7 +331,7 @@ export async function discoverOnboardingProfile(formData) {
   if (strategicPlanUrl) {
     try {
       const plan = await fetchPage(strategicPlanUrl);
-      strategicDocuments.push({ label: plan.url, text: plan.text });
+      strategicDocuments.push({ label: plan.url, text: plan.text, contentType: plan.contentType });
     } catch (error) {
       errors.push(`${strategicPlanUrl}: ${error.message || 'Unable to read strategic plan'}`);
     }
@@ -366,29 +346,40 @@ export async function discoverOnboardingProfile(formData) {
         contentType: strategicPlanFile.type || '',
         name: strategicPlanFile.name || '',
       });
-      strategicDocuments.push({ label: strategicPlanFile.name || 'Uploaded strategic plan', text });
+      strategicDocuments.push({
+        label: strategicPlanFile.name || 'Uploaded strategic plan',
+        text,
+        contentType: strategicPlanFile.type || '',
+      });
     } catch (error) {
       errors.push(`${strategicPlanFile.name || 'Uploaded strategic plan'}: ${error.message || 'Unable to read document'}`);
     }
   }
 
   const websiteText = pages.map((page) => page.text).join('\n\n');
-  const strategicPlanText = strategicDocuments
-    .map((document) => document.text)
+  const strategicDocumentResults = strategicDocuments.map((document) => ({
+    ...document,
+    quality: sanitizeStrategicDocumentText(document.text, { contentType: document.contentType }),
+  }));
+  const strategicPlanText = strategicDocumentResults
+    .map((document) => document.quality.text)
+    .filter(Boolean)
     .join('\n\n')
-    .replace(/\u0000/g, '')
     .trim()
     .slice(0, 60000);
+  const strategicManualReview = strategicDocumentResults
+    .filter((document) => document.quality.needsManualReview)
+    .map((document) => `${document.label}: ${document.quality.reason}`);
   const combinedText = [websiteText, strategicPlanText].filter(Boolean).join('\n\n');
-  const missionSnippets = findNearbySnippets(combinedText, ['mission', 'vision', 'values', 'beliefs', 'we believe', 'core values'], 4);
-  const prioritySnippets = findNearbySnippets(combinedText, ['strategic plan', 'priority', 'priorities', 'goals', 'focus areas', 'board goals', 'portrait of a graduate'], 4);
+  const missionSnippets = findMeaningfulSnippets(combinedText, ['mission', 'vision', 'values', 'beliefs', 'we believe', 'core values'], 4);
+  const prioritySnippets = findMeaningfulSnippets(combinedText, ['strategic plan', 'priority', 'priorities', 'goals', 'focus areas', 'board goals', 'portrait of a graduate'], 4);
   const discoveredSocials = extractSocialLinksFromPages(pages, website);
   const discoveredSchools = extractSchoolNames(combinedText);
   const sourceUrls = [
     ...pages.map((page) => page.url),
     ...strategicDocuments.map((document) => document.label),
   ].join('\n');
-  const fetchError = errors.length ? errors.slice(0, 8).join('\n') : '';
+  const fetchError = [...errors.slice(0, 8), ...strategicManualReview].filter(Boolean).join('\n');
 
   const confirmedProfile = {
     organization_name: organizationName,
@@ -416,6 +407,7 @@ export async function discoverOnboardingProfile(formData) {
       pages_reviewed: pages.map((page) => page.url),
       strategic_plan_sources: strategicDocuments.map((document) => document.label),
       strategic_plan_characters: strategicPlanText.length,
+      strategic_plan_manual_review: strategicManualReview.length > 0,
       discovered_socials: discoveredSocials,
       mission_vision_values: missionSnippets.join('\n\n'),
       strategic_priorities: prioritySnippets.join('\n\n'),
@@ -525,6 +517,7 @@ export async function submitOnboardingRequest(formData) {
   } catch {
     confirmedProfile = {};
   }
+  assertConfirmedOnboardingProfileQuality(confirmedProfile);
   const request = {
     organization_name: cleanFormValue(formData, 'organization_name'),
     website: normalizeWebsite(formData.get('website')),
