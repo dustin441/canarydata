@@ -20,7 +20,7 @@ assert.match(client, /!userDistrictId && !isDemoReviewer && \([\s\S]*sidebar-sec
 assert.match(client, /!demoMode && !isDemoReviewer && \([\s\S]*handleNavSelect\('settings'\)/);
 assert.match(client, /if \(!noteModal \|\| isDemoReviewer\) return/);
 assert.match(client, /function openExcludeModal\(article\) \{\s*if \(isDemoReviewer\) return/);
-assert.match(client, /function handleEarnedMedia\(article, checked\) \{\s*if \(isDemoReviewer\) return/);
+assert.match(client, /function handleEarnedMedia\(article, checked\) \{\s*if \(isDemoReviewer \|\| earnedSavingIds\.has\(article\.id\)\) return/);
 assert.match(client, /Demo preparation access:/);
 assert.match(client, /districtId={userDistrictId \|\| \(isDemoReviewer \|\| demoMode \? districtFilter : ''\)}/);
 assert.match(client, /!isDemoReviewer && <button className="feedback-btn"/);

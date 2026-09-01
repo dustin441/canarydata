@@ -30,11 +30,12 @@ const ALL_COLUMNS = [
   { id: 'summary',            label: 'Summary',            defaultOn: true },
   { id: 'link',               label: 'Link',               defaultOn: true },
   { id: 'source',             label: 'Source',             defaultOn: true },
+  { id: 'source_ownership',   label: 'Source Ownership',   defaultOn: true },
   { id: 'tags',               label: 'Tags',               defaultOn: true },
   { id: 'score',              label: 'Score',              defaultOn: true },
   { id: 'innovation_reason',  label: 'Strategic Alignment', defaultOn: true  },
   { id: 'recommendation',     label: 'Recommendation',     defaultOn: true  },
-  { id: 'earned_media',       label: 'External Coverage',  defaultOn: true },
+  { id: 'earned_media',       label: 'Earned Media',       defaultOn: true },
   { id: 'notes',              label: 'Notes',              defaultOn: true },
   { id: 'query',              label: 'Source Query',       defaultOn: false },
 ];
@@ -42,8 +43,8 @@ const ALL_COLUMNS = [
 const DEFAULT_VISIBLE = new Set(
   ALL_COLUMNS.filter((c) => c.required || c.defaultOn).map((c) => c.id)
 );
-const COLUMN_PREFS_KEY = 'canary_columns_v3';
-const LEGACY_COLUMN_PREFS_KEY = 'canary_columns_v2';
+const COLUMN_PREFS_KEY = 'canary_columns_v4';
+const LEGACY_COLUMN_PREFS_KEY = 'canary_columns_v3';
 import {
   AreaChart, Area, LineChart, Line, PieChart, Pie, Cell, BarChart, Bar,
   XAxis, YAxis, CartesianGrid, Tooltip, ResponsiveContainer, Legend,
@@ -238,7 +239,8 @@ function InfoTooltip({ text }) {
 
 const SCORE_TOOLTIP = 'Canary Score (1–10) measures how coverage reflects on the district. 7–10 = positive, 3–7 = neutral, and 1–3 = concerning or critical.';
 const STRATEGIC_ALIGNMENT_TOOLTIP = 'Strategic Alignment appears only when reporting documents affirmative district action that advances a verified strategic priority. Topic similarity, crisis relevance, or district responsibility alone is not alignment.';
-const EXTERNAL_COVERAGE_TOOLTIP = 'External Coverage identifies stories published by a third-party source rather than a district-owned source. It does not claim that the communications team pitched, facilitated, or earned the story.';
+const SOURCE_OWNERSHIP_TOOLTIP = 'Source Ownership identifies who published the story. Owned means a district-controlled publisher; External means a third-party publisher.';
+const EARNED_MEDIA_TOOLTIP = 'Earned Media is External coverage the Communications team helped generate or secure through pitching, facilitating access, providing information or sources, or other direct involvement.';
 
 const HIDDEN_ROADMAP_METRIC_PATTERNS = [
   /\bVVE\b/i,
@@ -441,6 +443,7 @@ function articleCsvValue(article, columnId, { isEarned, getNoteText } = {}) {
     case 'summary': return article.summary || '';
     case 'link': return safeExternalHttpUrl(article.link) || '';
     case 'source': return article.source || formatSourceLabel(article.source_type ?? 'other');
+    case 'source_ownership': return article.is_earned_media ? 'External' : 'Owned';
     case 'tags': return canonicalTags(article.tags).join('; ');
     case 'score': return article.canary_score ?? '';
     case 'innovation_reason': return extractStrategicAlignmentLabels(article.innovation_reason).join('; ');
@@ -457,7 +460,7 @@ function articleCsvRow(article, columns, helpers = {}) {
 }
 
 const BIRD_EYE_CSV_COLUMNS = ALL_COLUMNS.filter((column) =>
-  ['date', 'headline', 'summary', 'link', 'source', 'tags', 'score', 'innovation_reason', 'earned_media'].includes(column.id)
+  ['date', 'headline', 'summary', 'link', 'source', 'source_ownership', 'tags', 'score', 'innovation_reason', 'earned_media'].includes(column.id)
 );
 
 const SOCIAL_CSV_HEADERS = [
@@ -1365,7 +1368,7 @@ function BirdEyeView({ articles, strategicGovernance, hasSelectedDistrict, selec
           <span className="kpi-change positive">{percent(strategicHitCount)} of mentions · {strategicAlignmentData.length} focus areas</span>
         </div>
         <div className="kpi-card">
-          <div className="kpi-header"><div className="kpi-label">External Coverage<InfoTooltip text={EXTERNAL_COVERAGE_TOOLTIP} /></div><div className="kpi-icon yellow">⭐</div></div>
+          <div className="kpi-header"><div className="kpi-label">Earned Media<InfoTooltip text={EARNED_MEDIA_TOOLTIP} /></div><div className="kpi-icon yellow">⭐</div></div>
           <div className="kpi-value">{earnedCount}</div>
           <span className="kpi-change positive">{percent(earnedCount)} of mentions</span>
         </div>
@@ -1398,7 +1401,7 @@ function BirdEyeView({ articles, strategicGovernance, hasSelectedDistrict, selec
               <th>Tags</th>
               <th>Score<InfoTooltip text={SCORE_TOOLTIP} /></th>
               <th>Strategic Alignment<InfoTooltip text={STRATEGIC_ALIGNMENT_TOOLTIP} /></th>
-              <th>External Coverage<InfoTooltip text={EXTERNAL_COVERAGE_TOOLTIP} /></th>
+              <th>Earned Media<InfoTooltip text={EARNED_MEDIA_TOOLTIP} /></th>
             </tr>
           </thead>
           <tbody>
@@ -1464,7 +1467,7 @@ function BirdEyeView({ articles, strategicGovernance, hasSelectedDistrict, selec
                   </td>
                   <td style={{ textAlign: 'center' }}>
                     {isEarned(article)
-                      ? <span style={{ fontSize: '0.7rem', fontWeight: 700, color: 'var(--canary-yellow)' }}>External</span>
+                      ? <span style={{ fontSize: '0.7rem', fontWeight: 700, color: 'var(--canary-yellow)' }}>Earned</span>
                       : <span style={{ color: 'var(--text-tertiary)' }}>—</span>
                     }
                   </td>
@@ -3774,6 +3777,7 @@ export default function DashboardClient({ articles, districts, queries: initialQ
       const legacySaved = localStorage.getItem(LEGACY_COLUMN_PREFS_KEY);
       if (legacySaved) {
         const next = new Set(JSON.parse(legacySaved));
+        next.add('source_ownership');
         next.add('earned_media');
         localStorage.setItem(COLUMN_PREFS_KEY, JSON.stringify([...next]));
         setVisibleColumns(next);
@@ -3927,28 +3931,56 @@ export default function DashboardClient({ articles, districts, queries: initialQ
     return article.id in noteOverrides ? noteOverrides[article.id] : article.notes;
   }, [noteOverrides]);
 
-  // Optimistic external-coverage state — tracks checkbox changes before DB confirms
+  // Optimistic communicator-earned state; source ownership remains read-only.
   const [earnedOverrides, setEarnedOverrides] = useState({});
+  const [earnedVersionOverrides, setEarnedVersionOverrides] = useState({});
+  const [earnedSavingIds, setEarnedSavingIds] = useState(() => new Set());
+  const [earnedError, setEarnedError] = useState('');
   const [, startTransition] = useTransition();
 
   function handleEarnedMedia(article, checked) {
-    if (isDemoReviewer) return;
+    if (isDemoReviewer || earnedSavingIds.has(article.id)) return;
+    if (checked && !isExternalCoverage(article)) {
+      setEarnedError('Only External coverage can be marked as Earned Media.');
+      return;
+    }
+    setEarnedError('');
     setEarnedOverrides((prev) => ({ ...prev, [article.id]: checked }));
     if (demoMode) return;
+    setEarnedSavingIds((prev) => new Set(prev).add(article.id));
     startTransition(async () => {
       try {
-        await setEarnedMedia(article.id, checked);
-      } catch {
+        const saved = await setEarnedMedia(
+          article.id,
+          checked,
+          article.id in earnedVersionOverrides ? earnedVersionOverrides[article.id] : (article.correction_version ?? 0),
+        );
+        const savedRow = Array.isArray(saved) ? saved[0] : saved;
+        if (Number.isInteger(savedRow?.correction_version)) {
+          setEarnedVersionOverrides((prev) => ({ ...prev, [article.id]: savedRow.correction_version }));
+        }
+      } catch (error) {
         // Revert on failure
         setEarnedOverrides((prev) => ({ ...prev, [article.id]: !checked }));
+        setEarnedError(error?.message || 'Unable to save the Earned Media mark.');
+      } finally {
+        setEarnedSavingIds((prev) => {
+          const next = new Set(prev);
+          next.delete(article.id);
+          return next;
+        });
       }
     });
+  }
+
+  function isExternalCoverage(article) {
+    return Boolean(article.is_earned_media);
   }
 
   function isEarned(article) {
     return article.id in earnedOverrides
       ? earnedOverrides[article.id]
-      : article.is_earned_media;
+      : Boolean(article.communications_earned);
   }
 
   const reportingArticles = useMemo(
@@ -4137,7 +4169,7 @@ export default function DashboardClient({ articles, districts, queries: initialQ
   const chartArticles = filtered;
   const articleCount = chartArticles.length;
   const notesCount = chartArticles.filter((article) => getNoteText(article)).length;
-  const earnedMediaCount = chartArticles.filter((article) => isEarned(article)).length;
+  const externalCoverageCount = chartArticles.filter((article) => isExternalCoverage(article)).length;
   const filteredNotesCount = notesCount;
   const communicationsBrief = useMemo(() => buildCommunicationsBrief(chartArticles, 3), [chartArticles]);
   const selectedCollectionHealth = useMemo(
@@ -4673,10 +4705,10 @@ export default function DashboardClient({ articles, districts, queries: initialQ
 
             <div className="kpi-card">
               <div className="kpi-header">
-                <div className="kpi-label">External Coverage<InfoTooltip text={EXTERNAL_COVERAGE_TOOLTIP} /></div>
+                <div className="kpi-label">External Coverage<InfoTooltip text={SOURCE_OWNERSHIP_TOOLTIP} /></div>
                 <div className="kpi-icon yellow">🏆</div>
               </div>
-              <div className="kpi-value">{earnedMediaCount}</div>
+              <div className="kpi-value">{externalCoverageCount}</div>
               <span className="kpi-change positive">Filtered timeframe</span>
             </div>
 
@@ -4994,6 +5026,7 @@ export default function DashboardClient({ articles, districts, queries: initialQ
               )}
             </div>
 
+            {earnedError && <div className="demo-mode-banner" role="alert">{earnedError}</div>}
             <div className="data-table-wrapper" key={`article-table-${districtFilter}-${currentView}`}>
               <table className="data-table">
                 <thead>
@@ -5003,11 +5036,12 @@ export default function DashboardClient({ articles, districts, queries: initialQ
                     {col('summary')           && <th>Summary</th>}
                     {col('link')              && <th>Link</th>}
                     {col('source')            && <th>Source</th>}
+                    {col('source_ownership')  && <th>Source Ownership<InfoTooltip text={SOURCE_OWNERSHIP_TOOLTIP} /></th>}
                     {col('tags')              && <th>Tags</th>}
                     {col('score')             && <th className="score-column">Score<InfoTooltip text={SCORE_TOOLTIP} /></th>}
                     {col('innovation_reason') && <th>Strategic Alignment<InfoTooltip text={STRATEGIC_ALIGNMENT_TOOLTIP} /></th>}
                     {col('recommendation')    && <th>Recommendation</th>}
-                    {col('earned_media')      && <th>External Coverage<InfoTooltip text={EXTERNAL_COVERAGE_TOOLTIP} /></th>}
+                    {col('earned_media')      && <th>Earned Media<InfoTooltip text={EARNED_MEDIA_TOOLTIP} /></th>}
                     {col('notes')             && <th>Notes</th>}
                     {col('query')             && <th>Source Query</th>}
                   </tr>
@@ -5080,6 +5114,20 @@ export default function DashboardClient({ articles, districts, queries: initialQ
                         </td>
                       )}
 
+                      {/* Automatic Source Ownership */}
+                      {col('source_ownership') && (
+                        <td style={{ textAlign: 'center' }}>
+                          <span style={{
+                            display: 'inline-flex', padding: '3px 9px', borderRadius: 'var(--radius-full)',
+                            fontSize: '0.7rem', fontWeight: 700,
+                            background: isExternalCoverage(article) ? 'rgba(245,197,24,0.14)' : 'var(--bg-elevated)',
+                            color: isExternalCoverage(article) ? 'var(--canary-yellow)' : 'var(--text-secondary)',
+                          }}>
+                            {isExternalCoverage(article) ? 'External' : 'Owned'}
+                          </span>
+                        </td>
+                      )}
+
                       {/* Tags */}
                       {col('tags') && (
                         <td>
@@ -5127,23 +5175,24 @@ export default function DashboardClient({ articles, districts, queries: initialQ
                         </td>
                       )}
 
-                      {/* External Coverage */}
+                      {/* Communicator Earned Media attestation */}
                       {col('earned_media') && (
                         <td style={{ textAlign: 'center' }}>
                           {isDemoReviewer ? (
                             <span style={{ fontSize: '0.7rem', fontWeight: 700, color: isEarned(article) ? 'var(--canary-yellow)' : 'var(--text-tertiary)' }}>
-                              {isEarned(article) ? 'External' : 'District-owned'}
+                              {isEarned(article) ? 'Earned' : 'Not marked'}
                             </span>
-                          ) : <label style={{ display: 'inline-flex', alignItems: 'center', gap: '6px', cursor: 'pointer' }}>
+                          ) : <label style={{ display: 'inline-flex', alignItems: 'center', gap: '6px', cursor: isExternalCoverage(article) && !earnedSavingIds.has(article.id) ? 'pointer' : 'not-allowed' }}>
                             <input
                               type="checkbox"
                               checked={isEarned(article)}
                               onChange={(e) => handleEarnedMedia(article, e.target.checked)}
-                              aria-label={`Mark ${article.headline} as external coverage`}
-                              style={{ accentColor: 'var(--canary-yellow)', width: '16px', height: '16px', cursor: 'pointer' }}
+                              disabled={!isExternalCoverage(article) || earnedSavingIds.has(article.id)}
+                              aria-label={`Mark ${article.headline} as Communications-earned coverage`}
+                              style={{ accentColor: 'var(--canary-yellow)', width: '16px', height: '16px', cursor: isExternalCoverage(article) && !earnedSavingIds.has(article.id) ? 'pointer' : 'not-allowed' }}
                             />
                             <span style={{ fontSize: '0.7rem', fontWeight: 700, color: isEarned(article) ? 'var(--canary-yellow)' : 'var(--text-tertiary)' }}>
-                              {isEarned(article) ? 'External' : 'Mark external'}
+                              {isEarned(article) ? 'Earned' : isExternalCoverage(article) ? 'Mark Earned' : 'External only'}
                             </span>
                           </label>}
                         </td>

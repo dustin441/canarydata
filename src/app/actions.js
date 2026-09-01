@@ -665,15 +665,23 @@ export async function submitOnboardingRequest(formData) {
   };
 }
 
-export async function setEarnedMedia(id, value) {
+export async function setEarnedMedia(id, value, expectedVersion) {
   const { actor, admin: supabase } = await requireCanaryActor();
   const { data: story } = await supabase.from('news_stories').select('district_id').eq('id', id).maybeSingle();
   assertDistrictAccess(actor, story?.district_id);
-  const { error } = await supabase
-    .from('news_stories')
-    .update({ is_earned_media: value })
-    .eq('id', id);
+  const normalizedVersion = Number(expectedVersion);
+  if (!Number.isInteger(normalizedVersion) || normalizedVersion < 0) {
+    throw new Error('A valid expected correction version is required.');
+  }
+  const { data, error } = await supabase.rpc('canary_set_story_communications_earned', {
+    p_actor_user_id: actor.id,
+    p_story_id: id,
+    p_value: Boolean(value),
+    p_expected_version: normalizedVersion,
+  });
   if (error) throw error;
+  revalidatePath('/dashboard');
+  return data;
 }
 
 export async function saveNote(id, notes) {

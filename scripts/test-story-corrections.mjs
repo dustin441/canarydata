@@ -33,26 +33,35 @@ assert.match(
 );
 
 const dashboard = await readFile(new URL('../src/app/dashboard/DashboardClient.js', import.meta.url), 'utf8');
-assert.match(dashboard, /canary_columns_v3/);
-assert.match(dashboard, /legacySaved[\s\S]*next\.add\('earned_media'\)/);
+assert.match(dashboard, /canary_columns_v4/);
+assert.match(dashboard, /legacySaved[\s\S]*next\.add\('source_ownership'\)[\s\S]*next\.add\('earned_media'\)/);
+assert.ok(
+  dashboard.indexOf("id: 'source'") < dashboard.indexOf("id: 'source_ownership'"),
+  'Source Ownership should remain next to Source',
+);
 assert.ok(
   dashboard.indexOf("id: 'recommendation'") < dashboard.indexOf("id: 'earned_media'"),
-  'External Coverage should remain to the right of Recommendation',
+  'Earned Media should remain to the right of Recommendation',
 );
 assert.ok(
   dashboard.indexOf("id: 'earned_media'") < dashboard.indexOf("id: 'notes'"),
-  'External Coverage should remain before Notes',
+  'Earned Media should remain before Notes',
 );
 assert.match(
   dashboard,
-  /col\('recommendation'\)[\s\S]*?<th>Recommendation<\/th>[\s\S]*?col\('earned_media'\)[\s\S]*?<th>External Coverage<InfoTooltip text=\{EXTERNAL_COVERAGE_TOOLTIP\} \/><\/th>[\s\S]*?col\('notes'\)/,
+  /col\('source'\)[\s\S]*?<th>Source<\/th>[\s\S]*?col\('source_ownership'\)[\s\S]*?<th>Source Ownership<InfoTooltip text=\{SOURCE_OWNERSHIP_TOOLTIP\} \/><\/th>/,
 );
 assert.match(
   dashboard,
-  /\{\/\* Recommendation \*\/[\s\S]*?\{\/\* External Coverage \*\/[\s\S]*?\{\/\* Notes \*\//,
+  /col\('recommendation'\)[\s\S]*?<th>Recommendation<\/th>[\s\S]*?col\('earned_media'\)[\s\S]*?<th>Earned Media<InfoTooltip text=\{EARNED_MEDIA_TOOLTIP\} \/><\/th>[\s\S]*?col\('notes'\)/,
 );
-assert.match(dashboard, /const earnedMediaCount = chartArticles\.filter\(\(article\) => isEarned\(article\)\)\.length/);
-assert.match(dashboard, /<div className="kpi-label">External Coverage<InfoTooltip text=\{EXTERNAL_COVERAGE_TOOLTIP\} \/><\/div>[\s\S]*?<div className="kpi-value">\{earnedMediaCount\}<\/div>[\s\S]*?Filtered timeframe/);
+assert.match(
+  dashboard,
+  /\{\/\* Recommendation \*\/[\s\S]*?\{\/\* Communicator Earned Media attestation \*\/[\s\S]*?\{\/\* Notes \*\//,
+);
+assert.match(dashboard, /const externalCoverageCount = chartArticles\.filter\(\(article\) => isExternalCoverage\(article\)\)\.length/);
+assert.match(dashboard, /<div className="kpi-label">External Coverage<InfoTooltip text=\{SOURCE_OWNERSHIP_TOOLTIP\} \/><\/div>[\s\S]*?<div className="kpi-value">\{externalCoverageCount\}<\/div>[\s\S]*?Filtered timeframe/);
+assert.match(dashboard, /<div className="kpi-label">Earned Media<InfoTooltip text=\{EARNED_MEDIA_TOOLTIP\} \/><\/div>/);
 assert.match(dashboard, /STRATEGIC_ALIGNMENT_TOOLTIP[\s\S]*?affirmative district action/);
 assert.match(dashboard, /formatStrategicAlignmentLabel\(label\)/);
 assert.match(dashboard, /Strategic Alignment<InfoTooltip text=\{STRATEGIC_ALIGNMENT_TOOLTIP\} \/>/);

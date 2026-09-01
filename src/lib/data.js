@@ -3,7 +3,7 @@ import { buildCollectionHealth, buildSocialCollectionHealth } from '@/lib/collec
 import { buildSocialAffiliatePreview } from '@/lib/social-affiliate-preview';
 import { mergeSocialProviderObservationMetadata } from '@/lib/social.mjs';
 
-const ARTICLE_COLUMNS = 'id, created_at, date, headline, summary, source, source_type, canary_score, tags, notes, is_earned_media, is_perched, link, district_id, innovation_reason, recommendation, source_query, canonical_url, visibility_status, manual_override, correction_version';
+const ARTICLE_COLUMNS = 'id, created_at, date, headline, summary, source, source_type, canary_score, tags, notes, is_earned_media, communications_earned, communications_earned_updated_at, communications_earned_updated_by, is_perched, link, district_id, innovation_reason, recommendation, source_query, canonical_url, visibility_status, manual_override, correction_version';
 const ARTICLE_PAGE_SIZE = 1000;
 
 export async function getArticles(districtId = null) {
