@@ -171,6 +171,7 @@ try {
     stripe: await readFile(new URL('../src/lib/stripe.js', import.meta.url), 'utf8'),
     dashboard: await readFile(new URL('../src/app/dashboard/DashboardClient.js', import.meta.url), 'utf8'),
     demo: await readFile(new URL('../src/app/demo/page.js', import.meta.url), 'utf8'),
+    globals: await readFile(new URL('../src/app/globals.css', import.meta.url), 'utf8'),
     webhook: await readFile(new URL('../src/app/api/stripe/webhook/route.js', import.meta.url), 'utf8'),
   };
   assert.doesNotMatch(files.paymentActions, /amount_due_cents:\s*149900/);
@@ -198,6 +199,8 @@ try {
   assert.match(files.demo, /resolveCanaryPricing\(\)/);
   assert.match(files.demo, /publicPricingLabel=\{formatAnnualPriceLabel\(publicPricing\.amountCents\)\}/);
   assert.match(files.demo, /publicPricingIntroductory=\{publicPricing\.amountCents === INTRODUCTORY_ANNUAL_PRICE_CENTS\}/);
+  assert.match(files.dashboard, /className="btn btn-secondary btn-sm export-csv-btn"/);
+  assert.match(files.globals, /@media \(max-width: 480px\)[\s\S]*\.topbar-right \.export-csv-btn,[\s\S]*\.topbar-right \.export-pdf-btn[\s\S]*display: none/);
   console.log('Pricing integration tests passed.');
 } finally {
   if (originalTestEmails === undefined) delete process.env.CANARY_TEST_PAYMENT_EMAILS;

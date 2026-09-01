@@ -5074,7 +5074,9 @@ input[type="date"]::-webkit-calendar-picker-indicator {
   }
 
   .topbar-right .privacy-topbar-link,
-  .topbar-right .feedback-btn {
+  .topbar-right .feedback-btn,
+  .topbar-right .export-csv-btn,
+  .topbar-right .export-pdf-btn {
     display: none;
   }
 

@@ -4448,7 +4448,7 @@ export default function DashboardClient({ articles, districts, queries: initialQ
           <div className="topbar-right">
             {currentView === 'dashboard' && (
               <button
-                className="btn btn-secondary btn-sm"
+                className="btn btn-secondary btn-sm export-csv-btn"
                 type="button"
                 onClick={handleExportCsv}
                 title="Exports the currently filtered table using your visible Columns selection."
