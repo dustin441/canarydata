@@ -229,7 +229,7 @@
     },
     "expected": {
       "summary": "Rifle Middle School created a forensic science course after a housing-related staffing challenge interrupted band instruction.",
-      "recommendation": "Explain the creative response while acknowledging the continuing band and workforce-housing challenges.",
+      "recommendation": "Explain the creative response while acknowledging the continuing band and workforce-housing challenges. Verify the details before amplification, then monitor for stakeholder questions or follow-up opportunities.",
       "sentiment": 0.25
     }
   },
@@ -461,5 +461,59 @@
       }
     },
     "expected": { "flag": false, "labels": [] }
+  },
+  {
+    "id": "recommendation-routine-is-concise-and-canonical",
+    "kind": "recommendation",
+    "input": {
+      "value": "N/A",
+      "context": { "risk": "Low", "sentiment": 0.1 }
+    },
+    "expected": "No immediate communications action recommended. Continue routine monitoring."
+  },
+  {
+    "id": "recommendation-short-positive-gets-complete-contract",
+    "kind": "recommendation",
+    "input": {
+      "value": "Amplify the student achievement.",
+      "context": { "risk": "Low", "sentiment": 0.7 }
+    },
+    "expected": "Amplify the student achievement. Verify the details before amplification, then monitor for stakeholder questions or follow-up opportunities."
+  },
+  {
+    "id": "recommendation-short-concern-gets-complete-contract",
+    "kind": "recommendation",
+    "input": {
+      "value": "Prepare a family update.",
+      "context": { "risk": "High", "sentiment": -0.6 }
+    },
+    "expected": "Prepare a family update. Confirm the relevant facts and responsible spokesperson before publishing, then monitor for stakeholder questions, misinformation, or material changes."
+  },
+  {
+    "id": "recommendation-short-neutral-gets-complete-contract",
+    "kind": "recommendation",
+    "input": {
+      "value": "Explain the project timeline and funding sources.",
+      "context": { "risk": "Low", "sentiment": 0 }
+    },
+    "expected": "Explain the project timeline and funding sources. Confirm the relevant details before publishing, then continue monitoring for stakeholder questions or material changes."
+  },
+  {
+    "id": "recommendation-complete-action-remains-unchanged",
+    "kind": "recommendation",
+    "input": {
+      "value": "Acknowledge the concern and explain the verified timeline through the district's established family channels. Continue monitoring for stakeholder questions or material changes before issuing additional updates.",
+      "context": { "risk": "Medium", "sentiment": -0.3 }
+    },
+    "expected": "Acknowledge the concern and explain the verified timeline through the district's established family channels. Continue monitoring for stakeholder questions or material changes before issuing additional updates."
+  },
+  {
+    "id": "recommendation-overlong-output-is-capped-at-complete-sentence",
+    "kind": "recommendation",
+    "input": {
+      "value": "Acknowledge the reported concern and confirm the verified timeline with district leadership before sharing any public update through established family communication channels. Coordinate the responsible spokesperson, supporting facts, and audience-specific message so staff and families receive consistent information from an authoritative district source. Monitor stakeholder questions, misinformation, media follow-up, and material changes that could require clarification or a second update through the same trusted channels. Document what was published, when it was shared, and which questions remain unresolved so the communications team can maintain continuity and avoid duplication. Add an unnecessary fifth sentence containing redundant background, repeated advice, and generic language that does not improve the district communications decision.",
+      "context": { "risk": "High", "sentiment": -0.5 }
+    },
+    "expected": "Acknowledge the reported concern and confirm the verified timeline with district leadership before sharing any public update through established family communication channels. Coordinate the responsible spokesperson, supporting facts, and audience-specific message so staff and families receive consistent information from an authoritative district source. Monitor stakeholder questions, misinformation, media follow-up, and material changes that could require clarification or a second update through the same trusted channels. Document what was published, when it was shared, and which questions remain unresolved so the communications team can maintain continuity and avoid duplication."
   }
 ]

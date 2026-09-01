@@ -185,9 +185,64 @@ function deterministicSentimentFallback(fields = {}) {
   return 0;
 }
 
+const ROUTINE_RECOMMENDATION = 'No immediate communications action recommended. Continue routine monitoring.';
+const SOURCE_REVIEW_RECOMMENDATION = 'Review the source details before taking communications action.';
+
+function recommendationString(value) {
+  if (typeof value === 'string') return value;
+  if (!value || typeof value !== 'object') return '';
+  return Object.entries(value)
+    .map(([key, entry]) => `${key.replace(/_/g, ' ')}: ${Array.isArray(entry) ? entry.join('; ') : String(entry)}`)
+    .join('\n');
+}
+
+function ensureRecommendationSentence(value) {
+  const text = String(value || '').trim();
+  return /[.!?]$/.test(text) ? text : `${text}.`;
+}
+
+function capRecommendationWords(value, maxWords = 90) {
+  const text = String(value || '').trim();
+  const words = text.split(/\s+/).filter(Boolean);
+  if (words.length <= maxWords) return text;
+  const sentences = text.match(/[^.!?]+[.!?]+/g) || [];
+  const kept = [];
+  let count = 0;
+  for (const sentence of sentences) {
+    const sentenceWords = sentence.trim().split(/\s+/).filter(Boolean).length;
+    if (count + sentenceWords > maxWords) break;
+    kept.push(sentence.trim());
+    count += sentenceWords;
+  }
+  if (kept.length) return kept.join(' ');
+  return `${words.slice(0, maxWords).join(' ')}…`;
+}
+
+export function normalizeRecommendationContract(value, context = {}) {
+  const text = recommendationString(value).replace(/\s+/g, ' ').trim();
+  if (!text || /^(n\/?a|not applicable|none|null|undefined|-)$/i.test(text)) return ROUTINE_RECOMMENDATION;
+  if (/^no immediate communications action recommended\b/i.test(text)) return ROUTINE_RECOMMENDATION;
+  if (/^review the source details before taking communications action\b/i.test(text)) return SOURCE_REVIEW_RECOMMENDATION;
+
+  const completeText = capRecommendationWords(ensureRecommendationSentence(text));
+  const words = completeText.split(/\s+/).filter(Boolean);
+  const hasMonitoringCondition = /\b(monitor|watch|track|follow[- ]?up|material changes?|stakeholder questions?|misinformation)\b/i.test(completeText);
+  if (words.length >= 18 || (words.length >= 12 && hasMonitoringCondition)) return completeText;
+
+  const sentiment = Number(context.sentiment || 0);
+  const risk = String(context.risk || context.risk_level || '').toLowerCase();
+  if (risk === 'high' || risk === 'medium' || sentiment < -0.2) {
+    return `${completeText} Confirm the relevant facts and responsible spokesperson before publishing, then monitor for stakeholder questions, misinformation, or material changes.`;
+  }
+  if (sentiment > 0.2) {
+    return `${completeText} Verify the details before amplification, then monitor for stakeholder questions or follow-up opportunities.`;
+  }
+  return `${completeText} Confirm the relevant details before publishing, then continue monitoring for stakeholder questions or material changes.`;
+}
+
 export function normalizeArticleInterpretation(ai = {}, evidence = {}) {
   const originalSummary = String(ai.summary ?? '').trim();
-  const originalRecommendation = String(ai.local_recommendation ?? ai.recommendation ?? '').trim();
+  const originalRecommendation = recommendationString(ai.local_recommendation ?? ai.recommendation);
   const monitoringExcerpt = String(evidence.monitoring_excerpt ?? evidence.snippet ?? '').trim();
   const summary = ACCESS_LIMITATION_CLAIM.test(originalSummary) && monitoringExcerpt
     ? monitoringExcerpt
@@ -218,6 +273,7 @@ export function normalizeArticleInterpretation(ai = {}, evidence = {}) {
     summary,
     recommendation,
   });
+  recommendation = normalizeRecommendationContract(recommendation, { risk: ai.risk, sentiment });
   return { summary, recommendation, sentiment };
 }
 

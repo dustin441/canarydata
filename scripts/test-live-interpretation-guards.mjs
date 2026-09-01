@@ -64,6 +64,42 @@ const noAction = runFinalizer({
 assert.equal(noAction.recommendation, 'No immediate communications action recommended. Continue routine monitoring.');
 assert.notEqual(noAction.recommendation, 'N/A');
 
+const shortPositiveRecommendation = runFinalizer({
+  summary: 'Students earned a statewide academic award.',
+  local_recommendation: 'Amplify the student achievement.',
+  sentiment: 0.7,
+  risk: 'Low',
+  tags: ['Academic Success'],
+  author: 'Reporter',
+  contact_info: 'N/A',
+}, {
+  ...basePrepared,
+  title: 'Students earn statewide academic award',
+  data: 'Students earned a statewide academic award.',
+});
+assert.equal(
+  shortPositiveRecommendation.recommendation,
+  'Amplify the student achievement. Verify the details before amplification, then monitor for stakeholder questions or follow-up opportunities.',
+);
+
+const shortConcernRecommendation = runFinalizer({
+  summary: 'A transportation disruption affected afternoon routes.',
+  local_recommendation: 'Prepare a family update.',
+  sentiment: -0.6,
+  risk: 'High',
+  tags: ['Operations & Finance'],
+  author: 'Reporter',
+  contact_info: 'N/A',
+}, {
+  ...basePrepared,
+  title: 'Transportation disruption affects routes',
+  data: 'A transportation disruption affected afternoon routes.',
+});
+assert.equal(
+  shortConcernRecommendation.recommendation,
+  'Prepare a family update. Confirm the relevant facts and responsible spokesperson before publishing, then monitor for stakeholder questions, misinformation, or material changes.',
+);
+
 const missingSentiment = runFinalizer({
   summary: 'The school created a forensic science course after a staffing challenge interrupted band instruction.',
   local_recommendation: 'Explain the creative response while acknowledging the staffing challenge.',

@@ -6,6 +6,7 @@ import {
   classifySource,
   detectSensitivePersonnelTrustIssue,
   normalizeArticleInterpretation,
+  normalizeRecommendationContract,
   validateCandidate,
 } from './canary-quality-policy.mjs';
 
@@ -34,6 +35,8 @@ for (const fixture of fixtures) {
       assert.equal(result.summary, fixture.expected.summary);
       assert.equal(result.recommendation, fixture.expected.recommendation);
       assert.equal(result.sentiment, fixture.expected.sentiment);
+    } else if (fixture.kind === 'recommendation') {
+      assert.equal(normalizeRecommendationContract(fixture.input.value, fixture.input.context), fixture.expected);
     } else if (fixture.kind === 'alignment') {
       const result = canonicalStrategicAlignment(fixture.input.ai, fixture.input.priorities, fixture.input.evidence);
       assert.equal(result.flag, fixture.expected.flag);
