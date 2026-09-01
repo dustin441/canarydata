@@ -21,6 +21,7 @@ const context = {
 };
 vm.createContext(context);
 vm.runInContext(extractFunction('normalizeEscapedRecommendationText'), context);
+vm.runInContext(extractFunction('normalizeStrategicAlignmentDisplayText'), context);
 vm.runInContext(extractFunction('formatStrategicAlignmentLabel'), context);
 vm.runInContext(extractFunction('extractStrategicAlignmentLabels'), context);
 
@@ -43,4 +44,18 @@ if (JSON.stringify(legacy) !== JSON.stringify(['Legacy Focus Area'])) {
   throw new Error(`Legacy fallback failed: ${JSON.stringify(legacy)}`);
 }
 
-console.log('PASS strategic alignment label parser');
+const singleInline = '**Safe and Supportive Schools:** The district documented a new safety practice.';
+if (context.normalizeStrategicAlignmentDisplayText(singleInline) !== '**Safe and Supportive Schools**\nThe district documented a new safety practice.') {
+  throw new Error('Single inline Strategic Alignment did not receive heading/body hierarchy.');
+}
+
+const multiInline = '**Academic Excellence** – The literacy initiative advances instruction.\n\n**Community Trust:** The district published measurable progress.';
+if (context.normalizeStrategicAlignmentDisplayText(multiInline) !== '**Academic Excellence**\nThe literacy initiative advances instruction.\n\n**Community Trust**\nThe district published measurable progress.') {
+  throw new Error('Multiple Strategic Alignments did not preserve consistent heading/body hierarchy.');
+}
+
+if (context.normalizeStrategicAlignmentDisplayText('N/A') !== 'N/A') {
+  throw new Error('N/A Strategic Alignment changed unexpectedly.');
+}
+
+console.log('PASS strategic alignment label parser and display hierarchy');

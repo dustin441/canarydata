@@ -170,6 +170,7 @@ try {
     paymentPricing: await readFile(new URL('../src/lib/payment-pricing.js', import.meta.url), 'utf8'),
     stripe: await readFile(new URL('../src/lib/stripe.js', import.meta.url), 'utf8'),
     dashboard: await readFile(new URL('../src/app/dashboard/DashboardClient.js', import.meta.url), 'utf8'),
+    demo: await readFile(new URL('../src/app/demo/page.js', import.meta.url), 'utf8'),
     webhook: await readFile(new URL('../src/app/api/stripe/webhook/route.js', import.meta.url), 'utf8'),
   };
   assert.doesNotMatch(files.paymentActions, /amount_due_cents:\s*149900/);
@@ -194,6 +195,9 @@ try {
   assert.match(files.webhook, /retrieveCheckoutSession\(eventSession\.id\)/);
   assert.doesNotMatch(files.webhook, /event\.created/);
   assert.doesNotMatch(files.dashboard, /Annual access:\s*<strong[^>]*>\$1,499/);
+  assert.match(files.demo, /resolveCanaryPricing\(\)/);
+  assert.match(files.demo, /publicPricingLabel=\{formatAnnualPriceLabel\(publicPricing\.amountCents\)\}/);
+  assert.match(files.demo, /publicPricingIntroductory=\{publicPricing\.amountCents === INTRODUCTORY_ANNUAL_PRICE_CENTS\}/);
   console.log('Pricing integration tests passed.');
 } finally {
   if (originalTestEmails === undefined) delete process.env.CANARY_TEST_PAYMENT_EMAILS;

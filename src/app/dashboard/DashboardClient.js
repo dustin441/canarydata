@@ -292,6 +292,18 @@ function normalizeEscapedRecommendationText(text) {
     .trim();
 }
 
+function normalizeStrategicAlignmentDisplayText(text) {
+  const normalized = normalizeEscapedRecommendationText(text);
+  if (!normalized) return normalized;
+  return normalized.replace(
+    /^[\t ]*\*\*([^*\n]+)\*\*[\t ]*(?:[:–—-][\t ]*)?(\S.*)$/gm,
+    (_, rawHeading, explanation) => {
+      const heading = rawHeading.replace(/:\s*$/, '').trim();
+      return `**${heading}**\n${explanation.trim()}`;
+    },
+  );
+}
+
 function safeExternalHttpUrl(value) {
   if (!value) return null;
   try {
@@ -5103,7 +5115,7 @@ export default function DashboardClient({ articles, districts, queries: initialQ
                             onSelect={setStrategicAlignmentFilter}
                           />
                           <RecommendationText
-                            text={article.innovation_reason !== 'N/A' ? article.innovation_reason : null}
+                            text={article.innovation_reason !== 'N/A' ? normalizeStrategicAlignmentDisplayText(article.innovation_reason) : null}
                           />
                         </td>
                       )}
