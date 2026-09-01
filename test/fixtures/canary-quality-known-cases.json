@@ -342,5 +342,124 @@
     "kind": "source",
     "input": { "title": "Apartments for rent near Hoover High School", "url": "https://example.com/rentals/hoover-high-school" },
     "expected": { "decision": "reject", "reason": "static_or_non_news_content" }
+  },
+  {
+    "id": "lesley-after-prom-independent-fatality",
+    "kind": "sentiment",
+    "input": {
+      "raw_sentiment": -0.9,
+      "headline": "Students from Example High killed in crash after prom",
+      "summary": "Prom had ended and the students were traveling independently in a personal vehicle. The district offered grief support.",
+      "tags": "Safety & Wellness"
+    },
+    "expected": { "sentiment": -0.1, "sensitive_personnel": false }
+  },
+  {
+    "id": "lesley-school-field-trip-fatality-preserves-concern",
+    "kind": "sentiment",
+    "input": {
+      "raw_sentiment": -0.65,
+      "headline": "Student dies during school-sponsored field trip",
+      "summary": "The fatal incident occurred while students were under district supervision on a school-sponsored trip.",
+      "tags": "Safety & Wellness"
+    },
+    "expected": { "sentiment": -0.65, "sensitive_personnel": false }
+  },
+  {
+    "id": "lesley-field-trip-negligence-requires-negative",
+    "kind": "sentiment",
+    "input": {
+      "raw_sentiment": 0.2,
+      "headline": "Student dies during school-sponsored field trip",
+      "summary": "Investigators documented negligence and failure to supervise while students were under district supervision.",
+      "tags": "Safety & Wellness"
+    },
+    "expected": { "sentiment": -0.3, "sensitive_personnel": false }
+  },
+  {
+    "id": "lesley-superintendent-off-duty-personal-dui",
+    "kind": "sentiment",
+    "input": {
+      "raw_sentiment": -0.8,
+      "headline": "Superintendent arrested for DUI Saturday night",
+      "summary": "The superintendent was off duty, driving a personal vehicle and was not on district business.",
+      "tags": "Safety & Wellness"
+    },
+    "expected": { "sentiment": -0.1, "sensitive_personnel": false }
+  },
+  {
+    "id": "lesley-superintendent-on-duty-district-vehicle-dui",
+    "kind": "sentiment",
+    "input": {
+      "raw_sentiment": -0.65,
+      "headline": "Superintendent arrested for DUI in district vehicle",
+      "summary": "The superintendent was on the clock, driving a district-owned vehicle on district business.",
+      "tags": "Safety & Wellness"
+    },
+    "expected": { "sentiment": -0.65, "sensitive_personnel": false }
+  },
+  {
+    "id": "lesley-controls-uncover-embezzlement-can-align",
+    "kind": "alignment",
+    "input": {
+      "ai": {
+        "strategic_alignment": "Financial Efficiency",
+        "alignment_explanation": "The district's strengthened internal controls and audit uncovered the embezzlement."
+      },
+      "priorities": [{ "label": "Financial Efficiency" }],
+      "evidence": {
+        "headline": "District audit uncovers embezzlement",
+        "summary": "Strengthened internal controls and a new financial review process detected the fraud."
+      }
+    },
+    "expected": { "flag": true, "labels": ["Financial Efficiency"] }
+  },
+  {
+    "id": "lesley-embezzlement-without-district-action-does-not-align",
+    "kind": "alignment",
+    "input": {
+      "ai": {
+        "strategic_alignment": "Financial Efficiency",
+        "alignment_explanation": "The incident involved district finances."
+      },
+      "priorities": [{ "label": "Financial Efficiency" }],
+      "evidence": {
+        "headline": "Employee exposes own embezzlement in social post",
+        "summary": "The fraud was discovered after the employee posted a new boat online; no district audit or control uncovered it."
+      }
+    },
+    "expected": { "flag": false, "labels": [] }
+  },
+  {
+    "id": "lesley-death-never-strategically-aligns",
+    "kind": "alignment",
+    "input": {
+      "ai": {
+        "strategic_alignment": "Safe and Supportive Schools",
+        "alignment_explanation": "The story concerns student safety."
+      },
+      "priorities": [{ "label": "Safe and Supportive Schools" }],
+      "evidence": {
+        "headline": "Student dies during school-sponsored field trip",
+        "summary": "The district is investigating the fatal incident."
+      }
+    },
+    "expected": { "flag": false, "labels": [] }
+  },
+  {
+    "id": "lesley-dui-never-strategically-aligns",
+    "kind": "alignment",
+    "input": {
+      "ai": {
+        "strategic_alignment": "Leadership",
+        "alignment_explanation": "The superintendent is a district leader."
+      },
+      "priorities": [{ "label": "Leadership" }],
+      "evidence": {
+        "headline": "Superintendent arrested for DUI in district vehicle",
+        "summary": "The incident occurred on district business."
+      }
+    },
+    "expected": { "flag": false, "labels": [] }
   }
 ]

@@ -105,15 +105,49 @@ function isProactiveTruthTelling(text) {
     && /\b(budget|funding|fiscal|legislation|financial|revenue|deficit|costs?|property tax)\b/i.test(text);
 }
 
+export function classifyInstitutionalIncident(fields = {}) {
+  const text = normalize([
+    fields.headline, fields.summary, fields.monitoring_excerpt, fields.risk,
+    fields.tags, fields.author, fields.source, fields.link,
+  ].join(' '));
+  const incident = /\b(death|died|dies|killed|fatal(?:ity)?|fatal crash|deadly crash|dui|dwi|intoxicated|drunk|arrest(?:ed)?|charged|misconduct|embezzl(?:e|ed|ement)|fraud|assault|abuse|crash|accident)\b/i.test(text);
+  const fatalityOrDeath = /\b(death|died|dies|killed|fatal(?:ity)?|fatal crash|deadly crash)\b/i.test(text);
+  const deathArrestFatality = fatalityOrDeath || /\b(arrest(?:ed)?|charged)\b/i.test(text);
+  const personalContext = /\b(off[- ]duty|personal time|personal vehicle|privately owned vehicle|away from (?:school|campus)|after hours|weekend|saturday night|sunday night|not on district business)\b/i.test(text);
+  const supervisedContext = /\b(school[- ]sponsored|district[- ]sponsored|field trip|under (?:district|school|staff) supervision|under (?:the )?(?:district|school)['’]s care|students? (?:were|was) in (?:the )?district care)\b/i.test(text);
+  const officialCapacityEvidence = /\b(on duty|on the clock|during (?:the )?workday|district[- ]owned vehicle|school[- ]owned vehicle|district vehicle|school vehicle|school bus|district business|school business|official capacity|using district (?:funds|resources|assets|equipment)|using school (?:funds|resources|assets|equipment))\b/i.test(text);
+  const officialCapacity = officialCapacityEvidence && !/\b(?:not|never) on district business\b/i.test(text);
+  const documentedFailure = /\b(neglig(?:ence|ent)|cover[- ]?up|ignored safeguards?|failed safeguards?|policy failure|failure to supervise|failed to supervise|liable|liability|district fault|school fault|district misconduct|institutional failure|violated policy|knew and failed|documented failure)\b/i.test(text);
+  const affirmativeStrategicActionEvidence = /\b(strengthen(?:ed|ing)? internal controls?|new internal controls?|financial controls?|audit(?:ed|ing)?|financial review process|compliance review|safeguards? implemented|policy reforms?|new oversight process)\b/i.test(text)
+    && /\b(uncover(?:ed)?|discover(?:ed)?|detect(?:ed)?|identified|exposed|prevent(?:ed)?|stopped)\b/i.test(text);
+  const affirmativeStrategicAction = affirmativeStrategicActionEvidence
+    && !/\b(?:no|without) (?:district )?(?:audit|internal controls?|financial controls?|review process|oversight process)\b/i.test(text);
+  return {
+    incident,
+    fatalityOrDeath,
+    deathArrestFatality,
+    personalContext,
+    supervisedContext,
+    officialCapacity,
+    institutionalNexus: supervisedContext || officialCapacity,
+    documentedFailure,
+    affirmativeStrategicAction,
+  };
+}
+
+export function shouldSuppressStrategicAlignment(context = {}) {
+  if (context.deathArrestFatality) return true;
+  return Boolean(context.incident && !context.affirmativeStrategicAction);
+}
+
 export function calibrateSentiment(rawSentiment, fields = {}) {
   let sentiment = Number(rawSentiment || 0);
   const text = normalize([
     fields.headline, fields.summary, fields.risk, fields.tags,
     fields.author, fields.source, fields.link,
   ].join(' '));
-  const personalIncident = /(teacher|educator|staff|employee|principal|coach).{0,80}(bac|dui|dwi|intoxicated|drunk|fatal crash|deadly crash|crash|killed|died|death|arrest|illness)|(?:bac|dui|dwi|intoxicated|drunk|fatal crash|deadly crash|crash|killed|died|death|arrest|illness).{0,80}(teacher|educator|staff|employee|principal|coach)/i.test(text);
+  const incidentContext = classifyInstitutionalIncident(fields);
   const griefWithoutBlame = /\b(mourns?|mourning|death|died|killed|loss of|memorial|grief)\b/i.test(text);
-  const culpability = /(district|school|board|superintendent|leadership).{0,80}(neglig|cover.?up|failed|failure|fault|liable|lawsuit|sued|policy failure|supervision|student harm|under district care|public criticism|backlash|scandal)|(neglig|cover.?up|failed|failure|fault|liable|lawsuit|sued|policy failure|supervision|student harm|under district care|public criticism|backlash|scandal).{0,80}(district|school|board|superintendent|leadership)/i.test(text);
   const sourceAuthored = isSourceAuthoredContent(text);
   const districtControlled = isDistrictControlledContent(fields);
   const routineDistrictNotice = districtControlled && isRoutineDistrictNotice(text);
@@ -121,14 +155,22 @@ export function calibrateSentiment(rawSentiment, fields = {}) {
   const proactiveTruthTelling = isProactiveTruthTelling(text);
   const sensitiveTrust = detectSensitivePersonnelTrustIssue(fields);
   if (sensitiveTrust && sentiment > -0.3) sentiment = -0.7;
-  if ((personalIncident || griefWithoutBlame) && !culpability && !sensitiveTrust) {
+  if (incidentContext.incident && incidentContext.documentedFailure) {
+    sentiment = Math.min(sentiment, -0.3);
+  } else if (incidentContext.incident && incidentContext.institutionalNexus) {
+    // Preserve the model's evidence-based concern, but never let an official-capacity
+    // incident read like a positive district achievement merely because it is relevant.
+    sentiment = Math.min(sentiment, 0.1);
+  } else if ((incidentContext.incident || griefWithoutBlame) && !sensitiveTrust) {
+    // A district nexus establishes relevance, not blame. Personal/off-duty tragedies
+    // remain neutral toward the institution unless the reporting supplies stronger facts.
     sentiment = Math.max(-0.1, Math.min(0.1, sentiment));
   }
-  if (neutralCapitalInvestment && !culpability && !sensitiveTrust && sentiment < 0) sentiment = 0;
-  if (routineDistrictNotice && !culpability && !sensitiveTrust) sentiment = 0;
-  else if (districtControlled && !culpability && !sensitiveTrust) sentiment = Math.max(-0.1, Math.min(0.25, sentiment));
-  if (proactiveTruthTelling && !culpability && !sensitiveTrust && sentiment < 0.1) sentiment = 0.1;
-  if (sourceAuthored && !culpability && !sensitiveTrust && sentiment > 0.25) sentiment = 0.25;
+  if (neutralCapitalInvestment && !incidentContext.documentedFailure && !sensitiveTrust && sentiment < 0) sentiment = 0;
+  if (routineDistrictNotice && !incidentContext.documentedFailure && !sensitiveTrust) sentiment = 0;
+  else if (districtControlled && !incidentContext.documentedFailure && !sensitiveTrust) sentiment = Math.max(-0.1, Math.min(0.25, sentiment));
+  if (proactiveTruthTelling && !incidentContext.documentedFailure && !sensitiveTrust && sentiment < 0.1) sentiment = 0.1;
+  if (sourceAuthored && !incidentContext.documentedFailure && !sensitiveTrust && sentiment > 0.25) sentiment = 0.25;
   return sentiment;
 }
 
@@ -180,7 +222,11 @@ export function normalizeArticleInterpretation(ai = {}, evidence = {}) {
 }
 
 const canonical = (value) => normalize(value).replace(/^\*\*|\*\*$/g, '').replace(/[“”]/g, '"').replace(/[’]/g, "'").replace(/\s+/g, ' ').trim();
-export function canonicalStrategicAlignment(ai, priorities = []) {
+export function canonicalStrategicAlignment(ai, priorities = [], evidence = {}) {
+  const incidentContext = classifyInstitutionalIncident(evidence);
+  if (shouldSuppressStrategicAlignment(incidentContext)) {
+    return { flag: false, labels: [], reason: 'N/A' };
+  }
   const allowed = new Map(priorities.map((priority) => [canonical(priority.label), priority.label]));
   const proposed = String(ai.strategic_alignment || '').split('|').map((part) => canonical(part)).filter(Boolean);
   if (!proposed.length || proposed.some((part) => !allowed.has(part)) || !String(ai.alignment_explanation || '').trim()) {

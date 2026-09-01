@@ -37,22 +37,25 @@ assert.match(dashboard, /canary_columns_v3/);
 assert.match(dashboard, /legacySaved[\s\S]*next\.add\('earned_media'\)/);
 assert.ok(
   dashboard.indexOf("id: 'recommendation'") < dashboard.indexOf("id: 'earned_media'"),
-  'Earned Media should return to the right side after Recommendation',
+  'External Coverage should remain to the right of Recommendation',
 );
 assert.ok(
   dashboard.indexOf("id: 'earned_media'") < dashboard.indexOf("id: 'notes'"),
-  'Earned Media should remain before Notes',
+  'External Coverage should remain before Notes',
 );
 assert.match(
   dashboard,
-  /col\('recommendation'\)[\s\S]*?<th>Recommendation<\/th>[\s\S]*?col\('earned_media'\)[\s\S]*?<th>Earned Media<\/th>[\s\S]*?col\('notes'\)/,
+  /col\('recommendation'\)[\s\S]*?<th>Recommendation<\/th>[\s\S]*?col\('earned_media'\)[\s\S]*?<th>External Coverage<InfoTooltip text=\{EXTERNAL_COVERAGE_TOOLTIP\} \/><\/th>[\s\S]*?col\('notes'\)/,
 );
 assert.match(
   dashboard,
-  /\{\/\* Recommendation \*\/[\s\S]*?\{\/\* Earned Media \*\/[\s\S]*?\{\/\* Notes \*\//,
+  /\{\/\* Recommendation \*\/[\s\S]*?\{\/\* External Coverage \*\/[\s\S]*?\{\/\* Notes \*\//,
 );
 assert.match(dashboard, /const earnedMediaCount = chartArticles\.filter\(\(article\) => isEarned\(article\)\)\.length/);
-assert.match(dashboard, /<div className="kpi-label">Earned Media<\/div>[\s\S]*?<div className="kpi-value">\{earnedMediaCount\}<\/div>[\s\S]*?Filtered timeframe/);
+assert.match(dashboard, /<div className="kpi-label">External Coverage<InfoTooltip text=\{EXTERNAL_COVERAGE_TOOLTIP\} \/><\/div>[\s\S]*?<div className="kpi-value">\{earnedMediaCount\}<\/div>[\s\S]*?Filtered timeframe/);
+assert.match(dashboard, /STRATEGIC_ALIGNMENT_TOOLTIP[\s\S]*?affirmative district action/);
+assert.match(dashboard, /formatStrategicAlignmentLabel\(label\)/);
+assert.match(dashboard, /Strategic Alignment<InfoTooltip text=\{STRATEGIC_ALIGNMENT_TOOLTIP\} \/>/);
 assert.match(dashboard, /Dashboard[\s\S]*?handleNavSelect\('birdseye'\)[\s\S]*?Bird’s Eye View[\s\S]*?handleNavSelect\('howto'\)/);
 assert.match(dashboard, /className="chart-card strategic-performance-chart"/);
 const dashboardCss = await readFile(new URL('../src/app/globals.css', import.meta.url), 'utf8');

@@ -35,7 +35,7 @@ for (const fixture of fixtures) {
       assert.equal(result.recommendation, fixture.expected.recommendation);
       assert.equal(result.sentiment, fixture.expected.sentiment);
     } else if (fixture.kind === 'alignment') {
-      const result = canonicalStrategicAlignment(fixture.input.ai, fixture.input.priorities);
+      const result = canonicalStrategicAlignment(fixture.input.ai, fixture.input.priorities, fixture.input.evidence);
       assert.equal(result.flag, fixture.expected.flag);
       assert.deepEqual(result.labels, fixture.expected.labels);
     } else if (fixture.kind === 'geography') {

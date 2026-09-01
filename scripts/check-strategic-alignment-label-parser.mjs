@@ -21,6 +21,7 @@ const context = {
 };
 vm.createContext(context);
 vm.runInContext(extractFunction('normalizeEscapedRecommendationText'), context);
+vm.runInContext(extractFunction('formatStrategicAlignmentLabel'), context);
 vm.runInContext(extractFunction('extractStrategicAlignmentLabels'), context);
 
 const santaClaraReason = '**Pillar 1: Academic Excellence and Instructional Coherence | Pillar 4: Systems, Communication, and Accountability** – The fabrication lab at Cabrillo Middle School directly exemplifies instructional coherence through innovative, hands-on learning design.';

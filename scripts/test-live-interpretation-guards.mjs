@@ -196,4 +196,82 @@ const independentWatchdog = runFinalizer({
 });
 assert.equal(independentWatchdog.sentiment, -0.7);
 
+const afterPromFatality = runFinalizer({
+  summary: 'Prom had ended and the students were traveling independently in a personal vehicle. The district offered grief support.',
+  local_recommendation: 'Support the affected families and protect student privacy.',
+  sentiment: -0.9,
+  risk: 'Medium',
+  tags: ['Safety & Wellness'],
+  strategic_alignment: 'Safe and Supportive Schools',
+  alignment_explanation: 'The story concerns students.',
+  author: 'Reporter',
+  contact_info: 'N/A',
+  relevance_score: 5,
+}, { ...basePrepared, title: 'Students from Example High killed in crash after prom' });
+assert.equal(afterPromFatality.sentiment, -0.1);
+assert.equal(afterPromFatality.innovation_flag, false);
+assert.equal(afterPromFatality.innovation_reason, 'N/A');
+assert.match(afterPromFatality.recommendation, /sensitive community tragedy/);
+
+const fieldTripFatality = runFinalizer({
+  summary: 'The fatal incident occurred while students were under district supervision on a school-sponsored field trip.',
+  local_recommendation: 'Coordinate a factual response and family support.',
+  sentiment: -0.65,
+  risk: 'High',
+  tags: ['Safety & Wellness'],
+  strategic_alignment: 'Safe and Supportive Schools',
+  alignment_explanation: 'The story concerns safety.',
+  author: 'Reporter',
+  contact_info: 'N/A',
+  relevance_score: 5,
+}, { ...basePrepared, title: 'Student dies during school-sponsored field trip' });
+assert.equal(fieldTripFatality.sentiment, -0.65);
+assert.equal(fieldTripFatality.innovation_flag, false);
+
+const personalDui = runFinalizer({
+  summary: 'The superintendent was off duty, driving a personal vehicle and was not on district business.',
+  local_recommendation: 'Monitor stakeholder reaction and distinguish personal conduct from district operations.',
+  sentiment: -0.8,
+  risk: 'Medium',
+  tags: ['Safety & Wellness'],
+  strategic_alignment: 'Leadership',
+  alignment_explanation: 'The superintendent is a district leader.',
+  author: 'Reporter',
+  contact_info: 'N/A',
+  relevance_score: 5,
+}, { ...basePrepared, title: 'Superintendent arrested for DUI Saturday night' });
+assert.equal(personalDui.sentiment, -0.1);
+assert.equal(personalDui.innovation_flag, false);
+
+const officialDui = runFinalizer({
+  summary: 'The superintendent was on the clock, driving a district-owned vehicle on district business.',
+  local_recommendation: 'Address the official-capacity conduct and district accountability.',
+  sentiment: -0.65,
+  risk: 'High',
+  tags: ['Safety & Wellness'],
+  strategic_alignment: 'Leadership',
+  alignment_explanation: 'The superintendent is a district leader.',
+  author: 'Reporter',
+  contact_info: 'N/A',
+  relevance_score: 5,
+}, { ...basePrepared, title: 'Superintendent arrested for DUI in district vehicle' });
+assert.equal(officialDui.sentiment, -0.65);
+assert.equal(officialDui.innovation_flag, false);
+
+const controlsExposeFraud = runFinalizer({
+  summary: 'Strengthened internal controls and a new financial review process detected the embezzlement.',
+  local_recommendation: 'Explain how the controls worked and what safeguards follow.',
+  sentiment: -0.35,
+  risk: 'High',
+  tags: ['Operations & Finance'],
+  strategic_alignment: 'Financial Efficiency',
+  alignment_explanation: 'The district audit and strengthened controls uncovered the fraud.',
+  author: 'Reporter',
+  contact_info: 'N/A',
+  relevance_score: 5,
+}, { ...basePrepared, title: 'District audit uncovers embezzlement' });
+assert.equal(controlsExposeFraud.sentiment, -0.1);
+assert.equal(controlsExposeFraud.innovation_flag, true);
+assert.match(controlsExposeFraud.innovation_reason, /Financial Efficiency/);
+
 console.log('Live ingestion interpretation guard checks passed.');

@@ -85,7 +85,7 @@ export default function Home() {
           <span className={styles.badge}>Awareness → Strategy → Leadership</span>
           <h2 className={styles.sectionTitle}>More than media monitoring</h2>
           <p className={styles.sectionDesc}>
-            Most monitoring tools stop at clips and mentions. Canary Data connects relevant coverage to sentiment, Strategic Alignment, earned media, and practical next steps so communicators can brief leadership with clarity.
+            Most monitoring tools stop at clips and mentions. Canary Data connects relevant coverage to sentiment, Strategic Alignment, external coverage, and practical next steps so communicators can brief leadership with clarity.
           </p>
         </div>
 
@@ -218,7 +218,7 @@ export default function Home() {
               <div className={styles.metricCard}><span>Total Mentions</span><strong>16</strong><small>Visible in the demo dashboard</small></div>
               <div className={styles.metricCard}><span>Avg. Sentiment Score</span><strong>6.6</strong><small>Concern / Neutral / Positive</small></div>
               <div className={styles.metricCard}><span>Strategic Hits</span><strong>9</strong><small>Coverage tied to district priorities</small></div>
-              <div className={styles.metricCard}><span>Earned Media</span><strong>6</strong><small>Proactive coverage wins</small></div>
+              <div className={styles.metricCard}><span>External Coverage</span><strong>6</strong><small>Third-party publisher coverage</small></div>
             </div>
 
             <div className={styles.demoColumns}>

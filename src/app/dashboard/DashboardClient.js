@@ -34,7 +34,7 @@ const ALL_COLUMNS = [
   { id: 'score',              label: 'Score',              defaultOn: true },
   { id: 'innovation_reason',  label: 'Strategic Alignment', defaultOn: true  },
   { id: 'recommendation',     label: 'Recommendation',     defaultOn: true  },
-  { id: 'earned_media',       label: 'Earned Media',       defaultOn: true },
+  { id: 'earned_media',       label: 'External Coverage',  defaultOn: true },
   { id: 'notes',              label: 'Notes',              defaultOn: true },
   { id: 'query',              label: 'Source Query',       defaultOn: false },
 ];
@@ -236,7 +236,9 @@ function InfoTooltip({ text }) {
   );
 }
 
-const SCORE_TOOLTIP = 'Canary Score (1–10) measures how positive an article is about your district. 7–10 = positive coverage, 3–7 = neutral, 1–3 = negative or critical news.';
+const SCORE_TOOLTIP = 'Canary Score (1–10) measures how coverage reflects on the district. 7–10 = positive, 3–7 = neutral, and 1–3 = concerning or critical.';
+const STRATEGIC_ALIGNMENT_TOOLTIP = 'Strategic Alignment appears only when reporting documents affirmative district action that advances a verified strategic priority. Topic similarity, crisis relevance, or district responsibility alone is not alignment.';
+const EXTERNAL_COVERAGE_TOOLTIP = 'External Coverage identifies stories published by a third-party source rather than a district-owned source. It does not claim that the communications team pitched, facilitated, or earned the story.';
 
 const HIDDEN_ROADMAP_METRIC_PATTERNS = [
   /\bVVE\b/i,
@@ -347,6 +349,16 @@ function formatDistrictName(id) {
     .join(' ');
 }
 
+function formatStrategicAlignmentLabel(value) {
+  const label = String(value || '').replace(/\s+/g, ' ').trim();
+  if (!label || /[A-Z]/.test(label)) return label;
+  const minorWords = new Set(['and', 'or', 'of', 'to', 'for', 'in', 'on', 'the', 'a', 'an']);
+  return label.split(' ').map((word, index) => {
+    if (index > 0 && minorWords.has(word)) return word;
+    return `${word.charAt(0).toUpperCase()}${word.slice(1)}`;
+  }).join(' ');
+}
+
 function extractStrategicAlignmentLabels(text) {
   if (!text || text === 'N/A') return [];
   const normalized = normalizeEscapedRecommendationText(text);
@@ -371,7 +383,7 @@ function extractStrategicAlignmentLabels(text) {
       .filter((label) => label.length <= 120)
       .filter((label) => !isHiddenRoadmapMetricLine(label))
       .filter((label) => !/^(strategic alignment|visibility intelligence|n\/a)$/i.test(label))
-      .forEach((label) => labels.push(label));
+      .forEach((label) => labels.push(formatStrategicAlignmentLabel(label)));
   });
 
   return [...new Set(labels)];
@@ -1331,17 +1343,17 @@ function BirdEyeView({ articles, strategicGovernance, hasSelectedDistrict, selec
           <span className="kpi-change positive">Filtered report set</span>
         </div>
         <div className="kpi-card">
-          <div className="kpi-header"><div className="kpi-label">Canary Score</div><div className="kpi-icon green">📈</div></div>
+          <div className="kpi-header"><div className="kpi-label">Canary Score<InfoTooltip text={SCORE_TOOLTIP} /></div><div className="kpi-icon green">📈</div></div>
           <div className="kpi-value">{reportScores.length ? (reportScores.reduce((sum, score) => sum + score, 0) / reportScores.length).toFixed(1) : 'Not available'}</div>
           <span className="kpi-change positive">Available for {reportScores.length} of {totalMentions} mentions</span>
         </div>
         <div className="kpi-card">
-          <div className="kpi-header"><div className="kpi-label">Strategic Hits</div><div className="kpi-icon blue">🎯</div></div>
+          <div className="kpi-header"><div className="kpi-label">Strategic Hits<InfoTooltip text={STRATEGIC_ALIGNMENT_TOOLTIP} /></div><div className="kpi-icon blue">🎯</div></div>
           <div className="kpi-value">{strategicHitCount}</div>
           <span className="kpi-change positive">{percent(strategicHitCount)} of mentions · {strategicAlignmentData.length} focus areas</span>
         </div>
         <div className="kpi-card">
-          <div className="kpi-header"><div className="kpi-label">Earned Media</div><div className="kpi-icon yellow">⭐</div></div>
+          <div className="kpi-header"><div className="kpi-label">External Coverage<InfoTooltip text={EXTERNAL_COVERAGE_TOOLTIP} /></div><div className="kpi-icon yellow">⭐</div></div>
           <div className="kpi-value">{earnedCount}</div>
           <span className="kpi-change positive">{percent(earnedCount)} of mentions</span>
         </div>
@@ -1372,9 +1384,9 @@ function BirdEyeView({ articles, strategicGovernance, hasSelectedDistrict, selec
               <th>Link</th>
               <th>Source</th>
               <th>Tags</th>
-              <th>Score</th>
-              <th>Strategic Alignment</th>
-              <th>Earned Media</th>
+              <th>Score<InfoTooltip text={SCORE_TOOLTIP} /></th>
+              <th>Strategic Alignment<InfoTooltip text={STRATEGIC_ALIGNMENT_TOOLTIP} /></th>
+              <th>External Coverage<InfoTooltip text={EXTERNAL_COVERAGE_TOOLTIP} /></th>
             </tr>
           </thead>
           <tbody>
@@ -1440,7 +1452,7 @@ function BirdEyeView({ articles, strategicGovernance, hasSelectedDistrict, selec
                   </td>
                   <td style={{ textAlign: 'center' }}>
                     {isEarned(article)
-                      ? <span style={{ fontSize: '0.7rem', fontWeight: 700, color: 'var(--canary-yellow)' }}>Earned</span>
+                      ? <span style={{ fontSize: '0.7rem', fontWeight: 700, color: 'var(--canary-yellow)' }}>External</span>
                       : <span style={{ color: 'var(--text-tertiary)' }}>—</span>
                     }
                   </td>
@@ -1463,7 +1475,7 @@ function StrategicAlignmentChart({ data, selectedLabel, onSelectLabel }) {
 
   return (
     <div className="chart-card strategic-performance-chart" style={{ minHeight: '320px' }}>
-      <h4>Strategic Alignment <span>Click a focus area to filter coverage</span></h4>
+      <h4>Strategic Alignment <InfoTooltip text={STRATEGIC_ALIGNMENT_TOOLTIP} /> <span>Click a focus area to filter coverage</span></h4>
       {chartData.length === 0 ? (
         <div className="empty-state" style={{ padding: '36px 16px' }}>
           <div className="empty-state-icon">🎯</div>
@@ -1665,7 +1677,7 @@ function HowItWorksView() {
           </article>
           <article>
             <span>4</span>
-            <div><strong>Show the value</strong><p>Use Bird’s Eye View to package strategic hits, earned media, supporting stories, and date-filtered evidence for leadership.</p></div>
+            <div><strong>Show the value</strong><p>Use Bird’s Eye View to package strategic hits, external coverage, supporting stories, and date-filtered evidence for leadership.</p></div>
           </article>
         </div>
         <div className="how-it-works-boundary">
@@ -3903,7 +3915,7 @@ export default function DashboardClient({ articles, districts, queries: initialQ
     return article.id in noteOverrides ? noteOverrides[article.id] : article.notes;
   }, [noteOverrides]);
 
-  // Optimistic earned media state — tracks checkbox changes before DB confirms
+  // Optimistic external-coverage state — tracks checkbox changes before DB confirms
   const [earnedOverrides, setEarnedOverrides] = useState({});
   const [, startTransition] = useTransition();
 
@@ -4649,7 +4661,7 @@ export default function DashboardClient({ articles, districts, queries: initialQ
 
             <div className="kpi-card">
               <div className="kpi-header">
-                <div className="kpi-label">Earned Media</div>
+                <div className="kpi-label">External Coverage<InfoTooltip text={EXTERNAL_COVERAGE_TOOLTIP} /></div>
                 <div className="kpi-icon yellow">🏆</div>
               </div>
               <div className="kpi-value">{earnedMediaCount}</div>
@@ -4981,9 +4993,9 @@ export default function DashboardClient({ articles, districts, queries: initialQ
                     {col('source')            && <th>Source</th>}
                     {col('tags')              && <th>Tags</th>}
                     {col('score')             && <th className="score-column">Score<InfoTooltip text={SCORE_TOOLTIP} /></th>}
-                    {col('innovation_reason') && <th>Strategic Alignment</th>}
+                    {col('innovation_reason') && <th>Strategic Alignment<InfoTooltip text={STRATEGIC_ALIGNMENT_TOOLTIP} /></th>}
                     {col('recommendation')    && <th>Recommendation</th>}
-                    {col('earned_media')      && <th>Earned Media</th>}
+                    {col('earned_media')      && <th>External Coverage<InfoTooltip text={EXTERNAL_COVERAGE_TOOLTIP} /></th>}
                     {col('notes')             && <th>Notes</th>}
                     {col('query')             && <th>Source Query</th>}
                   </tr>
@@ -5103,23 +5115,23 @@ export default function DashboardClient({ articles, districts, queries: initialQ
                         </td>
                       )}
 
-                      {/* Earned Media */}
+                      {/* External Coverage */}
                       {col('earned_media') && (
                         <td style={{ textAlign: 'center' }}>
                           {isDemoReviewer ? (
                             <span style={{ fontSize: '0.7rem', fontWeight: 700, color: isEarned(article) ? 'var(--canary-yellow)' : 'var(--text-tertiary)' }}>
-                              {isEarned(article) ? 'Earned' : 'Not marked'}
+                              {isEarned(article) ? 'External' : 'District-owned'}
                             </span>
                           ) : <label style={{ display: 'inline-flex', alignItems: 'center', gap: '6px', cursor: 'pointer' }}>
                             <input
                               type="checkbox"
                               checked={isEarned(article)}
                               onChange={(e) => handleEarnedMedia(article, e.target.checked)}
-                              aria-label={`Mark ${article.headline} as earned media`}
+                              aria-label={`Mark ${article.headline} as external coverage`}
                               style={{ accentColor: 'var(--canary-yellow)', width: '16px', height: '16px', cursor: 'pointer' }}
                             />
                             <span style={{ fontSize: '0.7rem', fontWeight: 700, color: isEarned(article) ? 'var(--canary-yellow)' : 'var(--text-tertiary)' }}>
-                              {isEarned(article) ? 'Earned' : 'Mark earned'}
+                              {isEarned(article) ? 'External' : 'Mark external'}
                             </span>
                           </label>}
                         </td>

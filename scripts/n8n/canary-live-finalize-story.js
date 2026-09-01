@@ -163,25 +163,60 @@ return $input.all().map((item, index) => {
       && /\b(budget|funding|fiscal|legislation|financial|revenue|deficit|costs?|property tax)\b/i.test(text);
   }
 
+  function classifyInstitutionalIncident(fields = {}) {
+    const text = [fields.headline, fields.summary, fields.monitoringExcerpt, fields.risk, fields.tags, fields.author, fields.source, fields.link].join(' ').toLowerCase();
+    const incident = /\b(death|died|dies|killed|fatal(?:ity)?|fatal crash|deadly crash|dui|dwi|intoxicated|drunk|arrest(?:ed)?|charged|misconduct|embezzl(?:e|ed|ement)|fraud|assault|abuse|crash|accident)\b/i.test(text);
+    const fatalityOrDeath = /\b(death|died|dies|killed|fatal(?:ity)?|fatal crash|deadly crash)\b/i.test(text);
+    const deathArrestFatality = fatalityOrDeath || /\b(arrest(?:ed)?|charged)\b/i.test(text);
+    const personalContext = /\b(off[- ]duty|personal time|personal vehicle|privately owned vehicle|away from (?:school|campus)|after hours|weekend|saturday night|sunday night|not on district business)\b/i.test(text);
+    const supervisedContext = /\b(school[- ]sponsored|district[- ]sponsored|field trip|under (?:district|school|staff) supervision|under (?:the )?(?:district|school)['’]s care|students? (?:were|was) in (?:the )?district care)\b/i.test(text);
+    const officialCapacityEvidence = /\b(on duty|on the clock|during (?:the )?workday|district[- ]owned vehicle|school[- ]owned vehicle|district vehicle|school vehicle|school bus|district business|school business|official capacity|using district (?:funds|resources|assets|equipment)|using school (?:funds|resources|assets|equipment))\b/i.test(text);
+    const officialCapacity = officialCapacityEvidence && !/\b(?:not|never) on district business\b/i.test(text);
+    const documentedFailure = /\b(neglig(?:ence|ent)|cover[- ]?up|ignored safeguards?|failed safeguards?|policy failure|failure to supervise|failed to supervise|liable|liability|district fault|school fault|district misconduct|institutional failure|violated policy|knew and failed|documented failure)\b/i.test(text);
+    const affirmativeStrategicActionEvidence = /\b(strengthen(?:ed|ing)? internal controls?|new internal controls?|financial controls?|audit(?:ed|ing)?|financial review process|compliance review|safeguards? implemented|policy reforms?|new oversight process)\b/i.test(text)
+      && /\b(uncover(?:ed)?|discover(?:ed)?|detect(?:ed)?|identified|exposed|prevent(?:ed)?|stopped)\b/i.test(text);
+    const affirmativeStrategicAction = affirmativeStrategicActionEvidence
+      && !/\b(?:no|without) (?:district )?(?:audit|internal controls?|financial controls?|review process|oversight process)\b/i.test(text);
+    return {
+      incident,
+      fatalityOrDeath,
+      deathArrestFatality,
+      personalContext,
+      supervisedContext,
+      officialCapacity,
+      institutionalNexus: supervisedContext || officialCapacity,
+      documentedFailure,
+      affirmativeStrategicAction,
+    };
+  }
+
+  function shouldSuppressStrategicAlignment(context = {}) {
+    if (context.deathArrestFatality) return true;
+    return Boolean(context.incident && !context.affirmativeStrategicAction);
+  }
+
   function calibrateSadVsBadSentiment(rawSentiment, fields = {}) {
     let s = Number(rawSentiment || 0);
     const haystack = [fields.headline, fields.summary, fields.risk, fields.tags, fields.author, fields.source, fields.link].join(' ').toLowerCase();
-    const personalIncident = /(teacher|educator|staff|employee|principal|coach).{0,80}(bac|dui|dwi|intoxicated|drunk|fatal crash|deadly crash|crash|killed|died|death|arrest|illness)|(?:bac|dui|dwi|intoxicated|drunk|fatal crash|deadly crash|crash|killed|died|death|arrest|illness).{0,80}(teacher|educator|staff|employee|principal|coach)/i.test(haystack);
+    const incidentContext = classifyInstitutionalIncident(fields);
     const griefWithoutBlame = /\b(mourns?|mourning|death|died|killed|loss of|memorial|grief)\b/i.test(haystack);
-    const districtCulpability = /(district|school|board|superintendent|leadership).{0,80}(neglig|cover.?up|failed|failure|fault|liable|lawsuit|sued|policy failure|supervision|misconduct under supervision|student harm|under district care|public criticism|backlash|scandal)|(neglig|cover.?up|failed|failure|fault|liable|lawsuit|sued|policy failure|supervision|student harm|under district care|public criticism|backlash|scandal).{0,80}(district|school|board|superintendent|leadership)/i.test(haystack);
     const districtControlled = isDistrictControlledContent(fields);
     const routineDistrictNotice = districtControlled && isRoutineDistrictNotice(haystack);
     const neutralCapitalInvestment = isNeutralCapitalInvestment(haystack);
     const sensitivePersonnelTrustIssue = detectSensitivePersonnelTrustIssue(fields);
     if (sensitivePersonnelTrustIssue && s > -0.3) s = -0.7;
-    if ((personalIncident || griefWithoutBlame) && !districtCulpability && !sensitivePersonnelTrustIssue) {
+    if (incidentContext.incident && incidentContext.documentedFailure) {
+      s = Math.min(s, -0.3);
+    } else if (incidentContext.incident && incidentContext.institutionalNexus) {
+      s = Math.min(s, 0.1);
+    } else if ((incidentContext.incident || griefWithoutBlame) && !sensitivePersonnelTrustIssue) {
       s = Math.max(-0.1, Math.min(0.1, s));
     }
-    if (neutralCapitalInvestment && !districtCulpability && !sensitivePersonnelTrustIssue && s < 0) s = 0;
-    if (routineDistrictNotice && !districtCulpability && !sensitivePersonnelTrustIssue) s = 0;
-    else if (districtControlled && !districtCulpability && !sensitivePersonnelTrustIssue) s = Math.max(-0.1, Math.min(0.25, s));
-    if (isProactiveTruthTelling(haystack) && !districtCulpability && !sensitivePersonnelTrustIssue && s < 0.1) s = 0.1;
-    if (isSourceAuthoredContent(haystack) && !districtCulpability && !sensitivePersonnelTrustIssue && s > 0.25) s = 0.25;
+    if (neutralCapitalInvestment && !incidentContext.documentedFailure && !sensitivePersonnelTrustIssue && s < 0) s = 0;
+    if (routineDistrictNotice && !incidentContext.documentedFailure && !sensitivePersonnelTrustIssue) s = 0;
+    else if (districtControlled && !incidentContext.documentedFailure && !sensitivePersonnelTrustIssue) s = Math.max(-0.1, Math.min(0.25, s));
+    if (isProactiveTruthTelling(haystack) && !incidentContext.documentedFailure && !sensitivePersonnelTrustIssue && s < 0.1) s = 0.1;
+    if (isSourceAuthoredContent(haystack) && !incidentContext.documentedFailure && !sensitivePersonnelTrustIssue && s > 0.25) s = 0.25;
     return s;
   }
 
@@ -240,11 +275,22 @@ return $input.all().map((item, index) => {
     districtId: prepared.district_id || meta.district_id || '',
     link,
   };
+  const incidentContext = classifyInstitutionalIncident({ ...sentimentFields, monitoringExcerpt });
   const sentiment = calibrateSadVsBadSentiment(rawSentiment, sentimentFields);
   const sensitivePersonnelTrustIssue = detectSensitivePersonnelTrustIssue(sentimentFields);
   const outputRisk = sensitivePersonnelTrustIssue ? 'High' : cleanJson.risk;
   const outputTags = canonicalTags(sensitivePersonnelTrustIssue ? ['Safety & Wellness'] : cleanJson.tags);
-  const outputStrategicAlignment = sensitivePersonnelTrustIssue ? { flag: false, reason: 'N/A' } : strategicAlignment;
+  const suppressStrategicAlignment = shouldSuppressStrategicAlignment(incidentContext);
+  const outputStrategicAlignment = sensitivePersonnelTrustIssue || suppressStrategicAlignment
+    ? { flag: false, reason: 'N/A' }
+    : strategicAlignment;
+  const sadWithoutInstitutionalBlame = incidentContext.fatalityOrDeath
+    && !incidentContext.institutionalNexus
+    && !incidentContext.documentedFailure
+    && !sensitivePersonnelTrustIssue;
+  if (sadWithoutInstitutionalBlame) {
+    recommendation = "Treat this as a sensitive community tragedy, not a district reputation-building opportunity. Use empathetic, factual communication; protect family privacy; coordinate approved grief-support information; avoid speculation; and monitor for material misinformation or district-related questions.";
+  }
   function inferRelevanceScore(data, riskLevel, calibratedSentiment) {
     const raw = data.relevance_score;
     const hasExplicit = raw !== undefined && raw !== null && String(raw).trim() !== '';
