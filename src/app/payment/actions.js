@@ -7,6 +7,7 @@ import { getAuthenticatedBillingContext } from '@/lib/billing';
 import { markCanaryPaymentPaid } from '@/lib/payment-state';
 import { isCanaryPaymentCovered } from '@/lib/payment-status.mjs';
 import { isCanaryAccountHardDenied } from '@/lib/trial-access.mjs';
+import { requireValidPurchaseOrder } from '@/lib/purchase-order.mjs';
 
 function requireBillingContext(context) {
   const { user, districtId, districtName, email, onboardingRequest } = context;
@@ -171,7 +172,7 @@ export async function createEmbeddedCanaryCheckout() {
 
 export async function saveBillingPurchaseOrder(formData) {
   const context = requireBillingContext(await getAuthenticatedBillingContext());
-  const poNumber = String(formData.get('po_number') || '').trim().slice(0, 80);
+  const poNumber = requireValidPurchaseOrder(formData.get('po_number'));
   const billingOrganizationName = String(formData.get('billing_organization_name') || context.organizationName || '').trim().slice(0, 160);
   const billingContactName = String(formData.get('billing_contact_name') || '').trim().slice(0, 120);
   const billingPhone = String(formData.get('billing_phone') || '').trim().slice(0, 40);
@@ -197,8 +198,32 @@ export async function saveBillingPurchaseOrder(formData) {
     amount_due_cents: context.pricing.amountCents,
   };
   if (context.organizationName) mergedMetadata.district_name = context.organizationName;
+  if (context.requestId) {
+    const { data: savedRequest, error: requestError } = await supabase
+      .from('onboarding_requests')
+      .update({
+        po_number: poNumber,
+        billing_phone: billingPhone,
+        billing_address_line1: billingAddressLine1,
+        billing_address_line2: billingAddressLine2,
+        billing_city: billingCity,
+        billing_state: billingState,
+        billing_zip: billingZip,
+      })
+      .eq('id', context.requestId)
+      .eq('contact_email', context.email)
+      .select('id')
+      .maybeSingle();
+    if (requestError || savedRequest?.id !== context.requestId) {
+      throw new Error('Unable to save the central billing and purchase-order record. Contact Canary Data.');
+    }
+  }
   const { error: updateError } = await supabase.auth.admin.updateUserById(context.user.id, { user_metadata: mergedMetadata });
-  if (updateError) throw new Error('Unable to save billing and purchase-order details.');
+  if (updateError) {
+    throw new Error(context.requestId
+      ? 'Purchase order saved centrally, but the account billing profile could not be synchronized. Contact Canary Data.'
+      : 'Unable to save billing and purchase-order details.');
+  }
   return { ok: true, poNumber, billingOrganizationName, billingContactName, billingPhone, billingAddressLine1, billingAddressLine2, billingCity, billingState, billingZip };
 }
 

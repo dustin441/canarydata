@@ -12,6 +12,7 @@ import { buildSocialDailySeries } from '@/lib/socialPerformance.mjs';
 import { resolveDemoReviewerAccess } from '@/lib/dashboard-access.mjs';
 import { loadCanaryAccountAccess } from '@/lib/account-access';
 import TrialEnded from './TrialEnded';
+import { getAdminBillingOverview } from '@/lib/admin-billing';
 
 const DASHBOARD_DATA_TIMEOUT_MS = 6500;
 
@@ -39,7 +40,7 @@ async function loadDashboardDataset(label, loader, fallback) {
   }
 }
 
-const DASHBOARD_VIEWS = new Set(['dashboard', 'birdseye', 'social', 'articles', 'queries', 'notes', 'corrections', 'clients', 'settings', 'howto', 'melodi']);
+const DASHBOARD_VIEWS = new Set(['dashboard', 'birdseye', 'social', 'articles', 'queries', 'notes', 'corrections', 'clients', 'billing', 'settings', 'howto', 'melodi']);
 const DEMO_REVIEWER_VIEWS = new Set(['dashboard', 'birdseye', 'social', 'articles', 'howto']);
 
 export default async function DashboardPage({ searchParams }) {
@@ -99,7 +100,9 @@ export default async function DashboardPage({ searchParams }) {
   });
   if (isDemoReviewer && !reviewerAccess.hasAccess) redirect('/demo?access=pending');
   const districts = isDemoReviewer ? reviewerAccess.districts : allDistricts;
-  const initialView = (isDemoReviewer ? DEMO_REVIEWER_VIEWS : DASHBOARD_VIEWS).has(requestedView) ? requestedView : 'dashboard';
+  const requestedViewAllowed = (isDemoReviewer ? DEMO_REVIEWER_VIEWS : DASHBOARD_VIEWS).has(requestedView)
+    && (requestedView !== 'billing' || isAdmin);
+  const initialView = requestedViewAllowed ? requestedView : 'dashboard';
   if (isDemoReviewer && requestedDistrictId !== reviewerAccess.selectedDistrictId) {
     redirect(`/dashboard?district=${encodeURIComponent(reviewerAccess.selectedDistrictId)}&view=${encodeURIComponent(initialView)}`);
   }
@@ -132,8 +135,9 @@ export default async function DashboardPage({ searchParams }) {
     loadDashboardDataset('Strategic priorities', () => getStrategicPriorities(dataDistrictId), []),
     isAdmin ? loadDashboardDataset('Collection health', () => getCollectionHealth(districts, dataDistrictId), []) : Promise.resolve({ data: [], warning: null }),
     isAdmin ? loadDashboardDataset('Social collection health', () => getSocialCollectionHealth(districts, dataDistrictId), []) : Promise.resolve({ data: [], warning: null }),
+    isAdmin ? loadDashboardDataset('Billing pipeline', getAdminBillingOverview, { rows: [], summary: null }) : Promise.resolve({ data: { rows: [], summary: null }, warning: null }),
   ]);
-  const [articles, queries, clients, excludedStories, correctionEvents, socialSources, socialThreads, socialMetricSnapshots, socialMetricHistory, socialReviewEvents, strategicProfiles, strategicPriorities, collectionHealth, socialCollectionHealth] = dataLoads.map((result) => result.data);
+  const [articles, queries, clients, excludedStories, correctionEvents, socialSources, socialThreads, socialMetricSnapshots, socialMetricHistory, socialReviewEvents, strategicProfiles, strategicPriorities, collectionHealth, socialCollectionHealth, adminBillingOverview] = dataLoads.map((result) => result.data);
   const enrichedSocialThreads = enrichSocialThreadsWithNativeMetrics(socialThreads, socialMetricSnapshots);
   const socialAccountMetricSummaries = Object.fromEntries(
     [...new Set(socialMetricSnapshots.map((row) => row.district_id).filter(Boolean))].map((districtId) => [
@@ -169,7 +173,7 @@ export default async function DashboardPage({ searchParams }) {
     trialEndsAt,
     paidThrough,
     billingOrganizationName: billingContext.user?.user_metadata?.billing_organization_name || billingContext.districtName || billingContext.onboardingRequest?.organization_name || billingContext.user?.user_metadata?.district_name || '',
-    poNumber: billingContext.user?.user_metadata?.po_number || '',
+    poNumber: billingContext.user?.user_metadata?.po_number || billingContext.onboardingRequest?.po_number || '',
     billingContactName: billingContext.user?.user_metadata?.billing_contact_name || '',
     billingPhone: billingContext.user?.user_metadata?.billing_phone || '',
     billingAddressLine1: billingContext.user?.user_metadata?.billing_address_line1 || '',
@@ -190,6 +194,7 @@ export default async function DashboardPage({ searchParams }) {
       districts={districts}
       queries={queries}
       clients={clients}
+      adminBillingOverview={adminBillingOverview}
       userDistrictId={dashboardUserDistrictId}
       initialDistrictId={initialDistrictId}
       initialView={initialView}

@@ -1788,7 +1788,8 @@ function SettingsView({ userDistrictId, districts, billingInfo = null, publicPri
     fd.append('billing_zip', billingZip);
     startBillingTransition(async () => {
       try {
-        await saveBillingPurchaseOrder(fd);
+        const savedBilling = await saveBillingPurchaseOrder(fd);
+        setPoNumber(savedBilling.poNumber);
         setBillingSaved(true);
       } catch (err) {
         setBillingError(err.message || 'Could not save billing details. Please try again.');
@@ -1890,7 +1891,18 @@ function SettingsView({ userDistrictId, districts, billingInfo = null, publicPri
             </div>
             <div className="form-group" style={{ marginBottom: 0 }}>
               <label className="form-label" style={{ color: 'var(--text-secondary)', fontSize: '0.85rem', marginBottom: '8px', display: 'block' }}>Purchase order number</label>
-              <input type="text" className="form-input" value={poNumber} onChange={(e) => setPoNumber(e.target.value)} placeholder="Enter PO number when your district provides it" />
+              <input
+                type="text"
+                className="form-input"
+                value={poNumber}
+                onChange={(e) => setPoNumber(e.target.value)}
+                placeholder="Example: PO-2026-1042"
+                minLength={3}
+                maxLength={80}
+                pattern="[A-Za-z0-9 ._#/\\-]*[A-Za-z0-9][A-Za-z0-9 ._#/\\-]*"
+                title="Use a district-issued PO number with letters or numbers and common separators. Placeholders such as N/A, pending, or TBD are not accepted."
+                required
+              />
             </div>
             {billingError && <p style={{ color: 'var(--status-negative)', fontSize: '0.82rem', margin: 0 }}>{billingError}</p>}
             {billingSaved && <p style={{ color: '#22C55E', fontSize: '0.82rem', margin: 0 }}>Billing details saved. Reopen documents to see the latest PO/contact details.</p>}
@@ -1997,6 +2009,69 @@ function SettingsView({ userDistrictId, districts, billingInfo = null, publicPri
             </div>
           </form>
         )}
+      </div>
+    </div>
+  );
+}
+
+function AdminBillingView({ overview = { rows: [], summary: null } }) {
+  const rows = overview?.rows || [];
+  const summary = overview?.summary;
+  const dateLabel = (value) => value
+    ? new Date(value).toLocaleDateString(undefined, { year: 'numeric', month: 'short', day: 'numeric' })
+    : '—';
+  const statusLabel = (value) => String(value || 'unknown').replaceAll('_', ' ');
+  const cards = summary ? [
+    ['Organizations', summary.organizations],
+    ['Paid', summary.paid],
+    ['Payment pending', summary.paymentPending],
+    ['Valid PO on file', summary.poValid],
+    ['PO missing / invalid', summary.poMissing + summary.poInvalid],
+    ['Active trials', summary.activeTrials],
+    ['Active access', summary.activeAccess],
+  ] : [];
+
+  return (
+    <div className="data-section">
+      <div className="data-header">
+        <div>
+          <h3>Admin billing & projections</h3>
+          <p style={{ color: 'var(--text-secondary)', fontSize: '0.85rem', margin: '6px 0 0' }}>
+            Stored lifecycle counts for planning. PO values are intentionally hidden; status indicates whether a usable-looking value is on file, not external authenticity.
+          </p>
+        </div>
+        <span style={{ fontSize: '0.85rem', color: 'var(--text-secondary)' }}>{rows.length} organizations</span>
+      </div>
+      <div style={{ display: 'grid', gridTemplateColumns: 'repeat(auto-fit, minmax(150px, 1fr))', gap: '12px', marginBottom: '24px' }}>
+        {cards.map(([label, value]) => (
+          <div key={label} style={{ background: 'var(--bg-elevated)', border: '1px solid var(--border-secondary)', borderRadius: 'var(--radius-md)', padding: '16px' }}>
+            <div style={{ color: 'var(--text-secondary)', fontSize: '0.78rem' }}>{label}</div>
+            <strong style={{ color: 'var(--text-primary)', fontSize: '1.45rem' }}>{value}</strong>
+          </div>
+        ))}
+      </div>
+      <div style={{ overflowX: 'auto' }}>
+        <table className="data-table" style={{ minWidth: '1050px' }}>
+          <thead><tr>
+            <th>Organization</th><th>PO status</th><th>Payment</th><th>Trial</th><th>Access</th>
+            <th>Trial dates</th><th>Paid date</th><th>Paid through</th>
+          </tr></thead>
+          <tbody>
+            {rows.map((billingRow) => (
+              <tr key={billingRow.id}>
+                <td style={{ fontWeight: 600, color: 'var(--text-primary)' }}>{billingRow.organizationName}</td>
+                <td>{billingRow.poState === 'valid' ? 'Valid-looking on file' : billingRow.poState === 'invalid' ? 'Needs correction' : 'Not provided'}</td>
+                <td>{statusLabel(billingRow.paymentStatus)}</td>
+                <td>{statusLabel(billingRow.trialStatus)}</td>
+                <td>{statusLabel(billingRow.accessStatus)}</td>
+                <td>{dateLabel(billingRow.trialStartsAt)} – {dateLabel(billingRow.trialEndsAt)}</td>
+                <td>{dateLabel(billingRow.paidAt)}</td>
+                <td>{dateLabel(billingRow.paidThrough)}</td>
+              </tr>
+            ))}
+            {rows.length === 0 && <tr><td colSpan="8" style={{ color: 'var(--text-secondary)', textAlign: 'center' }}>No onboarding billing records are available.</td></tr>}
+          </tbody>
+        </table>
       </div>
     </div>
   );
@@ -3743,7 +3818,7 @@ export function SocialView({ socialResults, legacySocialResults = [], socialSour
   );
 }
 
-export default function DashboardClient({ articles, districts, queries: initialQueries, clients = [], userDistrictId, initialDistrictId = null, initialView = 'dashboard', paymentNotice = null, billingInfo = null, publicPricingLabel = 'Annual access', publicPricingIntroductory = false, excludedStories = [], correctionEvents = [], socialSources = [], socialThreads = [], socialAccountMetricSummaries = {}, socialPerformanceHistory = {}, socialReviewEvents = [], strategicProfiles = [], strategicPriorities = [], collectionHealth = [], socialCollectionHealth = [], dataWarnings = [], isAdmin = false, isDemoReviewer = false, reviewerDistrictCount = 0, melodiEnabled = false, metaIntegrationEnabled = false, demoMode = false, socialReportAsOf = null }) {
+export default function DashboardClient({ articles, districts, queries: initialQueries, clients = [], adminBillingOverview = { rows: [], summary: null }, userDistrictId, initialDistrictId = null, initialView = 'dashboard', paymentNotice = null, billingInfo = null, publicPricingLabel = 'Annual access', publicPricingIntroductory = false, excludedStories = [], correctionEvents = [], socialSources = [], socialThreads = [], socialAccountMetricSummaries = {}, socialPerformanceHistory = {}, socialReviewEvents = [], strategicProfiles = [], strategicPriorities = [], collectionHealth = [], socialCollectionHealth = [], dataWarnings = [], isAdmin = false, isDemoReviewer = false, reviewerDistrictCount = 0, melodiEnabled = false, metaIntegrationEnabled = false, demoMode = false, socialReportAsOf = null }) {
   const defaultDistrictFilter = userDistrictId ?? initialDistrictId ?? districts[0]?.id ?? 'All';
   const [currentView, setCurrentView] = useState(initialView);
   const [search, setSearch] = useState('');
@@ -4375,6 +4450,15 @@ export default function DashboardClient({ articles, districts, queries: initialQ
                 Beta Testers
                 <span className="sidebar-link-badge">{clients.length}</span>
               </button>
+              <button
+                className={`sidebar-link ${currentView === 'billing' ? 'active' : ''}`}
+                onClick={() => handleNavSelect('billing')}
+                style={{ width: '100%', background: 'none', border: 'none', textAlign: 'left', cursor: 'pointer' }}
+              >
+                <span className="sidebar-link-icon">💳</span>
+                Billing & Projections
+                <span className="sidebar-link-badge">{adminBillingOverview?.summary?.organizations ?? 0}</span>
+              </button>
             </div>
           )}
           {!userDistrictId && (
@@ -4467,6 +4551,8 @@ export default function DashboardClient({ articles, districts, queries: initialQ
                         ? 'Bird’s Eye View — Leadership & Board Report'
                         : currentView === 'clients'
                         ? 'Beta Testers'
+                        : currentView === 'billing'
+                          ? 'Admin Billing & Projections'
                         : currentView === 'howto'
                           ? 'How This Works'
                           : currentView === 'articles'
@@ -4484,6 +4570,7 @@ export default function DashboardClient({ articles, districts, queries: initialQ
                   : currentView === 'corrections' ? 'Add, exclude, restore, and audit district stories'
                   : currentView === 'birdseye' ? 'Strategic Alignment themes, counts, and supporting coverage'
                   : currentView === 'clients' ? 'Login credentials for beta testers'
+                  : currentView === 'billing' ? 'Stored PO readiness, payment, trial, access, and coverage dates across organizations'
                   : currentView === 'howto' ? 'Media to decision to leadership proof'
                   : currentView === 'articles' ? 'Browse, filter, annotate, and export article-level coverage'
                   : currentView === 'social' ? 'Monthly scorecards, comparisons, highlights, and the complete official-post table'
@@ -4592,6 +4679,7 @@ export default function DashboardClient({ articles, districts, queries: initialQ
             </div>
           )}
           {currentView === 'clients' && <ClientsView clients={clients} />}
+          {isAdmin && currentView === 'billing' && <AdminBillingView overview={adminBillingOverview} />}
           {currentView === 'settings' && <SettingsView userDistrictId={userDistrictId} districts={districts} billingInfo={billingInfo} publicPricingLabel={publicPricingLabel} onPayByCard={openPaymentModal} metaIntegrationEnabled={metaIntegrationEnabled} />}
           {currentView === 'howto' && <HowItWorksView />}
           {currentView === 'social' && (

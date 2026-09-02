@@ -16,7 +16,7 @@ export async function loadCanaryAccountAccess({ user, admin, now = new Date() })
   if (email && admin) {
     let query = admin
       .from('onboarding_requests')
-      .select('id, organization_name, contact_email, payment_status, paid_through, trial_status, access_status, trial_starts_at, trial_ends_at, stripe_customer_id')
+      .select('id, organization_name, contact_email, payment_status, paid_through, trial_status, access_status, trial_starts_at, trial_ends_at, stripe_customer_id, po_number')
       .eq('contact_email', email);
     if (protectedMetadata.onboarding_request_id) query = query.eq('id', protectedMetadata.onboarding_request_id);
     const { data, error } = await query.order('created_at', { ascending: false }).limit(2);
