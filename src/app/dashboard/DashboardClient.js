@@ -297,10 +297,21 @@ function normalizeEscapedRecommendationText(text) {
 function normalizeStrategicAlignmentDisplayText(text) {
   const normalized = normalizeEscapedRecommendationText(text);
   if (!normalized) return normalized;
-  return normalized.replace(
+  // Some stored rows contain multiple complete label/explanation pairs on one
+  // physical line. The pill parser sees every bold label, but the expanded view
+  // previously promoted only the first start-of-line label to a section heading.
+  // Start each later structured pair on its own line before applying the shared
+  // label formatting so the compact and expanded views expose the same labels.
+  const sectioned = normalized.replace(
+    /([^\n])\s+(?=\*\*[^*\n]+\*\*\s*(?:[:–—-][\t ]*))/g,
+    '$1\n\n',
+  );
+  return sectioned.replace(
     /^[\t ]*\*\*([^*\n]+)\*\*[\t ]*(?:[:–—-][\t ]*)?(\S.*)$/gm,
     (_, rawHeading, explanation) => {
-      const heading = rawHeading.replace(/:\s*$/, '').trim();
+      const heading = formatStrategicAlignmentLabel(
+        rawHeading.replace(/^#+\s*/, '').replace(/[*:]/g, '').trim(),
+      );
       return `**${heading}**\n${explanation.trim()}`;
     },
   );

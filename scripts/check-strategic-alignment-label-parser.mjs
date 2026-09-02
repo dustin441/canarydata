@@ -49,6 +49,18 @@ if (JSON.stringify(alabasterLabels) !== JSON.stringify(expectedAlabasterLabels))
   throw new Error(`Long official Alabaster priorities were dropped: ${JSON.stringify(alabasterLabels)}`);
 }
 
+const sequentialAlabasterReason = "**Lead the way in fostering engaged stakeholders that are actively involved in promoting student success** – Alumni-led youth programming directly demonstrates community stakeholder engagement and student success pathways. **Maintain comprehensive student support systems which develop the whole child** – Free youth camp supports athletic development and whole-child enrichment.";
+const sequentialAlabasterLabels = context.extractStrategicAlignmentLabels(sequentialAlabasterReason);
+const sequentialAlabasterDisplay = context.normalizeStrategicAlignmentDisplayText(sequentialAlabasterReason);
+const sequentialDisplayLabels = [...sequentialAlabasterDisplay.matchAll(/^\*\*([^*]+)\*\*$/gm)].map((match) => match[1]);
+if (JSON.stringify(sequentialDisplayLabels) !== JSON.stringify(sequentialAlabasterLabels)) {
+  throw new Error(`Alabaster chips and expanded headings disagree: chips=${JSON.stringify(sequentialAlabasterLabels)} headings=${JSON.stringify(sequentialDisplayLabels)}`);
+}
+if (!sequentialAlabasterDisplay.includes('Alumni-led youth programming directly demonstrates community stakeholder engagement and student success pathways.')
+  || !sequentialAlabasterDisplay.includes('Free youth camp supports athletic development and whole-child enrichment.')) {
+  throw new Error(`Alabaster expanded explanations were lost: ${JSON.stringify(sequentialAlabasterDisplay)}`);
+}
+
 const legacy = context.extractStrategicAlignmentLabels('Legacy Focus Area – supporting explanation');
 if (JSON.stringify(legacy) !== JSON.stringify(['Legacy Focus Area'])) {
   throw new Error(`Legacy fallback failed: ${JSON.stringify(legacy)}`);
