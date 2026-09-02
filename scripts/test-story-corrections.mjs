@@ -61,6 +61,14 @@ assert.match(
 );
 assert.match(dashboard, /const externalCoverageCount = chartArticles\.filter\(\(article\) => isExternalCoverage\(article\)\)\.length/);
 assert.match(dashboard, /<div className="kpi-label">External Coverage<InfoTooltip text=\{SOURCE_OWNERSHIP_TOOLTIP\} \/><\/div>[\s\S]*?<div className="kpi-value">\{externalCoverageCount\}<\/div>[\s\S]*?Filtered timeframe/);
+assert.match(dashboard, /<div className="kpi-grid dashboard-kpi-grid">[\s\S]*?Total Mentions[\s\S]*?External Coverage[\s\S]*?Earned Media[\s\S]*?Avg Canary Score[\s\S]*?Notes Added[\s\S]*?Strategic Hits[\s\S]*?<section className="communications-brief"/);
+const dashboardKpiGrid = dashboard.slice(
+  dashboard.indexOf('<div className="kpi-grid dashboard-kpi-grid">', dashboard.indexOf('Cross-channel reporting')),
+  dashboard.indexOf('<section className="communications-brief"'),
+);
+assert.doesNotMatch(dashboardKpiGrid, /Top Source/);
+assert.match(dashboard, /<div className="kpi-label">Earned Media<InfoTooltip text=\{EARNED_MEDIA_TOOLTIP\} \/><\/div>[\s\S]*?<div className="kpi-value">\{earnedMediaCount\}<\/div>/);
+assert.match(dashboard, /<section className="communications-brief"[\s\S]*?<div className="charts-grid">[\s\S]*?Mention Trend[\s\S]*?Source Breakdown[\s\S]*?Sentiment Trend/);
 assert.match(dashboard, /<div className="kpi-label">Earned Media<InfoTooltip text=\{EARNED_MEDIA_TOOLTIP\} \/><\/div>/);
 assert.match(dashboard, /STRATEGIC_ALIGNMENT_TOOLTIP[\s\S]*?affirmative district action/);
 assert.match(dashboard, /formatStrategicAlignmentLabel\(label\)/);

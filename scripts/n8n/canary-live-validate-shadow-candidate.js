@@ -6,6 +6,13 @@ function scoreTerms(haystack, terms, weight = 1) {
   const matches = terms.filter((term) => termMatches(haystack, term));
   return { score: matches.length * weight, matches };
 }
+function scoreExclusionTerms(haystack, terms, weight = 1) {
+  // Standalone two-letter state codes such as IN, OR, ID, and CO are also
+  // ordinary words or abbreviations. Full state/city/source terms provide
+  // deterministic negative geography without rejecting valid local stories.
+  const contextualTerms = terms.filter((term) => !/^[a-z]{2}$/i.test(String(term || '').trim()));
+  return scoreTerms(haystack, contextualTerms, weight);
+}
 function asTerms(value) {
   return Array.isArray(value) ? value.filter(Boolean) : [];
 }
@@ -38,9 +45,19 @@ return $input.all().map((item) => {
     ...asTerms(profile.zip_codes), ...asTerms(profile.nearby_cities),
     ...asTerms(profile.include_geo_terms), ...asTerms(profile.trusted_sources),
   ], 2);
-  const exclusions = scoreTerms(haystack, [
-    ...asTerms(profile.exclude_geo_terms), ...asTerms(profile.blocked_sources),
-  ], 5);
+  const geoExclusions = scoreExclusionTerms(haystack, asTerms(profile.exclude_geo_terms), 5);
+  // Blocked-source checks are evaluated only against source metadata. This keeps
+  // explicitly configured short source names enforceable without scanning common
+  // two-letter words across the headline and snippet.
+  const blockedSources = scoreTerms(
+    normalized([row.source_name, row.source_type, row.url].filter(Boolean).join(' ')),
+    asTerms(profile.blocked_sources),
+    5,
+  );
+  const exclusions = {
+    score: geoExclusions.score + blockedSources.score,
+    matches: [...geoExclusions.matches, ...blockedSources.matches],
+  };
 
   const entityMatchScore = entity.score + requiredEntity.score;
   const geoMatchScore = geo.score;

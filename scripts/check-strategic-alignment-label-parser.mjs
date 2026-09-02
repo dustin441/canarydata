@@ -39,6 +39,16 @@ if (labels.some((label) => label.includes('fabrication lab'))) {
   throw new Error('Explanation leaked into Strategic Alignment focus areas');
 }
 
+const alabasterReason = '**Maintain a variety of adaptable learning experiences that meet the needs of all students to equip them with the skills to be college and career ready** – The AI robot initiative supports adaptable instruction. **Lead the way in recruiting, hiring, growing, and retaining qualified personnel who continually improve practices in order to meet all student needs** – Staff are implementing an emerging instructional tool.';
+const alabasterLabels = context.extractStrategicAlignmentLabels(alabasterReason);
+const expectedAlabasterLabels = [
+  'Maintain a variety of adaptable learning experiences that meet the needs of all students to equip them with the skills to be college and career ready',
+  'Lead the way in recruiting, hiring, growing, and retaining qualified personnel who continually improve practices in order to meet all student needs',
+];
+if (JSON.stringify(alabasterLabels) !== JSON.stringify(expectedAlabasterLabels)) {
+  throw new Error(`Long official Alabaster priorities were dropped: ${JSON.stringify(alabasterLabels)}`);
+}
+
 const legacy = context.extractStrategicAlignmentLabels('Legacy Focus Area – supporting explanation');
 if (JSON.stringify(legacy) !== JSON.stringify(['Legacy Focus Area'])) {
   throw new Error(`Legacy fallback failed: ${JSON.stringify(legacy)}`);

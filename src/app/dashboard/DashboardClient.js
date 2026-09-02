@@ -388,13 +388,17 @@ function extractStrategicAlignmentLabels(text) {
   const candidates = boldMatches.length
     ? boldMatches
     : [normalized.split('\n')[0].split(/[–-]/)[0]];
+  // Bold values are the structured priority labels emitted by the alignment
+  // contract and can legitimately contain full district priority statements.
+  // Keep a stricter cap only for the unstructured legacy first-line fallback.
+  const maxLabelLength = boldMatches.length ? 300 : 120;
 
   candidates.forEach((candidate) => {
     candidate
       .split('|')
       .map((part) => part.replace(/^#+\s*/, '').replace(/[*:]/g, '').trim())
       .filter(Boolean)
-      .filter((label) => label.length <= 120)
+      .filter((label) => label.length <= maxLabelLength)
       .filter((label) => !isHiddenRoadmapMetricLine(label))
       .filter((label) => !/^(strategic alignment|visibility intelligence|n\/a)$/i.test(label))
       .forEach((label) => labels.push(formatStrategicAlignmentLabel(label)));
@@ -4170,6 +4174,7 @@ export default function DashboardClient({ articles, districts, queries: initialQ
   const articleCount = chartArticles.length;
   const notesCount = chartArticles.filter((article) => getNoteText(article)).length;
   const externalCoverageCount = chartArticles.filter((article) => isExternalCoverage(article)).length;
+  const earnedMediaCount = chartArticles.filter((article) => isEarned(article)).length;
   const filteredNotesCount = notesCount;
   const communicationsBrief = useMemo(() => buildCommunicationsBrief(chartArticles, 3), [chartArticles]);
   const selectedCollectionHealth = useMemo(
@@ -4216,7 +4221,6 @@ export default function DashboardClient({ articles, districts, queries: initialQ
     ? (reportScores.reduce((sum, score) => sum + score, 0) / reportScores.length).toFixed(1)
     : '—';
 
-  const topSource = sourceBreakdown[0];
   const selectedDistrict = districts.find((d) => d.id === districtFilter);
   const selectedDistrictName = districtFilter === 'All'
     ? 'All Districts'
@@ -4691,7 +4695,7 @@ export default function DashboardClient({ articles, districts, queries: initialQ
           </section>
 
           {/* KPI Cards */}
-          <div className="kpi-grid">
+          <div className="kpi-grid dashboard-kpi-grid">
             <div className="kpi-card">
               <div className="kpi-header">
                 <div className="kpi-label">Total Mentions</div>
@@ -4714,6 +4718,15 @@ export default function DashboardClient({ articles, districts, queries: initialQ
 
             <div className="kpi-card">
               <div className="kpi-header">
+                <div className="kpi-label">Earned Media<InfoTooltip text={EARNED_MEDIA_TOOLTIP} /></div>
+                <div className="kpi-icon yellow">⭐</div>
+              </div>
+              <div className="kpi-value">{earnedMediaCount}</div>
+              <span className="kpi-change positive">Communications-attested External coverage</span>
+            </div>
+
+            <div className="kpi-card">
+              <div className="kpi-header">
                 <div className="kpi-label">
                   Avg Canary Score
                   <InfoTooltip text={SCORE_TOOLTIP} />
@@ -4721,21 +4734,6 @@ export default function DashboardClient({ articles, districts, queries: initialQ
                 <div className="kpi-icon green">📈</div>
               </div>
               <ScoreGauge score={avgScore} />
-            </div>
-
-            <div className="kpi-card">
-              <div className="kpi-header">
-                <div className="kpi-label">Top Source</div>
-                <div className="kpi-icon blue">🌐</div>
-              </div>
-              <div className="kpi-value" style={{ fontSize: '1.4rem' }}>
-                {topSource?.name ?? '—'}
-              </div>
-              {topSource && (
-                <span className="kpi-change positive">
-                  {topSource.value}% of coverage
-                </span>
-              )}
             </div>
 
             <div className="kpi-card">

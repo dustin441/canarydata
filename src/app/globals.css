@@ -1033,6 +1033,16 @@ a:hover {
   margin-bottom: 28px;
 }
 
+.dashboard-kpi-grid {
+  grid-template-columns: repeat(6, minmax(0, 1fr));
+}
+
+@media (max-width: 1400px) {
+  .dashboard-kpi-grid {
+    grid-template-columns: repeat(3, minmax(0, 1fr));
+  }
+}
+
 .kpi-card {
   background: var(--bg-card);
   border: 1px solid var(--border-primary);
