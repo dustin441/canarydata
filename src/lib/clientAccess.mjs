@@ -1,6 +1,25 @@
 import { resolveCanaryTrialAccess } from './trial-access.mjs';
 
-export function buildClientAccessDirectory(users = [], now = new Date()) {
+function normalizeEmail(value) {
+  return String(value || '').trim().toLowerCase();
+}
+
+function indexLifecycleRequests(requests = []) {
+  const byId = new Map();
+  const byEmail = new Map();
+  for (const request of requests) {
+    if (request?.id) byId.set(String(request.id), request);
+    const email = normalizeEmail(request?.contact_email);
+    if (!email) continue;
+    const matches = byEmail.get(email) || [];
+    matches.push(request);
+    byEmail.set(email, matches);
+  }
+  return { byId, byEmail };
+}
+
+export function buildClientAccessDirectory(users = [], onboardingRequests = [], now = new Date()) {
+  const lifecycle = indexLifecycleRequests(onboardingRequests);
   return users
     .filter((user) => {
       const metadata = user?.app_metadata || {};
@@ -9,7 +28,13 @@ export function buildClientAccessDirectory(users = [], now = new Date()) {
     .map((user) => {
       const metadata = user.app_metadata || {};
       const profile = user.user_metadata || {};
-      const access = resolveCanaryTrialAccess({ protectedMetadata: metadata, now });
+      const requestId = metadata.onboarding_request_id ? String(metadata.onboarding_request_id) : '';
+      const emailMatches = lifecycle.byEmail.get(normalizeEmail(user.email)) || [];
+      const onboardingRequest = requestId ? lifecycle.byId.get(requestId) : emailMatches[0];
+      const lifecycleAmbiguous = requestId ? !onboardingRequest : emailMatches.length > 1;
+      const access = lifecycleAmbiguous
+        ? { state: 'verification_required', reason: 'lifecycle_ambiguous', trialEndsAt: null }
+        : resolveCanaryTrialAccess({ protectedMetadata: metadata, onboardingRequest, now });
       return {
         id: user.id,
         district_id: metadata.district_id,

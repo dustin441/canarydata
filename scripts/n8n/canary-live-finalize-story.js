@@ -275,9 +275,25 @@ return $input.all().map((item, index) => {
     const text = [fields.headline, fields.summary, fields.monitoringExcerpt].join(' ').toLowerCase();
     const adverseExperience = /\b(anti[- ]black bias|racial bias|bias|discriminat(?:ion|ory)|racism|racist|unsafe|harass(?:ment|ed|ing)?|bully(?:ing|ied)?|civil rights complaint|parent complaint|family complaint|alleg(?:ation|ed|es)|inequit(?:y|able)|exclusion)\b/i.test(text);
     if (!adverseExperience) return false;
-    const organization = '(?:district|school|school board|board|administration|administrators?|officials?)';
-    const action = '(?:implemented|launched|adopted|approved|completed|expanded|created|introduced|changed|revised|trained|investigated|responded|resolved|published|reported|measured|opened)';
-    const affirmativeDistrictAction = new RegExp(`\\b${organization}\\b.{0,120}\\b${action}\\b|\\b${action}\\b.{0,120}\\b${organization}\\b`, 'i').test(text);
+    const organizationPattern = '\\b(?:district|school|school board|board|administration|administrators?|officials?)\\b';
+    const actionPattern = '\\b(?:implement(?:ed|s|ing)?|launch(?:ed|es|ing)?|adopt(?:ed|s|ing)?|approv(?:e|ed|es|ing)|complet(?:e|ed|es|ing)|expand(?:ed|s|ing)?|creat(?:e|ed|es|ing)|introduc(?:e|ed|es|ing)|chang(?:e|ed|es|ing)|revis(?:e|ed|es|ing)|train(?:ed|s|ing)?|investigat(?:e|ed|es|ing)|respond(?:ed|s|ing)?|resolv(?:e|ed|es|ing)|publish(?:ed|es|ing)?|report(?:ed|s|ing)?|measur(?:e|ed|es|ing)|open(?:ed|s|ing)?)\\b';
+    const organization = new RegExp(organizationPattern, 'i');
+    const actions = new RegExp(actionPattern, 'gi');
+    const negatedPrefix = /(?:\b(?:not|never|without)\b|\b(?:yet|failed|fails|refused|refuses|declined|declines)\s+to\b|\b(?:didn['’]t|doesn['’]t|hasn['’]t|haven['’]t|hadn['’]t|won['’]t)\b)(?:\s+\w+){0,3}\s*$/i;
+    const affirmativeDistrictAction = text
+      .split(/(?<=[.!?;])\s+/)
+      .some((sentence) => {
+        if (!organization.test(sentence)) return false;
+        actions.lastIndex = 0;
+        for (const match of sentence.matchAll(actions)) {
+          const actionIndex = match.index ?? 0;
+          const prefix = sentence.slice(Math.max(0, actionIndex - 70), actionIndex);
+          if (negatedPrefix.test(prefix)) continue;
+          const organizationMatch = organization.exec(sentence);
+          if (organizationMatch && Math.abs(actionIndex - organizationMatch.index) <= 120) return true;
+        }
+        return false;
+      });
     return !affirmativeDistrictAction;
   }
 

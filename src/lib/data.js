@@ -172,6 +172,7 @@ const SOCIAL_METRIC_SNAPSHOT_COLUMNS = 'id, district_id, provider_account_link_i
 const SOCIAL_METRIC_SNAPSHOT_PAGE_SIZE = 1000;
 const SOCIAL_METRIC_LINK_BATCH_SIZE = 100;
 const SOCIAL_METRIC_HISTORY_DAYS = 95;
+const ALL_DISTRICT_SOCIAL_HISTORY_DAYS = 90;
 const SOCIAL_REVIEW_EVENT_COLUMNS = 'id, batch_id, district_id, social_thread_id, actor_user_id, action, before_state, after_state, resulting_version, created_at';
 const SOCIAL_REVIEW_EVENT_PAGE_SIZE = 1000;
 
@@ -258,7 +259,12 @@ export async function getSocialThreads(districtId = null, includeReview = false,
       .order('published_at', { ascending: false })
       .order('id', { ascending: true })
       .range(from, from + SOCIAL_THREAD_PAGE_SIZE - 1);
-    if (districtId) query = query.eq('district_id', districtId);
+    if (districtId) {
+      query = query.eq('district_id', districtId);
+    } else {
+      const cutoff = new Date(Date.now() - (ALL_DISTRICT_SOCIAL_HISTORY_DAYS * 24 * 60 * 60 * 1000)).toISOString();
+      query = query.gte('published_at', cutoff);
+    }
     const { data, error } = await query;
     if (error) throw error;
     const page = data ?? [];
@@ -484,7 +490,21 @@ export async function getClients() {
     if (batch.length < perPage) break;
   }
 
-  return buildClientAccessDirectory(users);
+  const onboardingRequests = [];
+  for (let from = 0; ; from += 1000) {
+    const { data, error } = await supabase
+      .from('onboarding_requests')
+      .select('id, contact_email, payment_status, paid_through, trial_status, access_status, trial_starts_at, trial_ends_at, created_at')
+      .order('created_at', { ascending: false })
+      .range(from, from + 999);
+    if (error?.code === 'PGRST205') break;
+    if (error) throw error;
+    const batch = data ?? [];
+    onboardingRequests.push(...batch);
+    if (batch.length < 1000) break;
+  }
+
+  return buildClientAccessDirectory(users, onboardingRequests);
 }
 
 export async function getCollectionHealth(districts, districtId = null) {

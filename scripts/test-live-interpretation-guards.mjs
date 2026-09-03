@@ -351,6 +351,25 @@ const biasComplaintOnly = runFinalizer({
 assert.equal(biasComplaintOnly.innovation_flag, false);
 assert.equal(biasComplaintOnly.innovation_reason, 'N/A');
 
+const negatedBiasResponse = runFinalizer({
+  summary: 'Parents alleged racial bias, and the district has not responded to the complaint.',
+  local_recommendation: 'Acknowledge the concern and establish a response plan.',
+  sentiment: -0.5,
+  risk: 'High',
+  tags: ['Safety & Wellness', 'Engagement'],
+  author: 'Reporter',
+  contact_info: 'N/A',
+  relevance_score: 5,
+  strategic_alignment: 'Safe, Supported, Included, and Empowered',
+  alignment_explanation: 'The concern relates to the district safety goal.',
+}, {
+  ...basePrepared,
+  title: 'Parents allege racial bias; district has not responded',
+  data: 'Parents alleged racial bias. The district has not responded to the complaint.',
+});
+assert.equal(negatedBiasResponse.innovation_flag, false);
+assert.equal(negatedBiasResponse.innovation_reason, 'N/A');
+
 const biasResponseWithAction = runFinalizer({
   summary: 'The district implemented a new anti-bias response protocol and staff training after community feedback.',
   local_recommendation: 'Explain the implementation and publish measurable follow-up milestones.',

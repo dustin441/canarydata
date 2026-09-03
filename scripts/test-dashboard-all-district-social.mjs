@@ -4,5 +4,7 @@ const data = await readFile(new URL('../src/lib/data.js', import.meta.url), 'utf
 const page = await readFile(new URL('../src/app/dashboard/page.js', import.meta.url), 'utf8');
 assert.match(data, /getSocialThreads\(districtId = null, includeReview = false, includeDetails = true\)/);
 assert.match(data, /if \(!includeDetails\) return threads\.map\(\(thread\) => \(\{ \.\.\.thread, social_comments: \[\] \}\)\);/);
-assert.match(page, /getSocialThreads\(dataDistrictId, isAdmin, Boolean\(dataDistrictId\)\)/);
+assert.match(data, /ALL_DISTRICT_SOCIAL_HISTORY_DAYS = 90/);
+assert.match(data, /query = query\.gte\('published_at', cutoff\)/);
+assert.match(page, /getSocialThreads\(dataDistrictId, isAdmin && Boolean\(dataDistrictId\), Boolean\(dataDistrictId\)\)/);
 console.log('All-district Social detail boundary checks passed.');
