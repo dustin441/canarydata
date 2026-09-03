@@ -370,6 +370,44 @@ const negatedBiasResponse = runFinalizer({
 assert.equal(negatedBiasResponse.innovation_flag, false);
 assert.equal(negatedBiasResponse.innovation_reason, 'N/A');
 
+const noInvestigationLaunched = runFinalizer({
+  summary: 'The district said no investigation was launched after parents alleged racial bias.',
+  local_recommendation: 'Clarify whether an investigation will begin.',
+  sentiment: -0.5,
+  risk: 'High',
+  tags: ['Safety & Wellness', 'Engagement'],
+  author: 'Reporter',
+  contact_info: 'N/A',
+  relevance_score: 5,
+  strategic_alignment: 'Safe, Supported, Included, and Empowered',
+  alignment_explanation: 'The report concerns the district safety goal.',
+}, {
+  ...basePrepared,
+  title: 'Parents allege racial bias; no investigation launched',
+  data: 'The district said no investigation was launched after parents alleged racial bias.',
+});
+assert.equal(noInvestigationLaunched.innovation_flag, false);
+assert.equal(noInvestigationLaunched.innovation_reason, 'N/A');
+
+const parentReportedDistrictInactive = runFinalizer({
+  summary: 'Parents reported racial bias, and the district has not responded to the complaint.',
+  local_recommendation: 'Acknowledge the concern and establish a response plan.',
+  sentiment: -0.5,
+  risk: 'High',
+  tags: ['Safety & Wellness', 'Engagement'],
+  author: 'Reporter',
+  contact_info: 'N/A',
+  relevance_score: 5,
+  strategic_alignment: 'Safe, Supported, Included, and Empowered',
+  alignment_explanation: 'The report concerns the district safety goal.',
+}, {
+  ...basePrepared,
+  title: 'Parents report racial bias; district has not responded',
+  data: 'Parents reported racial bias, and the district has not responded to the complaint.',
+});
+assert.equal(parentReportedDistrictInactive.innovation_flag, false);
+assert.equal(parentReportedDistrictInactive.innovation_reason, 'N/A');
+
 const biasResponseWithAction = runFinalizer({
   summary: 'The district implemented a new anti-bias response protocol and staff training after community feedback.',
   local_recommendation: 'Explain the implementation and publish measurable follow-up milestones.',
