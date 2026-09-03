@@ -271,6 +271,16 @@ return $input.all().map((item, index) => {
     return Boolean(context.incident && !context.affirmativeStrategicAction);
   }
 
+  function isAdverseExperienceWithoutAffirmativeDistrictAction(fields = {}) {
+    const text = [fields.headline, fields.summary, fields.monitoringExcerpt].join(' ').toLowerCase();
+    const adverseExperience = /\b(anti[- ]black bias|racial bias|bias|discriminat(?:ion|ory)|racism|racist|unsafe|harass(?:ment|ed|ing)?|bully(?:ing|ied)?|civil rights complaint|parent complaint|family complaint|alleg(?:ation|ed|es)|inequit(?:y|able)|exclusion)\b/i.test(text);
+    if (!adverseExperience) return false;
+    const organization = '(?:district|school|school board|board|administration|administrators?|officials?)';
+    const action = '(?:implemented|launched|adopted|approved|completed|expanded|created|introduced|changed|revised|trained|investigated|responded|resolved|published|reported|measured|opened)';
+    const affirmativeDistrictAction = new RegExp(`\\b${organization}\\b.{0,120}\\b${action}\\b|\\b${action}\\b.{0,120}\\b${organization}\\b`, 'i').test(text);
+    return !affirmativeDistrictAction;
+  }
+
   function calibrateSadVsBadSentiment(rawSentiment, fields = {}) {
     let s = Number(rawSentiment || 0);
     const haystack = [fields.headline, fields.summary, fields.risk, fields.tags, fields.author, fields.source, fields.link].join(' ').toLowerCase();
@@ -356,7 +366,8 @@ return $input.all().map((item, index) => {
   const sensitivePersonnelTrustIssue = detectSensitivePersonnelTrustIssue(sentimentFields);
   const outputRisk = sensitivePersonnelTrustIssue ? 'High' : cleanJson.risk;
   const outputTags = canonicalTags(sensitivePersonnelTrustIssue ? ['Safety & Wellness'] : cleanJson.tags);
-  const suppressStrategicAlignment = shouldSuppressStrategicAlignment(incidentContext);
+  const suppressStrategicAlignment = shouldSuppressStrategicAlignment(incidentContext)
+    || isAdverseExperienceWithoutAffirmativeDistrictAction({ ...sentimentFields, monitoringExcerpt });
   const outputStrategicAlignment = sensitivePersonnelTrustIssue || suppressStrategicAlignment
     ? { flag: false, reason: 'N/A' }
     : strategicAlignment;

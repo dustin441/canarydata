@@ -59,6 +59,11 @@ for (const expected of [
   request.confirmed_profile.discovery_notes,
 ]) assert.match(retryTask.markdown_content, new RegExp(expected.replace(/[.*+?^${}()|[\]\\]/g, '\\$&')));
 assert.equal(retryTask.name, '[Trial onboarding] Parity Public Schools');
+assert.match(directTask.markdown_content, /Do not place a reusable password in ClickUp, email, or a shared tracker/);
+assert.match(directTask.markdown_content, /review the district through the authenticated admin dashboard/);
+assert.match(directTask.markdown_content, /Forgot Password/);
+assert.match(directTask.markdown_content, /8-digit recovery code goes directly to the customer’s login email/);
+assert.doesNotMatch(directTask.markdown_content, /share(?:d|ing)? (?:the )?password/i);
 assert.deepEqual(retryTask.tags, ['trial-onboarding', 'canary-data']);
 assert.doesNotMatch(actionsSource, /id: saved\.id,\s*clickup_task_url:/, 'internal ClickUp task links must never cross the client-facing server-action boundary');
 

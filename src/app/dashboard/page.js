@@ -130,7 +130,7 @@ export default async function DashboardPage({ searchParams }) {
     loadDashboardDataset('Excluded news results', () => getExcludedStories(dataDistrictId), []),
     loadDashboardDataset('News correction history', () => getStoryCorrectionEvents(dataDistrictId), []),
     loadDashboardDataset('Social sources', () => getSocialSources(dataDistrictId), []),
-    loadDashboardDataset('Social results', () => getSocialThreads(dataDistrictId, isAdmin), []),
+    loadDashboardDataset('Social results', () => getSocialThreads(dataDistrictId, isAdmin, Boolean(dataDistrictId)), []),
     loadDashboardDataset('Native Social metrics', () => getSocialMetricSnapshots(dataDistrictId), []),
     dataDistrictId ? loadDashboardDataset('Native Social history', () => getSocialMetricHistory(dataDistrictId), []) : Promise.resolve({ data: [], warning: null }),
     isAdmin ? loadDashboardDataset('Social correction history', () => getRecentSocialReviewEvents(dataDistrictId), []) : Promise.resolve({ data: [], warning: null }),

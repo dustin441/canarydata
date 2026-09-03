@@ -2,6 +2,7 @@ import { createAdminClient } from '@/lib/supabase/admin';
 import { buildCollectionHealth, buildSocialCollectionHealth } from '@/lib/collectionHealth.mjs';
 import { buildSocialAffiliatePreview } from '@/lib/social-affiliate-preview';
 import { mergeSocialProviderObservationMetadata } from '@/lib/social.mjs';
+import { buildClientAccessDirectory } from '@/lib/clientAccess.mjs';
 
 const ARTICLE_COLUMNS = 'id, created_at, date, headline, summary, source, source_type, canary_score, tags, notes, is_earned_media, communications_earned, communications_earned_updated_at, communications_earned_updated_by, is_perched, link, district_id, innovation_reason, recommendation, source_query, canonical_url, visibility_status, manual_override, correction_version';
 const ARTICLE_PAGE_SIZE = 1000;
@@ -246,7 +247,7 @@ export async function readAllSocialProviderObservations(supabase, threadIds = []
   return observations;
 }
 
-export async function getSocialThreads(districtId = null, includeReview = false) {
+export async function getSocialThreads(districtId = null, includeReview = false, includeDetails = true) {
   const supabase = createAdminClient();
   const threads = [];
   for (let from = 0; ; from += SOCIAL_THREAD_PAGE_SIZE) {
@@ -266,6 +267,7 @@ export async function getSocialThreads(districtId = null, includeReview = false)
   }
 
   if (threads.length === 0) return threads;
+  if (!includeDetails) return threads.map((thread) => ({ ...thread, social_comments: [] }));
 
   const comments = [];
   // Keep representative-comment reads bounded without serializing one request
@@ -471,12 +473,18 @@ export async function toggleEarnedMedia(id, value) {
 
 export async function getClients() {
   const supabase = createAdminClient();
-  const { data, error } = await supabase
-    .from('client_credentials')
-    .select('district_id, first_name, last_name, email, temp_password, created_at')
-    .order('created_at');
-  if (error) throw error;
-  return data ?? [];
+  const users = [];
+  const perPage = 1000;
+
+  for (let page = 1; ; page += 1) {
+    const { data, error } = await supabase.auth.admin.listUsers({ page, perPage });
+    if (error) throw error;
+    const batch = data?.users ?? [];
+    users.push(...batch);
+    if (batch.length < perPage) break;
+  }
+
+  return buildClientAccessDirectory(users);
 }
 
 export async function getCollectionHealth(districts, districtId = null) {

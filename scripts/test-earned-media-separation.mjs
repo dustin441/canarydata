@@ -65,4 +65,9 @@ assert.match(melodi, /source ownership=/);
 assert.match(melodi, /communications earned=/);
 assert.match(melodi, /communications_earned/);
 
+assert.match(dashboard, /const \[sourceOwnershipFilter, setSourceOwnershipFilter\] = useState\('All'\)/);
+assert.match(dashboard, /sourceOwnershipFilter === 'All'[\s\S]*?sourceOwnershipFilter === \(isExternalCoverage\(a\) \? 'External' : 'Owned'\)/);
+assert.match(dashboard, /aria-label="Filter by source ownership"/);
+assert.match(dashboard, /<option value="Owned">Owned<\/option>[\s\S]*?<option value="External">External<\/option>/);
+
 console.log('Owned, External, and Communications-earned separation tests passed.');

@@ -332,4 +332,42 @@ assert.equal(controlsExposeFraud.sentiment, -0.1);
 assert.equal(controlsExposeFraud.innovation_flag, true);
 assert.match(controlsExposeFraud.innovation_reason, /Financial Efficiency/);
 
+const biasComplaintOnly = runFinalizer({
+  summary: 'A parent said anti-Black bias left her son feeling unsafe at school during a community forum.',
+  local_recommendation: 'Acknowledge the concern and prepare a factual response.',
+  sentiment: -0.6,
+  risk: 'High',
+  tags: ['Safety & Wellness', 'Engagement'],
+  author: 'Reporter',
+  contact_info: 'N/A',
+  relevance_score: 5,
+  strategic_alignment: 'Safe, Supported, Included, and Empowered',
+  alignment_explanation: 'The concern relates to the district goal of creating a safe environment.',
+}, {
+  ...basePrepared,
+  title: 'Parent says anti-Black bias left son feeling unsafe at school',
+  data: 'A parent described alleged anti-Black bias and said her son felt unsafe. The report documents the family concern but no affirmative district action.',
+});
+assert.equal(biasComplaintOnly.innovation_flag, false);
+assert.equal(biasComplaintOnly.innovation_reason, 'N/A');
+
+const biasResponseWithAction = runFinalizer({
+  summary: 'The district implemented a new anti-bias response protocol and staff training after community feedback.',
+  local_recommendation: 'Explain the implementation and publish measurable follow-up milestones.',
+  sentiment: 0.1,
+  risk: 'Medium',
+  tags: ['Safety & Wellness', 'Engagement'],
+  author: 'Reporter',
+  contact_info: 'N/A',
+  relevance_score: 5,
+  strategic_alignment: 'Safe, Supported, Included, and Empowered',
+  alignment_explanation: 'The district implemented a documented protocol and training program that advances the verified safety goal.',
+}, {
+  ...basePrepared,
+  title: 'District implements anti-bias response protocol and staff training',
+  data: 'The district implemented a new anti-bias response protocol and staff training after community feedback.',
+});
+assert.equal(biasResponseWithAction.innovation_flag, true);
+assert.match(biasResponseWithAction.innovation_reason, /Safe, Supported, Included, and Empowered/);
+
 console.log('Live ingestion interpretation guard checks passed.');

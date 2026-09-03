@@ -2078,12 +2078,7 @@ function AdminBillingView({ overview = { rows: [], summary: null } }) {
 }
 
 function ClientsView({ clients }) {
-  const [revealed, setRevealed] = useState({});
   const [copied, setCopied] = useState({});
-
-  function toggleReveal(id) {
-    setRevealed((prev) => ({ ...prev, [id]: !prev[id] }));
-  }
 
   function copyText(key, text) {
     navigator.clipboard.writeText(text).then(() => {
@@ -2092,80 +2087,62 @@ function ClientsView({ clients }) {
     });
   }
 
-  const loginUrl = 'https://canarydata.vercel.app/login';
+  const loginUrl = 'https://www.canarydata.media/login';
+  const dateLabel = (value) => value
+    ? new Date(value).toLocaleDateString(undefined, { year: 'numeric', month: 'short', day: 'numeric' })
+    : 'Not yet';
 
   return (
     <div className="data-section">
       <div className="data-header">
-        <h3>👥 Beta Testers</h3>
-        <span style={{ fontSize: '0.85rem', color: 'var(--text-secondary)' }}>{clients.length} clients</span>
+        <div>
+          <h3>👥 Customer Access</h3>
+          <p style={{ color: 'var(--text-secondary)', fontSize: '0.85rem', margin: '6px 0 0', maxWidth: '760px' }}>
+            Review districts from your authenticated admin dashboard. For customer handoff, send the login URL and confirmed email only. The customer chooses Forgot Password and receives the 8-digit recovery code directly.
+          </p>
+        </div>
+        <span style={{ fontSize: '0.85rem', color: 'var(--text-secondary)' }}>{clients.length} users</span>
       </div>
       <div style={{ overflowX: 'auto' }}>
-        <table className="data-table" style={{ minWidth: '900px' }}>
+        <table className="data-table" style={{ minWidth: '1050px' }}>
           <thead>
             <tr>
               <th>Organization</th>
               <th>Contact</th>
-              <th>Email</th>
-              <th>Temp Password</th>
-              <th>Login URL</th>
+              <th>Login email</th>
+              <th>Access</th>
+              <th>Last sign-in</th>
+              <th>Trial ends</th>
+              <th>Login</th>
             </tr>
           </thead>
           <tbody>
-            {clients.map((c) => {
-              const emailKey = `email-${c.district_id}`;
-              const pwKey = `pw-${c.district_id}`;
-              const urlKey = `url-${c.district_id}`;
+            {clients.map((client) => {
+              const emailKey = `email-${client.id}`;
+              const urlKey = `url-${client.id}`;
               return (
-                <tr key={c.district_id}>
+                <tr key={client.id}>
                   <td style={{ fontWeight: 500, color: 'var(--text-primary)' }}>
-                    {c.district_id.split('-').map(w => w.charAt(0).toUpperCase() + w.slice(1)).join(' ')}
+                    {client.district_id.split('-').map((word) => word.charAt(0).toUpperCase() + word.slice(1)).join(' ')}
                   </td>
-                  <td style={{ color: 'var(--text-secondary)' }}>{c.first_name} {c.last_name}</td>
+                  <td style={{ color: 'var(--text-secondary)' }}>{[client.first_name, client.last_name].filter(Boolean).join(' ') || 'Not provided'}</td>
                   <td>
                     <div style={{ display: 'flex', alignItems: 'center', gap: '8px' }}>
-                      <span style={{ fontFamily: 'monospace', fontSize: '0.85rem' }}>{c.email}</span>
-                      <button
-                        onClick={() => copyText(emailKey, c.email)}
-                        className="btn btn-sm btn-secondary"
-                        style={{ padding: '2px 8px', fontSize: '0.75rem', minWidth: '52px' }}
-                      >
+                      <span style={{ fontFamily: 'monospace', fontSize: '0.85rem' }}>{client.email}</span>
+                      <button onClick={() => copyText(emailKey, client.email)} className="btn btn-sm btn-secondary" style={{ padding: '2px 8px', fontSize: '0.75rem', minWidth: '52px' }}>
                         {copied[emailKey] ? '✓' : 'Copy'}
                       </button>
                     </div>
                   </td>
+                  <td>{client.access_state === 'active' ? 'Active' : 'Inactive'}</td>
+                  <td>{dateLabel(client.last_sign_in_at)}</td>
+                  <td>{client.trial_ends_at ? dateLabel(client.trial_ends_at) : 'Not trial-based'}</td>
                   <td>
                     <div style={{ display: 'flex', alignItems: 'center', gap: '8px' }}>
-                      <span style={{ fontFamily: 'monospace', fontSize: '0.85rem', color: 'var(--text-secondary)' }}>
-                        {revealed[c.district_id] ? c.temp_password : '••••••••••••••'}
-                      </span>
-                      <button
-                        onClick={() => toggleReveal(c.district_id)}
-                        className="btn btn-sm btn-secondary"
-                        style={{ padding: '2px 8px', fontSize: '0.75rem', minWidth: '52px' }}
-                      >
-                        {revealed[c.district_id] ? 'Hide' : 'Show'}
-                      </button>
-                      <button
-                        onClick={() => copyText(pwKey, c.temp_password)}
-                        className="btn btn-sm btn-secondary"
-                        style={{ padding: '2px 8px', fontSize: '0.75rem', minWidth: '52px' }}
-                      >
-                        {copied[pwKey] ? '✓' : 'Copy'}
-                      </button>
-                    </div>
-                  </td>
-                  <td>
-                    <div style={{ display: 'flex', alignItems: 'center', gap: '8px' }}>
-                      <a href={loginUrl} target="_blank" rel="noreferrer"
-                        style={{ fontSize: '0.85rem', color: 'var(--brand-primary)', textDecoration: 'none' }}>
-                        canarydata.vercel.app/login
+                      <a href={loginUrl} target="_blank" rel="noreferrer" style={{ fontSize: '0.85rem', color: 'var(--brand-primary)', textDecoration: 'none' }}>
+                        Open login
                       </a>
-                      <button
-                        onClick={() => copyText(urlKey, loginUrl)}
-                        className="btn btn-sm btn-secondary"
-                        style={{ padding: '2px 8px', fontSize: '0.75rem', minWidth: '52px' }}
-                      >
+                      <button onClick={() => copyText(urlKey, loginUrl)} className="btn btn-sm btn-secondary" style={{ padding: '2px 8px', fontSize: '0.75rem', minWidth: '52px' }}>
                         {copied[urlKey] ? '✓' : 'Copy'}
                       </button>
                     </div>
@@ -2173,6 +2150,7 @@ function ClientsView({ clients }) {
                 </tr>
               );
             })}
+            {clients.length === 0 && <tr><td colSpan="7" style={{ color: 'var(--text-secondary)', textAlign: 'center' }}>No customer Auth accounts are available.</td></tr>}
           </tbody>
         </table>
       </div>
@@ -2275,10 +2253,12 @@ function RecommendationText({ text }) {
       {open && (
         <div className="expand-overlay" onClick={() => setOpen(false)}>
           <div className="expand-popover" style={{ maxHeight: '80vh', overflowY: 'auto' }} onClick={(e) => e.stopPropagation()}>
-            {hasMarkdown
-              ? <div>{renderRecMarkdown(visibleText)}</div>
-              : <p className="expand-body">{visibleText}</p>
-            }
+            <div data-recommendation-format={hasMarkdown ? 'structured' : 'concise'}>
+              {hasMarkdown
+                ? renderRecMarkdown(visibleText)
+                : renderRecMarkdown(`## Recommended next step\n${visibleText}`)
+              }
+            </div>
             <button className="expand-close-btn" onClick={() => setOpen(false)}>Hide</button>
           </div>
         </div>
@@ -3824,6 +3804,7 @@ export default function DashboardClient({ articles, districts, queries: initialQ
   const [search, setSearch] = useState('');
   const [campaignSearch, setCampaignSearch] = useState('');
   const [sourceFilter, setSourceFilter] = useState('All');
+  const [sourceOwnershipFilter, setSourceOwnershipFilter] = useState('All');
   const [tagFilter, setTagFilter] = useState('All');
   const [districtFilter, setDistrictFilter] = useState(defaultDistrictFilter);
   const [dateStart, setDateStart] = useState('');
@@ -4127,6 +4108,7 @@ export default function DashboardClient({ articles, districts, queries: initialQ
   const birdEyeFilterContext = [
     strategicAlignmentFilter === 'All' ? 'All Strategic Alignment focus areas' : `Focus area: ${strategicAlignmentFilter}`,
     sourceFilter !== 'All' ? `Source: ${sourceFilter}` : 'News sources in the current district view',
+    sourceOwnershipFilter !== 'All' ? `Ownership: ${sourceOwnershipFilter}` : null,
     tagFilter !== 'All' ? `Tag: ${tagFilter}` : null,
     scoreMin !== 1 || scoreMax !== 10 ? `Score: ${scoreMin}–${scoreMax}` : null,
     selectedQueries.size > 0 ? `${selectedQueries.size} source ${selectedQueries.size === 1 ? 'query' : 'queries'} selected` : null,
@@ -4213,6 +4195,7 @@ export default function DashboardClient({ articles, districts, queries: initialQ
     setSearch('');
     setCampaignSearch('');
     setSourceFilter('All');
+    setSourceOwnershipFilter('All');
     setTagFilter('All');
     clearSecondaryFilters();
     setColMenuOpen(false);
@@ -4230,6 +4213,9 @@ export default function DashboardClient({ articles, districts, queries: initialQ
       const matchSource =
         sourceFilter === 'All' ||
         articleSource === sourceFilter;
+      const matchSourceOwnership =
+        sourceOwnershipFilter === 'All' ||
+        sourceOwnershipFilter === (isExternalCoverage(a) ? 'External' : 'Owned');
       const matchTag =
         tagFilter === 'All' || canonicalTags(a.tags).includes(tagFilter);
       const matchDateStart = !dateStart || a.date >= dateStart;
@@ -4246,13 +4232,13 @@ export default function DashboardClient({ articles, districts, queries: initialQ
       const matchStrategicAlignment =
         strategicAlignmentFilter === 'All' ||
         extractStrategicAlignmentLabels(a.innovation_reason).includes(strategicAlignmentFilter);
-      return matchSearch && matchSource && matchTag && matchDateStart && matchDateEnd && matchScore && matchQuery && matchStrategicAlignment;
+      return matchSearch && matchSource && matchSourceOwnership && matchTag && matchDateStart && matchDateEnd && matchScore && matchQuery && matchStrategicAlignment;
     }).sort((a, b) => {
       const dateCompare = String(b.date || '').localeCompare(String(a.date || ''));
       if (dateCompare !== 0) return dateCompare;
       return String(b.created_at || '').localeCompare(String(a.created_at || ''));
     });
-  }, [campaignArticles, search, sourceFilter, tagFilter, dateStart, dateEnd, scoreMin, scoreMax, selectedQueries, strategicAlignmentFilter, getNoteText]);
+  }, [campaignArticles, search, sourceFilter, sourceOwnershipFilter, tagFilter, dateStart, dateEnd, scoreMin, scoreMax, selectedQueries, strategicAlignmentFilter, getNoteText]);
 
   // Keep KPI/charts aligned with the visible media table. Every media view starts
   // from the same district and campaign slice of the central reporting dataset.
@@ -4447,7 +4433,7 @@ export default function DashboardClient({ articles, districts, queries: initialQ
                 style={{ width: '100%', background: 'none', border: 'none', textAlign: 'left', cursor: 'pointer' }}
               >
                 <span className="sidebar-link-icon">👥</span>
-                Beta Testers
+                Customer Access
                 <span className="sidebar-link-badge">{clients.length}</span>
               </button>
               <button
@@ -4550,7 +4536,7 @@ export default function DashboardClient({ articles, districts, queries: initialQ
                         : currentView === 'birdseye'
                         ? 'Bird’s Eye View — Leadership & Board Report'
                         : currentView === 'clients'
-                        ? 'Beta Testers'
+                        ? 'Customer Access'
                         : currentView === 'billing'
                           ? 'Admin Billing & Projections'
                         : currentView === 'howto'
@@ -4569,7 +4555,7 @@ export default function DashboardClient({ articles, districts, queries: initialQ
                   : currentView === 'notes' ? 'Articles with analyst annotations'
                   : currentView === 'corrections' ? 'Add, exclude, restore, and audit district stories'
                   : currentView === 'birdseye' ? 'Strategic Alignment themes, counts, and supporting coverage'
-                  : currentView === 'clients' ? 'Login credentials for beta testers'
+                  : currentView === 'clients' ? 'Customer login emails, access status, and secure activation guidance'
                   : currentView === 'billing' ? 'Stored PO readiness, payment, trial, access, and coverage dates across organizations'
                   : currentView === 'howto' ? 'Media to decision to leadership proof'
                   : currentView === 'articles' ? 'Browse, filter, annotate, and export article-level coverage'
@@ -4763,6 +4749,7 @@ export default function DashboardClient({ articles, districts, queries: initialQ
                 {' · '}{filtered.length} visible articles
                 {dateStart || dateEnd ? ` · Date: ${dateStart || 'Any'}–${dateEnd || 'Any'}` : ''}
                 {sourceFilter !== 'All' ? ` · Source: ${sourceFilter}` : ''}
+                {sourceOwnershipFilter !== 'All' ? ` · Ownership: ${sourceOwnershipFilter}` : ''}
                 {tagFilter !== 'All' ? ` · Tag: ${tagFilter}` : ''}
                 {campaignSearch ? ` · Campaign/topic: ${campaignSearch}` : ''}
               </p>
@@ -5006,10 +4993,15 @@ export default function DashboardClient({ articles, districts, queries: initialQ
                   value={search}
                   onChange={(e) => setSearch(e.target.value)}
                 />
-                <select className="filter-select" value={sourceFilter} onChange={(e) => setSourceFilter(e.target.value)}>
+                <select className="filter-select" value={sourceFilter} onChange={(e) => setSourceFilter(e.target.value)} aria-label="Filter by source type">
                   {allSources.map((s) => <option key={s} value={s}>{formatSourceLabel(s)}</option>)}
                 </select>
-                <select className="filter-select" value={tagFilter} onChange={(e) => setTagFilter(e.target.value)}>
+                <select className="filter-select" value={sourceOwnershipFilter} onChange={(e) => setSourceOwnershipFilter(e.target.value)} aria-label="Filter by source ownership">
+                  <option value="All">Owned + External</option>
+                  <option value="Owned">Owned</option>
+                  <option value="External">External</option>
+                </select>
+                <select className="filter-select" value={tagFilter} onChange={(e) => setTagFilter(e.target.value)} aria-label="Filter by tag">
                   {allTags.map((t) => <option key={t}>{t}</option>)}
                 </select>
                 {!demoMode && districtFilter !== 'All' && (
