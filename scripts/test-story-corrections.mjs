@@ -73,6 +73,10 @@ assert.match(dashboard, /<div className="kpi-label">Earned Media<InfoTooltip tex
 assert.match(dashboard, /STRATEGIC_ALIGNMENT_TOOLTIP[\s\S]*?affirmative district action/);
 assert.match(dashboard, /formatStrategicAlignmentLabel\(label\)/);
 assert.match(dashboard, /Strategic Alignment<InfoTooltip text=\{STRATEGIC_ALIGNMENT_TOOLTIP\} \/>/);
+assert.match(dashboard, /filter-group-label">Strategic Alignment <InfoTooltip text=\{STRATEGIC_ALIGNMENT_TOOLTIP\} \/>/);
+assert.match(dashboard, /fill="#EF4444" fontSize="11" fontWeight="700">Concern<\/text>/);
+assert.match(dashboard, /fill="#60A5FA" fontSize="11" fontWeight="700">Neutral<\/text>/);
+assert.match(dashboard, /fill="#22C55E" fontSize="11" fontWeight="700">Positive<\/text>/);
 assert.match(dashboard, /Dashboard[\s\S]*?handleNavSelect\('birdseye'\)[\s\S]*?Bird’s Eye View[\s\S]*?handleNavSelect\('howto'\)/);
 assert.match(dashboard, /className="chart-card strategic-performance-chart"/);
 const dashboardCss = await readFile(new URL('../src/app/globals.css', import.meta.url), 'utf8');

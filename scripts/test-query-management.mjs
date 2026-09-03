@@ -12,6 +12,7 @@ import {
   searchQueryFingerprint,
   searchQuerySnapshot,
   validateSearchQueryText,
+  validateCustomerSearchQueryText,
 } from '../src/lib/queryPolicy.mjs';
 import { buildQueryReviewTask } from '../src/lib/clickup.js';
 
@@ -22,6 +23,12 @@ assert.equal(validateSearchQueryText('  Hoover school board  '), 'Hoover school 
 assert.throws(() => validateSearchQueryText('***'), /letter or number/);
 assert.throws(() => validateSearchQueryText('ab'), /at least 3 characters/);
 assert.throws(() => validateSearchQueryText('x'.repeat(201)), /200 characters or fewer/);
+assert.equal(validateCustomerSearchQueryText('"Hoover City Schools" budget'), '"Hoover City Schools" budget');
+assert.equal(validateCustomerSearchQueryText('site:hoovercityschools.net budget'), 'site:hoovercityschools.net budget');
+assert.throws(() => validateCustomerSearchQueryText('"District A" OR "District B"'), /one school, district, person, program, or topic/);
+assert.throws(() => validateCustomerSearchQueryText('(Hoover schools) budget'), /Compound Boolean queries/);
+assert.throws(() => validateCustomerSearchQueryText('site:example.org site:example.com budget'), /no more than one site/);
+assert.throws(() => validateCustomerSearchQueryText('"Hoover" "budget"'), /one complete quoted phrase/);
 assert.equal(activeNewsQueryCount([
   { channels: 'news', active: true },
   { channels: 'news', active: false },

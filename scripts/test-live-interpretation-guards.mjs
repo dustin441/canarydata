@@ -64,6 +64,28 @@ const noAction = runFinalizer({
 assert.equal(noAction.recommendation, 'No immediate communications action recommended. Continue routine monitoring.');
 assert.notEqual(noAction.recommendation, 'N/A');
 
+const structuredRecommendation = [
+  '## Strategic Intent', 'Amplify the verified result.', '',
+  '## Audience Focus', '**Primary:** Families', '**Secondary:** Community', '',
+  '## Message Angle', 'Lead with the measurable outcome.', '',
+  '## Channel Strategy', 'Website and family email.', '',
+  '## Execution Plan', '- Verify the metric', '- Publish approved copy', '',
+  '## Guardrails', '- Use sourced figures', '- Avoid unsupported claims', '',
+  '## Expected Outcome', 'Clear community understanding.', '',
+  '## Next Phase', 'Monitor questions and follow-up coverage.',
+].join('\n');
+const structured = runFinalizer({
+  summary: 'Students improved on the verified measure.',
+  local_recommendation: structuredRecommendation,
+  sentiment: 0.6,
+  risk: 'Low',
+  tags: ['Academic Success'],
+  author: 'Reporter',
+  contact_info: 'N/A',
+  relevance_score: 5,
+}, basePrepared);
+assert.equal(structured.recommendation, structuredRecommendation);
+
 const shortPositiveRecommendation = runFinalizer({
   summary: 'Students earned a statewide academic award.',
   local_recommendation: 'Amplify the student achievement.',

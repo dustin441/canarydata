@@ -634,9 +634,9 @@ function ScoreGauge({ score }) {
         <line x1="142.3" y1="41.8" x2="152.3" y2="28.0" stroke="#94A3B8" strokeWidth="1.5" opacity="0.55" />
 
         {/* Zone labels */}
-        <text x="14"  y="116" textAnchor="middle" fill="#EF4444" fontSize="7.5" fontWeight="700" opacity="0.75">Concern</text>
-        <text x="100" y="9"   textAnchor="middle" fill="#60A5FA" fontSize="7.5" fontWeight="700" opacity="0.75">Neutral</text>
-        <text x="186" y="116" textAnchor="middle" fill="#22C55E" fontSize="7.5" fontWeight="700" opacity="0.75">Positive</text>
+        <text x="20"  y="116" textAnchor="middle" fill="#EF4444" fontSize="11" fontWeight="700">Concern</text>
+        <text x="100" y="10"  textAnchor="middle" fill="#60A5FA" fontSize="11" fontWeight="700">Neutral</text>
+        <text x="180" y="116" textAnchor="middle" fill="#22C55E" fontSize="11" fontWeight="700">Positive</text>
 
         {/* Score value */}
         <text
@@ -5098,7 +5098,7 @@ export default function DashboardClient({ articles, districts, queries: initialQ
               />
 
               <div className="filter-control-group">
-                <span className="filter-group-label">Strategic Alignment</span>
+                <span className="filter-group-label">Strategic Alignment <InfoTooltip text={STRATEGIC_ALIGNMENT_TOOLTIP} /></span>
                 <select
                   className="filter-select"
                   value={strategicAlignmentFilter}

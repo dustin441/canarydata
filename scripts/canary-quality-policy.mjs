@@ -79,6 +79,24 @@ function organizationKey(value) {
   return normalize(value).replace(/[^a-z0-9]+/g, ' ').trim();
 }
 
+const GENERIC_DOCUMENT_HOSTS = new Set(['docs.google.com', 'drive.google.com', 'boarddocs.com', 'go.boarddocs.com', 'dropbox.com', 'www.dropbox.com']);
+function sourceHostname(value) {
+  try { return new URL(String(value || '')).hostname.toLowerCase().replace(/^www\./, ''); } catch { return ''; }
+}
+export function isDistrictControlledNewsSource(fields = {}) {
+  const sourceKey = organizationKey(fields.source);
+  const districtKey = organizationKey(fields.district_name || fields.districtName || fields.district_id || fields.districtId);
+  if (sourceKey && districtKey && sourceKey === districtKey) return true;
+  const storyHost = sourceHostname(fields.link);
+  if (!storyHost || GENERIC_DOCUMENT_HOSTS.has(storyHost)) return false;
+  const sourceUrls = fields.strategic_priority_profile?.source_urls || fields.strategicProfile?.source_urls || [];
+  return sourceUrls.some((url) => {
+    const officialHost = sourceHostname(url);
+    return officialHost && !GENERIC_DOCUMENT_HOSTS.has(officialHost)
+      && (storyHost === officialHost || storyHost.endsWith(`.${officialHost}`));
+  });
+}
+
 function isDistrictControlledContent(fields = {}) {
   const source = organizationKey(fields.source);
   const district = organizationKey(fields.district_name || fields.districtName || fields.district_id || fields.districtId);
@@ -219,10 +237,13 @@ function capRecommendationWords(value, maxWords = 90) {
 }
 
 export function normalizeRecommendationContract(value, context = {}) {
-  const text = recommendationString(value).replace(/\s+/g, ' ').trim();
+  const rawText = recommendationString(value).replace(/\\n/g, '\n').replace(/\r\n?/g, '\n').trim();
+  const text = rawText.replace(/\s+/g, ' ').trim();
   if (!text || /^(n\/?a|not applicable|none|null|undefined|-)$/i.test(text)) return ROUTINE_RECOMMENDATION;
   if (/^no immediate communications action recommended\b/i.test(text)) return ROUTINE_RECOMMENDATION;
   if (/^review the source details before taking communications action\b/i.test(text)) return SOURCE_REVIEW_RECOMMENDATION;
+  const requiredHeadings = ['Strategic Intent', 'Audience Focus', 'Message Angle', 'Channel Strategy', 'Execution Plan', 'Guardrails', 'Expected Outcome', 'Next Phase'];
+  if (requiredHeadings.every((heading) => rawText.includes(`## ${heading}`))) return rawText;
 
   const completeText = capRecommendationWords(ensureRecommendationSentence(text));
   const words = completeText.split(/\s+/).filter(Boolean);

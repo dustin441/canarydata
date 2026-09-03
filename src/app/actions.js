@@ -5,7 +5,7 @@ import { createClient as createServerClient } from '@/lib/supabase/server';
 import { createClickUpFeedbackTask, createClickUpOnboardingTask, createClickUpQueryReviewTask, isClickUpConfigured } from '@/lib/clickup';
 import { revalidatePath } from 'next/cache';
 import { canonicalizeStoryUrl, requireCorrectionReason } from '@/lib/storyCorrections.mjs';
-import { CUSTOMER_SEARCH_QUERY_LIMIT, applySearchQuerySnapshotFilters, buildSearchQueryUpdate, hasActiveSearchQueryDuplicate, reconcileActiveSearchQueryWrite, searchQueryFingerprint, searchQuerySnapshot, validateSearchQueryText } from '@/lib/queryPolicy.mjs';
+import { CUSTOMER_SEARCH_QUERY_LIMIT, applySearchQuerySnapshotFilters, buildSearchQueryUpdate, hasActiveSearchQueryDuplicate, reconcileActiveSearchQueryWrite, searchQueryFingerprint, searchQuerySnapshot, validateCustomerSearchQueryText, validateSearchQueryText } from '@/lib/queryPolicy.mjs';
 import { lookup } from 'node:dns/promises';
 import { isIP } from 'node:net';
 import { createHash, randomUUID } from 'node:crypto';
@@ -1098,7 +1098,9 @@ export async function addQuery({ query_text, district_id, district_name, geo_cit
 
   let queryText;
   try {
-    queryText = validateSearchQueryText(query_text);
+    queryText = actor.isAdmin
+      ? validateSearchQueryText(query_text)
+      : validateCustomerSearchQueryText(query_text);
   } catch (error) {
     return { error: error.message };
   }

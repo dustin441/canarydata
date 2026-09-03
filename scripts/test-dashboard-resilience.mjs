@@ -8,7 +8,7 @@ const [page, data, dashboard, errorBoundary] = await Promise.all([
   readFile(new URL('../src/app/dashboard/error.js', import.meta.url), 'utf8'),
 ]);
 
-assert.match(page, /const DASHBOARD_DATA_TIMEOUT_MS = 6500/);
+assert.match(page, /const DASHBOARD_DATA_TIMEOUT_MS = 20000/);
 assert.match(page, /Promise\.race\(\[Promise\.resolve\(\)\.then\(loader\), timeout\]\)/);
 assert.match(page, /return \{ data: fallback, warning: label \}/);
 for (const label of [

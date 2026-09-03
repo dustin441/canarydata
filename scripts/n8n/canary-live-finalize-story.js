@@ -75,10 +75,13 @@ function capRecommendationWords(value, maxWords = 90) {
 }
 
 function normalizeRecommendationContract(value, context = {}) {
-  const text = recommendationString(value).replace(/\s+/g, ' ').trim();
+  const rawText = recommendationString(value).replace(/\\n/g, '\n').replace(/\r\n?/g, '\n').trim();
+  const text = rawText.replace(/\s+/g, ' ').trim();
   if (!text || /^(n\/?a|not applicable|none|null|undefined|-)$/i.test(text)) return ROUTINE_RECOMMENDATION;
   if (/^no immediate communications action recommended\b/i.test(text)) return ROUTINE_RECOMMENDATION;
   if (/^review the source details before taking communications action\b/i.test(text)) return SOURCE_REVIEW_RECOMMENDATION;
+  const requiredHeadings = ['Strategic Intent', 'Audience Focus', 'Message Angle', 'Channel Strategy', 'Execution Plan', 'Guardrails', 'Expected Outcome', 'Next Phase'];
+  if (requiredHeadings.every((heading) => rawText.includes(`## ${heading}`))) return rawText;
 
   const completeText = capRecommendationWords(ensureRecommendationSentence(text));
   const words = completeText.split(/\s+/).filter(Boolean);
@@ -190,6 +193,24 @@ return $input.all().map((item, index) => {
 
   function organizationKey(value) {
     return String(value || '').toLowerCase().replace(/[^a-z0-9]+/g, ' ').trim();
+  }
+
+  const GENERIC_DOCUMENT_HOSTS = new Set(['docs.google.com', 'drive.google.com', 'boarddocs.com', 'go.boarddocs.com', 'dropbox.com', 'www.dropbox.com']);
+  function sourceHostname(value) {
+    try { return new URL(String(value || '')).hostname.toLowerCase().replace(/^www\./, ''); } catch { return ''; }
+  }
+  function isDistrictControlledNewsSource(fields = {}) {
+    const sourceKey = organizationKey(fields.source);
+    const districtKey = organizationKey(fields.districtName || fields.districtId);
+    if (sourceKey && districtKey && sourceKey === districtKey) return true;
+    const storyHost = sourceHostname(fields.link);
+    if (!storyHost || GENERIC_DOCUMENT_HOSTS.has(storyHost)) return false;
+    const sourceUrls = fields.strategicProfile?.source_urls || [];
+    return sourceUrls.some((url) => {
+      const officialHost = sourceHostname(url);
+      return officialHost && !GENERIC_DOCUMENT_HOSTS.has(officialHost)
+        && (storyHost === officialHost || storyHost.endsWith(`.${officialHost}`));
+    });
   }
 
   function isDistrictControlledContent(fields = {}) {
@@ -386,6 +407,13 @@ return $input.all().map((item, index) => {
       source_query: prepared.source_query || meta.source_query || '',
       district_id: prepared.district_id || meta.district_id || '',
       source_type: prepared.source_type || meta.source_type || 'news',
+      is_earned_media: !isDistrictControlledNewsSource({
+        source,
+        link,
+        districtName: prepared.district_name || meta.district_name || '',
+        districtId: prepared.district_id || meta.district_id || '',
+        strategicProfile: meta.strategic_priority_profile || {},
+      }),
       relevance_score: relevanceScore,
     },
   };

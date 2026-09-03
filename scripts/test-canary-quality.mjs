@@ -5,10 +5,16 @@ import {
   canonicalStrategicAlignment,
   classifySource,
   detectSensitivePersonnelTrustIssue,
+  isDistrictControlledNewsSource,
   normalizeArticleInterpretation,
   normalizeRecommendationContract,
   validateCandidate,
 } from './canary-quality-policy.mjs';
+
+assert.equal(isDistrictControlledNewsSource({ source: 'Tuscaloosa City Schools', district_id: 'tuscaloosa-city-schools', link: 'https://tuscaloosacityschools.com/news/item' }), true);
+assert.equal(isDistrictControlledNewsSource({ source: 'WBMA', district_id: 'tuscaloosa-city-schools', link: 'https://abc3340.com/news/local/item', strategic_priority_profile: { source_urls: ['https://tuscaloosacityschools.com/strategic-plan'] } }), false);
+assert.equal(isDistrictControlledNewsSource({ source: 'District News', district_id: 'district-one', link: 'https://news.districtone.org/item', strategic_priority_profile: { source_urls: ['https://districtone.org/plan'] } }), true);
+assert.equal(isDistrictControlledNewsSource({ source: 'BoardDocs', district_id: 'district-one', link: 'https://go.boarddocs.com/item', strategic_priority_profile: { source_urls: ['https://go.boarddocs.com/plan'] } }), false);
 
 const fixtures = JSON.parse(await readFile(new URL('../test/fixtures/canary-quality-known-cases.json', import.meta.url), 'utf8'));
 const failures = [];

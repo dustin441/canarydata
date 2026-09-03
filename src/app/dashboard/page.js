@@ -14,7 +14,10 @@ import { loadCanaryAccountAccess } from '@/lib/account-access';
 import TrialEnded from './TrialEnded';
 import { getAdminBillingOverview } from '@/lib/admin-billing';
 
-const DASHBOARD_DATA_TIMEOUT_MS = 6500;
+// All-district admin views paginate thousands of News and Social rows. Keep the
+// fail-soft boundary, but allow those bounded reads to finish before replacing
+// valid data with empty arrays.
+const DASHBOARD_DATA_TIMEOUT_MS = 20000;
 
 async function loadDashboardDataset(label, loader, fallback) {
   let timer;

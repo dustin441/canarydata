@@ -25,6 +25,22 @@ export function validateSearchQueryText(value) {
   return query;
 }
 
+export function validateCustomerSearchQueryText(value) {
+  const query = validateSearchQueryText(value);
+  if (/\b(?:AND|OR|NOT)\b/i.test(query) || /[()]/.test(query)) {
+    throw new Error('Use one school, district, person, program, or topic per query. Compound Boolean queries require Canary review.');
+  }
+  const siteClauses = query.match(/\bsite\s*:/gi) || [];
+  if (siteClauses.length > 1) {
+    throw new Error('Use no more than one site: filter per query.');
+  }
+  const quoteCount = (query.match(/["“”]/g) || []).length;
+  if (quoteCount % 2 !== 0 || quoteCount > 2) {
+    throw new Error('Use at most one complete quoted phrase per query.');
+  }
+  return query;
+}
+
 export function activeNewsQueryCount(queries) {
   return (queries || []).filter((query) => query?.active !== false && query?.channels === 'news').length;
 }
@@ -107,7 +123,9 @@ export function buildSearchQueryUpdate({ actor, existingQuery, changes = {} }) {
     : existingQuery.channels;
 
   return {
-    query_text: validateSearchQueryText(changes.query_text),
+    query_text: actor?.isAdmin
+      ? validateSearchQueryText(changes.query_text)
+      : validateCustomerSearchQueryText(changes.query_text),
     channels,
     geo_city: cleanSearchQueryLocation(changes.geo_city ?? existingQuery.geo_city, 100),
     geo_state: cleanSearchQueryLocation(changes.geo_state ?? existingQuery.geo_state, 50),
