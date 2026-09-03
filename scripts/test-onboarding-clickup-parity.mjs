@@ -59,6 +59,8 @@ for (const expected of [
   request.confirmed_profile.discovery_notes,
 ]) assert.match(retryTask.markdown_content, new RegExp(expected.replace(/[.*+?^${}()|[\]\\]/g, '\\$&')));
 assert.equal(retryTask.name, '[Trial onboarding] Parity Public Schools');
+assert.match(directTask.markdown_content, /official-domain newsroom coverage check/);
+assert.match(directTask.markdown_content, /Record a provider limitation rather than representing owned coverage as complete/);
 assert.match(directTask.markdown_content, /Do not place a reusable password in ClickUp, email, or a shared tracker/);
 assert.match(directTask.markdown_content, /review the district through the authenticated admin dashboard/);
 assert.match(directTask.markdown_content, /Forgot Password/);

@@ -82,7 +82,7 @@ export function buildOnboardingTask(input) {
       '1. Auto-discover mission/vision/values, strategic plan language, official handles, schools, additive signals, and lookalike exclusions.',
       '2. Admin reviews/edits discovered setup.',
       '3. Customer confirms strategic language and handles if needed.',
-      '4. Canary runs clean-results test/backfill.',
+      '4. Canary runs clean-results test/backfill, including an explicit official-domain newsroom coverage check when the district publishes releases. Record a provider limitation rather than representing owned coverage as complete when those releases are not discoverable.',
       '5. Admin creates the protected login, verifies tenant scope, and starts the 30-day trial.',
       '6. For internal QA, Lesley or another authorized administrator should review the district through the authenticated admin dashboard; client credentials are not required for admin review.',
       '7. After acceptance, send the customer the login URL and their confirmed login email. The customer uses Forgot Password to set their own password; the 8-digit recovery code goes directly to the customer’s login email.',
