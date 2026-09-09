@@ -752,6 +752,9 @@ assert.doesNotMatch(actions, /Only approved results can be promoted/);
 for (const marker of ['Our Social', 'Public conversation', 'Hide as irrelevant', 'Correction history', 'Table', 'Cards', 'Official district post', 'Public mention']) {
   assert.ok(dashboard.includes(marker), `Dashboard must include ${marker}`);
 }
+assert.match(dashboard, /No reviewed social results in this view/);
+assert.match(dashboard, /Public discoveries remain outside client reporting until a Canary administrator approves them/);
+assert.doesNotMatch(dashboard, /check back after the next collection/i);
 assert.match(dashboard, /export function SocialView\(/);
 assert.match(dashboard, /const \[correctionHistoryPage, setCorrectionHistoryPage\] = useState\(\{ districtFilter, limit: 100 \}\)/);
 assert.match(dashboard, /useEffect\(\(\) => \{[\s\S]*?setCorrectionHistoryPage\(\{ districtFilter, limit: 100 \}\);[\s\S]*?\}, \[districtFilter\]\);/);

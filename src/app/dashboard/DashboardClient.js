@@ -3692,7 +3692,13 @@ export function SocialView({ socialResults, legacySocialResults = [], socialSour
         </details>
 
         {visibleResults.length === 0 ? (
-          <div className="empty-state"><div className="empty-state-icon">💬</div><h3>No social results found</h3><p>Try another filter, or check back after the next collection.</p></div>
+          <div className="empty-state">
+            <div className="empty-state-icon">💬</div>
+            <h3>No reviewed social results in this view</h3>
+            <p>{relationshipFilter === 'public'
+              ? 'No reviewed public conversation is available for this district and current view. Public discoveries remain outside client reporting until a Canary administrator approves them.'
+              : 'No reviewed social results match the selected filters.'}</p>
+          </div>
         ) : (
           <>
             {socialFeedViewMode === 'table' ? (
