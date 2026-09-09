@@ -19,6 +19,7 @@ import {
   summarizeSocialContentFormats,
   summarizeSocialReport,
 } from '../src/lib/socialReport.mjs';
+import { isLegacySocialArticle, isNewsEligibleArticle } from '../src/lib/newsEligibility.mjs';
 
 assert.equal(neutralizeSpreadsheetFormula('=HYPERLINK("https://bad.example")'), "'=HYPERLINK(\"https://bad.example\")");
 assert.equal(neutralizeSpreadsheetFormula('  @SUM(1,2)'), "'  @SUM(1,2)");
@@ -241,6 +242,8 @@ async function compileDataModuleForPaginationTest(source, createAdminClient) {
     '@/lib/collectionHealth.mjs': { buildCollectionHealth: () => ({}) },
     '@/lib/social-affiliate-preview': { buildSocialAffiliatePreview: () => ({}) },
     '@/lib/social.mjs': { mergeSocialProviderObservationMetadata: (threads) => threads },
+    '@/lib/clientAccess.mjs': { buildClientAccessDirectory: () => ({}) },
+    '@/lib/newsEligibility.mjs': { isLegacySocialArticle, isNewsEligibleArticle },
   };
   const controlledRequire = (specifier) => {
     assert.ok(specifier in modules, `Unexpected module import in data harness: ${specifier}`);

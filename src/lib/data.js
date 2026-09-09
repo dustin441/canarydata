@@ -3,51 +3,58 @@ import { buildCollectionHealth, buildSocialCollectionHealth } from '@/lib/collec
 import { buildSocialAffiliatePreview } from '@/lib/social-affiliate-preview';
 import { mergeSocialProviderObservationMetadata } from '@/lib/social.mjs';
 import { buildClientAccessDirectory } from '@/lib/clientAccess.mjs';
+import { isLegacySocialArticle, isNewsEligibleArticle } from '@/lib/newsEligibility.mjs';
 
 const ARTICLE_COLUMNS = 'id, created_at, date, headline, summary, source, source_type, canary_score, tags, notes, is_earned_media, communications_earned, communications_earned_updated_at, communications_earned_updated_by, is_perched, link, district_id, innovation_reason, recommendation, source_query, canonical_url, visibility_status, manual_override, correction_version';
 const ARTICLE_PAGE_SIZE = 1000;
 
-export async function getArticles(districtId = null) {
+async function getArticleRows({ districtId = null, visibilityStatus = null, predicate = () => true, limit = null } = {}) {
   const supabase = createAdminClient();
-  const allArticles = [];
+  const matchingArticles = [];
 
   for (let from = 0; ; from += ARTICLE_PAGE_SIZE) {
     let query = supabase
       .from('news_stories')
       .select(ARTICLE_COLUMNS)
-      .eq('visibility_status', 'active')
       .order('date', { ascending: false })
       .order('id', { ascending: true })
       .range(from, from + ARTICLE_PAGE_SIZE - 1);
 
-    if (districtId) {
-      query = query.eq('district_id', districtId);
-    }
+    if (visibilityStatus) query = query.eq('visibility_status', visibilityStatus);
+    if (districtId) query = query.eq('district_id', districtId);
 
     const { data, error } = await query;
     if (error) throw error;
 
     const page = data ?? [];
-    allArticles.push(...page);
+    matchingArticles.push(...page.filter(predicate));
 
-    if (page.length < ARTICLE_PAGE_SIZE) break;
+    if (page.length < ARTICLE_PAGE_SIZE || (limit && matchingArticles.length >= limit)) break;
   }
 
-  return allArticles;
+  return limit ? matchingArticles.slice(0, limit) : matchingArticles;
+}
+
+export async function getArticles(districtId = null, { limit = null } = {}) {
+  return getArticleRows({
+    districtId,
+    visibilityStatus: 'active',
+    predicate: isNewsEligibleArticle,
+    limit,
+  });
+}
+
+export async function getLegacySocialAuditArticles(districtId = null) {
+  return getArticleRows({ districtId, predicate: isLegacySocialArticle });
 }
 
 export async function getExcludedStories(districtId = null) {
-  const supabase = createAdminClient();
-  let query = supabase
-    .from('news_stories')
-    .select(ARTICLE_COLUMNS)
-    .eq('visibility_status', 'excluded')
-    .order('created_at', { ascending: false })
-    .limit(250);
-  if (districtId) query = query.eq('district_id', districtId);
-  const { data, error } = await query;
-  if (error) throw error;
-  return data ?? [];
+  return getArticleRows({
+    districtId,
+    visibilityStatus: 'excluded',
+    predicate: isNewsEligibleArticle,
+    limit: 250,
+  });
 }
 
 export async function getStoryCorrectionEvents(districtId = null) {
@@ -532,10 +539,10 @@ export async function getCollectionHealth(districts, districtId = null) {
   const [rawResults, candidates, stories] = await Promise.all([
     readRecent('raw_search_results', 'district_id, collected_at', 'collected_at'),
     readRecent('story_candidates', 'district_id, evaluated_at', 'evaluated_at'),
-    readRecent('news_stories', 'district_id, created_at', 'created_at'),
+    readRecent('news_stories', 'district_id, source_type, created_at', 'created_at'),
   ]);
   const scopedDistricts = districtId ? districts.filter((district) => district.id === districtId) : districts;
-  return buildCollectionHealth({ districts: scopedDistricts, rawResults, candidates, stories });
+  return buildCollectionHealth({ districts: scopedDistricts, rawResults, candidates, stories: stories.filter(isNewsEligibleArticle) });
 }
 
 export async function getSocialCollectionHealth(districts, districtId = null) {

@@ -2,6 +2,7 @@ import { readFile, writeFile } from 'node:fs/promises';
 import { createHash } from 'node:crypto';
 import { feedbackDispatchAgeHours } from '../src/lib/feedbackDispatch.mjs';
 import { buildSocialCollectionHealth } from '../src/lib/collectionHealth.mjs';
+import { isNewsEligibleArticle } from '../src/lib/newsEligibility.mjs';
 
 const required = (name) => {
   const value = process.env[name];
@@ -77,7 +78,7 @@ const [districts, generatedQueries, searchQueries, rawResults, stories, candidat
   supabase('generated_queries', { select: 'id,district_id,query_type,query_text,search_params,active', active: 'eq.true', limit: '1000' }),
   supabase('search_queries', { select: 'id,district_id,query_text,active', active: 'eq.true', limit: '1000' }),
   supabase('raw_search_results', { select: 'generated_query_id,district_id,source_name,collected_at', collected_at: `gte.${isoAgo(14)}`, limit: '5000' }),
-  supabase('news_stories', { select: 'district_id,source,created_at', created_at: `gte.${isoAgo(14)}`, limit: '5000' }),
+  supabase('news_stories', { select: 'district_id,source,source_type,created_at', visibility_status: 'eq.active', created_at: `gte.${isoAgo(14)}`, limit: '5000' }),
   supabase('story_candidates', { select: 'generated_query_id,district_id,decision,evaluated_at', evaluated_at: `gte.${isoAgo(7)}`, limit: '5000' }),
   supabase('feedback', { select: 'id,district_id,district_name,status,created_at,message', status: 'eq.query_review_pending', limit: '1000' }),
   supabase('feedback', { select: 'id,district_id,district_name,status,created_at,message', status: 'in.(lead_request,lead_clickup_failed,onboarding_request,onboarding_clickup_failed,clickup_failed)', limit: '1000' }),
@@ -130,7 +131,7 @@ for (const row of rawResults) {
   if (row.source_name) sourcesByDistrict.get(row.district_id).add(String(row.source_name).toLowerCase());
   setLatest(latestRawByDistrict, row.district_id, row.collected_at);
 }
-for (const row of stories) {
+for (const row of stories.filter(isNewsEligibleArticle)) {
   inc(storyByDistrict, row.district_id);
   setLatest(latestStoryByDistrict, row.district_id, row.created_at);
 }

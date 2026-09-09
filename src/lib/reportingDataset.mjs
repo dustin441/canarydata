@@ -1,11 +1,9 @@
 import { buildSocialResults } from './social.mjs';
 import { canonicalTags } from './canonicalTags.mjs';
+import { isLegacySocialArticle, isNewsEligibleArticle } from './newsEligibility.mjs';
 
-export const SOCIAL_SOURCE_TYPES = new Set(['facebook', 'instagram', 'tiktok', 'twitter', 'x', 'youtube', 'threads', 'linkedin']);
-
-export function isNewsMediaArticle(article) {
-  return !SOCIAL_SOURCE_TYPES.has(String(article?.source_type || '').toLowerCase());
-}
+// Backward-compatible export for existing report/demo consumers.
+export const isNewsMediaArticle = isNewsEligibleArticle;
 
 function includesCampaign(values, campaignSearch = '') {
   const query = String(campaignSearch || '').trim().toLowerCase();
@@ -47,44 +45,16 @@ function socialRecordKey(result) {
   return `${result?.districtId || 'unscoped'}:${result?.id || result?.url || result?.date || ''}`;
 }
 
-function normalizeSocialPlatform(value) {
-  const platform = String(value || '').trim().toLowerCase();
-  if (platform === 'twitter') return 'x';
-  return platform;
-}
-
-function socialLaneKey(districtId, platform) {
-  return `${districtId || 'unscoped'}:${normalizeSocialPlatform(platform)}`;
-}
-
-export function buildReportingDataset({ articles = [], socialThreads = [], socialSources = [] } = {}) {
+export function buildReportingDataset({ articles = [], socialThreads = [], legacySocialArticles = [] } = {}) {
   const seenMediaIds = new Set();
-  const mediaArticles = articles.filter(isNewsMediaArticle).filter((article) => {
+  const mediaArticles = articles.filter(isNewsEligibleArticle).filter((article) => {
     const key = mediaRecordKey(article);
     if (seenMediaIds.has(key)) return false;
     seenMediaIds.add(key);
     return true;
   });
-  const legacySocialArticles = articles.filter((article) => !isNewsMediaArticle(article));
-  const configuredLaneKeys = new Set();
-  for (const source of socialSources) {
-    if (source?.active === false) continue;
-    const platform = normalizeSocialPlatform(source?.platform || source?.source_type);
-    if (platform) configuredLaneKeys.add(socialLaneKey(source?.district_id, platform));
-  }
-  for (const thread of socialThreads) {
-    const platform = normalizeSocialPlatform(thread?.platform);
-    if (platform) configuredLaneKeys.add(socialLaneKey(thread?.district_id, platform));
-  }
-  const fallbackLegacyArticles = legacySocialArticles.filter((article) => (
-    !configuredLaneKeys.has(socialLaneKey(article?.district_id, article?.source_type))
-  ));
-  const suppressedLegacyArticles = legacySocialArticles.filter((article) => (
-    configuredLaneKeys.has(socialLaneKey(article?.district_id, article?.source_type))
-  ));
-
   const socialInputsByDistrict = new Map();
-  for (const record of [...socialThreads, ...fallbackLegacyArticles]) {
+  for (const record of socialThreads) {
     const districtId = record?.district_id || 'unscoped';
     if (!socialInputsByDistrict.has(districtId)) socialInputsByDistrict.set(districtId, []);
     socialInputsByDistrict.get(districtId).push(record);
@@ -92,17 +62,16 @@ export function buildReportingDataset({ articles = [], socialThreads = [], socia
   const socialResults = Array.from(socialInputsByDistrict.values())
     .flatMap((recordsForDistrict) => buildSocialResults(recordsForDistrict));
 
-  // Preserve only legacy rows suppressed by a configured canonical district/platform
-  // lane as admin reference data. Unmigrated lanes retain their legacy fallback.
+  // Legacy news_stories Social rows are supplied only to authenticated admins and
+  // remain audit evidence. They never enter client Social feeds, totals, or reports.
   const legacyInputsByDistrict = new Map();
-  for (const record of [...socialThreads, ...suppressedLegacyArticles]) {
+  for (const record of legacySocialArticles.filter(isLegacySocialArticle)) {
     const districtId = record?.district_id || 'unscoped';
     if (!legacyInputsByDistrict.has(districtId)) legacyInputsByDistrict.set(districtId, []);
     legacyInputsByDistrict.get(districtId).push(record);
   }
   const suppressedLegacySocialResults = Array.from(legacyInputsByDistrict.values())
-    .flatMap((recordsForDistrict) => buildSocialResults(recordsForDistrict))
-    .filter((result) => !result.socialAccountId && !result.externalThreadId);
+    .flatMap((recordsForDistrict) => buildSocialResults(recordsForDistrict));
 
   const records = [
     ...mediaArticles.map((article) => ({

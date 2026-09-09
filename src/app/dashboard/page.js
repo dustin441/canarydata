@@ -1,4 +1,4 @@
-import { getArticles, getDistricts, getQueries, getClients, getExcludedStories, getStoryCorrectionEvents, getSocialSources, getSocialThreads, getSocialMetricSnapshots, getSocialMetricHistory, getRecentSocialReviewEvents, getStrategicProfiles, getStrategicPriorities, getCollectionHealth, getSocialCollectionHealth } from '@/lib/data';
+import { getArticles, getDistricts, getQueries, getClients, getExcludedStories, getLegacySocialAuditArticles, getStoryCorrectionEvents, getSocialSources, getSocialThreads, getSocialMetricSnapshots, getSocialMetricHistory, getRecentSocialReviewEvents, getStrategicProfiles, getStrategicPriorities, getCollectionHealth, getSocialCollectionHealth } from '@/lib/data';
 import { createClient } from '@/lib/supabase/server';
 import { createAdminClient } from '@/lib/supabase/admin';
 import DashboardClient from './DashboardClient';
@@ -125,6 +125,7 @@ export default async function DashboardPage({ searchParams }) {
   const dashboardUserDistrictId = isDemoReviewer ? null : userDistrictId;
   const dataLoads = await Promise.all([
     loadDashboardDataset('News results', () => getArticles(dataDistrictId), []),
+    isAdmin ? loadDashboardDataset('Legacy Social audit evidence', () => getLegacySocialAuditArticles(dataDistrictId), []) : Promise.resolve({ data: [], warning: null }),
     loadDashboardDataset('Queries', () => getQueries(dataDistrictId), []),
     isAdmin ? loadDashboardDataset('Client directory', getClients, []) : Promise.resolve({ data: [], warning: null }),
     loadDashboardDataset('Excluded news results', () => getExcludedStories(dataDistrictId), []),
@@ -140,7 +141,7 @@ export default async function DashboardPage({ searchParams }) {
     isAdmin ? loadDashboardDataset('Social collection health', () => getSocialCollectionHealth(districts, dataDistrictId), []) : Promise.resolve({ data: [], warning: null }),
     isAdmin ? loadDashboardDataset('Billing pipeline', getAdminBillingOverview, { rows: [], summary: null }) : Promise.resolve({ data: { rows: [], summary: null }, warning: null }),
   ]);
-  const [articles, queries, clients, excludedStories, correctionEvents, socialSources, socialThreads, socialMetricSnapshots, socialMetricHistory, socialReviewEvents, strategicProfiles, strategicPriorities, collectionHealth, socialCollectionHealth, adminBillingOverview] = dataLoads.map((result) => result.data);
+  const [articles, legacySocialAuditArticles, queries, clients, excludedStories, correctionEvents, socialSources, socialThreads, socialMetricSnapshots, socialMetricHistory, socialReviewEvents, strategicProfiles, strategicPriorities, collectionHealth, socialCollectionHealth, adminBillingOverview] = dataLoads.map((result) => result.data);
   const enrichedSocialThreads = enrichSocialThreadsWithNativeMetrics(socialThreads, socialMetricSnapshots);
   const socialAccountMetricSummaries = Object.fromEntries(
     [...new Set(socialMetricSnapshots.map((row) => row.district_id).filter(Boolean))].map((districtId) => [
@@ -194,6 +195,7 @@ export default async function DashboardPage({ searchParams }) {
   return (
     <DashboardClient
       articles={articles}
+      legacySocialAuditArticles={legacySocialAuditArticles}
       districts={districts}
       queries={queries}
       clients={clients}

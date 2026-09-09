@@ -3798,7 +3798,7 @@ export function SocialView({ socialResults, legacySocialResults = [], socialSour
   );
 }
 
-export default function DashboardClient({ articles, districts, queries: initialQueries, clients = [], adminBillingOverview = { rows: [], summary: null }, userDistrictId, initialDistrictId = null, initialView = 'dashboard', paymentNotice = null, billingInfo = null, publicPricingLabel = 'Annual access', publicPricingIntroductory = false, excludedStories = [], correctionEvents = [], socialSources = [], socialThreads = [], socialAccountMetricSummaries = {}, socialPerformanceHistory = {}, socialReviewEvents = [], strategicProfiles = [], strategicPriorities = [], collectionHealth = [], socialCollectionHealth = [], dataWarnings = [], isAdmin = false, isDemoReviewer = false, reviewerDistrictCount = 0, melodiEnabled = false, metaIntegrationEnabled = false, demoMode = false, socialReportAsOf = null }) {
+export default function DashboardClient({ articles, legacySocialAuditArticles = [], districts, queries: initialQueries, clients = [], adminBillingOverview = { rows: [], summary: null }, userDistrictId, initialDistrictId = null, initialView = 'dashboard', paymentNotice = null, billingInfo = null, publicPricingLabel = 'Annual access', publicPricingIntroductory = false, excludedStories = [], correctionEvents = [], socialSources = [], socialThreads = [], socialAccountMetricSummaries = {}, socialPerformanceHistory = {}, socialReviewEvents = [], strategicProfiles = [], strategicPriorities = [], collectionHealth = [], socialCollectionHealth = [], dataWarnings = [], isAdmin = false, isDemoReviewer = false, reviewerDistrictCount = 0, melodiEnabled = false, metaIntegrationEnabled = false, demoMode = false, socialReportAsOf = null }) {
   const defaultDistrictFilter = userDistrictId ?? initialDistrictId ?? districts[0]?.id ?? 'All';
   const [currentView, setCurrentView] = useState(initialView);
   const [search, setSearch] = useState('');
@@ -4063,8 +4063,8 @@ export default function DashboardClient({ articles, districts, queries: initialQ
     [articles, noteOverrides],
   );
   const reportingDataset = useMemo(
-    () => buildReportingDataset({ articles: reportingArticles, socialThreads, socialSources }),
-    [reportingArticles, socialThreads, socialSources],
+    () => buildReportingDataset({ articles: reportingArticles, socialThreads, legacySocialArticles: legacySocialAuditArticles }),
+    [reportingArticles, socialThreads, legacySocialAuditArticles],
   );
   const districtReportingDataset = useMemo(
     () => filterReportingDataset(reportingDataset, { districtId: districtFilter }),

@@ -4,6 +4,7 @@ import { createClient as createSessionClient } from '@/lib/supabase/server';
 import { createAdminClient } from '@/lib/supabase/admin';
 import { safeMelodiSourceUrl, selectMelodiContext, stableMelodiCitationId, validateMelodiAnswer } from '@/lib/melodi.mjs';
 import { loadCanaryAccountAccess } from '@/lib/account-access';
+import { getArticles } from '@/lib/data';
 
 export const runtime = 'nodejs';
 export const maxDuration = 60;
@@ -166,7 +167,7 @@ export async function POST(request) {
       admin.from('districts').select('id, name').eq('id', districtId).maybeSingle(),
       admin.from('strategic_profiles').select('district_id, source_confidence, mission, vision, values, source_urls, last_reviewed_at').eq('district_id', districtId).maybeSingle(),
       admin.from('strategic_priorities').select('id, label, description, confidence, source_urls').eq('district_id', districtId).eq('active', true).order('label').limit(20),
-      admin.from('news_stories').select('id, date, headline, summary, source, source_type, canary_score, tags, is_earned_media, communications_earned, link, canonical_url, innovation_reason, recommendation, created_at').eq('district_id', districtId).eq('visibility_status', 'active').order('date', { ascending: false }).limit(120),
+      getArticles(districtId, { limit: 120 }).then((data) => ({ data, error: null })).catch((error) => ({ data: null, error })),
       admin.from('social_threads').select('id, platform, canonical_url, relationship_type, author_name, author_handle, headline, body, summary, recommendation, published_at, engagement_total, sentiment, risk_level, tags, strategic_alignment, visibility_status, created_at').eq('district_id', districtId).eq('visibility_status', 'active').order('published_at', { ascending: false }).limit(120),
     ]);
     const queryError = [districtResult, profileResult, prioritiesResult, newsResult, socialResult].find((result) => result.error)?.error;
