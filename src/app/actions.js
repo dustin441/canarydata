@@ -12,6 +12,7 @@ import { createHash, randomUUID } from 'node:crypto';
 import { assertStrategicPlanFileSize } from '@/lib/onboarding-upload.mjs';
 import { assertConfirmedOnboardingProfileQuality, findMeaningfulSnippets, sanitizeStrategicDocumentText } from '@/lib/onboarding-discovery-quality.mjs';
 import { buildSocialCorrectionRpcArgs, requireSocialCorrectionExpectedVersion } from '@/lib/socialLifecycle.mjs';
+import { normalizeSocialDiscoveryBatchItems } from '@/lib/socialDiscoveryReview.mjs';
 import { requireCanaryAccountAccess } from '@/lib/account-access';
 
 async function requireCanaryActor() {
@@ -893,6 +894,53 @@ export async function reviewSocialDiscoveryCandidate(input = {}) {
   revalidatePath('/dashboard/affiliates');
   revalidatePath('/dashboard');
   return Array.isArray(data) ? data[0] : data;
+}
+
+export async function reviewSocialDiscoveryCandidates(input = {}) {
+  const { actor, admin: supabase } = await requireCanaryActor();
+  assertCanaryReviewer(actor);
+  const districtId = cleanAffiliateText(input.districtId, 'District', 200, true);
+  const action = String(input.action || '').trim().toLowerCase();
+  if (!['approve', 'reject'].includes(action)) throw new Error('Unsupported Social discovery action.');
+  assertDistrictAccess(actor, districtId);
+  const items = normalizeSocialDiscoveryBatchItems(input.items);
+  const reviewerNote = cleanAffiliateText(input.reviewerNote, 'Reviewer note', 2000, true);
+  const idempotencyKey = cleanAffiliateText(input.idempotencyKey || randomUUID(), 'Idempotency key', 80, true);
+  const candidateIds = items.map((item) => item.candidateId);
+  const { data: current, error: currentError } = await supabase
+    .from('social_discovery_candidates')
+    .select('id,district_id,status,review_version')
+    .eq('district_id', districtId)
+    .eq('status', 'pending')
+    .in('id', candidateIds);
+  if (currentError) throw currentError;
+  if ((current || []).length !== items.length) throw new Error('One or more candidates changed. Refresh before reviewing the batch.');
+  const currentById = new Map((current || []).map((candidate) => [candidate.id, candidate]));
+  for (const item of items) {
+    const candidate = currentById.get(item.candidateId);
+    if (!candidate || candidate.review_version !== item.expectedVersion) {
+      throw new Error('One or more candidates changed. Refresh before reviewing the batch.');
+    }
+  }
+
+  const reviewed = [];
+  const failed = [];
+  for (const item of items) {
+    const { data, error } = await supabase.rpc('canary_review_social_discovery', {
+      p_actor_user_id: actor.id,
+      p_expected_district_id: districtId,
+      p_candidate_id: item.candidateId,
+      p_action: action,
+      p_expected_version: item.expectedVersion,
+      p_reviewer_note: reviewerNote,
+      p_idempotency_key: `${idempotencyKey}:${item.candidateId}:${action}`,
+    });
+    if (error) failed.push({ candidateId: item.candidateId, message: error.message || 'Review failed.' });
+    else reviewed.push(Array.isArray(data) ? data[0] : data);
+  }
+  revalidatePath('/dashboard/affiliates');
+  revalidatePath('/dashboard');
+  return { requested: items.length, reviewed, failed };
 }
 
 export async function claimSocialAffiliate(input = {}) {

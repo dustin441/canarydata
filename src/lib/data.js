@@ -593,7 +593,7 @@ export async function getPendingSocialDiscoveryCandidates(districtId) {
     .eq('district_id', districtId)
     .eq('status', 'pending')
     .order('last_seen_at', { ascending: false })
-    .limit(100);
+    .limit(500);
   if (error) {
     if (error.code === '42P01' || error.code === 'PGRST205') return { available: false, candidates: [] };
     throw error;

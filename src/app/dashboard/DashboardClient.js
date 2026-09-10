@@ -174,9 +174,11 @@ function nativeSocialWindowLabel(metric) {
   return nativeSocialMetricWindowLabel(metric);
 }
 
-function renderedSocialMediaUrl(value) {
+function renderedSocialMediaUrl(value, sourceValue = '') {
   const safeUrl = safeSocialMediaUrl(value);
-  return safeUrl || '';
+  if (!safeUrl) return '';
+  const sourceUrl = safeSocialUrl(sourceValue);
+  return sourceUrl ? `/api/social-media?url=${encodeURIComponent(safeUrl)}&source=${encodeURIComponent(sourceUrl)}` : safeUrl;
 }
 
 function formatSourceLabel(source) {
@@ -2698,8 +2700,8 @@ function SocialPostPreviewCard({ result, source, rank = null, showContext = fals
   const mediaUrl = safeSocialMediaUrl(result.mediaUrl);
   const videoUrl = safeSocialMediaUrl(result.videoUrl);
   const profileImageUrl = safeSocialMediaUrl(result.profileImageUrl || (result.relationshipType === 'owned' ? source?.metadata?.profile_picture_url : ''));
-  const renderedMediaUrl = renderedSocialMediaUrl(mediaUrl);
-  const renderedVideoUrl = renderedSocialMediaUrl(videoUrl);
+  const renderedMediaUrl = renderedSocialMediaUrl(mediaUrl, result.url);
+  const renderedVideoUrl = renderedSocialMediaUrl(videoUrl, result.url);
   const renderedProfileImageUrl = renderedSocialMediaUrl(profileImageUrl);
   const [failedMediaUrl, setFailedMediaUrl] = useState('');
   const [failedProfileImageUrl, setFailedProfileImageUrl] = useState('');
@@ -2919,8 +2921,8 @@ function SocialPostPreviewCard({ result, source, rank = null, showContext = fals
 
 function SocialReportCard({ result, rank }) {
   const thumbnailUrl = safeSocialMediaUrl(result.mediaUrl);
-  const renderedThumbnailUrl = renderedSocialMediaUrl(thumbnailUrl);
   const sourceUrl = safeSocialUrl(result.url);
+  const renderedThumbnailUrl = renderedSocialMediaUrl(thumbnailUrl, sourceUrl);
   const [failedThumbnailUrl, setFailedThumbnailUrl] = useState('');
   const thumbnailAvailable = Boolean(thumbnailUrl && failedThumbnailUrl !== thumbnailUrl);
   const reportedInteractions = socialReportInteractionTotal(result);
