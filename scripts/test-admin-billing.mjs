@@ -4,8 +4,9 @@ import { readFile } from 'node:fs/promises';
 const poSourceUrl = new URL('../src/lib/purchase-order.mjs', import.meta.url);
 const billingOverviewUrl = new URL('../src/lib/admin-billing.mjs', import.meta.url);
 const billingSourceUrl = new URL('../src/lib/admin-billing.js', import.meta.url);
+const actionsSourceUrl = new URL('../src/app/actions.js', import.meta.url);
 const { validatePurchaseOrder } = await import(poSourceUrl);
-const { buildAdminBillingOverview, mergeAdminBillingRecords } = await import(billingOverviewUrl);
+const { buildAdminBillingOverview, filterAdminBillingRows, mergeAdminBillingRecords } = await import(billingOverviewUrl);
 
 for (const value of ['PO-2026-1042', 'FY26/PO 00481', '#A_19.7', '2026-00481']) {
   const result = validatePurchaseOrder(value);
@@ -34,23 +35,39 @@ const overview = buildAdminBillingOverview([
     trial_status: 'not_started', access_status: 'pending_setup', trial_starts_at: null,
     trial_ends_at: null, paid_at: null, paid_through: null,
   },
+  {
+    id: 'request-4', organization_name: 'Shelby County School District', po_number: null, payment_status: 'paid',
+    trial_status: 'converted', access_status: 'manual_hold', paid_at: '2026-07-28T16:30:36Z',
+    paid_through: '2027-07-28T16:30:36Z', updated_at: '2026-09-10T00:00:00Z',
+    confirmed_profile: { sales_attribution: { owner: 'Cindy Warner', commission_eligible: true } },
+  },
 ], new Date('2026-09-02T00:00:00Z'));
 
 assert.deepEqual(overview.summary, {
-  organizations: 3,
-  paid: 1,
+  organizations: 4,
+  paid: 2,
   paymentPending: 2,
   poValid: 1,
-  poMissing: 1,
+  poMissing: 2,
   poInvalid: 1,
   activeTrials: 1,
   activeAccess: 2,
+  followUp: 2,
 });
 assert.equal(overview.rows[0].poState, 'valid');
 assert.equal(overview.rows[1].poState, 'missing');
 assert.equal(overview.rows[2].poState, 'invalid');
 assert.equal('poNumber' in overview.rows[0], false, 'central view must not expose raw PO numbers');
 assert.equal(JSON.stringify(overview).includes('PO-10'), false, 'central view must not serialize raw PO values');
+const shelby = overview.rows.find((row) => row.id === 'request-4');
+assert.equal(shelby.salesAttributionOwner, 'Cindy Warner');
+assert.equal(shelby.commissionEligible, true);
+assert.equal(shelby.followUpReason, 'Manual access decision');
+assert.equal(shelby.expectedUpdatedAt, '2026-09-10T00:00:00Z');
+assert.deepEqual(filterAdminBillingRows(overview.rows, { searchTerm: 'shelby', statusFilter: 'all' }).map((row) => row.id), ['request-4']);
+assert.deepEqual(filterAdminBillingRows(overview.rows, { searchTerm: '', statusFilter: 'commission' }).map((row) => row.id), ['request-4']);
+assert.deepEqual(filterAdminBillingRows(overview.rows, { searchTerm: '', statusFilter: 'follow_up' }).map((row) => row.id).sort(), ['request-3', 'request-4']);
+assert.equal(JSON.stringify(shelby).includes('cwarner@'), false, 'billing rows must not expose contact email through attribution support');
 
 const merged = mergeAdminBillingRecords([
   { id: 'request-1', organization_name: 'Request Name', contact_email: 'hidden@district.org', po_number: null, payment_status: 'pending' },
@@ -85,7 +102,13 @@ assert.match(adminBillingSource, /freshUserResult\?\.user\?\.app_metadata\?\.rol
 assert.match(adminBillingSource, /status = 403/, 'non-admin reads must be forbidden server-side');
 assert.match(adminBillingSource, /\.from\('onboarding_requests'\)/);
 assert.match(adminBillingSource, /contact_email/, 'server-side email reconciliation should merge legacy request/account links');
+assert.match(adminBillingSource, /confirmed_profile/, 'server-side billing read should load protected attribution metadata');
 assert.match(adminBillingSource, /listUsers\(\{ page, perPage \}\)/, 'legacy and protected Auth billing state must be loaded with pagination');
+const actionsSource = await readFile(actionsSourceUrl, 'utf8');
+assert.match(actionsSource, /export async function updateAdminBillingAttribution/);
+assert.match(actionsSource, /assertCanaryReviewer\(actor\)/, 'billing attribution mutation must require a protected admin');
+assert.match(actionsSource, /\.eq\('updated_at', expectedUpdatedAt\)/, 'billing attribution mutation must be concurrency guarded');
+assert.match(actionsSource, /owner\.length > 120/, 'billing attribution owner must be bounded');
 
 const dashboardPage = await readFile(new URL('../src/app/dashboard/page.js', import.meta.url), 'utf8');
 assert.match(dashboardPage, /isAdmin \? loadDashboardDataset\('Billing pipeline'/, 'only protected admins may trigger the cross-district billing read');

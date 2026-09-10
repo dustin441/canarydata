@@ -79,6 +79,64 @@ function cleanFormValue(formData, key) {
   return String(formData.get(key) || '').trim();
 }
 
+export async function updateAdminBillingAttribution(formData) {
+  const { actor, admin } = await requireCanaryActor();
+  assertCanaryReviewer(actor);
+  const onboardingRequestId = cleanFormValue(formData, 'onboarding_request_id');
+  const expectedUpdatedAt = cleanFormValue(formData, 'expected_updated_at');
+  const owner = cleanFormValue(formData, 'sales_attribution_owner').replace(/\s+/g, ' ');
+  const commissionEligible = formData.get('commission_eligible') === 'on';
+  if (!/^[0-9a-f]{8}-[0-9a-f]{4}-[1-5][0-9a-f]{3}-[89ab][0-9a-f]{3}-[0-9a-f]{12}$/i.test(onboardingRequestId)) {
+    throw new Error('A valid onboarding billing record is required.');
+  }
+  if (!expectedUpdatedAt || !Number.isFinite(Date.parse(expectedUpdatedAt))) {
+    throw new Error('Billing record version is required. Refresh and try again.');
+  }
+  if (owner.length > 120) throw new Error('Sales attribution owner is too long.');
+
+  const { data: current, error: currentError } = await admin
+    .from('onboarding_requests')
+    .select('id, updated_at, confirmed_profile')
+    .eq('id', onboardingRequestId)
+    .maybeSingle();
+  if (currentError) throw currentError;
+  if (!current) throw new Error('Billing record not found.');
+  if (current.updated_at !== expectedUpdatedAt) {
+    throw new Error('Billing record changed. Refresh before saving attribution.');
+  }
+
+  const updatedAt = new Date().toISOString();
+  const confirmedProfile = current.confirmed_profile && typeof current.confirmed_profile === 'object'
+    ? current.confirmed_profile
+    : {};
+  const nextProfile = {
+    ...confirmedProfile,
+    sales_attribution: {
+      owner: owner || null,
+      commission_eligible: commissionEligible,
+      updated_at: updatedAt,
+      updated_by: actor.id,
+    },
+  };
+  const { data: updated, error: updateError } = await admin
+    .from('onboarding_requests')
+    .update({ confirmed_profile: nextProfile, updated_at: updatedAt })
+    .eq('id', onboardingRequestId)
+    .eq('updated_at', expectedUpdatedAt)
+    .select('id, updated_at')
+    .maybeSingle();
+  if (updateError) throw updateError;
+  if (!updated) throw new Error('Billing record changed. Refresh before saving attribution.');
+  revalidatePath('/dashboard');
+  return {
+    success: true,
+    id: updated.id,
+    expectedUpdatedAt: updated.updated_at,
+    salesAttributionOwner: owner,
+    commissionEligible,
+  };
+}
+
 function normalizeWebsite(value) {
   const trimmed = String(value || '').trim();
   if (!trimmed) return '';

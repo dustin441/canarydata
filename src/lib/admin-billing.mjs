@@ -21,6 +21,39 @@ function dateValue(current, incoming, mode = 'latest') {
   return values.sort((a, b) => Date.parse(a) - Date.parse(b))[mode === 'earliest' ? 0 : values.length - 1];
 }
 
+function billingFollowUpReason(record, nowMs) {
+  const accessStatus = status(record.access_status, 'pending_setup');
+  const paymentStatus = status(record.payment_status, 'pending');
+  const trialStatus = status(record.trial_status, 'not_started');
+  if (accessStatus === 'manual_hold') return 'Manual access decision';
+  if (accessStatus === 'pending_setup' || accessStatus === 'configuration_in_progress') return 'Setup incomplete';
+  if (paymentStatus === 'failed') return 'Payment failed';
+  const paymentCovered = paymentStatus === 'paid' || paymentStatus === 'complimentary';
+  if (!paymentCovered && trialStatus === 'expired') return 'Trial ended unpaid';
+  const trialEndsAt = Date.parse(record.trial_ends_at || '');
+  const sevenDaysMs = 7 * 24 * 60 * 60 * 1000;
+  if (!paymentCovered && trialStatus === 'active' && Number.isFinite(trialEndsAt)
+    && trialEndsAt > nowMs && trialEndsAt - nowMs <= sevenDaysMs) return 'Trial ends within 7 days';
+  return null;
+}
+
+export function filterAdminBillingRows(rows = [], { searchTerm = '', statusFilter = 'all' } = {}) {
+  const query = String(searchTerm || '').trim().toLowerCase();
+  return (rows || []).filter((row) => {
+    const searchable = [row.organizationName, row.salesAttributionOwner, row.paymentStatus, row.trialStatus, row.accessStatus]
+      .filter(Boolean).join(' ').toLowerCase();
+    if (query && !searchable.includes(query)) return false;
+    if (statusFilter === 'paid') return row.paymentStatus === 'paid';
+    if (statusFilter === 'payment_pending') return row.paymentStatus === 'pending';
+    if (statusFilter === 'active_trials') return row.trialStatus === 'active';
+    if (statusFilter === 'active_access') return row.accessStatus === 'active';
+    if (statusFilter === 'manual_hold') return row.accessStatus === 'manual_hold';
+    if (statusFilter === 'follow_up') return Boolean(row.followUpReason);
+    if (statusFilter === 'commission') return row.commissionEligible === true;
+    return true;
+  });
+}
+
 function isIncludedBillingUser(user) {
   const protectedMetadata = user?.app_metadata || {};
   const hasLifecycle = protectedMetadata.district_id
@@ -125,6 +158,7 @@ export function buildAdminBillingOverview(records = [], now = new Date()) {
   const nowMs = now instanceof Date ? now.getTime() : new Date(now).getTime();
   const rows = (records || []).map((record) => {
     const po = validatePurchaseOrder(record.po_number);
+    const salesAttribution = record.confirmed_profile?.sales_attribution || {};
     return {
       id: record.id,
       organizationName: record.organization_name || 'Unnamed organization',
@@ -136,6 +170,10 @@ export function buildAdminBillingOverview(records = [], now = new Date()) {
       trialEndsAt: record.trial_ends_at || null,
       paidAt: record.paid_at || null,
       paidThrough: record.paid_through || null,
+      salesAttributionOwner: String(salesAttribution.owner || '').trim(),
+      commissionEligible: salesAttribution.commission_eligible === true,
+      followUpReason: billingFollowUpReason(record, nowMs),
+      expectedUpdatedAt: record.updated_at || null,
     };
   });
 
@@ -152,6 +190,7 @@ export function buildAdminBillingOverview(records = [], now = new Date()) {
         && Number.isFinite(Date.parse(row.trialEndsAt || ''))
         && Date.parse(row.trialEndsAt) > nowMs).length,
       activeAccess: rows.filter((row) => row.accessStatus === 'active').length,
+      followUp: rows.filter((row) => Boolean(row.followUpReason)).length,
     },
   };
 }
