@@ -3319,7 +3319,18 @@ function MonthlySocialPerformance({
         </div>
       </section>
 
-      <aside className="social-monthly-data-readiness"><strong>Data readiness</strong><span>{accountMetricSummary?.platformCount ? (demoMode ? 'Fictional demo post and account snapshots are populated for this sample district. Dates move dynamically while sequence and source windows remain stable; no live social account is connected.' : 'Authorized Meta post and account snapshots are connected for the selected district. Post metrics are latest lifetime values for posts published in the report window, not interactions accrued only during that window. Account metrics retain their platform-specific source periods.') : 'No authorized Meta account snapshot is available for this view. Public or canonical post metrics may still appear where their source reports them; unavailable native fields remain N/A.'}</span></aside>
+      <aside className="social-monthly-data-readiness">
+        <strong>Data readiness</strong>
+        <span>
+          {accountMetricSummary?.platformCount
+            ? (demoMode
+                ? 'Fictional demo post and account snapshots are populated for this sample district. Dates move dynamically while sequence and source windows remain stable; no live social account is connected.'
+                : 'Authorized Meta post and account snapshots are connected for the selected district. Post metrics are latest lifetime values for posts published in the report window, not interactions accrued only during that window. Account metrics retain their platform-specific source periods.')
+            : posts.length > 0
+              ? 'Verified owned-post collection is live for this district. Publishing and post-level engagement appear where the source reports them. Native Meta account metrics are not connected, so followers and reach or unique-viewer fields remain N/A.'
+              : 'No owned-post or authorized Meta account snapshot is available for this view. Unavailable native fields remain N/A.'}
+        </span>
+      </aside>
     </section>
   );
 }
