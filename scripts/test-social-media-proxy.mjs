@@ -19,6 +19,7 @@ await assert.rejects(() => readBoundedResponseBody(new Response(bytes(1,2,3,4), 
 
 const route = await readFile(new URL('../src/app/api/social-media/route.js', import.meta.url), 'utf8');
 const dashboard = await readFile(new URL('../src/app/dashboard/DashboardClient.js', import.meta.url), 'utf8');
+const middleware = await readFile(new URL('../src/middleware.js', import.meta.url), 'utf8');
 assert.match(route, /safeSocialMediaUrl\(upstream\.url\)/);
 assert.match(route, /detectSocialMediaType\(buffered\)/);
 assert.match(route, /readBoundedResponseBody\(upstream\)/);
@@ -34,4 +35,5 @@ assert.match(route, /searchParams\.get\('warm'\) === '1'/);
 assert.match(dashboard, /function renderedSocialMediaUrl\(value, sourceValue = ''\)[\s\S]*\/api\/social-media\?url=/);
 assert.match(dashboard, /renderedMediaUrl = renderedSocialMediaUrl\(mediaUrl, result\.url\)/);
 assert.match(dashboard, /renderedThumbnailUrl = renderedSocialMediaUrl\(thumbnailUrl, sourceUrl\)/);
+assert.match(middleware, /api\/social-media/);
 console.log('Social media proxy resilience checks passed.');
