@@ -40,7 +40,9 @@ export function metaConfigured() {
 
 export function metaIntegrationEnabledForDistrict(districtId) {
   if (!metaIntegrationPilotConfigured() || !districtId) return false;
-  return metaPilotDistricts().has(String(districtId));
+  const districts = metaPilotDistricts();
+  // Explicit rollout switch; callers still enforce protected actor/district access.
+  return districts.has('*') || districts.has(String(districtId));
 }
 
 function metaPilotDistricts() {

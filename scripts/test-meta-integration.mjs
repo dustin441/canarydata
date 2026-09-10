@@ -13,6 +13,17 @@ const meta = await import('../src/lib/meta-integration.mjs');
 
 assert.equal(meta.metaIntegrationEnabledForDistrict('district-pilot'), true, 'Explicit pilot district must be enabled when configuration is complete.');
 assert.equal(meta.metaIntegrationEnabledForDistrict('district-outside'), false, 'A configured global flag must not enable an unlisted district.');
+process.env.META_INTEGRATION_PILOT_DISTRICT_IDS = '*';
+assert.equal(meta.metaIntegrationEnabledForDistrict('alabaster-city-schools'), true);
+assert.equal(meta.metaIntegrationEnabledForDistrict('future-authorized-district'), true);
+assert.equal(meta.metaIntegrationEnabledForDistrict(''), false);
+process.env.META_INTEGRATION_ENABLED = 'false';
+assert.equal(meta.metaIntegrationEnabledForDistrict('alabaster-city-schools'), false);
+process.env.META_INTEGRATION_ENABLED = 'true';
+const configuredSecret = process.env.META_APP_SECRET;
+delete process.env.META_APP_SECRET;
+assert.equal(meta.metaIntegrationEnabledForDistrict('alabaster-city-schools'), false);
+process.env.META_APP_SECRET = configuredSecret;
 process.env.META_INTEGRATION_PILOT_DISTRICT_IDS = '';
 assert.equal(meta.metaIntegrationEnabledForDistrict('district-pilot'), false, 'An empty pilot allowlist must fail closed.');
 process.env.META_INTEGRATION_PILOT_DISTRICT_IDS = 'district-pilot,district-second';
