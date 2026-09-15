@@ -35,6 +35,11 @@ assert.match(source, /canonical_lineage_contract_invalid/, 'the monitor must det
 assert.match(source, /canonical_write_failure_contract_invalid/, 'the monitor must detect silent write-batch truncation');
 assert.match(source, /continueErrorOutput/, 'failed story writes must route to a structured error output');
 assert.match(source, /story_write_partial_failure/, 'partial story writes must fail visibly with stable lineage evidence');
+assert.match(source, /boundedRetryFailureSink/, 'the monitor must recognize the explicit bounded retry path before the terminal failure sink');
+assert.match(source, /Retry Failed Story Write/, 'the monitor must inspect the configured retry writer rather than requiring a direct failure edge');
+for (const table of ['raw_search_results', 'news_stories', 'story_candidates']) {
+  assert.match(source, new RegExp(`pagedSupabase\\('${table}'`), `${table} health evidence must be paginated instead of silently truncated`);
+}
 assert.ok(source.includes("itemMatching\\(index\\)"), 'the monitor must require linked-item resolution across AI branches');
 assert.match(source, /request_id: request_id \|\| null/, 'review request IDs must affect change fingerprints');
 assert.match(source, /\.sort\(\(a, b\) => JSON\.stringify\(a\)\.localeCompare\(JSON\.stringify\(b\)\)\)/, 'alert fingerprints must be order-stable');

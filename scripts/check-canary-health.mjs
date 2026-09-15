@@ -77,9 +77,9 @@ const [districts, generatedQueries, searchQueries, rawResults, stories, candidat
   supabase('districts', { select: 'id,name', limit: '1000' }),
   supabase('generated_queries', { select: 'id,district_id,query_type,query_text,search_params,active', active: 'eq.true', limit: '1000' }),
   supabase('search_queries', { select: 'id,district_id,query_text,active', active: 'eq.true', limit: '1000' }),
-  supabase('raw_search_results', { select: 'generated_query_id,district_id,source_name,collected_at', collected_at: `gte.${isoAgo(14)}`, limit: '5000' }),
-  supabase('news_stories', { select: 'district_id,source,source_type,created_at', visibility_status: 'eq.active', created_at: `gte.${isoAgo(14)}`, limit: '5000' }),
-  supabase('story_candidates', { select: 'generated_query_id,district_id,decision,evaluated_at', evaluated_at: `gte.${isoAgo(7)}`, limit: '5000' }),
+  pagedSupabase('raw_search_results', { select: 'id,generated_query_id,district_id,source_name,collected_at', collected_at: `gte.${isoAgo(14)}` }, 'collected_at.desc,id.desc'),
+  pagedSupabase('news_stories', { select: 'id,district_id,source,source_type,created_at', visibility_status: 'eq.active', created_at: `gte.${isoAgo(14)}` }, 'created_at.desc,id.desc'),
+  pagedSupabase('story_candidates', { select: 'id,generated_query_id,district_id,decision,evaluated_at', evaluated_at: `gte.${isoAgo(7)}` }, 'evaluated_at.desc,id.desc'),
   supabase('feedback', { select: 'id,district_id,district_name,status,created_at,message', status: 'eq.query_review_pending', limit: '1000' }),
   supabase('feedback', { select: 'id,district_id,district_name,status,created_at,message', status: 'in.(lead_request,lead_clickup_failed,onboarding_request,onboarding_clickup_failed,clickup_failed)', limit: '1000' }),
   supabase('feedback', { select: 'id,district_id,district_name,status,created_at,message', status: 'is.null', limit: '1000' }),
@@ -281,10 +281,22 @@ for (const workflow of workflowDefinitions) {
   const writeFailureNode = (workflow.nodes || []).find((node) => node.name === 'Fail Story Write Batch');
   const writeFailureCode = writeFailureNode?.parameters?.jsCode || '';
   const errorConnections = workflow.connections?.['Upsert Validated Shadow Story']?.main?.[1] || [];
+  const directFailureSink = errorConnections.some((connection) => connection.node === 'Fail Story Write Batch');
+  const retryPrepNode = (workflow.nodes || []).find((node) => node.name === 'Prepare Failed Story Retry');
+  const retryWriter = (workflow.nodes || []).find((node) => node.name === 'Retry Failed Story Write');
+  const retryPrepConnections = workflow.connections?.['Prepare Failed Story Retry']?.main?.[0] || [];
+  const retryErrorConnections = workflow.connections?.['Retry Failed Story Write']?.main?.[1] || [];
+  const boundedRetryFailureSink = errorConnections.some((connection) => connection.node === 'Prepare Failed Story Retry')
+    && Boolean(retryPrepNode)
+    && retryPrepConnections.some((connection) => connection.node === 'Retry Failed Story Write')
+    && retryWriter?.onError === 'continueErrorOutput'
+    && retryWriter?.retryOnFail === true
+    && Number(retryWriter?.maxTries || 0) >= 2
+    && retryErrorConnections.some((connection) => connection.node === 'Fail Story Write Batch');
   const isolatesWriteFailures = storyWriter?.onError === 'continueErrorOutput'
     && storyWriter?.retryOnFail === true
     && Number(storyWriter?.maxTries || 0) >= 2
-    && errorConnections.some((connection) => connection.node === 'Fail Story Write Batch')
+    && (directFailureSink || boundedRetryFailureSink)
     && /story_write_partial_failure/.test(writeFailureCode)
     && /raw_result_id/.test(writeFailureCode)
     && /story_candidate_id/.test(writeFailureCode);
