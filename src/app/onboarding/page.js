@@ -96,12 +96,24 @@ export default function Onboarding() {
         </div>
 
         <div className="auth-card" style={{ maxWidth: '820px' }}>
-          <h2>{step === 'confirm' ? 'Confirm your trial setup' : 'Request a 30-day district trial'}</h2>
-          <p className="auth-subtitle">
-            {step === 'confirm'
-              ? 'Review what Canary found and edit anything before sending it to our setup team.'
-              : 'Share the basics and Canary will prepare a clean test dashboard before we create your login. No payment is due upfront. Your 30-day trial starts when access is granted.'}
-          </p>
+          <h2>{step === 'confirm' ? 'Confirm your trial setup' : 'Design Your Canary Data Evaluation'}</h2>
+          {step === 'confirm' ? (
+            <p className="auth-subtitle">
+              Review what Canary found and edit anything before sending it to our setup team.
+            </p>
+          ) : (
+            <div className="auth-subtitle" style={{ textAlign: 'left' }}>
+              <p>
+                Think of this intake as designing your Canary Data evaluation. The schools, accounts, sources and information you provide will determine what Canary monitors during your 30-day trial.
+              </p>
+              <p>
+                Please set aside approximately 15–20 minutes to complete this form thoughtfully and accurately. Include the district, schools, social accounts, news sources and other information you want Canary Data to monitor so your trial reflects the communications landscape you want to evaluate.
+              </p>
+              <p>
+                Your trial environment will be configured based on this submission. During the trial, we’re happy to correct factual errors or address information that did not populate as submitted. Additional schools, sources, accounts or other preference-based configuration changes can be made if you choose to become a Canary Data customer.
+              </p>
+            </div>
+          )}
 
           {error && (
             <div className="auth-error">
@@ -159,9 +171,10 @@ export default function Onboarding() {
                 </div>
               ))}
 
+              <h3 style={{ color: 'var(--text-primary)', margin: '0 0 0.65rem' }}>Before you submit</h3>
               <label style={{ display: 'flex', gap: '0.65rem', alignItems: 'flex-start', margin: '0 0 1rem', color: 'var(--text-secondary)', lineHeight: 1.5 }}>
                 <input name="setup_confirmation" value="confirmed" type="checkbox" required style={{ marginTop: '0.2rem' }} />
-                <span>I reviewed these setup details and confirm they are accurate enough for Canary to begin its manual setup and quality review.</span>
+                <span>I have reviewed the information I’ve provided and understand that my 30-day trial will be configured based on this submission. I understand that factual errors or information that does not populate as submitted can be corrected during the trial, while additional or preference-based configuration changes can be made after purchase.</span>
               </label>
 
               <div style={{ display: 'flex', gap: '0.75rem', flexWrap: 'wrap' }}>
