@@ -9,13 +9,15 @@ import { assertConfirmedOnboardingProfileQuality } from '@/lib/onboarding-discov
 
 const fieldStyle = { marginBottom: '1rem' };
 const DRAFT_FIELDS = [
-  ['mission_vision_values', 'Mission / vision / values'],
-  ['strategic_priorities', 'Strategic priorities / focus areas'],
-  ['strategic_plan_text', 'Full strategic plan text'],
-  ['social_handles', 'Official social handles'],
+  ['mission_vision_values', 'Mission / vision / values or organizational narrative'],
+  ['strategic_priorities', 'Strategic priorities, focus areas, or goals'],
+  ['strategic_plan_text', 'Full strategic plan, narrative, focus areas, or goals text'],
+  ['social_handles', 'Official social profile or page URLs'],
   ['keywords', 'Keywords, nicknames, mascots, or terms to monitor'],
   ['school_names', 'School names'],
   ['known_exclusions', 'Known lookalikes or exclusions'],
+  ['district_news_url', 'District news / blog URL'],
+  ['frequent_news_outlets', 'News outlets that frequently cover you'],
   ['discovered_source_urls', 'Public pages Canary reviewed'],
   ['discovery_notes', 'Notes for Canary review'],
 ];
@@ -68,7 +70,7 @@ export default function Onboarding() {
 
     try {
       assertConfirmedOnboardingProfileQuality(draft);
-      const formData = new FormData();
+      const formData = new FormData(e.currentTarget);
       appendObjectToFormData(formData, intake);
       formData.append('confirmed_profile', JSON.stringify(draft));
       await submitOnboardingRequest(formData);
@@ -98,7 +100,7 @@ export default function Onboarding() {
           <p className="auth-subtitle">
             {step === 'confirm'
               ? 'Review what Canary found and edit anything before sending it to our setup team.'
-              : 'Share the basics and Canary will prepare a clean test dashboard before we create your login. No payment is due upfront.'}
+              : 'Share the basics and Canary will prepare a clean test dashboard before we create your login. No payment is due upfront. Your 30-day trial starts when access is granted.'}
           </p>
 
           {error && (
@@ -157,6 +159,11 @@ export default function Onboarding() {
                 </div>
               ))}
 
+              <label style={{ display: 'flex', gap: '0.65rem', alignItems: 'flex-start', margin: '0 0 1rem', color: 'var(--text-secondary)', lineHeight: 1.5 }}>
+                <input name="setup_confirmation" value="confirmed" type="checkbox" required style={{ marginTop: '0.2rem' }} />
+                <span>I reviewed these setup details and confirm they are accurate enough for Canary to begin its manual setup and quality review.</span>
+              </label>
+
               <div style={{ display: 'flex', gap: '0.75rem', flexWrap: 'wrap' }}>
                 <button type="button" className="btn btn-secondary" disabled={loading} onClick={() => setStep('intake')} style={{ flex: '1 1 180px' }}>
                   Back to Intake
@@ -180,12 +187,12 @@ export default function Onboarding() {
                 </div>
 
                 <div className="form-group" style={fieldStyle}>
-                  <label htmlFor="strategic_plan_url">Strategic plan URL (optional)</label>
+                  <label htmlFor="strategic_plan_url">Strategic plan, narrative, focus areas, or goals URL (optional)</label>
                   <input id="strategic_plan_url" name="strategic_plan_url" className="form-input" defaultValue={intake.strategic_plan_url || ''} placeholder="Public webpage, Google Drive link, or PDF URL" />
                 </div>
 
                 <div className="form-group" style={fieldStyle}>
-                  <label htmlFor="strategic_plan_file">Strategic plan document (optional)</label>
+                  <label htmlFor="strategic_plan_file">Strategic plan, narrative, focus areas, or goals document (optional)</label>
                   <input id="strategic_plan_file" name="strategic_plan_file" type="file" className="form-input" accept=".pdf,.docx,.txt,.md,text/plain,application/pdf,application/vnd.openxmlformats-officedocument.wordprocessingml.document" />
                   <small style={{ color: 'var(--text-tertiary)' }}>PDF, DOCX, TXT, or Markdown · 4 MB maximum</small>
                 </div>
@@ -198,6 +205,11 @@ export default function Onboarding() {
                 <div className="form-group" style={fieldStyle}>
                   <label htmlFor="contact_email">Email</label>
                   <input id="contact_email" name="contact_email" type="email" className="form-input" defaultValue={intake.contact_email || ''} placeholder="you@district.org" required autoComplete="email" />
+                </div>
+
+                <div className="form-group" style={fieldStyle}>
+                  <label htmlFor="billing_phone">Contact / billing phone</label>
+                  <input id="billing_phone" name="billing_phone" type="tel" className="form-input" defaultValue={intake.billing_phone || ''} placeholder="(555) 555-0123" required autoComplete="tel" maxLength={40} />
                 </div>
 
                 <div className="form-group" style={fieldStyle}>
@@ -222,8 +234,19 @@ export default function Onboarding() {
               </div>
 
               <div className="form-group" style={fieldStyle}>
-                <label htmlFor="social_handles">Official social handles or URLs</label>
-                <textarea id="social_handles" name="social_handles" className="form-input" rows={3} defaultValue={intake.social_handles || ''} placeholder="Facebook, Instagram, X/Twitter, TikTok, YouTube, LinkedIn..." />
+                <label htmlFor="social_handles">Official social profile or page URLs</label>
+                <textarea id="social_handles" name="social_handles" className="form-input" rows={3} defaultValue={intake.social_handles || ''} placeholder="https://www.facebook.com/exampledistrict&#10;https://www.instagram.com/exampledistrict/" />
+                <small style={{ color: 'var(--text-tertiary)' }}>Enter full official profile or page URLs rather than platform names.</small>
+              </div>
+
+              <div className="form-group" style={fieldStyle}>
+                <label htmlFor="district_news_url">District news or blog URL (optional)</label>
+                <input id="district_news_url" name="district_news_url" className="form-input" defaultValue={intake.district_news_url || ''} placeholder="https://www.examplek12.org/news" />
+              </div>
+
+              <div className="form-group" style={fieldStyle}>
+                <label htmlFor="frequent_news_outlets">News outlets that frequently cover your district / organization (optional)</label>
+                <textarea id="frequent_news_outlets" name="frequent_news_outlets" className="form-input" rows={3} defaultValue={intake.frequent_news_outlets || ''} placeholder="Local newspaper, TV station, community publication, education reporter..." />
               </div>
 
               <div className="form-group" style={fieldStyle}>

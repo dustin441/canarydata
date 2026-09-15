@@ -21,12 +21,47 @@ function dateValue(current, incoming, mode = 'latest') {
   return values.sort((a, b) => Date.parse(a) - Date.parse(b))[mode === 'earliest' ? 0 : values.length - 1];
 }
 
+function validDate(value) {
+  return Number.isFinite(Date.parse(value || ''));
+}
+
+function verifiedCheckPayment(record) {
+  const profilePayment = record?.confirmed_profile?.billing_payment || {};
+  const protectedPayment = record?._protectedCheckPayment || {};
+  const evidence = protectedPayment.depositedAt ? protectedPayment : {
+    method: profilePayment.method,
+    status: profilePayment.status,
+    depositedAt: profilePayment.deposited_at,
+    verifiedBy: profilePayment.verified_by,
+  };
+  return String(evidence.method || '').toLowerCase() === 'check'
+    && String(evidence.status || '').toLowerCase() === 'deposited'
+    && validDate(evidence.depositedAt)
+    && Boolean(String(evidence.verifiedBy || '').trim());
+}
+
+function billingPaymentMethod(record) {
+  const paymentStatus = status(record.payment_status, 'pending');
+  if (paymentStatus === 'complimentary') return 'complimentary';
+  if (paymentStatus !== 'paid') return 'unknown';
+  if (record._stripePaymentConfirmed === true) return 'stripe_card';
+  if (verifiedCheckPayment(record)) return 'check';
+  return 'unknown';
+}
+
+function confirmedPaymentStatus(record, paymentMethod) {
+  const storedStatus = status(record.payment_status, 'pending');
+  if (storedStatus === 'paid' && !['stripe_card', 'check'].includes(paymentMethod)) return 'verification_needed';
+  return storedStatus;
+}
+
 function billingFollowUpReason(record, nowMs) {
   const accessStatus = status(record.access_status, 'pending_setup');
   const paymentStatus = status(record.payment_status, 'pending');
   const trialStatus = status(record.trial_status, 'not_started');
   if (accessStatus === 'manual_hold') return 'Manual access decision';
   if (accessStatus === 'pending_setup' || accessStatus === 'configuration_in_progress') return 'Setup incomplete';
+  if (paymentStatus === 'paid' && billingPaymentMethod(record) === 'unknown') return 'Payment needs verification';
   if (paymentStatus === 'failed') return 'Payment failed';
   const paymentCovered = paymentStatus === 'paid' || paymentStatus === 'complimentary';
   if (!paymentCovered && trialStatus === 'expired') return 'Trial ended unpaid';
@@ -37,14 +72,43 @@ function billingFollowUpReason(record, nowMs) {
   return null;
 }
 
+function csvCell(value) {
+  let text = value === null || value === undefined ? '' : String(value);
+  if (/^[\t\r\n ]*[=+\-@]/.test(text)) text = `'${text}`;
+  return /[",\r\n]/.test(text) ? `"${text.replaceAll('"', '""')}"` : text;
+}
+
+function paymentMethodLabel(value) {
+  if (value === 'stripe_card') return 'Stripe/card';
+  if (value === 'check') return 'Check';
+  if (value === 'complimentary') return 'Complimentary';
+  return 'Unknown';
+}
+
+export function buildAdminBillingCsv(rows = []) {
+  const headers = [
+    'Organization', 'Contact Email', 'Payment Status', 'Payment Method', 'Trial Status', 'Access Status',
+    'PO Status', 'Follow-up Reason', 'Follow-up Owner', 'Trial Starts', 'Trial Ends', 'Paid Date', 'Paid Through',
+    'Sales Attribution Owner', 'Commission Eligible', 'Request Created',
+  ];
+  const lines = (rows || []).map((row) => [
+    row.organizationName, row.contactEmail, row.paymentStatus, paymentMethodLabel(row.paymentMethod), row.trialStatus,
+    row.accessStatus, row.poState, row.followUpReason, row.followUpOwner, row.trialStartsAt, row.trialEndsAt,
+    row.paidAt, row.paidThrough, row.salesAttributionOwner, row.commissionEligible ? 'Yes' : 'No', row.createdAt,
+  ].map(csvCell).join(','));
+  return [headers.join(','), ...lines].join('\r\n');
+}
+
 export function filterAdminBillingRows(rows = [], { searchTerm = '', statusFilter = 'all' } = {}) {
   const query = String(searchTerm || '').trim().toLowerCase();
   return (rows || []).filter((row) => {
-    const searchable = [row.organizationName, row.salesAttributionOwner, row.paymentStatus, row.trialStatus, row.accessStatus]
-      .filter(Boolean).join(' ').toLowerCase();
+    const searchable = [
+      row.organizationName, row.contactEmail, row.salesAttributionOwner, row.followUpOwner, row.followUpReason,
+      row.paymentMethod, row.paymentStatus, row.trialStatus, row.accessStatus,
+    ].filter(Boolean).join(' ').toLowerCase();
     if (query && !searchable.includes(query)) return false;
     if (statusFilter === 'paid') return row.paymentStatus === 'paid';
-    if (statusFilter === 'payment_pending') return row.paymentStatus === 'pending';
+    if (statusFilter === 'payment_pending') return ['pending', 'failed', 'verification_needed'].includes(row.paymentStatus);
     if (statusFilter === 'active_trials') return row.trialStatus === 'active';
     if (statusFilter === 'active_access') return row.accessStatus === 'active';
     if (statusFilter === 'manual_hold') return row.accessStatus === 'manual_hold';
@@ -98,7 +162,9 @@ export function mergeAdminBillingRecords(onboardingRecords = [], authUsers = [])
     const incomingPaymentCovered = incomingPaymentStatus === 'paid' || incomingPaymentStatus === 'complimentary';
     const hasProtectedPayment = Object.hasOwn(protectedMetadata, 'payment_status')
       || Object.hasOwn(protectedMetadata, 'payment_paid_at')
-      || Object.hasOwn(protectedMetadata, 'paid_through');
+      || Object.hasOwn(protectedMetadata, 'paid_through')
+      || Object.hasOwn(protectedMetadata, 'stripe_checkout_session_id')
+      || Object.hasOwn(protectedMetadata, 'check_deposited_at');
     const hasProtectedTrial = Object.hasOwn(protectedMetadata, 'trial_status')
       || Object.hasOwn(protectedMetadata, 'trial_starts_at')
       || Object.hasOwn(protectedMetadata, 'trial_ends_at');
@@ -128,6 +194,12 @@ export function mergeAdminBillingRecords(onboardingRecords = [], authUsers = [])
     const trialEndsAt = hasProtectedTrial && !current._authTrialSeen
       ? protectedMetadata.trial_ends_at || null
       : dateValue(current.trial_ends_at, protectedMetadata.trial_ends_at);
+    const protectedCheckPayment = {
+      method: protectedMetadata.payment_method,
+      status: protectedMetadata.check_payment_status,
+      depositedAt: protectedMetadata.check_deposited_at,
+      verifiedBy: protectedMetadata.check_verified_by,
+    };
     records.set(id, {
       ...current,
       _authPaymentSeen: current._authPaymentSeen || hasProtectedPayment,
@@ -139,6 +211,7 @@ export function mergeAdminBillingRecords(onboardingRecords = [], authUsers = [])
         displayMetadata.district_name,
         protectedMetadata.district_id,
       ),
+      contact_email: firstValue(current.contact_email, user.email),
       po_number: firstValue(current.po_number, displayMetadata.po_number),
       payment_status: paymentStatus,
       trial_status: trialStatus,
@@ -147,10 +220,18 @@ export function mergeAdminBillingRecords(onboardingRecords = [], authUsers = [])
       trial_ends_at: trialEndsAt,
       paid_at: paidAt,
       paid_through: paidThrough,
+      _stripePaymentConfirmed: current._stripePaymentConfirmed || (
+        incomingPaymentStatus === 'paid'
+        && validDate(protectedMetadata.payment_paid_at)
+        && Boolean(String(protectedMetadata.stripe_checkout_session_id || '').trim())
+      ),
+      _protectedCheckPayment: validDate(current._protectedCheckPayment?.depositedAt)
+        ? current._protectedCheckPayment
+        : protectedCheckPayment,
     });
   }
   return [...records.values()]
-    .map(({ contact_email: _contactEmail, _authPaymentSeen, _authTrialSeen, _authAccessSeen, ...record }) => record)
+    .map(({ _authPaymentSeen, _authTrialSeen, _authAccessSeen, ...record }) => record)
     .sort((a, b) => String(a.organization_name || '').localeCompare(String(b.organization_name || '')));
 }
 
@@ -159,20 +240,28 @@ export function buildAdminBillingOverview(records = [], now = new Date()) {
   const rows = (records || []).map((record) => {
     const po = validatePurchaseOrder(record.po_number);
     const salesAttribution = record.confirmed_profile?.sales_attribution || {};
+    const followUp = record.confirmed_profile?.follow_up || {};
+    const paymentMethod = billingPaymentMethod(record);
+    const paymentStatus = confirmedPaymentStatus(record, paymentMethod);
+    const paymentConfirmed = paymentStatus === 'paid';
     return {
       id: record.id,
       organizationName: record.organization_name || 'Unnamed organization',
+      contactEmail: String(record.contact_email || '').trim().toLowerCase(),
       poState: po.valid ? 'valid' : po.present ? 'invalid' : 'missing',
-      paymentStatus: status(record.payment_status, 'pending'),
+      paymentStatus,
+      paymentMethod,
       trialStatus: status(record.trial_status, 'not_started'),
       accessStatus: status(record.access_status, 'pending_setup'),
       trialStartsAt: record.trial_starts_at || null,
       trialEndsAt: record.trial_ends_at || null,
-      paidAt: record.paid_at || null,
-      paidThrough: record.paid_through || null,
+      paidAt: paymentConfirmed ? (record.paid_at || record._protectedCheckPayment?.depositedAt || null) : null,
+      paidThrough: paymentConfirmed || paymentStatus === 'complimentary' ? (record.paid_through || null) : null,
       salesAttributionOwner: String(salesAttribution.owner || '').trim(),
       commissionEligible: salesAttribution.commission_eligible === true,
+      followUpOwner: String(followUp.owner || '').trim(),
       followUpReason: billingFollowUpReason(record, nowMs),
+      createdAt: record.created_at || null,
       expectedUpdatedAt: record.updated_at || null,
     };
   });
@@ -182,7 +271,7 @@ export function buildAdminBillingOverview(records = [], now = new Date()) {
     summary: {
       organizations: rows.length,
       paid: rows.filter((row) => row.paymentStatus === 'paid').length,
-      paymentPending: rows.filter((row) => row.paymentStatus === 'pending').length,
+      paymentPending: rows.filter((row) => ['pending', 'failed', 'verification_needed'].includes(row.paymentStatus)).length,
       poValid: rows.filter((row) => row.poState === 'valid').length,
       poMissing: rows.filter((row) => row.poState === 'missing').length,
       poInvalid: rows.filter((row) => row.poState === 'invalid').length,

@@ -11,6 +11,7 @@ const request = {
   website: 'https://parity.example',
   contact_name: 'Pat Parity',
   contact_email: 'pat@parity.example',
+  billing_phone: '+1 480 555 0199',
   contact_title: 'Communications Director',
   city: 'Mesa',
   state: 'AZ',
@@ -30,6 +31,8 @@ const request = {
     known_exclusions: 'Parity, France',
     discovered_source_urls: 'https://parity.example/strategy',
     discovery_notes: 'Confirmed by customer',
+    district_news_url: 'https://parity.example/news',
+    frequent_news_outlets: 'Parity Gazette\nMesa Daily',
   },
 };
 
@@ -46,6 +49,7 @@ assert.equal(recovered.organization_name, request.organization_name);
 assert.deepEqual(retryTask, directTask, 'fallback retry payload must equal direct onboarding payload');
 for (const expected of [
   request.contact_title,
+  request.billing_phone,
   request.city,
   request.social_handles,
   request.keywords,
@@ -57,6 +61,8 @@ for (const expected of [
   request.confirmed_profile.strategic_priorities,
   request.confirmed_profile.discovered_source_urls,
   request.confirmed_profile.discovery_notes,
+  request.confirmed_profile.district_news_url,
+  request.confirmed_profile.frequent_news_outlets,
 ]) assert.match(retryTask.markdown_content, new RegExp(expected.replace(/[.*+?^${}()|[\]\\]/g, '\\$&')));
 assert.equal(retryTask.name, '[Trial onboarding] Parity Public Schools');
 assert.match(directTask.markdown_content, /official-domain newsroom coverage check/);

@@ -2,7 +2,7 @@ import { createClient } from '@/lib/supabase/server';
 import { createAdminClient } from '@/lib/supabase/admin';
 import { buildAdminBillingOverview, mergeAdminBillingRecords } from './admin-billing.mjs';
 
-const ADMIN_BILLING_COLUMNS = 'id, updated_at, organization_name, contact_email, payment_status, trial_status, access_status, trial_starts_at, trial_ends_at, paid_at, paid_through, po_number, confirmed_profile';
+const ADMIN_BILLING_COLUMNS = 'id, created_at, updated_at, organization_name, contact_email, payment_status, trial_status, access_status, trial_starts_at, trial_ends_at, paid_at, paid_through, po_number, confirmed_profile';
 
 async function listAllAuthUsers(admin) {
   const users = [];

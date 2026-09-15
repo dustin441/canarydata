@@ -19,7 +19,7 @@ import { buildStrategicGovernance } from '@/lib/strategicGovernance.mjs';
 import { buildReportingDataset, filterReportingDataset } from '@/lib/reportingDataset.mjs';
 import { articleMatchesSearch } from '@/lib/articleSearch.mjs';
 import { buildSocialExecutiveDecision, buildSocialPerformanceFromDailySeries } from '@/lib/socialPerformance.mjs';
-import { filterAdminBillingRows } from '@/lib/admin-billing.mjs';
+import { buildAdminBillingCsv, filterAdminBillingRows } from '@/lib/admin-billing.mjs';
 
 const stripePromise = process.env.NEXT_PUBLIC_STRIPE_PUBLISHABLE_KEY
   ? loadStripe(process.env.NEXT_PUBLIC_STRIPE_PUBLISHABLE_KEY)
@@ -2034,6 +2034,13 @@ function AdminBillingView({ overview = { rows: [], summary: null } }) {
     ? new Date(value).toLocaleDateString(undefined, { year: 'numeric', month: 'short', day: 'numeric' })
     : '—';
   const statusLabel = (value) => String(value || 'unknown').replaceAll('_', ' ');
+  const paymentMethodLabel = (value) => value === 'stripe_card'
+    ? 'Stripe/card'
+    : value === 'check'
+      ? 'Check'
+      : value === 'complimentary'
+        ? 'Complimentary'
+        : 'Unknown';
   const cards = summary ? [
     ['Organizations', summary.organizations],
     ['Paid', summary.paid],
@@ -2053,11 +2060,23 @@ function AdminBillingView({ overview = { rows: [], summary: null } }) {
       try {
         const updated = await updateAdminBillingAttribution(formData);
         setRowOverrides((current) => ({ ...current, [billingRow.id]: updated }));
-        setSaveMessage(`Saved attribution for ${billingRow.organizationName}.`);
+        setSaveMessage(`Saved CRM ownership and attribution for ${billingRow.organizationName}.`);
       } catch (error) {
-        setSaveMessage(error?.message || 'Could not save attribution.');
+        setSaveMessage(error?.message || 'Could not save CRM ownership and attribution.');
       }
     });
+  }
+
+  function exportFilteredCsv() {
+    const csv = buildAdminBillingCsv(filteredRows);
+    const href = URL.createObjectURL(new Blob([csv], { type: 'text/csv;charset=utf-8' }));
+    const anchor = document.createElement('a');
+    anchor.href = href;
+    anchor.download = `canary-admin-billing-${new Date().toISOString().slice(0, 10)}.csv`;
+    document.body.appendChild(anchor);
+    anchor.click();
+    anchor.remove();
+    URL.revokeObjectURL(href);
   }
 
   return (
@@ -2071,7 +2090,7 @@ function AdminBillingView({ overview = { rows: [], summary: null } }) {
           <details style={{ color: 'var(--text-secondary)', fontSize: '0.8rem', marginTop: '8px', maxWidth: '900px' }}>
             <summary style={{ cursor: 'pointer', color: 'var(--brand-primary)' }}>What the columns mean</summary>
             <p style={{ lineHeight: 1.6 }}>
-              PO status checks whether a usable-looking PO is stored. Payment and Trial are billing lifecycle states. Access controls product availability and does not automatically follow payment. Follow-up explains records requiring human action. Trial dates show the trial window. Paid date and Paid through show confirmed payment coverage. Sales attribution records the owner and whether the organization is commission-eligible.
+              PO status checks whether a usable-looking PO is stored. Payment and Trial are billing lifecycle states. Paid means a confirmed Stripe payment or a verified deposited check; a stored paid flag without that evidence is shown as verification needed. Payment method is inferred only from protected lifecycle evidence and otherwise remains Unknown. Access controls product availability and does not automatically follow payment. Follow-up explains records requiring human action and its owner records who is responsible. Trial dates show the trial window. Paid date and Paid through show confirmed payment coverage. Sales attribution records the owner and whether the organization is commission-eligible.
             </p>
           </details>
         </div>
@@ -2104,13 +2123,16 @@ function AdminBillingView({ overview = { rows: [], summary: null } }) {
           <option value="manual_hold">Manual hold</option>
           <option value="commission">Commission eligible</option>
         </select>
+        <button type="button" className="btn btn-sm btn-secondary" onClick={exportFilteredCsv}>
+          Export filtered CSV
+        </button>
         {saveMessage && <span role="status" style={{ color: 'var(--text-secondary)', fontSize: '0.8rem' }}>{saveMessage}</span>}
       </div>
       <div style={{ overflowX: 'auto' }}>
-        <table className="data-table" style={{ minWidth: '1450px' }}>
+        <table className="data-table" style={{ minWidth: '1650px' }}>
           <thead><tr>
-            <th>Organization</th><th>PO status</th><th>Payment</th><th>Trial</th><th>Access</th><th>Follow-up</th>
-            <th>Trial dates</th><th>Paid date</th><th>Paid through</th><th>Sales attribution</th>
+            <th>Organization</th><th>PO status</th><th>Payment</th><th>Payment method</th><th>Trial</th><th>Access</th><th>Follow-up</th>
+            <th>Trial dates</th><th>Paid date</th><th>Paid through</th><th>Follow-up owner / sales attribution</th>
           </tr></thead>
           <tbody>
             {filteredRows.map((billingRow) => {
@@ -2121,6 +2143,7 @@ function AdminBillingView({ overview = { rows: [], summary: null } }) {
                   <td style={{ fontWeight: 600, color: 'var(--text-primary)' }}>{billingRow.organizationName}</td>
                   <td>{billingRow.poState === 'valid' ? 'Valid-looking on file' : billingRow.poState === 'invalid' ? 'Needs correction' : 'Not provided'}</td>
                   <td>{statusLabel(billingRow.paymentStatus)}</td>
+                  <td>{paymentMethodLabel(billingRow.paymentMethod)}</td>
                   <td>{statusLabel(billingRow.trialStatus)}</td>
                   <td>{statusLabel(billingRow.accessStatus)}</td>
                   <td>{billingRow.followUpReason || '—'}</td>
@@ -2132,6 +2155,14 @@ function AdminBillingView({ overview = { rows: [], summary: null } }) {
                       <form onSubmit={(event) => saveAttribution(event, billingRow)} style={{ display: 'flex', gap: '8px', alignItems: 'center' }}>
                         <input type="hidden" name="onboarding_request_id" value={billingRow.id} />
                         <input type="hidden" name="expected_updated_at" value={billingRow.expectedUpdatedAt} />
+                        <input
+                          aria-label={`Follow-up owner for ${billingRow.organizationName}`}
+                          name="follow_up_owner"
+                          defaultValue={billingRow.followUpOwner}
+                          placeholder="Follow-up owner"
+                          maxLength={120}
+                          style={{ width: '135px' }}
+                        />
                         <input
                           aria-label={`Sales attribution for ${billingRow.organizationName}`}
                           name="sales_attribution_owner"
@@ -2152,7 +2183,7 @@ function AdminBillingView({ overview = { rows: [], summary: null } }) {
                 </tr>
               );
             })}
-            {filteredRows.length === 0 && <tr><td colSpan="10" style={{ color: 'var(--text-secondary)', textAlign: 'center' }}>No billing records match these filters.</td></tr>}
+            {filteredRows.length === 0 && <tr><td colSpan="11" style={{ color: 'var(--text-secondary)', textAlign: 'center' }}>No billing records match these filters.</td></tr>}
           </tbody>
         </table>
       </div>

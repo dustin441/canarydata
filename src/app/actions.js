@@ -86,6 +86,7 @@ export async function updateAdminBillingAttribution(formData) {
   const onboardingRequestId = cleanFormValue(formData, 'onboarding_request_id');
   const expectedUpdatedAt = cleanFormValue(formData, 'expected_updated_at');
   const owner = cleanFormValue(formData, 'sales_attribution_owner').replace(/\s+/g, ' ');
+  const followUpOwner = cleanFormValue(formData, 'follow_up_owner').replace(/\s+/g, ' ');
   const commissionEligible = formData.get('commission_eligible') === 'on';
   if (!/^[0-9a-f]{8}-[0-9a-f]{4}-[1-5][0-9a-f]{3}-[89ab][0-9a-f]{3}-[0-9a-f]{12}$/i.test(onboardingRequestId)) {
     throw new Error('A valid onboarding billing record is required.');
@@ -94,6 +95,7 @@ export async function updateAdminBillingAttribution(formData) {
     throw new Error('Billing record version is required. Refresh and try again.');
   }
   if (owner.length > 120) throw new Error('Sales attribution owner is too long.');
+  if (followUpOwner.length > 120) throw new Error('Follow-up owner is too long.');
 
   const { data: current, error: currentError } = await admin
     .from('onboarding_requests')
@@ -118,6 +120,12 @@ export async function updateAdminBillingAttribution(formData) {
       updated_at: updatedAt,
       updated_by: actor.id,
     },
+    follow_up: {
+      ...(confirmedProfile.follow_up && typeof confirmedProfile.follow_up === 'object' ? confirmedProfile.follow_up : {}),
+      owner: followUpOwner || null,
+      updated_at: updatedAt,
+      updated_by: actor.id,
+    },
   };
   const { data: updated, error: updateError } = await admin
     .from('onboarding_requests')
@@ -135,6 +143,7 @@ export async function updateAdminBillingAttribution(formData) {
     expectedUpdatedAt: updated.updated_at,
     salesAttributionOwner: owner,
     commissionEligible,
+    followUpOwner,
   };
 }
 
@@ -361,8 +370,10 @@ export async function discoverOnboardingProfile(formData) {
   const strategicPlanFile = formData.get('strategic_plan_file');
   const city = cleanFormValue(formData, 'city');
   const state = cleanFormValue(formData, 'state');
+  const billingPhone = cleanFormValue(formData, 'billing_phone');
   if (!organizationName) throw new Error('District or organization name is required');
   if (!website) throw new Error('Website is required');
+  if (!billingPhone) throw new Error('Contact / billing phone is required');
 
   const pages = [];
   const strategicDocuments = [];
@@ -450,6 +461,8 @@ export async function discoverOnboardingProfile(formData) {
     keywords: cleanFormValue(formData, 'keywords') || buildKeywords({ organizationName, city, state, schoolNames: discoveredSchools }),
     school_names: cleanFormValue(formData, 'school_names') || discoveredSchools,
     known_exclusions: cleanFormValue(formData, 'known_exclusions'),
+    district_news_url: normalizeWebsite(formData.get('district_news_url')),
+    frequent_news_outlets: cleanFormValue(formData, 'frequent_news_outlets'),
     mission_vision_values: missionSnippets.join('\n\n'),
     strategic_priorities: prioritySnippets.join('\n\n'),
     discovered_source_urls: sourceUrls,
@@ -577,11 +590,26 @@ export async function submitOnboardingRequest(formData) {
     confirmedProfile = {};
   }
   assertConfirmedOnboardingProfileQuality(confirmedProfile);
+  if (cleanFormValue(formData, 'setup_confirmation') !== 'confirmed') {
+    throw new Error('You must confirm that the setup is accurate before final submission.');
+  }
+  const districtNewsUrl = normalizeWebsite(formData.get('district_news_url'));
+  const frequentNewsOutlets = cleanFormValue(formData, 'frequent_news_outlets');
+  confirmedProfile = {
+    ...confirmedProfile,
+    district_news_url: districtNewsUrl,
+    frequent_news_outlets: frequentNewsOutlets,
+    customer_confirmation: {
+      confirmed: true,
+      confirmed_at: new Date().toISOString(),
+    },
+  };
   const request = {
     organization_name: cleanFormValue(formData, 'organization_name'),
     website: normalizeWebsite(formData.get('website')),
     contact_name: cleanFormValue(formData, 'contact_name'),
     contact_email: cleanFormValue(formData, 'contact_email').toLowerCase(),
+    billing_phone: cleanFormValue(formData, 'billing_phone'),
     contact_title: cleanFormValue(formData, 'contact_title'),
     city: cleanFormValue(formData, 'city'),
     state: cleanFormValue(formData, 'state'),
@@ -608,6 +636,12 @@ export async function submitOnboardingRequest(formData) {
   if (!request.website) throw new Error('Website is required');
   if (!request.contact_name) throw new Error('Contact name is required');
   if (!request.contact_email) throw new Error('Contact email is required');
+  if (!request.billing_phone) throw new Error('Contact / billing phone is required');
+  if (request.billing_phone.length > 40 || request.billing_phone.replace(/\D/g, '').length < 7) {
+    throw new Error('Enter a valid contact / billing phone number');
+  }
+  if (districtNewsUrl.length > 2048) throw new Error('District news / blog URL is too long');
+  if (frequentNewsOutlets.length > 4000) throw new Error('Frequently covering news outlets are too long');
 
   const clickupConfigured = isClickUpConfigured();
   let onboardingDispatchStatus = clickupConfigured ? `onboarding_clickup_dispatching:${Date.now()}:${randomUUID()}` : 'submitted';
