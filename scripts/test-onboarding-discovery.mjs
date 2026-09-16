@@ -33,6 +33,8 @@ assert.match(onboarding, /name="strategic_plan_url"/);
 assert.match(onboarding, /name="strategic_plan_file"/);
 assert.match(onboarding, /Full strategic plan, narrative, focus areas, or goals text/);
 assert.ok(onboarding.includes('Design Your Canary Data Evaluation'));
+assert.match(onboarding, /className="auth-subtitle" style=\{\{ textAlign: 'left', display: 'grid', gap: '0\.85rem' \}\}/, 'intro paragraphs must have explicit visible spacing');
+assert.equal((onboarding.match(/<p style=\{\{ margin: 0 \}\}>/g) || []).length, 3, 'each intro paragraph must reset the inherited margin so grid gap controls spacing');
 assert.ok(onboarding.includes('Think of this intake as designing your Canary Data evaluation. The schools, accounts, sources and information you provide will determine what Canary monitors during your 30-day trial.'));
 assert.ok(onboarding.includes('Please set aside approximately 15–20 minutes to complete this form thoughtfully and accurately. Include the district, schools, social accounts, news sources and other information you want Canary Data to monitor so your trial reflects the communications landscape you want to evaluate.'));
 assert.ok(onboarding.includes('Your trial environment will be configured based on this submission. During the trial, we’re happy to correct factual errors or address information that did not populate as submitted. Additional schools, sources, accounts or other preference-based configuration changes can be made if you choose to become a Canary Data customer.'));
