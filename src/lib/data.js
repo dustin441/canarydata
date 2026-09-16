@@ -547,13 +547,13 @@ export async function getCollectionHealth(districts, districtId = null) {
 
 export async function getSocialCollectionHealth(districts, districtId = null) {
   const supabase = createAdminClient();
-  const cutoff = new Date(Date.now() - 7 * 86_400_000).toISOString();
-  const readPages = async (table, columns, configure) => {
+  const readPages = async (table, columns, configure, { optional = false } = {}) => {
     const rows = [];
     for (let from = 0; ; from += 1000) {
       let query = configure(supabase.from(table).select(columns));
       if (districtId) query = query.eq('district_id', districtId);
       const { data, error } = await query.range(from, from + 999);
+      if (optional && (error?.code === '42P01' || error?.code === 'PGRST205')) return [];
       if (error) throw error;
       const page = data ?? [];
       rows.push(...page);
@@ -561,13 +561,15 @@ export async function getSocialCollectionHealth(districts, districtId = null) {
     }
     return rows;
   };
-  const [socialQueries, socialRuns, socialAccounts] = await Promise.all([
+  const [socialQueries, socialRuns, socialAccounts, pendingCandidates, visibleAmbientThreads] = await Promise.all([
     readPages('search_queries', 'id,district_id,channels,active', (query) => query.eq('channels', 'social').eq('active', true).order('district_id').order('id')),
-    readPages('social_collection_runs', 'id,district_id,status,started_at,completed_at,raw_items,accepted_threads,error_code,diagnostics', (query) => query.gte('started_at', cutoff).contains('diagnostics', { lane: 'all_district_public_facebook_v1' }).order('started_at', { ascending: false }).order('id', { ascending: false })),
+    readPages('social_collection_runs', 'id,district_id,status,started_at,completed_at,raw_items,accepted_threads,provider_errors,error_code,error_message,diagnostics', (query) => query.contains('diagnostics', { lane: 'all_district_public_facebook_v1' }).order('started_at', { ascending: false }).order('id', { ascending: false })),
     readPages('social_accounts', 'id,district_id,active', (query) => query.eq('active', true).order('district_id').order('id')),
+    readPages('social_discovery_candidates', 'id,district_id,status', (query) => query.eq('status', 'pending').order('district_id').order('id'), { optional: true }),
+    readPages('social_threads', 'id,district_id,relationship_type,visibility_status,published_at,canonical_url,author_name,author_handle,headline,summary,body', (query) => query.eq('relationship_type', 'ambient').eq('visibility_status', 'active').order('published_at', { ascending: false }).order('id')),
   ]);
   const scopedDistricts = districtId ? districts.filter((district) => district.id === districtId) : districts;
-  return buildSocialCollectionHealth({ districts: scopedDistricts, socialQueries, socialRuns, socialAccounts });
+  return buildSocialCollectionHealth({ districts: scopedDistricts, socialQueries, socialRuns, socialAccounts, pendingCandidates, visibleAmbientThreads });
 }
 
 export async function getQueries(districtId = null) {
@@ -584,19 +586,29 @@ export async function getQueries(districtId = null) {
   return data ?? [];
 }
 
-export async function getPendingSocialDiscoveryCandidates(districtId) {
-  if (!districtId || districtId === 'All') throw new Error('A specific district is required.');
+const SOCIAL_DISCOVERY_PAGE_SIZE = 1000;
+
+export async function getPendingSocialDiscoveryCandidates(districtId = null) {
   const supabase = createAdminClient();
-  const { data, error } = await supabase
-    .from('social_discovery_candidates')
-    .select('id,district_id,provider,platform,external_thread_id,canonical_url,relationship_type,candidate_payload,status,review_version,source_workflow_id,source_execution_id,first_seen_at,last_seen_at')
-    .eq('district_id', districtId)
-    .eq('status', 'pending')
-    .order('last_seen_at', { ascending: false })
-    .limit(500);
-  if (error) {
-    if (error.code === '42P01' || error.code === 'PGRST205') return { available: false, candidates: [] };
-    throw error;
+  const candidates = [];
+  for (let from = 0; ; from += SOCIAL_DISCOVERY_PAGE_SIZE) {
+    let query = supabase
+      .from('social_discovery_candidates')
+      .select('id,district_id,provider,platform,external_thread_id,canonical_url,relationship_type,candidate_payload,status,review_version,source_workflow_id,source_execution_id,first_seen_at,last_seen_at')
+      .eq('status', 'pending')
+      .order('district_id')
+      .order('last_seen_at', { ascending: false })
+      .order('id')
+      .range(from, from + SOCIAL_DISCOVERY_PAGE_SIZE - 1);
+    if (districtId && districtId !== 'All') query = query.eq('district_id', districtId);
+    const { data, error } = await query;
+    if (error) {
+      if (error.code === '42P01' || error.code === 'PGRST205') return { available: false, candidates: [] };
+      throw error;
+    }
+    const page = data ?? [];
+    candidates.push(...page);
+    if (page.length < SOCIAL_DISCOVERY_PAGE_SIZE) break;
   }
-  return { available: true, candidates: data ?? [] };
+  return { available: true, candidates };
 }

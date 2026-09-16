@@ -32,7 +32,7 @@ for (const action of ['addQuery', 'deleteQuery']) {
   const start = actions.indexOf(`export async function ${action}`);
   assert.match(actions.slice(start, start + 2500), /assertDistrictAccess\(actor,/, `${action} must enforce district access`);
 }
-for (const action of ['claimSocialAffiliate', 'revokeSocialAffiliate', 'reviewSocialDiscoveryCandidate']) {
+for (const action of ['claimSocialAffiliate', 'revokeSocialAffiliate', 'reviewSocialDiscoveryCandidate', 'reviewSocialDiscoveryCandidates']) {
   const start = actions.indexOf(`export async function ${action}`);
   assert.notEqual(start, -1, `${action} must exist`);
   const body = actions.slice(start, start + 3500);
@@ -44,6 +44,21 @@ const discoveryReviewStart = actions.indexOf('export async function reviewSocial
 const discoveryReviewBody = actions.slice(discoveryReviewStart, actions.indexOf('\nexport async function ', discoveryReviewStart + 1));
 assert.doesNotMatch(discoveryReviewBody, /\.from\('social_discovery_candidates'\)/, 'discovery review retries must reach the payload-bound idempotent RPC instead of pre-rejecting terminal candidates');
 assert.match(discoveryReviewBody, /rpc\('canary_review_social_discovery'/);
+const discoveryBatchStart = actions.indexOf('export async function reviewSocialDiscoveryCandidates');
+const discoveryBatchBody = actions.slice(discoveryBatchStart, actions.indexOf('\nexport async function ', discoveryBatchStart + 1));
+assert.match(discoveryBatchBody, /normalizeSocialDiscoveryBatchItems/);
+assert.match(discoveryBatchBody, /candidate\.review_version !== item\.expectedVersion/);
+assert.match(discoveryBatchBody, /p_expected_district_id: districtId/);
+assert.match(discoveryBatchBody, /p_expected_version: item\.expectedVersion/);
+assert.match(discoveryBatchBody, /rpc\('canary_review_social_discovery'/);
+
+const publicConversationPage = await readFile(new URL('../src/app/dashboard/affiliates/page.js', import.meta.url), 'utf8');
+assert.match(publicConversationPage, /app_metadata\?\.role !== 'admin'/, 'Public Conversation admin page must reject non-admin users');
+assert.match(publicConversationPage, /getPendingSocialDiscoveryCandidates/, 'admin page must load pending candidates only after the protected role check');
+assert.ok(
+  publicConversationPage.indexOf("app_metadata?.role !== 'admin'") < publicConversationPage.indexOf('getPendingSocialDiscoveryCandidates()'),
+  'the protected admin role check must run before unreviewed candidates are loaded',
+);
 const addQueryStart = actions.indexOf('export async function addQuery');
 const deleteQueryStart = actions.indexOf('export async function deleteQuery');
 assert.match(actions.slice(addQueryStart, deleteQueryStart), /CUSTOMER_SEARCH_QUERY_LIMIT/, 'customer query additions must enforce the account limit');

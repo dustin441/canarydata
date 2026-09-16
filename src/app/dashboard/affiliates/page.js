@@ -1,17 +1,62 @@
 import { redirect } from 'next/navigation';
 import { createClient } from '@/lib/supabase/server';
 import { createAdminClient } from '@/lib/supabase/admin';
-import { getDistricts, getPendingSocialDiscoveryCandidates, getSocialAffiliateAccounts, getSocialAffiliateClaims, getSocialAffiliatePreviews } from '@/lib/data';
+import {
+  getDistricts,
+  getPendingSocialDiscoveryCandidates,
+  getSocialAffiliateAccounts,
+  getSocialAffiliateClaims,
+  getSocialAffiliatePreviews,
+  getSocialCollectionHealth,
+} from '@/lib/data';
 import AffiliateAccountsClient from './AffiliateAccountsClient';
 import SocialDiscoveryReviewClient from './SocialDiscoveryReviewClient';
 import { loadCanaryAccountAccess } from '@/lib/account-access';
-export default async function AffiliateAccountsPage({searchParams}){
- const params=await searchParams;const session=await createClient();const{data:{user:sessionUser}}=await session.auth.getUser();
- if(!sessionUser?.id)redirect('/login?redirect_to=/dashboard/affiliates');
- const admin=createAdminClient();const{data:{user}}=await admin.auth.admin.getUserById(sessionUser.id);if(user?.app_metadata?.role!=='admin')redirect('/dashboard');
- const access=await loadCanaryAccountAccess({user,admin});if(!access.allowed)redirect('/dashboard');
- const districts=await getDistricts();const requested=typeof params?.districtId==='string'?params.districtId:null;const districtId=requested&&districts.some(d=>d.id===requested)?requested:null;const district=districts.find(d=>d.id===districtId);
- const [accounts,claims,discovery]=districtId?await Promise.all([getSocialAffiliateAccounts(districtId),getSocialAffiliateClaims(districtId),getPendingSocialDiscoveryCandidates(districtId)]):[[],[],{available:false,candidates:[]}];
- const previews=districtId?await getSocialAffiliatePreviews(districtId,claims):[];
- return <><AffiliateAccountsClient districtId={districtId} districtName={district?.name||'Selected district'} districts={districts} accounts={accounts} claims={claims} previews={previews}/>{districtId&&<main className="affiliate-admin-page affiliate-admin-continuation"><SocialDiscoveryReviewClient districtId={districtId} candidates={discovery.candidates} available={discovery.available}/></main>}</>;
+
+export default async function AffiliateAccountsPage({ searchParams }) {
+  const params = await searchParams;
+  const session = await createClient();
+  const { data: { user: sessionUser } } = await session.auth.getUser();
+  if (!sessionUser?.id) redirect('/login?redirect_to=/dashboard/affiliates');
+
+  const admin = createAdminClient();
+  const { data: { user } } = await admin.auth.admin.getUserById(sessionUser.id);
+  if (user?.app_metadata?.role !== 'admin') redirect('/dashboard');
+  const access = await loadCanaryAccountAccess({ user, admin });
+  if (!access.allowed) redirect('/dashboard');
+
+  const districts = await getDistricts();
+  const requested = typeof params?.districtId === 'string' ? params.districtId : null;
+  const districtId = requested && districts.some((district) => district.id === requested) ? requested : null;
+  const district = districts.find((item) => item.id === districtId);
+  const [affiliateData, discovery, health] = await Promise.all([
+    districtId
+      ? Promise.all([getSocialAffiliateAccounts(districtId), getSocialAffiliateClaims(districtId)])
+      : Promise.resolve([[], []]),
+    getPendingSocialDiscoveryCandidates(),
+    getSocialCollectionHealth(districts),
+  ]);
+  const [accounts, claims] = affiliateData;
+  const previews = districtId ? await getSocialAffiliatePreviews(districtId, claims) : [];
+
+  return <>
+    <AffiliateAccountsClient
+      districtId={districtId}
+      districtName={district?.name || 'Selected district'}
+      districts={districts}
+      accounts={accounts}
+      claims={claims}
+      previews={previews}
+    />
+    <main className="affiliate-admin-page affiliate-admin-continuation">
+      <SocialDiscoveryReviewClient
+        districts={districts}
+        initialDistrictId={districtId}
+        candidates={discovery.candidates}
+        health={health}
+        available={discovery.available}
+        referenceNow={new Date().toISOString()}
+      />
+    </main>
+  </>;
 }

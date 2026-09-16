@@ -495,6 +495,7 @@ async function compileSocialViewForInteractionTest(source, reviewSocialThreadMoc
     '@/lib/reportingDataset.mjs': { buildReportingDataset: () => ({}), filterReportingDataset: () => ({}) },
     '@/lib/articleSearch.mjs': { articleMatchesSearch: () => true },
     '@/lib/socialPerformance.mjs': socialPerformanceModule,
+    '@/lib/admin-billing.mjs': { buildAdminBillingCsv: () => '', filterAdminBillingRows: (rows) => rows },
     recharts: new Proxy({}, { get: () => hostComponent }),
   };
   const bindings = await loadBindings();

@@ -40,10 +40,20 @@ const [socialDistrict] = buildSocialCollectionHealth({
   socialRuns: [
     { district_id: 'alabaster', status: 'partial', started_at: '2026-07-24T08:00:00Z', completed_at: '2026-07-24T08:05:00Z', raw_items: 600, accepted_threads: 300 },
     { district_id: 'alabaster', status: 'success', started_at: '2026-07-24T09:00:00Z', completed_at: '2026-07-24T09:05:00Z', raw_items: 10, accepted_threads: 2 },
-    { district_id: 'alabaster', status: 'empty', started_at: '2026-07-24T10:00:00Z', completed_at: '2026-07-24T10:05:00Z', raw_items: 4, accepted_threads: 0 },
+    { district_id: 'alabaster', status: 'empty', started_at: '2026-07-24T10:00:00Z', completed_at: '2026-07-24T10:05:00Z', raw_items: 4, accepted_threads: 0, provider_errors: 2, error_code: 'quota_warning' },
     { district_id: 'alabaster', status: 'running', started_at: '2026-07-24T11:00:00Z', completed_at: null, raw_items: 0, accepted_threads: 0 },
   ],
   socialAccounts: [{ district_id: 'alabaster', active: true }],
+  pendingCandidates: [
+    { district_id: 'alabaster', status: 'pending' },
+    { district_id: 'alabaster', status: 'approved' },
+  ],
+  visibleAmbientThreads: [
+    { id: 'ambient-old', district_id: 'alabaster', relationship_type: 'ambient', visibility_status: 'active', published_at: '2026-07-23T10:00:00Z', canonical_url: 'https://example.test/old', author_name: 'Older author', body: 'Older visible item' },
+    { id: 'ambient-new', district_id: 'alabaster', relationship_type: 'ambient', visibility_status: 'active', published_at: '2026-07-24T09:30:00Z', canonical_url: 'https://example.test/new', author_handle: '@new-author', headline: 'Newest visible ambient item' },
+    { id: 'owned-newer', district_id: 'alabaster', relationship_type: 'owned', visibility_status: 'active', published_at: '2026-07-24T10:30:00Z' },
+    { id: 'ambient-hidden', district_id: 'alabaster', relationship_type: 'ambient', visibility_status: 'excluded', published_at: '2026-07-24T11:00:00Z' },
+  ],
   now,
 });
 assert.equal(socialDistrict.status, 'healthy');
@@ -52,6 +62,15 @@ assert.equal(socialDistrict.latestRawItems, 4);
 assert.equal(socialDistrict.latestAcceptedCandidates, 0);
 assert.equal(socialDistrict.officialAccountCount, 1);
 assert.equal(socialDistrict.nonterminalRunCount, 0);
+assert.equal(socialDistrict.latestProviderErrors, 2);
+assert.equal(socialDistrict.pendingCandidateCount, 1);
+assert.deepEqual(socialDistrict.latestVisibleAmbientItem, {
+  id: 'ambient-new',
+  publishedAt: '2026-07-24T09:30:00Z',
+  canonicalUrl: 'https://example.test/new',
+  author: 'new-author',
+  excerpt: 'Newest visible ambient item',
+});
 
 const [stuckSocialDistrict] = buildSocialCollectionHealth({
   districts: [{ id: 'alabaster', name: 'Alabaster City Schools' }],

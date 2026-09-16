@@ -25,6 +25,33 @@ export function socialDiscoveryEngagement(candidate = {}) {
     .reduce((total, key) => total + numberOrZero(item[key]), 0);
 }
 
+export function socialDiscoveryConfidence(candidate = {}) {
+  const item = payload(candidate);
+  const raw = item.identity_confidence ?? item.confidence_score ?? item.confidence
+    ?? item.provider_metadata?.identity_confidence ?? item.provider_metadata?.confidence;
+  if (raw === null || raw === undefined || raw === '') return null;
+  const value = Number(raw);
+  if (!Number.isFinite(value)) return null;
+  const normalized = value > 1 && value <= 100 ? value / 100 : value;
+  return Math.max(0, Math.min(1, normalized));
+}
+
+export function socialDiscoveryConfidenceBand(candidate = {}) {
+  const confidence = socialDiscoveryConfidence(candidate);
+  if (confidence === null) return 'unknown';
+  if (confidence >= 0.8) return 'high';
+  if (confidence >= 0.5) return 'medium';
+  return 'low';
+}
+
+export function socialDiscoveryAgeHours(candidate = {}, nowValue = Date.now()) {
+  const item = payload(candidate);
+  const publishedAt = Date.parse(item.published_at || candidate.first_seen_at || candidate.last_seen_at || '');
+  const now = typeof nowValue === 'number' ? nowValue : Date.parse(nowValue);
+  if (!Number.isFinite(publishedAt) || !Number.isFinite(now)) return null;
+  return Math.max(0, (now - publishedAt) / 3_600_000);
+}
+
 export function socialDiscoveryPriority(candidate = {}) {
   const item = payload(candidate);
   const text = `${item.headline || ''} ${item.body || ''}`;
@@ -52,10 +79,18 @@ export function filterSocialDiscoveryCandidates(candidates = [], filters = {}) {
   const priority = String(filters.priority || 'all').toLowerCase();
   const author = String(filters.author || 'all').toLowerCase();
   const platform = String(filters.platform || 'all').toLowerCase();
+  const districtId = String(filters.districtId || 'all').toLowerCase();
+  const confidence = String(filters.confidence || 'all').toLowerCase();
+  const query = String(filters.query || '').trim().toLowerCase();
+  const maxAgeDays = Number(filters.maxAgeDays);
   return candidates.filter((candidate) => (
     (priority === 'all' || socialDiscoveryPriority(candidate) === priority)
     && (author === 'all' || socialDiscoveryAuthor(candidate).toLowerCase() === author)
     && (platform === 'all' || String(candidate.platform || '').toLowerCase() === platform)
+    && (districtId === 'all' || String(candidate.district_id || '').toLowerCase() === districtId)
+    && (confidence === 'all' || socialDiscoveryConfidenceBand(candidate) === confidence)
+    && (!Number.isFinite(maxAgeDays) || maxAgeDays <= 0 || (socialDiscoveryAgeHours(candidate, filters.now) ?? Number.POSITIVE_INFINITY) <= maxAgeDays * 24)
+    && (!query || `${payload(candidate).headline || ''} ${payload(candidate).body || ''} ${socialDiscoveryAuthor(candidate)}`.toLowerCase().includes(query))
   ));
 }
 

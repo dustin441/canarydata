@@ -109,6 +109,8 @@ async function compileActionsHarness({
       validateSearchQueryText: (value) => value,
     },
     '@/lib/onboarding-upload.mjs': { assertStrategicPlanFileSize() {} },
+    '@/lib/onboarding-discovery-quality.mjs': { assertConfirmedOnboardingProfileQuality() {}, findMeaningfulSnippets: () => [], sanitizeStrategicDocumentText: (value) => value },
+    '@/lib/socialDiscoveryReview.mjs': { normalizeSocialDiscoveryBatchItems: (value) => value },
     '@/lib/account-access': { requireCanaryAccountAccess: async () => ({ allowed: true }) },
     '@/lib/socialLifecycle.mjs': lifecycle,
   };

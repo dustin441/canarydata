@@ -149,7 +149,7 @@ export function summarizeSocialCollectionHealth(record = {}, nowValue = Date.now
   };
 }
 
-export function buildSocialCollectionHealth({ districts = [], socialQueries = [], socialRuns = [], socialAccounts = [], now = Date.now() } = {}) {
+export function buildSocialCollectionHealth({ districts = [], socialQueries = [], socialRuns = [], socialAccounts = [], pendingCandidates = [], visibleAmbientThreads = [], now = Date.now() } = {}) {
   const nowMs = typeof now === 'number' ? now : new Date(now).getTime();
   const nonterminalGraceMs = 4 * HOUR;
   const enrolled = new Set(socialQueries.filter((query) => query.active !== false && query.channels === 'social').map((query) => query.district_id));
@@ -163,8 +163,11 @@ export function buildSocialCollectionHealth({ districts = [], socialQueries = []
     latestRunId: null,
     latestRunStatus: null,
     latestRunError: null,
+    latestProviderErrors: 0,
     latestRawItems: 0,
     latestAcceptedCandidates: 0,
+    pendingCandidateCount: 0,
+    latestVisibleAmbientItem: null,
     nonterminalRunCount: 0,
   });
   const records = new Map(districts.map((district) => [district.id, emptyRecord(district.id, district.name)]));
@@ -196,10 +199,29 @@ export function buildSocialCollectionHealth({ districts = [], socialQueries = []
       record.latestRunStartedAt = run.started_at || terminalAt;
       record.latestRunId = run.id || null;
       record.latestRunStatus = run.status;
-      record.latestRunError = run.error_code || null;
+      record.latestRunError = run.error_code || run.error_message || null;
+      record.latestProviderErrors = Number(run.provider_errors || 0);
       record.latestRawItems = Number(run.raw_items || 0);
       record.latestAcceptedCandidates = Number(run.accepted_threads || 0);
     }
+  }
+
+  for (const candidate of pendingCandidates) {
+    if (candidate.status === 'pending') ensure(candidate.district_id).pendingCandidateCount += 1;
+  }
+  for (const thread of visibleAmbientThreads) {
+    if (thread.relationship_type !== 'ambient' || thread.visibility_status !== 'active') continue;
+    const record = ensure(thread.district_id);
+    const publishedAt = timestamp(thread.published_at);
+    const currentPublishedAt = timestamp(record.latestVisibleAmbientItem?.publishedAt);
+    if (!publishedAt || (currentPublishedAt && publishedAt <= currentPublishedAt)) continue;
+    record.latestVisibleAmbientItem = {
+      id: thread.id,
+      publishedAt: thread.published_at,
+      canonicalUrl: thread.canonical_url || null,
+      author: String(thread.author_name || thread.author_handle || 'Unknown author').replace(/^@/, '').trim() || 'Unknown author',
+      excerpt: String(thread.headline || thread.summary || thread.body || '').replace(/\s+/g, ' ').trim().slice(0, 240),
+    };
   }
 
   return [...records.values()].map((record) => summarizeSocialCollectionHealth(record, nowMs));

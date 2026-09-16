@@ -4548,6 +4548,15 @@ export default function DashboardClient({ articles, legacySocialAuditArticles = 
           {!userDistrictId && !isDemoReviewer && (
             <div className="sidebar-section">
               <div className="sidebar-section-label">Admin</div>
+              <a
+                className="sidebar-link"
+                href="/dashboard/affiliates"
+                onClick={() => setSidebarOpen(false)}
+              >
+                <span className="sidebar-link-icon">🗣️</span>
+                Public Conversation
+                <span className="sidebar-link-badge">Admin</span>
+              </a>
               <button
                 className={`sidebar-link ${districtFilter === 'All' ? 'active' : ''}`}
                 onClick={() => handleDistrictSelect('All')}
@@ -5012,7 +5021,10 @@ export default function DashboardClient({ articles, legacySocialAuditArticles = 
                   <div><dt>Latest terminal run</dt><dd>{selectedSocialCollectionHealth?.latestActivityAt ? formatDate(selectedSocialCollectionHealth.latestActivityAt) : 'Not available'}</dd></div>
                   <div><dt>Raw items checked</dt><dd>{selectedSocialCollectionHealth?.latestRawItems ?? 'N/A'}</dd></div>
                   <div><dt>Candidates staged</dt><dd>{selectedSocialCollectionHealth?.latestAcceptedCandidates ?? 'N/A'}</dd></div>
+                  <div><dt>Provider errors</dt><dd>{selectedSocialCollectionHealth?.latestProviderErrors ?? 'N/A'}</dd></div>
+                  <div><dt>Pending review</dt><dd>{selectedSocialCollectionHealth?.pendingCandidateCount ?? 'N/A'}</dd></div>
                   <div><dt>Official accounts</dt><dd>{selectedSocialCollectionHealth?.officialAccountCount ?? 'N/A'}</dd></div>
+                  <div><dt>Latest visible ambient item</dt><dd>{selectedSocialCollectionHealth?.latestVisibleAmbientItem ? <a href={selectedSocialCollectionHealth.latestVisibleAmbientItem.canonicalUrl} target="_blank" rel="noreferrer">{formatDate(selectedSocialCollectionHealth.latestVisibleAmbientItem.publishedAt)}</a> : 'None visible'}</dd></div>
                 </dl>
               </div>
             </>)}
