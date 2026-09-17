@@ -2993,13 +2993,14 @@ function SocialReportCard({ result, rank }) {
 
 function SocialReportThumbnail({ result }) {
   const thumbnailUrl = safeSocialMediaUrl(result.mediaUrl);
+  const renderedThumbnailUrl = renderedSocialMediaUrl(thumbnailUrl, safeSocialUrl(result.url));
   const [failedThumbnailUrl, setFailedThumbnailUrl] = useState('');
   const thumbnailAvailable = Boolean(thumbnailUrl && failedThumbnailUrl !== thumbnailUrl);
   return (
     <div className="social-report-thumbnail">
       {thumbnailAvailable ? (
         // eslint-disable-next-line @next/next/no-img-element -- remote social thumbnails are validated and proxied for print.
-        <img src={proxiedSocialMediaUrl(thumbnailUrl)} alt="" onError={() => setFailedThumbnailUrl(thumbnailUrl)} />
+        <img src={renderedThumbnailUrl} alt="" onError={() => setFailedThumbnailUrl(thumbnailUrl)} />
       ) : (
         <span>{thumbnailUrl ? 'Thumbnail unavailable' : 'Text-only post'}</span>
       )}

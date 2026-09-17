@@ -320,6 +320,8 @@ assert.match(dashboardSource, /SOCIAL_CSV_HEADERS/);
 assert.match(dashboardSource, /function exportOfficialSocialCsv\(\)/);
 assert.match(dashboardSource, /function exportPublicConversationCsv\(\)/);
 assert.match(dashboardSource, /function exportSocialPdf\(\)/);
+assert.doesNotMatch(dashboardSource, /proxiedSocialMediaUrl/, 'Social PDF thumbnails must not call an undefined legacy helper');
+assert.match(dashboardSource, /function SocialReportThumbnail\([\s\S]{0,500}renderedSocialMediaUrl\(thumbnailUrl, safeSocialUrl\(result\.url\)\)/, 'Social PDF thumbnails must use the defined media renderer with source context');
 assert.match(dashboardSource, /useState\('last-30-days'\)/, 'Social reporting must default to the trailing 30 calendar days');
 assert.match(dashboardSource, /social-report-card-meta[\s\S]{0,300}social-platform-label/, 'Top Post cards must show a platform chip');
 assert.match(dashboardSource, /<h2>Complete Post Evidence<\/h2>[\s\S]{0,300}<SocialReportTable results=\{allPosts\}/, 'the Social PDF must contain the complete eligible post table');
