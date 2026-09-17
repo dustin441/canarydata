@@ -1,5 +1,17 @@
 export const MAX_SOCIAL_MEDIA_BYTES = 25 * 1024 * 1024;
 
+export function unavailableSocialMediaResponse(warm, source = 'upstream-unavailable') {
+  if (warm) return Response.json({ cached: false, source }, { headers: { 'Cache-Control': 'no-store' } });
+  return new Response(null, {
+    status: 204,
+    headers: {
+      'Cache-Control': 'public, max-age=300, s-maxage=300',
+      'X-Canary-Media-Cache': source,
+      'X-Content-Type-Options': 'nosniff',
+    },
+  });
+}
+
 function ascii(bytes, start, end) {
   return String.fromCharCode(...bytes.slice(start, end));
 }

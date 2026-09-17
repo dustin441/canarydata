@@ -1427,34 +1427,81 @@ export async function submitFeedback(formData) {
 
   if (!message?.trim()) throw new Error('Message is required');
 
-  let photoUrl = null;
-
-  if (file && file.size > 0) {
-    const ext = file.name.split('.').pop();
-    const path = `${Date.now()}-${Math.random().toString(36).slice(2)}.${ext}`;
-    const bytes = await file.arrayBuffer();
-    const { error: uploadError } = await supabase.storage
-      .from('feedback-attachments')
-      .upload(path, bytes, { contentType: file.type });
-    if (uploadError) throw uploadError;
-    const { data: urlData } = supabase.storage
-      .from('feedback-attachments')
-      .getPublicUrl(path);
-    photoUrl = urlData.publicUrl;
-  }
-
   const clickupConfigured = isClickUpConfigured();
-  const dispatchStatus = clickupConfigured ? `clickup_dispatching:${Date.now()}:${randomUUID()}` : null;
-  const { data: feedback, error } = await supabase.from('feedback').insert({
+  // Reserve every row while its optional attachment is being prepared. The
+  // retry worker skips timestamped dispatch reservations, so it cannot create
+  // a task from the pre-attachment snapshot.
+  const dispatchStatus = `clickup_dispatching:${Date.now()}:${randomUUID()}`;
+  let { data: feedback, error } = await supabase.from('feedback').insert({
     message: message.trim(),
-    photo_url: photoUrl,
+    photo_url: null,
     district_id: districtId,
     district_name: districtName,
     status: dispatchStatus,
   }).select('*').single();
   if (error) throw error;
 
-  if (!clickupConfigured) return;
+  let attachmentStatus = 'not_provided';
+  if (file && file.size > 0) {
+    attachmentStatus = 'failed';
+    let uploadedPath = null;
+    try {
+      const allowedTypes = new Map([
+        ['image/jpeg', 'jpg'],
+        ['image/png', 'png'],
+        ['image/gif', 'gif'],
+        ['image/webp', 'webp'],
+      ]);
+      const ext = allowedTypes.get(String(file.type || '').toLowerCase());
+      if (!ext) throw new Error('Feedback attachments must be JPEG, PNG, GIF, or WebP images.');
+      if (file.size > 4 * 1024 * 1024) throw new Error('Feedback attachments must be 4 MB or smaller.');
+      uploadedPath = `${feedback.id}.${ext}`;
+      const bytes = await file.arrayBuffer();
+      const { error: uploadError } = await supabase.storage
+        .from('feedback-attachments')
+        .upload(uploadedPath, bytes, { contentType: file.type, upsert: false });
+      if (uploadError) throw uploadError;
+      const { data: urlData } = supabase.storage
+        .from('feedback-attachments')
+        .getPublicUrl(uploadedPath);
+      const photoUrl = urlData.publicUrl;
+      const { data: attached, error: attachmentUpdateError } = await supabase
+        .from('feedback')
+        .update({ photo_url: photoUrl })
+        .eq('id', feedback.id)
+        .eq('status', dispatchStatus)
+        .select('*')
+        .maybeSingle();
+      if (attachmentUpdateError || !attached) {
+        await supabase.storage.from('feedback-attachments').remove([uploadedPath]);
+        throw attachmentUpdateError || new Error('Feedback attachment ownership changed before it could be linked.');
+      }
+      feedback = attached;
+      attachmentStatus = 'stored';
+    } catch (attachmentError) {
+      console.error('Canary feedback attachment failed after message persistence', {
+        feedbackId: feedback.id,
+        message: attachmentError?.message || 'Unknown attachment error',
+      });
+    }
+  }
+
+  if (!clickupConfigured) {
+    const { data: released, error: releaseError } = await supabase
+      .from('feedback')
+      .update({ status: null })
+      .eq('id', feedback.id)
+      .eq('status', dispatchStatus)
+      .select('id')
+      .maybeSingle();
+    if (releaseError || !released) {
+      console.error('Canary feedback dispatch reservation could not be released', {
+        feedbackId: feedback.id,
+        message: releaseError?.message || 'Dispatch ownership changed before release',
+      });
+    }
+    return { ok: true, id: feedback.id, attachment_status: attachmentStatus };
+  }
 
   try {
     const task = await createClickUpFeedbackTask(feedback);
@@ -1474,4 +1521,5 @@ export async function submitFeedback(formData) {
       });
     }
   }
+  return { ok: true, id: feedback.id, attachment_status: attachmentStatus };
 }

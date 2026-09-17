@@ -44,6 +44,17 @@ const workerSource = await readFile(new URL('./sync-feedback-to-clickup.mjs', im
 assert.match(actionsSource, /transitionFeedbackClickUpDispatch/);
 assert.match(actionsSource, /\.eq\('status', expectedStatus\)[\s\S]{0,120}\.select\('id'\)[\s\S]{0,80}\.maybeSingle\(\)/, 'direct dispatch outcomes must use an exact compare-and-set');
 assert.match(actionsSource, /feedbackTrackingColumnsUnavailable/, 'the live legacy feedback schema must retain status-only compatibility');
+const submitFeedbackSource = actionsSource.slice(actionsSource.indexOf('export async function submitFeedback'), actionsSource.indexOf('\n}', actionsSource.indexOf('export async function submitFeedback')) + 2);
+assert.ok(submitFeedbackSource.indexOf(".from('feedback').insert") < submitFeedbackSource.indexOf('file.arrayBuffer()'), 'feedback must be durably inserted before optional attachment upload');
+assert.match(submitFeedbackSource, /const dispatchStatus = `clickup_dispatching:\$\{Date\.now\(\)\}:\$\{randomUUID\(\)\}`/, 'every feedback row must reserve dispatch ownership while its attachment is prepared');
+assert.match(submitFeedbackSource, /update\(\{ photo_url: photoUrl \}\)[\s\S]{0,160}\.eq\('status', dispatchStatus\)/, 'attachment linking must retain the preparation reservation');
+assert.match(submitFeedbackSource, /if \(!clickupConfigured\)[\s\S]{0,180}update\(\{ status: null \}\)[\s\S]{0,120}\.eq\('status', dispatchStatus\)/, 'rows without direct ClickUp credentials must be released to pending only after attachment processing');
+assert.match(workerSource, /String\(row\.status \|\| ''\)\.includes\('clickup_dispatching:'\)/, 'the retry worker must skip active preparation reservations');
+assert.doesNotMatch(submitFeedbackSource, /clickup_(?:synced|failed)_attachment_failed/, 'attachment outcomes must not invent statuses that legacy retry and health checks do not understand');
+assert.match(submitFeedbackSource, /file\.size > 4 \* 1024 \* 1024/, 'attachment limit must remain below the configured Server Action body ceiling');
+assert.match(submitFeedbackSource, /return \{ ok: true, id: feedback\.id, attachment_status:/, 'feedback submitter must receive a durable receipt and attachment status');
+const dashboardSource = await readFile(new URL('../src/app/dashboard/DashboardClient.js', import.meta.url), 'utf8');
+assert.match(dashboardSource, /Feedback ID:/, 'feedback confirmation must display the durable receipt ID');
 assert.match(workerSource, /buildFeedbackTask\(feedback\)/, 'lead retry payloads must share the direct producer builder');
 assert.match(workerSource, /CANARY_CLICKUP_LIST_ID \|\| process\.env\.CLICKUP_LIST_ID/, 'the dedicated Canary list must override a stale generic ClickUp list');
 assert.match(workerSource, /CANARY_CLICKUP_API_TOKEN \|\| process\.env\.CLICKUP_API_TOKEN/, 'the dedicated Canary token must override stale generic ClickUp credentials');

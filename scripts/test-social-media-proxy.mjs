@@ -1,6 +1,6 @@
 import assert from 'node:assert/strict';
 import { readFile } from 'node:fs/promises';
-import { detectSocialMediaType, readBoundedResponseBody, socialMediaReferer } from '../src/lib/social-media-proxy.mjs';
+import { detectSocialMediaType, readBoundedResponseBody, socialMediaReferer, unavailableSocialMediaResponse } from '../src/lib/social-media-proxy.mjs';
 
 const bytes = (...values) => new Uint8Array(values);
 assert.equal(detectSocialMediaType(bytes(0xff,0xd8,0xff,0x00)), 'image/jpeg');
@@ -17,6 +17,16 @@ const jpegResponse = new Response(bytes(0xff,0xd8,0xff,0x00), { headers: { 'cont
 assert.deepEqual([...await readBoundedResponseBody(jpegResponse, 10)], [0xff,0xd8,0xff,0x00]);
 await assert.rejects(() => readBoundedResponseBody(new Response(bytes(1,2,3,4), { headers: { 'content-length':'4' } }), 3), /social_media_too_large/);
 
+const unavailable = unavailableSocialMediaResponse(false, 'upstream-404');
+assert.equal(unavailable.status, 204);
+assert.equal((await unavailable.arrayBuffer()).byteLength, 0);
+assert.equal(unavailable.headers.get('x-canary-media-cache'), 'upstream-404');
+assert.equal(unavailable.headers.get('x-content-type-options'), 'nosniff');
+const warmUnavailable = unavailableSocialMediaResponse(true, 'upstream-403');
+assert.equal(warmUnavailable.status, 200);
+assert.deepEqual(await warmUnavailable.json(), { cached: false, source: 'upstream-403' });
+assert.equal(warmUnavailable.headers.get('cache-control'), 'no-store');
+
 const route = await readFile(new URL('../src/app/api/social-media/route.js', import.meta.url), 'utf8');
 const dashboard = await readFile(new URL('../src/app/dashboard/DashboardClient.js', import.meta.url), 'utf8');
 const middleware = await readFile(new URL('../src/middleware.js', import.meta.url), 'utf8');
@@ -25,7 +35,8 @@ assert.match(route, /detectSocialMediaType\(buffered\)/);
 assert.match(route, /readBoundedResponseBody\(upstream\)/);
 assert.match(route, /\[408, 425, 429, 500, 502, 503, 504\]/);
 assert.match(route, /status: 415/);
-assert.match(route, /status: 502/);
+assert.match(route, /unavailableSocialMediaResponse\(warm,/);
+assert.doesNotMatch(route, /Social media provider returned an unavailable response[^\n]*status: 502/);
 assert.doesNotMatch(route, /return new Response\(upstream\.body[\s\S]*contentType\.startsWith/);
 assert.match(route, /CACHE_BUCKET = 'social-media-cache'/);
 assert.match(route, /createHash\('sha256'\)/);

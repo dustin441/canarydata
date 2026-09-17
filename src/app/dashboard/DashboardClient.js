@@ -1727,6 +1727,7 @@ function SettingsView({ userDistrictId, districts, billingInfo = null, publicPri
   const [isPending, startSupportTransition] = useTransition();
   const [isBillingPending, startBillingTransition] = useTransition();
   const [submitted, setSubmitted] = useState(false);
+  const [supportReceipt, setSupportReceipt] = useState(null);
   const [billingSaved, setBillingSaved] = useState(false);
   const [supportError, setSupportError] = useState(null);
   const [billingError, setBillingError] = useState(null);
@@ -1766,7 +1767,8 @@ function SettingsView({ userDistrictId, districts, billingInfo = null, publicPri
     fd.append('district_name', districts?.find((d) => d.id === userDistrictId)?.name ?? '');
     startSupportTransition(async () => {
       try {
-        await submitFeedback(fd);
+        const receipt = await submitFeedback(fd);
+        setSupportReceipt(receipt);
         setSubmitted(true);
         setIssue('');
       } catch (err) {
@@ -1980,7 +1982,10 @@ function SettingsView({ userDistrictId, districts, billingInfo = null, publicPri
             gap: '10px',
           }}>
             <span style={{ fontSize: '1.1rem', flexShrink: 0 }}>✓</span>
-            Your issue has been received. Someone will reach back within 24–48 business hours.
+            <span>
+              Your issue has been received. Someone will reach back within 24–48 business hours.
+              {supportReceipt?.id && <><br /><small>Feedback ID: {supportReceipt.id}</small></>}
+            </span>
           </div>
         ) : (
           <form onSubmit={handleSupportSubmit}>
@@ -2387,6 +2392,7 @@ function FeedbackModal({ districtId, districtName, onClose }) {
   const [preview, setPreview] = useState(null);
   const [isPending, startTransition] = useTransition();
   const [submitted, setSubmitted] = useState(false);
+  const [receipt, setReceipt] = useState(null);
   const [error, setError] = useState(null);
 
   function handlePhoto(e) {
@@ -2406,7 +2412,8 @@ function FeedbackModal({ districtId, districtName, onClose }) {
     if (photo) fd.append('photo', photo);
     startTransition(async () => {
       try {
-        await submitFeedback(fd);
+        const saved = await submitFeedback(fd);
+        setReceipt(saved);
         setSubmitted(true);
       } catch (err) {
         setError(err.message || 'Something went wrong. Please try again.');
@@ -2421,6 +2428,8 @@ function FeedbackModal({ districtId, districtName, onClose }) {
           <>
             <h3>Thanks for the feedback! 🙌</h3>
             <p className="modal-success">We received your message and will review it shortly.</p>
+            {receipt?.id && <p className="modal-success">Feedback ID: {receipt.id}</p>}
+            {receipt?.attachment_status === 'failed' && <p style={{ color: 'var(--status-warning)', fontSize: '0.82rem' }}>Your message was saved, but the optional screenshot could not be attached.</p>}
             <div className="modal-actions">
               <button className="modal-submit-btn" onClick={onClose}>Close</button>
             </div>

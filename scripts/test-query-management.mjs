@@ -298,7 +298,7 @@ assert.match(feedbackSyncSource, /from\('onboarding_requests'\)/, 'shared worker
 assert.match(feedbackSyncSource, /from\(rowTable\(row\)\)/, 'worker claims and links must target the owning source table');
 assert.match(feedbackSyncSource, /buildOnboardingTask\(feedback\)/, 'structured and fallback onboarding retries must use the complete shared task builder');
 assert.match(feedbackSyncSource, /--onboarding-id=/, 'structured onboarding rows must support targeted retry');
-assert.match(actionsSource, /const dispatchStatus = clickupConfigured \? `clickup_dispatching:\$\{Date\.now\(\)\}:\$\{randomUUID\(\)\}` : null/, 'ordinary feedback must reserve timestamped dispatch ownership before direct ClickUp creation');
+assert.match(actionsSource, /const dispatchStatus = `clickup_dispatching:\$\{Date\.now\(\)\}:\$\{randomUUID\(\)\}`/, 'ordinary feedback must reserve timestamped dispatch ownership before attachment processing or direct ClickUp creation');
 assert.match(actionsSource, /const dispatchStatus = `query_review_dispatching:\$\{Date\.now\(\)\}:\$\{randomUUID\(\)\}`/, 'query-review direct dispatches must encode reservation time');
 assert.match(feedbackSyncSource, /_dispatching:\$\{Date\.now\(\)\}:\$\{randomUUID\(\)\}/, 'worker claims must encode reservation time');
 assert.match(feedbackSyncSource, /Onboarding request ID/, 'direct onboarding tasks must be discoverable during uncertain-dispatch reconciliation');

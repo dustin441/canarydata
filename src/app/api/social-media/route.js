@@ -1,7 +1,7 @@
 import { createHash } from 'node:crypto';
 import { createAdminClient } from '@/lib/supabase/admin';
 import { safeSocialMediaUrl, safeSocialUrl } from '@/lib/social.mjs';
-import { detectSocialMediaType, readBoundedResponseBody, socialMediaReferer } from '@/lib/social-media-proxy.mjs';
+import { detectSocialMediaType, readBoundedResponseBody, socialMediaReferer, unavailableSocialMediaResponse } from '@/lib/social-media-proxy.mjs';
 
 export const runtime = 'nodejs';
 
@@ -101,15 +101,15 @@ export async function GET(request) {
   try {
     upstream = await fetchUpstream(targetUrl, request);
   } catch {
-    return Response.json({ error: 'Social media could not be retrieved.' }, { status: 502 });
+    return unavailableSocialMediaResponse(warm, 'fetch-failed');
   }
   if (!upstream?.ok) {
     await upstream?.body?.cancel().catch(() => {});
-    return Response.json({ error: 'Social media provider returned an unavailable response.' }, { status: 502 });
+    return unavailableSocialMediaResponse(warm, `upstream-${upstream?.status || 'unavailable'}`);
   }
   if (!safeSocialMediaUrl(upstream.url)) {
     await upstream.body?.cancel().catch(() => {});
-    return Response.json({ error: 'Social media redirected to an unsupported host.' }, { status: 502 });
+    return unavailableSocialMediaResponse(warm, 'unsupported-redirect');
   }
 
   const upstreamType = (upstream.headers.get('content-type') || '').split(';', 1)[0].trim().toLowerCase();
@@ -123,11 +123,13 @@ export async function GET(request) {
     try {
       buffered = await readBoundedResponseBody(upstream);
     } catch (error) {
-      const status = error?.message === 'social_media_too_large' ? 413 : 502;
-      return Response.json({ error: status === 413 ? 'Social media exceeded the proxy size limit.' : 'Social media could not be read.' }, { status });
+      if (error?.message === 'social_media_too_large') {
+        return Response.json({ error: 'Social media exceeded the proxy size limit.' }, { status: 413 });
+      }
+      return unavailableSocialMediaResponse(warm, 'read-failed');
     }
     if (!supportedType) contentType = detectSocialMediaType(buffered);
-    if (!contentType) return Response.json({ error: 'The upstream response was not supported media.' }, { status: 415 });
+    if (!contentType) return unavailableSocialMediaResponse(warm, 'unsupported-media-type');
     responseBody = buffered;
     if (contentType.startsWith('image/') && path) cacheState = await writeCache(path, buffered, contentType) ? 'stored' : 'store-failed';
   }
