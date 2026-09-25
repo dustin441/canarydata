@@ -20,6 +20,7 @@ import { buildReportingDataset, filterReportingDataset } from '@/lib/reportingDa
 import { articleMatchesSearch } from '@/lib/articleSearch.mjs';
 import { buildSocialExecutiveDecision, buildSocialPerformanceFromDailySeries } from '@/lib/socialPerformance.mjs';
 import { buildAdminBillingCsv, filterAdminBillingRows } from '@/lib/admin-billing.mjs';
+import { canaryScoreBand, canaryScoreBandLabel, publicConversationAction, publicConversationSummary } from '@/lib/publicConversation.mjs';
 
 const stripePromise = process.env.NEXT_PUBLIC_STRIPE_PUBLISHABLE_KEY
   ? loadStripe(process.env.NEXT_PUBLIC_STRIPE_PUBLISHABLE_KEY)
@@ -240,7 +241,7 @@ function InfoTooltip({ text }) {
   );
 }
 
-const SCORE_TOOLTIP = 'Canary Score (1–10) measures how coverage reflects on the district. 7–10 = positive, 3–7 = neutral, and 1–3 = concerning or critical.';
+const SCORE_TOOLTIP = 'Canary Score (1–10) measures how coverage reflects on the district. 7.0–10.0 = positive, 3.0–6.9 = neutral, and 1.0–2.9 = concerning or critical.';
 const STRATEGIC_ALIGNMENT_TOOLTIP = 'Strategic Alignment appears only when reporting documents affirmative district action that advances a verified strategic priority. Topic similarity, crisis relevance, or district responsibility alone is not alignment.';
 const SOURCE_OWNERSHIP_TOOLTIP = 'Source Ownership identifies who published the story. Owned means a district-controlled publisher; External means a third-party publisher.';
 const EARNED_MEDIA_TOOLTIP = 'Earned Media is External coverage the Communications team helped generate or secure through pitching, facilitating access, providing information or sources, or other direct involvement.';
@@ -482,15 +483,16 @@ const BIRD_EYE_CSV_COLUMNS = ALL_COLUMNS.filter((column) =>
 );
 
 const SOCIAL_CSV_HEADERS = [
-  'Date', 'District', 'Platform', 'Classification', 'Account', 'Post', 'Source URL', 'Media type',
+  'Date', 'District', 'Platform', 'Classification', 'Account', 'Post', 'School / program', 'Source URL', 'Media type',
   'Reactions', 'Comments / Replies', 'Shares', 'Views', 'Viewers / reach', 'Clicks', 'Saves', 'Reposts', 'Total public interactions', 'Interaction rate (complete interactions ÷ reported views)',
   'Views observed at', 'Viewers / reach observed at', 'Reactions observed at', 'Comments observed at', 'Shares observed at', 'Clicks observed at', 'Saves observed at', 'Reposts observed at',
   'Views availability', 'Viewers / reach availability', 'Reactions availability', 'Comments availability', 'Shares availability', 'Clicks availability', 'Saves availability', 'Reposts availability',
   'Views attribution scope', 'Viewers / reach attribution scope', 'Reactions attribution scope', 'Comments attribution scope', 'Shares attribution scope', 'Clicks attribution scope', 'Saves attribution scope', 'Reposts attribution scope',
-  'Review state', 'Strategic priorities', 'Recommended action',
+  'Review state', 'Canary Score', 'Score band', 'Score rationale', 'Sentiment', 'Strategic priorities', 'Suggested action', 'Recommended action', 'Suggested response',
 ];
 
 function socialCsvRow(result) {
+  const publicAction = publicConversationAction(result);
   const interactionTotal = socialReportInteractionTotal(result);
   const comparableInteractionTotal = socialReportComparableInteractionTotal(result);
   const reportedViews = socialReportMetricValue(result, 'views');
@@ -505,8 +507,9 @@ function socialCsvRow(result) {
     result.relationshipLabel || result.relationshipType || '',
     result.authorName || result.authorHandle || '',
     result.headline || result.summary || '',
+    result.schoolProgram || 'Districtwide / not identified',
     safeSocialUrl(result.url) || '',
-    result.mediaType || (result.mediaUrl ? 'image' : 'text'),
+    result.mediaType || (result.videoUrl ? 'video' : result.mediaUrl ? 'image' : 'text'),
     metricValue('reactions'),
     metricValue('comments'),
     metricValue('shares'),
@@ -542,8 +545,14 @@ function socialCsvRow(result) {
     nativeSocialScopeLabel(nativeSocialMetric(result, 'saves')),
     nativeSocialScopeLabel(nativeSocialMetric(result, 'reposts')),
     result.visibilityStatus || '',
-    (result.actionIntelligence?.strategicPriorityLabels || []).join('; '),
-    result.actionIntelligence?.recommendedAction || '',
+    result.canaryScore ?? 'N/A',
+    canaryScoreBandLabel(result.canaryScore),
+    result.scoreRationale || '',
+    result.sentiment || 'N/A',
+    publicAction.strategicLabels.join('; '),
+    publicAction.actionLabel,
+    publicAction.rationale,
+    publicAction.draftResponse,
   ];
 }
 
@@ -3459,12 +3468,140 @@ function MonthlySocialPerformance({
   );
 }
 
+function PublicConversationDetail({ result, onClose, correctionEnabled = false }) {
+  const [copied, setCopied] = useState(false);
+  const [copyError, setCopyError] = useState('');
+  const [reviewSaving, setReviewSaving] = useState(false);
+  const [reviewMessage, setReviewMessage] = useState('');
+  const drawerRef = useRef(null);
+  const closeButtonRef = useRef(null);
+  const previousFocusRef = useRef(null);
+  useEffect(() => {
+    previousFocusRef.current = document.activeElement;
+    const previousOverflow = document.body?.style?.overflow || '';
+    if (document.body?.style) document.body.style.overflow = 'hidden';
+    const focusTimer = window.setTimeout(() => closeButtonRef.current?.focus(), 0);
+    const onKeyDown = (event) => {
+      if (event.key === 'Escape') {
+        event.preventDefault();
+        onClose();
+        return;
+      }
+      if (event.key !== 'Tab' || !drawerRef.current) return;
+      const focusable = Array.from(drawerRef.current.querySelectorAll('a[href], button:not([disabled]), select:not([disabled]), input:not([disabled]), textarea:not([disabled]), [tabindex]:not([tabindex="-1"])'))
+        .filter((element) => element.getAttribute('aria-hidden') !== 'true');
+      if (!focusable.length) {
+        event.preventDefault();
+        drawerRef.current.focus();
+        return;
+      }
+      const first = focusable[0];
+      const last = focusable[focusable.length - 1];
+      if (event.shiftKey && document.activeElement === first) {
+        event.preventDefault();
+        last.focus();
+      } else if (!event.shiftKey && document.activeElement === last) {
+        event.preventDefault();
+        first.focus();
+      }
+    };
+    window.addEventListener('keydown', onKeyDown);
+    return () => {
+      window.clearTimeout(focusTimer);
+      window.removeEventListener('keydown', onKeyDown);
+      if (document.body?.style) document.body.style.overflow = previousOverflow;
+      previousFocusRef.current?.focus?.();
+    };
+  }, [onClose]);
+  const action = publicConversationAction(result);
+  const resultUrl = safeSocialUrl(result.url);
+  const mediaUrl = safeSocialMediaUrl(result.mediaUrl);
+  const videoUrl = safeSocialMediaUrl(result.videoUrl);
+  const renderedMediaUrl = renderedSocialMediaUrl(mediaUrl, result.url);
+  const renderedVideoUrl = renderedSocialMediaUrl(videoUrl, result.url);
+  const copyDraft = async () => {
+    if (!action.draftResponse) return;
+    setCopyError('');
+    try {
+      await navigator.clipboard.writeText(action.draftResponse);
+      setCopied(true);
+      window.setTimeout(() => setCopied(false), 1800);
+    } catch {
+      setCopied(false);
+      setCopyError('Could not copy automatically. Select the draft text and copy it manually.');
+    }
+  };
+  const applyReviewAction = async (reviewAction) => {
+    setReviewSaving(true);
+    setReviewMessage('');
+    try {
+      await reviewSocialThread({ socialThreadId: result.id, action: reviewAction, expectedVersion: result.reviewVersion });
+      window.location.reload();
+    } catch (error) {
+      setReviewMessage(error?.message || 'Unable to update this social result.');
+      setReviewSaving(false);
+    }
+  };
+  return (
+    <div className="public-conversation-drawer-backdrop" role="presentation" onMouseDown={(event) => { if (event.target === event.currentTarget) onClose(); }}>
+      <aside ref={drawerRef} className="public-conversation-drawer" role="dialog" aria-modal="true" aria-labelledby="public-conversation-detail-title" tabIndex={-1}>
+        <header>
+          <div><span>{formatSourceLabel(result.platform)} · {result.relationshipLabel}</span><h2 id="public-conversation-detail-title">Public conversation detail</h2></div>
+          <button ref={closeButtonRef} type="button" aria-label="Close public conversation detail" onClick={onClose}>×</button>
+        </header>
+        {renderedVideoUrl ? (
+          <div className="public-conversation-detail-media"><video src={renderedVideoUrl} poster={renderedMediaUrl || undefined} controls playsInline preload="metadata">Your browser does not support video playback.</video></div>
+        ) : renderedMediaUrl ? (
+          <div className="public-conversation-detail-media"><Image src={renderedMediaUrl} alt="Post media" width={960} height={720} unoptimized /></div>
+        ) : (
+          <div className="public-conversation-detail-media empty"><strong>Text-only post</strong><span>No public image was supplied with this record.</span></div>
+        )}
+        <section className="public-conversation-detail-copy">
+          <div><strong>{result.authorName || result.authorHandle || 'Public account'}</strong><span>{result.schoolProgram || 'Districtwide / not identified'} · {formatDate(result.date)}</span></div>
+          <p>{result.fullBody || result.body || result.summary || result.headline || 'Post copy is unavailable.'}</p>
+          {resultUrl && <a href={resultUrl} target="_blank" rel="noopener noreferrer">Open original post ↗</a>}
+        </section>
+        <section className="public-conversation-intelligence-grid">
+          <article><span>Canary Score<InfoTooltip text={SCORE_TOOLTIP} /></span><strong className={`score-badge ${getScoreClass(result.canaryScore)}`}>{formatCanaryScore(result.canaryScore)}</strong><small>{canaryScoreBandLabel(result.canaryScore)}</small></article>
+          <article><span>Sentiment</span><strong>{result.sentiment || 'Not available'}</strong><small>{result.scoreRationale || 'A score explanation will appear after intelligence enrichment.'}</small></article>
+          <article><span>Suggested action</span><strong>{action.actionLabel}</strong><small>{action.rationale || 'Review the evidence and current conversation before deciding whether to engage.'}</small></article>
+          <article><span>Public engagement</span><strong>{result.engagementTotal === null ? 'N/A' : formatSocialMetric(result.engagementTotal)}</strong><small>{formatSocialMetric(result.reactionCount)} reactions · {formatSocialMetric(result.commentCount + result.replyCount)} comments · {formatSocialMetric(result.shareCount)} shares</small></article>
+        </section>
+        <section className="public-conversation-strategy">
+          <h3>Strategic alignment</h3>
+          {action.strategicLabels.length ? <div>{action.strategicLabels.map((label) => <span key={label}>{label}</span>)}</div> : <p>No verified strategic-priority alignment is recorded for this post.</p>}
+          {action.strategicAlignmentReason && <p>{action.strategicAlignmentReason}</p>}
+        </section>
+        <section className="public-conversation-response">
+          <div><h3>How to respond</h3><span>Review-only guidance. Canary never comments or posts for you.</span></div>
+          {action.draftResponse ? <blockquote>{action.draftResponse}</blockquote> : <p>Response guidance is not available yet. Open the original post to review it directly.</p>}
+          {action.factsToVerify.length > 0 && <div className="public-conversation-facts"><strong>Verify before responding</strong><ul>{action.factsToVerify.map((fact) => <li key={fact}>{fact}</li>)}</ul></div>}
+          <div className="public-conversation-response-actions">
+            <button type="button" className="btn btn-secondary" disabled={!action.draftResponse} onClick={copyDraft}>{copied ? 'Copied' : 'Copy suggested response'}</button>
+            {resultUrl && <a className="btn btn-primary" href={resultUrl} target="_blank" rel="noopener noreferrer">Open post to comment ↗</a>}
+          </div>
+          {copyError && <p className="form-error" role="status">{copyError}</p>}
+        </section>
+        {correctionEnabled && (
+          <section className="social-correction-controls" aria-label="Social correction controls">
+            <div><strong>Wrong result?</strong><span>Hide irrelevant posts or restore a previously hidden result.</span></div>
+            {result.visibilityStatus !== 'excluded'
+              ? <button type="button" className="btn btn-secondary btn-sm social-exclude-button" disabled={reviewSaving} onClick={() => applyReviewAction('exclude')}>Hide as irrelevant</button>
+              : <button type="button" className="btn btn-secondary btn-sm" disabled={reviewSaving} onClick={() => applyReviewAction('restore')}>Restore</button>}
+            {reviewMessage && <p className="social-review-error" role="alert">{reviewMessage}</p>}
+          </section>
+        )}
+      </aside>
+    </div>
+  );
+}
+
 export function SocialView({ socialResults, legacySocialResults = [], socialSources, socialAccountMetricSummaries = {}, socialPerformanceHistory = {}, socialReviewEvents = [], districtFilter, districts, campaignSearch, setCampaignSearch, isAdmin = false, reportAsOf = null, demoMode = false }) {
-  const [socialPageTab, setSocialPageTab] = useState('overview');
+  const [socialPageTab, setSocialPageTab] = useState('feed');
   const [relationshipFilter, setRelationshipFilter] = useState('public');
   const socialSearch = campaignSearch;
   const setSocialSearch = setCampaignSearch;
-  const [socialResultLimit, setSocialResultLimit] = useState(12);
+
   const [platformFilter, setPlatformFilter] = useState('all');
   const [mediaFilter, setMediaFilter] = useState('all');
   const [performanceFilter, setPerformanceFilter] = useState('all');
@@ -3473,7 +3610,10 @@ export function SocialView({ socialResults, legacySocialResults = [], socialSour
   const [socialDateStart, setSocialDateStart] = useState('');
   const [socialDateEnd, setSocialDateEnd] = useState('');
   const [socialSort, setSocialSort] = useState('newest');
-  const [socialFeedViewMode, setSocialFeedViewMode] = useState('table');
+  const [scoreBandFilter, setScoreBandFilter] = useState('all');
+  const [strategicFilter, setStrategicFilter] = useState('all');
+  const [actionFilter, setActionFilter] = useState('all');
+  const [selectedConversationId, setSelectedConversationId] = useState(null);
   const [socialMessage, setSocialMessage] = useState('');
   const [sourcesOpen, setSourcesOpen] = useState(false);
   const [socialReportMode, setSocialReportMode] = useState(false);
@@ -3545,8 +3685,7 @@ export function SocialView({ socialResults, legacySocialResults = [], socialSour
   const sourceByDistrictPlatform = useMemo(() => new Map(
     scopedSources.map((source) => [`${source.district_id}:${source.platform}`, source]),
   ), [scopedSources]);
-  const sourceForResult = (result) => scopedSources.find((source) => source.id === result.socialAccountId)
-    || scopedSources.find((source) => source.platform === result.platform && source.district_id === result.districtId);
+
   const platformOptions = useMemo(() => [...new Set(results.map((result) => result.platform))].sort(), [results]);
   const facetedResults = useMemo(() => {
     const query = socialSearch.trim().toLowerCase();
@@ -3567,11 +3706,16 @@ export function SocialView({ socialResults, legacySocialResults = [], socialSour
       const minimumMatches = minRate === null || (rate !== null && Number.isFinite(minRate) && rate >= minRate);
       const maximumMatches = maxRate === null || (rate !== null && Number.isFinite(maxRate) && rate <= maxRate);
       const dateMatches = socialDateFilterMatches(result, socialDateStart, socialDateEnd);
-      const searchMatches = !query || [result.headline, result.summary, result.authorName, result.platform, result.matchReason, result.actionIntelligence?.actionLabel, result.actionIntelligence?.recommendedAction, result.actionIntelligence?.strategicAlignmentReason, ...(result.actionIntelligence?.strategicPriorityLabels || [])]
+      const scoreMatches = scoreBandFilter === 'all' || canaryScoreBand(result.canaryScore) === scoreBandFilter;
+      const strategicLabels = publicConversationAction(result).strategicLabels;
+      const strategicMatches = strategicFilter === 'all'
+        || (strategicFilter === 'aligned' ? strategicLabels.length > 0 : strategicLabels.length === 0);
+      const actionMatches = actionFilter === 'all' || publicConversationAction(result).actionType === actionFilter;
+      const searchMatches = !query || [result.headline, result.summary, result.body, result.authorName, result.platform, result.matchReason, result.actionIntelligence?.actionLabel, result.actionIntelligence?.recommendedAction, result.actionIntelligence?.strategicAlignmentReason, ...strategicLabels]
         .some((value) => String(value || '').toLowerCase().includes(query));
-      return relationshipMatches && platformMatches && mediaMatches && performanceMatches && minimumMatches && maximumMatches && dateMatches && searchMatches;
+      return relationshipMatches && platformMatches && mediaMatches && performanceMatches && minimumMatches && maximumMatches && dateMatches && scoreMatches && strategicMatches && actionMatches && searchMatches;
     });
-  }, [results, relationshipFilter, platformFilter, mediaFilter, performanceFilter, minimumEngagementRate, maximumEngagementRate, socialDateStart, socialDateEnd, socialSearch, sourceByDistrictPlatform]);
+  }, [results, relationshipFilter, platformFilter, mediaFilter, performanceFilter, minimumEngagementRate, maximumEngagementRate, socialDateStart, socialDateEnd, scoreBandFilter, strategicFilter, actionFilter, socialSearch, sourceByDistrictPlatform]);
   const visibleResults = useMemo(() => {
     const rateFor = (result) => {
       const source = sourceByDistrictPlatform.get(`${result.districtId}:${result.platform}`);
@@ -3584,6 +3728,8 @@ export function SocialView({ socialResults, legacySocialResults = [], socialSour
       if (socialSort === 'comments') return b.commentCount - a.commentCount;
       if (socialSort === 'shares') return b.shareCount - a.shareCount;
       if (socialSort === 'views') return b.viewCount - a.viewCount;
+      if (socialSort === 'score-high') return (Number(b.canaryScore) || -1) - (Number(a.canaryScore) || -1);
+      if (socialSort === 'score-low') return (Number(a.canaryScore) || 11) - (Number(b.canaryScore) || 11);
       if (socialSort === 'oldest') return new Date(a.date).getTime() - new Date(b.date).getTime();
       return new Date(b.date).getTime() - new Date(a.date).getTime();
     });
@@ -3621,10 +3767,14 @@ export function SocialView({ socialResults, legacySocialResults = [], socialSour
     'All verified official platforms',
     socialSearch ? `Campaign/topic: “${socialSearch}”` : null,
   ].filter(Boolean).join(' · ');
-  const pagedResults = visibleResults.slice(0, socialResultLimit);
+
+  const publicSummary = useMemo(() => publicConversationSummary(results), [results]);
+  const selectedConversation = useMemo(
+    () => results.find((result) => result.id === selectedConversationId) || null,
+    [results, selectedConversationId],
+  );
   const changeSocialFilter = (setter, value) => {
     setter(value);
-    setSocialResultLimit(12);
   };
   const resetSocialFilters = () => {
     setRelationshipFilter('public');
@@ -3635,11 +3785,15 @@ export function SocialView({ socialResults, legacySocialResults = [], socialSour
     setMaximumEngagementRate('');
     setSocialDateStart('');
     setSocialDateEnd('');
+    setScoreBandFilter('all');
+    setStrategicFilter('all');
+    setActionFilter('all');
     setSocialSearch('');
     setSocialSort('newest');
-    setSocialResultLimit(12);
+
   };
   const hasActiveSocialFilters = relationshipFilter !== 'public' || platformFilter !== 'all' || mediaFilter !== 'all'
+    || scoreBandFilter !== 'all' || strategicFilter !== 'all' || actionFilter !== 'all'
     || performanceFilter !== 'all' || minimumEngagementRate !== '' || maximumEngagementRate !== '' || socialDateStart !== '' || socialDateEnd !== '' || socialSearch !== '' || socialSort !== 'newest';
   const scopedReviewEvents = socialReviewEvents.filter((event) => districtFilter === 'All' || event.district_id === districtFilter);
   const correctionHistoryLimit = correctionHistoryPage.districtFilter === districtFilter ? correctionHistoryPage.limit : 100;
@@ -3760,9 +3914,15 @@ export function SocialView({ socialResults, legacySocialResults = [], socialSour
       <section className="social-review-scope" aria-label="Social review scope">
         <div className="social-navigation-heading">
           <div><strong>Choose what to see</strong><span>Public conversation is the default. Classification and platform filters work together.</span></div>
-          <em>{summary.total} collected results</em>
+          <em>{publicSummary.total} public result{publicSummary.total === 1 ? '' : 's'}</em>
         </div>
-        <div className="social-summary-grid" aria-label="Social result summary">
+        <div className="public-intelligence-summary" aria-label="Public Conversation summary">
+          <article><span>Public posts</span><strong>{publicSummary.total}</strong><small>Current district scope</small></article>
+          <article><span>Average Canary Score</span><strong>{publicSummary.averageScore === null ? 'N/A' : publicSummary.averageScore.toFixed(1)}</strong><small>{publicSummary.scored} of {publicSummary.total} scored</small></article>
+          <article><span>Score distribution</span><strong>{publicSummary.positive} / {publicSummary.neutral} / {publicSummary.concerning}</strong><small>Positive · Neutral · Concerning</small></article>
+          <article><span>Strategic hits</span><strong>{publicSummary.strategicHits}</strong><small>Verified priority connections</small></article>
+        </div>
+        <div className="social-summary-grid public-conversation-scope" aria-label="Public Conversation classification filter">
           <button type="button" aria-pressed={relationshipFilter === 'public'} className={relationshipFilter === 'public' ? 'active' : ''} onClick={() => changeSocialFilter(setRelationshipFilter, 'public')}>
             <span>Public conversation</span><strong>{summary.direct + summary.ambient}</strong>
           </button>
@@ -3802,19 +3962,20 @@ export function SocialView({ socialResults, legacySocialResults = [], socialSour
           <div className="social-results-heading-controls">
             <span>{visibleResults.length} result{visibleResults.length === 1 ? '' : 's'}</span>
             <button type="button" className="social-view-mode" onClick={exportPublicConversationCsv} disabled={visibleResults.length === 0}>Export filtered CSV</button>
-            <button type="button" className="social-view-mode" aria-pressed={socialFeedViewMode === 'table'} onClick={() => setSocialFeedViewMode('table')}>Table</button>
-            <button type="button" className="social-view-mode" aria-pressed={socialFeedViewMode === 'cards'} onClick={() => setSocialFeedViewMode('cards')}>Cards</button>
-            <input className="filter-input" value={socialSearch} onChange={(event) => changeSocialFilter(setSocialSearch, event.target.value)} placeholder="Search social results…" />
+            <input className="filter-input" aria-label="Search public conversation" value={socialSearch} onChange={(event) => changeSocialFilter(setSocialSearch, event.target.value)} placeholder="Search social results…" />
           </div>
         </div>
 
         <div className="social-filter-panel" aria-label="Social result filters">
           <label><span>Platform</span><select value={platformFilter} onChange={(event) => changeSocialFilter(setPlatformFilter, event.target.value)}><option value="all">All platforms</option>{platformOptions.map((platform) => <option key={platform} value={platform}>{formatSourceLabel(platform)}</option>)}</select></label>
           <label><span>Content</span><select value={mediaFilter} onChange={(event) => changeSocialFilter(setMediaFilter, event.target.value)}><option value="all">All content</option><option value="image">Images</option><option value="video">Videos</option><option value="text">Text-only / no media</option></select></label>
+          <label><span>Canary Score</span><select value={scoreBandFilter} onChange={(event) => changeSocialFilter(setScoreBandFilter, event.target.value)}><option value="all">All scores</option><option value="positive">Positive (7.0–10.0)</option><option value="neutral">Neutral (3.0–6.9)</option><option value="concerning">Concerning (1.0–2.9)</option><option value="unavailable">Not scored</option></select></label>
+          <label><span>Strategic alignment</span><select value={strategicFilter} onChange={(event) => changeSocialFilter(setStrategicFilter, event.target.value)}><option value="all">Aligned or not aligned</option><option value="aligned">Verified alignment</option><option value="unaligned">No verified alignment</option></select></label>
+          <label><span>Suggested action</span><select value={actionFilter} onChange={(event) => changeSocialFilter(setActionFilter, event.target.value)}><option value="all">All actions</option><option value="respond">Respond</option><option value="clarify">Clarify</option><option value="amplify">Amplify</option><option value="thank">Thank</option><option value="monitor">Monitor</option><option value="elevate">Elevate</option><option value="strategy">Strategy</option><option value="no_action">No action</option></select></label>
 
           <label><span>From date</span><input type="date" value={socialDateStart} max={socialDateEnd || undefined} onChange={(event) => changeSocialFilter(setSocialDateStart, event.target.value)} /></label>
           <label><span>To date</span><input type="date" value={socialDateEnd} min={socialDateStart || undefined} onChange={(event) => changeSocialFilter(setSocialDateEnd, event.target.value)} /></label>
-          <label><span>Sort by</span><select value={socialSort} onChange={(event) => changeSocialFilter(setSocialSort, event.target.value)}><option value="newest">Newest first</option><option value="oldest">Oldest first</option><option value="engagement">Highest engagement</option><option value="engagement-rate">Highest engagement rate</option><option value="reactions">Most reactions</option><option value="comments">Most comments</option><option value="shares">Most shares</option><option value="views">Most views</option></select></label>
+          <label><span>Sort by</span><select value={socialSort} onChange={(event) => changeSocialFilter(setSocialSort, event.target.value)}><option value="newest">Newest first</option><option value="oldest">Oldest first</option><option value="score-high">Highest Canary Score</option><option value="score-low">Lowest Canary Score</option><option value="engagement">Highest engagement</option><option value="engagement-rate">Highest engagement rate</option><option value="reactions">Most reactions</option><option value="comments">Most comments</option><option value="shares">Most shares</option><option value="views">Most views</option></select></label>
           <button type="button" className="social-filter-reset" onClick={resetSocialFilters} disabled={!hasActiveSocialFilters}>Reset filters</button>
         </div>
         <details className="social-advanced-filters">
@@ -3835,45 +3996,35 @@ export function SocialView({ socialResults, legacySocialResults = [], socialSour
               : 'No reviewed social results match the selected filters.'}</p>
           </div>
         ) : (
-          <>
-            {socialFeedViewMode === 'table' ? (
-              <div className="social-monthly-table-wrap social-monthly-post-table-wrap social-public-conversation-table">
-                <table aria-label="Filtered public conversation">
-                  <thead><tr><th>Date</th><th>Platform</th><th>Classification</th><th>Account</th><th>Post</th><th>Interactions</th><th>Source</th></tr></thead>
-                  <tbody>{visibleResults.map((result) => {
-                    const resultUrl = safeSocialUrl(result.url);
-                    const interactions = socialReportInteractionTotal(result);
-                    const strategicContext = (result.actionIntelligence?.strategicPriorityLabels || []).join('; ');
-                    return <tr key={`conversation-row-${result.platform}-${result.id}`}><td>{formatDate(result.date)}</td><td>{formatSourceLabel(result.platform)}</td><td>{result.relationshipLabel || result.relationshipType || 'Public mention'}</td><td>{result.authorName || result.authorHandle || 'Public account'}</td><td className="social-monthly-post-copy"><strong>{result.headline || result.summary || 'Untitled post'}</strong>{strategicContext && <small>Strategic context: {strategicContext}</small>}</td><td>{interactions === null ? 'N/A' : formatSocialMetric(interactions)}</td><td>{resultUrl ? <a href={resultUrl} target="_blank" rel="noopener noreferrer">Open post ↗</a> : 'Unavailable'}</td></tr>;
-                  })}</tbody>
-                </table>
-              </div>
-            ) : (
-              <div className="social-scorecard-grid">
-                {pagedResults.map((result) => (
-                  <SocialPostPreviewCard
-                    key={`${result.platform}-${result.id}`}
-                    result={result}
-                    source={sourceForResult(result)}
-                    showContext
-                    compact={false}
-                    listCompact={false}
-                    correctionEnabled={isAdmin && Boolean(result.provider && result.externalThreadId)}
-                  />
-                ))}
-              </div>
-            )}
-            {socialFeedViewMode === 'cards' && pagedResults.length < visibleResults.length && (
-              <div className="social-load-more">
-                <button type="button" className="btn btn-secondary" onClick={() => setSocialResultLimit((current) => current + 12)}>
-                  Load 12 more results
-                </button>
-                <span>Showing {pagedResults.length} of {visibleResults.length}</span>
-              </div>
-            )}
-          </>
+          <div className="social-monthly-table-wrap social-monthly-post-table-wrap social-public-conversation-table">
+            <table aria-label="Filtered public conversation">
+              <thead><tr><th>Date</th><th>Post</th><th>Classification</th><th>School / program</th><th>Canary Score<InfoTooltip text={SCORE_TOOLTIP} /></th><th>Strategic alignment</th><th>Suggested action</th><th>Engagement</th><th>Source</th></tr></thead>
+              <tbody>{visibleResults.map((result) => {
+                const resultUrl = safeSocialUrl(result.url);
+                const mediaUrl = safeSocialMediaUrl(result.mediaUrl);
+                const renderedMediaUrl = renderedSocialMediaUrl(mediaUrl, result.url);
+                const interactions = socialReportInteractionTotal(result);
+                const action = publicConversationAction(result);
+                return <tr key={`conversation-row-${result.platform}-${result.id}`}>
+                  <td><time>{formatDate(result.date)}</time><small>{formatSourceLabel(result.platform)}</small></td>
+                  <td className="public-conversation-post-cell">
+                    {renderedMediaUrl ? <Image src={renderedMediaUrl} alt="" width={72} height={72} unoptimized /> : <span className="public-conversation-text-thumb">{result.videoUrl ? 'Video' : 'Text'}</span>}
+                    <div><strong>{result.authorName || result.authorHandle || 'Public account'}</strong><p>{result.headline || result.summary || 'Untitled post'}</p></div>
+                  </td>
+                  <td><span className={`social-relationship-badge ${result.relationshipType}`}>{result.relationshipLabel}</span></td>
+                  <td>{result.schoolProgram || <span className="public-conversation-muted">Districtwide / not identified</span>}</td>
+                  <td><span className={`score-badge ${getScoreClass(result.canaryScore)}`}>{formatCanaryScore(result.canaryScore)}</span><small>{canaryScoreBandLabel(result.canaryScore)}</small></td>
+                  <td>{action.strategicLabels.length ? <div className="public-conversation-alignment-list">{action.strategicLabels.map((label) => <span key={label}>{label}</span>)}</div> : <span className="public-conversation-muted">Not aligned</span>}</td>
+                  <td><button type="button" className={`public-conversation-action ${action.actionType}`} onClick={() => setSelectedConversationId(result.id)}><strong>{action.actionLabel}</strong><span>How to respond</span></button></td>
+                  <td>{interactions === null ? 'N/A' : formatSocialMetric(interactions)}</td>
+                  <td>{resultUrl ? <a href={resultUrl} target="_blank" rel="noopener noreferrer">Open post ↗</a> : 'Unavailable'}</td>
+                </tr>;
+              })}</tbody>
+            </table>
+          </div>
         )}
       </section>
+      {selectedConversation && <PublicConversationDetail result={selectedConversation} onClose={() => setSelectedConversationId(null)} correctionEnabled={isAdmin && Boolean(selectedConversation.provider && selectedConversation.externalThreadId)} />}
 
       {isAdmin && (
         <details className="social-audit-history">

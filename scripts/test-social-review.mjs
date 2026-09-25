@@ -20,6 +20,7 @@ import {
   summarizeSocialReport,
 } from '../src/lib/socialReport.mjs';
 import { isLegacySocialArticle, isNewsEligibleArticle } from '../src/lib/newsEligibility.mjs';
+import * as publicConversationModule from '../src/lib/publicConversation.mjs';
 
 assert.equal(neutralizeSpreadsheetFormula('=HYPERLINK("https://bad.example")'), "'=HYPERLINK(\"https://bad.example\")");
 assert.equal(neutralizeSpreadsheetFormula('  @SUM(1,2)'), "'  @SUM(1,2)");
@@ -496,6 +497,7 @@ async function compileSocialViewForInteractionTest(source, reviewSocialThreadMoc
     '@/lib/articleSearch.mjs': { articleMatchesSearch: () => true },
     '@/lib/socialPerformance.mjs': socialPerformanceModule,
     '@/lib/admin-billing.mjs': { buildAdminBillingCsv: () => '', filterAdminBillingRows: (rows) => rows },
+    '@/lib/publicConversation.mjs': publicConversationModule,
     recharts: new Proxy({}, { get: () => hostComponent }),
   };
   const bindings = await loadBindings();
@@ -580,6 +582,9 @@ const mentionResult = {
   date: '2026-08-02T12:00:00.000Z',
   headline: 'Public mention should stay out of official reporting',
   summary: 'Public mention should stay out of official reporting',
+  mediaType: 'video',
+  isTextOnly: false,
+  videoUrl: 'https://scontent-lga3-3.xx.fbcdn.net/public-conversation.mp4',
   actionIntelligence: null,
 };
 const missingProviderResult = {
@@ -623,6 +628,7 @@ const windowStub = {
   setTimeout: (callback) => { callback(); return 1; },
   clearTimeout() {},
   addEventListener() {},
+  removeEventListener() {},
 };
 const documentStub = { querySelectorAll: () => [] };
 globalThis.window = windowStub;
@@ -643,6 +649,13 @@ const socialProps = {
 let socialTree = renderer.render(SocialView, socialProps);
 let overviewButton = findButton(socialTree, 'Our Social');
 let feedButton = findButton(socialTree, 'Public conversation');
+assert.equal(overviewButton.props['aria-pressed'], false);
+assert.equal(feedButton.props['aria-pressed'], true);
+assert.match(nodeText(socialTree), /Public mention should stay out of official reporting/);
+overviewButton.props.onClick();
+socialTree = renderer.render(SocialView, socialProps);
+overviewButton = findButton(socialTree, 'Our Social');
+feedButton = findButton(socialTree, 'Public conversation');
 assert.equal(overviewButton.props['aria-pressed'], true);
 assert.equal(feedButton.props['aria-pressed'], false);
 assert.match(nodeText(socialTree), /Actionable official post/);
@@ -674,22 +687,27 @@ assert.doesNotMatch(nodeText(socialTree), /Actionable official post/);
 assert.match(nodeText(socialTree), /Public conversation table/);
 findButton(socialTree, 'All results').props.onClick();
 socialTree = renderer.render(SocialView, socialProps);
-findButton(socialTree, 'Cards').props.onClick();
+assert.equal(findNodes(socialTree, (node) => node.type === 'button' && nodeText(node).includes('Cards')).length, 0, 'The public customer view is table-only.');
+const videoRow = findNodes(socialTree, (node) => node.type === 'tr' && nodeText(node).includes('Public mention should stay out of official reporting'))[0];
+findButton(videoRow, 'How to respond').props.onClick();
 socialTree = renderer.render(SocialView, socialProps);
-
-const actionableCard = findNodes(socialTree, (node) => node.type === 'article' && nodeText(node).includes('Actionable official post'))
-  .find((node) => findNodes(node, (child) => child.type === 'button' && nodeText(child) === 'Hide as irrelevant').length === 1);
-const excludedCard = findNodes(socialTree, (node) => node.type === 'article' && nodeText(node).includes('Previously hidden result'))
-  .find((node) => findNodes(node, (child) => child.type === 'button' && nodeText(child) === 'Restore').length === 1);
-assert.ok(actionableCard, 'An actionable admin result with provider identifiers must expose the hide correction.');
-assert.ok(excludedCard, 'An excluded admin result with provider identifiers must expose the restore correction.');
-for (const ineligibleHeadline of ['Missing provider result', 'Missing external ID result']) {
-  const ineligibleCard = findNodes(socialTree, (node) => node.type === 'article' && nodeText(node).includes(ineligibleHeadline))[0];
-  assert.ok(ineligibleCard, `Expected to render ${ineligibleHeadline}.`);
-  assert.equal(findNodes(ineligibleCard, (node) => node.props?.['aria-label'] === 'Social correction controls').length, 0);
-}
-await findButton(actionableCard, 'Hide as irrelevant').props.onClick();
-await findButton(excludedCard, 'Restore').props.onClick();
+let conversationDrawer = findNodes(socialTree, (node) => node.props?.role === 'dialog')[0];
+assert.equal(findNodes(conversationDrawer, (node) => node.type === 'video').length, 1, 'Video-only Public Conversation evidence renders as video instead of text-only.');
+findNodes(conversationDrawer, (node) => node.type === 'button' && node.props?.['aria-label'] === 'Close public conversation detail')[0].props.onClick();
+socialTree = renderer.render(SocialView, socialProps);
+const actionableRow = findNodes(socialTree, (node) => node.type === 'tr' && nodeText(node).includes('Actionable official post'))[0];
+findButton(actionableRow, 'How to respond').props.onClick();
+socialTree = renderer.render(SocialView, socialProps);
+conversationDrawer = findNodes(socialTree, (node) => node.props?.role === 'dialog')[0];
+assert.ok(conversationDrawer, 'Selecting a table row action opens the Public Conversation detail drawer.');
+await findButton(conversationDrawer, 'Hide as irrelevant').props.onClick();
+findNodes(conversationDrawer, (node) => node.type === 'button' && node.props?.['aria-label'] === 'Close public conversation detail')[0].props.onClick();
+socialTree = renderer.render(SocialView, socialProps);
+const excludedRow = findNodes(socialTree, (node) => node.type === 'tr' && nodeText(node).includes('Previously hidden result'))[0];
+findButton(excludedRow, 'How to respond').props.onClick();
+socialTree = renderer.render(SocialView, socialProps);
+conversationDrawer = findNodes(socialTree, (node) => node.props?.role === 'dialog')[0];
+await findButton(conversationDrawer, 'Restore').props.onClick();
 assert.deepEqual(reviewCalls, [
   { socialThreadId: 'actionable-result', action: 'exclude', expectedVersion: 7 },
   { socialThreadId: 'excluded-result', action: 'restore', expectedVersion: 11 },
@@ -705,7 +723,8 @@ findButton(nonAdminTree, 'Public conversation').props.onClick();
 nonAdminTree = nonAdminHarness.renderer.render(nonAdminHarness.SocialView, { ...socialProps, isAdmin: false });
 findButton(nonAdminTree, 'All results').props.onClick();
 nonAdminTree = nonAdminHarness.renderer.render(nonAdminHarness.SocialView, { ...socialProps, isAdmin: false });
-findButton(nonAdminTree, 'Cards').props.onClick();
+const nonAdminRow = findNodes(nonAdminTree, (node) => node.type === 'tr' && nodeText(node).includes('Actionable official post'))[0];
+findButton(nonAdminRow, 'How to respond').props.onClick();
 nonAdminTree = nonAdminHarness.renderer.render(nonAdminHarness.SocialView, { ...socialProps, isAdmin: false });
 assert.equal(findNodes(nonAdminTree, (node) => node.props?.['aria-label'] === 'Social correction controls').length, 0);
 assert.equal(findNodes(nonAdminTree, (node) => node.type === 'button' && ['Hide as irrelevant', 'Restore'].includes(nodeText(node))).length, 0);
@@ -750,7 +769,7 @@ assert.doesNotMatch(actions, /approve_official|runReviewAction|runBulkAction|exp
 assert.match(sql, /p_action not in \('approve', 'promote'/);
 assert.match(sql, /p_action not in \('approve_official', 'promote'\)/);
 assert.doesNotMatch(actions, /Only approved results can be promoted/);
-for (const marker of ['Our Social', 'Public conversation', 'Hide as irrelevant', 'Correction history', 'Table', 'Cards', 'Official district post', 'Public mention']) {
+for (const marker of ['Our Social', 'Public conversation', 'Hide as irrelevant', 'Correction history', 'Public conversation table', 'Canary Score', 'How to respond', 'Official district post', 'Public mention']) {
   assert.ok(dashboard.includes(marker), `Dashboard must include ${marker}`);
 }
 assert.match(dashboard, /No reviewed social results in this view/);
@@ -766,17 +785,23 @@ assert.doesNotMatch(dashboard, /if \(correctionHistoryPage\.districtFilter !== d
 assert.match(dashboard, /Showing \{visibleReviewEvents\.length\} of \{scopedReviewEvents\.length\} correction events/);
 assert.match(dashboard, /Load 100 more correction events/);
 assert.doesNotMatch(dashboard, /scopedReviewEvents\.slice\(0, 100\)/);
-assert.match(dashboard, /const \[socialPageTab, setSocialPageTab\] = useState\('overview'\)/);
-assert.match(dashboard, /const \[socialFeedViewMode, setSocialFeedViewMode\] = useState\('table'\)/);
+assert.match(dashboard, /const \[socialPageTab, setSocialPageTab\] = useState\('feed'\)/);
+assert.doesNotMatch(dashboard, /socialFeedViewMode|>Cards</);
+assert.match(dashboard, /previousFocusRef\.current = document\.activeElement/);
+assert.match(dashboard, /event\.key !== 'Tab'/);
+assert.match(dashboard, /previousFocusRef\.current\?\.focus\?\.\(\)/);
+assert.match(dashboard, /renderedVideoUrl[\s\S]*<video/);
+assert.match(dashboard, /Neutral \(3\.0–6\.9\)/);
+assert.match(dashboard, /Concerning \(1\.0–2\.9\)/);
 assert.match(dashboard, /aria-label="Social page sections"/);
-assert.match(dashboard, /correctionEnabled=\{isAdmin && Boolean\(result\.provider && result\.externalThreadId\)\}/);
+assert.match(dashboard, /correctionEnabled=\{isAdmin && Boolean\(selectedConversation\.provider && selectedConversation\.externalThreadId\)\}/);
 assert.match(dashboard, /applyReviewAction\('exclude'\)[\s\S]*Hide as irrelevant/);
 assert.match(dashboard, /applyReviewAction\('restore'\)[\s\S]*>Restore</);
 assert.match(dashboard, /Immutable correction history retains recorded exclusions and restorations/);
 assert.doesNotMatch(dashboard, /historical approvals/);
 assert.match(dashboard, /<details className="social-monthly-analyst-note social-monthly-analyst-note-top">/);
 assert.doesNotMatch(dashboard, /Approve for client and reports|Select eligible official posts|Review audit history|Needs approval|Bulk social review actions|Action Queue|review feed|reviewed owned posts/);
-assert.doesNotMatch(dashboard, /bulkReviewSocialThreads|socialActionFilterMatches|actionFilter|onToggleSelected|social-review-select/);
+assert.doesNotMatch(dashboard, /bulkReviewSocialThreads|socialActionFilterMatches|onToggleSelected|social-review-select/);
 assert.doesNotMatch(dashboard, /Promote to client|Promote approved batch|Approved internally/);
 assert.match(dashboard, /Social cues include all enriched results for the selected district/);
 assert.match(dashboard, /View Social posts\s*<\/button>/);
@@ -870,7 +895,7 @@ assert.match(dashboard, /reportPeriod = `\$\{topPostsWindow\.label\}/);
 assert.match(dashboard, /Choose one district before exporting a Social Report/);
 assert.match(dashboard, /setSocialReportMode\(true\)/);
 assert.doesNotMatch(dashboard, /function exportSocialPdf\(\)[\s\S]{0,250}setCurrentView\('dashboard'\)/);
-assert.match(dashboard, /source\.id === result\.socialAccountId/);
+assert.match(dashboard, /renderedSocialMediaUrl\(mediaUrl, result\.url\)/);
 assert.match(dashboard, /source\.active === true/);
 assert.match(dashboard, /const SHOW_GLOBAL_BOARD_REPORT_EXPORT = false/);
 assert.match(dashboard, /SHOW_GLOBAL_BOARD_REPORT_EXPORT && \['dashboard', 'birdseye', 'social'\]/);
@@ -934,10 +959,10 @@ for (const marker of ['Our Social', 'What we are saying about ourselves', 'Publi
   assert.ok(dashboard.includes(marker), `Social information hierarchy must include ${marker}`);
 }
 assert.match(dashboard, /useState\('public'\)/);
-assert.match(dashboard, /useState\('table'\)/);
+assert.doesNotMatch(dashboard, /useState\('cards'\)|socialFeedViewMode/);
 assert.match(dashboard, /visibleResults\.map\(\(result\) => socialCsvRow/);
 assert.match(dashboard, /<tbody>\{visibleResults\.map/);
-assert.match(dashboard, /socialFeedViewMode === 'cards' && pagedResults\.length < visibleResults\.length/);
+assert.match(dashboard, /aria-label="Filtered public conversation"/);
 assert.doesNotMatch(dashboard, /Top district posts by platform/);
 assert.match(dashboard, /scoreFilterIsDefault/);
 assert.match(dashboard, /scoreCount: 0/);

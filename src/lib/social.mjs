@@ -1,19 +1,23 @@
 const SOCIAL_PLATFORMS = new Set(['facebook', 'instagram', 'tiktok', 'twitter', 'x', 'youtube', 'threads', 'linkedin']);
-const SOCIAL_ACTION_TYPES = new Set(['respond', 'amplify', 'strategy', 'monitor', 'elevate']);
+const SOCIAL_ACTION_TYPES = new Set(['respond', 'clarify', 'amplify', 'thank', 'strategy', 'monitor', 'elevate', 'no_action']);
 
 function numberOrZero(value) {
   const parsed = Number(value);
   return Number.isFinite(parsed) && parsed > 0 ? parsed : 0;
 }
 
-function conciseText(value, maxLength) {
-  const text = String(value || '')
+function cleanText(value) {
+  return String(value || '')
     .replace(/\\[nrt]/gi, ' ')
     .replace(/\*\*|__|`/g, '')
     .replace(/^\s*#{1,6}\s+/gm, '')
     .replace(/^\s*[-*•]\s+/gm, '')
     .replace(/\s+/g, ' ')
     .trim();
+}
+
+function conciseText(value, maxLength) {
+  const text = cleanText(value);
   if (!text || text.length <= maxLength) return text;
   const candidate = text.slice(0, maxLength - 1);
   const lastSpace = candidate.lastIndexOf(' ');
@@ -113,10 +117,13 @@ export function socialRelationshipFilterMatches(item = {}, filter = 'all') {
 export function socialActionLabel(value) {
   const labels = {
     respond: 'Respond',
+    clarify: 'Clarify',
     amplify: 'Amplify',
+    thank: 'Thank',
     strategy: 'Strategy',
     monitor: 'Monitor',
     elevate: 'Elevate',
+    no_action: 'No action',
   };
   return labels[String(value || '').toLowerCase()] || null;
 }
@@ -128,7 +135,7 @@ function conciseArray(value, maxItems = 6, maxLength = 180) {
     .slice(0, maxItems);
 }
 
-function normalizeActionIntelligence(value, fallbackRecommendation = '') {
+function normalizeActionIntelligence(value) {
   if (!value || typeof value !== 'object') return null;
   const actionType = String(value.action_type || value.actionType || '').toLowerCase();
   if (!SOCIAL_ACTION_TYPES.has(actionType)) return null;
@@ -143,7 +150,7 @@ function normalizeActionIntelligence(value, fallbackRecommendation = '') {
     audiences: conciseArray(value.audiences, 6, 60),
     situationSummary: conciseText(value.situation_summary || value.situationSummary, 360),
     actionRationale: conciseText(value.action_rationale || value.actionRationale, 420),
-    recommendedAction: conciseText(value.recommended_action || value.recommendedAction || fallbackRecommendation, 420),
+    recommendedAction: conciseText(value.recommended_action || value.recommendedAction, 420),
     draftResponse: conciseText(value.draft_response || value.draftResponse, 700),
     contentOpportunity: conciseText(value.content_opportunity || value.contentOpportunity, 420),
     strategicPriorityIds: conciseArray(value.strategic_priority_ids || value.strategicPriorityIds, 6, 80),
@@ -171,7 +178,7 @@ export function summarizeSocialActions(items = []) {
     summary.total += 1;
     summary[actionType] += 1;
     return summary;
-  }, { total: 0, respond: 0, amplify: 0, strategy: 0, monitor: 0, elevate: 0 });
+  }, { total: 0, respond: 0, clarify: 0, amplify: 0, thank: 0, strategy: 0, monitor: 0, elevate: 0, no_action: 0 });
 }
 
 export function normalizeSocialResult(item = {}) {
@@ -189,7 +196,11 @@ export function normalizeSocialResult(item = {}) {
   const providerMetadata = item.provider_metadata && typeof item.provider_metadata === 'object'
     ? item.provider_metadata
     : {};
-  const actionIntelligence = normalizeActionIntelligence(providerMetadata.action_intelligence, item.recommendation);
+  const actionIntelligence = normalizeActionIntelligence(providerMetadata.action_intelligence);
+  const rawScoreConfidence = providerMetadata.canary_score_confidence ?? providerMetadata.score_confidence;
+  const scoreConfidence = rawScoreConfidence === null || rawScoreConfidence === undefined || rawScoreConfidence === ''
+    ? null
+    : Number(rawScoreConfidence);
   const suppliedAvailability = providerMetadata.metric_availability && typeof providerMetadata.metric_availability === 'object'
     ? providerMetadata.metric_availability
     : {};
@@ -215,6 +226,20 @@ export function normalizeSocialResult(item = {}) {
       date: comment.published_at || null,
       reactionCount: numberOrZero(comment.reaction_count),
     }));
+  const matchedTerms = conciseArray(item.matched_terms, 12, 160);
+  const sourceIdentity = conciseText(item.author_name || item.author_handle || '', 160);
+  const explicitSchoolProgram = conciseText(
+    providerMetadata.school_program
+      || providerMetadata.school_program_name
+      || providerMetadata.matched_school
+      || providerMetadata.matched_program,
+    160,
+  );
+  const matchedSchoolProgram = matchedTerms.find((term) => /\b(?:school|academy|campus|program|center|centre|institute|college)\b/i.test(term)) || '';
+  const affiliateSource = /\b(?:school|elementary|intermediate|academy|campus|program|department|athletics|transportation|nutrition|food services|special education|career center|technical center)\b/i.test(sourceIdentity)
+    ? sourceIdentity
+    : '';
+  const schoolProgram = explicitSchoolProgram || conciseText(matchedSchoolProgram, 160) || affiliateSource || null;
 
   return {
     id: item.id || item.external_thread_id || item.canonical_url || item.link,
@@ -228,6 +253,8 @@ export function normalizeSocialResult(item = {}) {
     authorProfileUrl: suppliedAuthorProfileUrl || derivedInstagramProfileUrl,
     headline: conciseText(item.headline || item.body || 'Social conversation', 220),
     summary: conciseText(item.summary || item.body || '', 420),
+    body: conciseText(item.body || item.summary || item.headline || '', 4000),
+    fullBody: cleanText(item.body || item.summary || item.headline || ''),
     url: safeSocialUrl(item.canonical_url || item.link || item.permalink),
     mediaUrl: safeSocialMediaUrl(item.media_url || providerMetadata.media_url),
     videoUrl: safeSocialMediaUrl(item.video_url || providerMetadata.video_url),
@@ -240,8 +267,17 @@ export function normalizeSocialResult(item = {}) {
     viewCount,
     engagementTotal: providerMetadata.native_interaction_coverage === 'partial' ? null : (numberOrZero(item.engagement_total) || calculatedEngagement),
     canaryScore: item.canary_score ?? null,
+    scoreRationale: conciseText(providerMetadata.canary_score_rationale || providerMetadata.score_rationale || '', 600),
+    scoreConfidence: Number.isFinite(scoreConfidence)
+      ? Math.max(0, Math.min(1, scoreConfidence))
+      : null,
     riskLevel: item.risk_level || null,
     sentiment: item.sentiment || null,
+    strategicAlignment: Array.isArray(item.strategic_alignment)
+      ? item.strategic_alignment
+      : (typeof item.strategic_alignment === 'string' ? item.strategic_alignment.split(/[;|\n]/).map((value) => value.trim()).filter(Boolean) : []),
+    schoolProgram,
+    matchedTerms,
     matchReason: conciseText(item.match_reason || (relationshipType === 'ambient' ? 'Matched a configured district social query.' : ''), 220),
     recommendation: conciseText(item.recommendation || '', 320),
     tags: Array.isArray(item.tags) ? item.tags : [],

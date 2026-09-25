@@ -65,6 +65,7 @@ const canonicalThread = {
   reaction_count: 120,
   share_count: 9,
   engagement_total: 159,
+  matched_terms: ['Thompson High School'],
   match_reason: 'Published by a connected district account.',
   social_comments: [
     {
@@ -118,6 +119,12 @@ assert.equal(canonical.representativeComments.length, 1);
 assert.equal(canonical.representativeComments[0].authorName, 'Community Member');
 assert.equal(canonical.representativeComments[0].body, 'Will transportation details be posted soon?');
 assert.equal(canonical.representativeComments[0].reactionCount, 2);
+assert.equal(canonical.schoolProgram, 'Thompson High School');
+assert.deepEqual(canonical.matchedTerms, ['Thompson High School']);
+const longBody = `Full post ${'copy '.repeat(1200)}`;
+const longPost = normalizeSocialResult({ ...canonicalThread, id: 'long-post', body: longBody });
+assert.equal(longPost.fullBody, longBody.trim());
+assert.ok(longPost.body.length <= 4000);
 assert.equal(legacy.hasPerformanceData, false);
 assert.equal(canonical.visibilityStatus, 'active');
 assert.equal(normalizeSocialResult({ ...canonicalThread, visibility_status: 'review' }).visibilityStatus, 'review');
@@ -130,6 +137,12 @@ assert.equal(socialRelationshipFilterMatches(directTag, 'owned'), false);
 assert.equal(socialRelationshipFilterMatches(canonical, 'owned'), true);
 assert.equal(socialRelationshipFilterMatches(canonical, 'public'), false);
 assert.equal(directTag.authorProfileUrl, 'https://www.instagram.com/community.partner/');
+assert.equal(normalizeSocialResult({ ...canonicalThread, id: 'affiliate-source', matched_terms: ['Klein ISD'], author_name: 'Haude Elementary' }).schoolProgram, 'Haude Elementary');
+assert.equal(normalizeSocialResult({
+  ...canonicalThread,
+  id: 'thank-action',
+  provider_metadata: { action_intelligence: { action_type: 'thank', draft_response: 'Thank you for supporting our students.' } },
+}).actionIntelligence.actionType, 'thank');
 
 const enrichedAction = normalizeSocialResult({
   ...canonicalThread,
@@ -166,10 +179,13 @@ assert.equal(socialActionFilterMatches(enrichedAction, 'respond'), false);
 assert.deepEqual(summarizeSocialActions([enrichedAction, canonical]), {
   total: 1,
   respond: 0,
+  clarify: 0,
   amplify: 1,
+  thank: 0,
   strategy: 0,
   monitor: 0,
   elevate: 0,
+  no_action: 0,
 });
 
 const missingConfidenceAction = normalizeSocialResult({
