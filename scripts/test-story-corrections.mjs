@@ -21,6 +21,7 @@ for (const action of ['addManualStory', 'excludeStory', 'restoreStory']) {
 assert.match(actions, /assertDistrictAccess\(actor, targetDistrictId\)/);
 assert.match(actions, /assertDistrictAccess\(actor, story\.district_id\)/);
 assert.match(actions, /canary_add_manual_story/);
+assert.match(actions, /p_source_ownership: cleanSourceOwnership/);
 assert.match(actions, /canary_exclude_story/);
 assert.match(actions, /canary_restore_story/);
 
@@ -86,6 +87,7 @@ assert.match(dashboardCss, /\.headline-cell \.headline-text[\s\S]*?-webkit-line-
 assert.match(dashboardCss, /\.strategic-performance-chart[\s\S]*?grid-column: 1 \/ -1/);
 assert.match(dashboard, /Add \/ Correct Stories/);
 assert.match(dashboard, /\+ Add Story/);
+assert.match(dashboard, /name="source_ownership" defaultValue="external"/);
 assert.match(dashboard, /setCurrentView\('corrections'\)/);
 
 console.log('Manual story correction tests passed.');

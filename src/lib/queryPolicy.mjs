@@ -41,6 +41,16 @@ export function validateCustomerSearchQueryText(value) {
   return query;
 }
 
+export function isCustomerEditableSearchQuery(query) {
+  if (query?.active !== true || query?.channels !== 'news') return false;
+  try {
+    validateCustomerSearchQueryText(query.query_text);
+    return true;
+  } catch {
+    return false;
+  }
+}
+
 export function activeNewsQueryCount(queries) {
   return (queries || []).filter((query) => query?.active !== false && query?.channels === 'news').length;
 }
@@ -107,6 +117,9 @@ export function buildSearchQueryUpdate({ actor, existingQuery, changes = {} }) {
   }
   if (!actor?.isAdmin && (existingQuery.active !== true || existingQuery.channels !== 'news')) {
     throw new Error('Customers can edit only their active news queries.');
+  }
+  if (!actor?.isAdmin && !isCustomerEditableSearchQuery(existingQuery)) {
+    throw new Error('This is a Canary-managed query. Submit a focused add or removal request instead of editing it directly.');
   }
 
   const requestedDistrictId = String(changes.district_id ?? existingQuery.district_id ?? '').trim();
