@@ -919,7 +919,7 @@ function QueriesView({ initialQueries, districts, userDistrictId, selectedDistri
         )}
         {canManageQueries && (
           <td style={{ textAlign: 'right', minWidth: '86px' }}>
-            {canEditQuery ? (isEditing ? (
+            {isEditing ? (
               <div style={{ display: 'flex', flexWrap: 'wrap', justifyContent: 'flex-end', gap: '6px' }}>
                 <button
                   className="btn btn-primary btn-sm"
@@ -939,15 +939,19 @@ function QueriesView({ initialQueries, districts, userDistrictId, selectedDistri
                 </button>
               </div>
             ) : (
-              <div style={{ display: 'flex', flexWrap: 'wrap', justifyContent: 'flex-end', gap: '6px' }}>
-                <button
-                  className="btn btn-secondary btn-sm"
-                  onClick={() => startEdit(q)}
-                  disabled={Boolean(updatingId || deletingId)}
-                  style={{ padding: '4px 10px', fontSize: '0.75rem' }}
-                >
-                  Edit
-                </button>
+              <div style={{ display: 'flex', flexWrap: 'wrap', alignItems: 'center', justifyContent: 'flex-end', gap: '6px' }}>
+                {canEditQuery ? (
+                  <button
+                    className="btn btn-secondary btn-sm"
+                    onClick={() => startEdit(q)}
+                    disabled={Boolean(updatingId || deletingId)}
+                    style={{ padding: '4px 10px', fontSize: '0.75rem' }}
+                  >
+                    Edit
+                  </button>
+                ) : (
+                  <span style={{ color: 'var(--text-tertiary)', fontSize: '0.75rem', fontWeight: 600 }}>Managed by Canary</span>
+                )}
                 <button
                   className="btn btn-danger btn-sm"
                   onClick={() => handleDelete(q.id)}
@@ -957,8 +961,6 @@ function QueriesView({ initialQueries, districts, userDistrictId, selectedDistri
                   {deletingId === q.id ? '…' : 'Remove'}
                 </button>
               </div>
-            )) : (
-              <span style={{ color: 'var(--text-tertiary)', fontSize: '0.75rem', fontWeight: 600 }}>Managed by Canary</span>
             )}
           </td>
         )}

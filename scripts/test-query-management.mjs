@@ -322,5 +322,6 @@ assert.match(dashboardSource, /does not directly change canonical ingestion/);
 assert.match(dashboardSource, /Request removal of this query\?[\s\S]*canonical monitoring will remain unchanged until Canary reviews the request/);
 assert.match(dashboardSource, /request slots used/);
 assert.match(dashboardSource, /customer requests, not proof of live collection/);
+assert.match(dashboardSource, /Managed by Canary<\/span>[\s\S]*?onClick=\{\(\) => handleDelete\(q\.id\)\}[\s\S]*?Remove/, 'managed queries must retain the removal-request action');
 
 console.log('Query management policy tests passed.');
