@@ -788,7 +788,7 @@ export async function saveNote(id, notes) {
   if (error) throw error;
 }
 
-export async function addManualStory({ districtId, link, headline, source, date, summary, reason }) {
+export async function addManualStory({ districtId, link, headline, source, sourceOwnership, date, summary, reason }) {
   const { actor, admin: supabase } = await requireCanaryActor();
   const targetDistrictId = String(districtId || '').trim();
   assertDistrictAccess(actor, targetDistrictId);
@@ -797,10 +797,12 @@ export async function addManualStory({ districtId, link, headline, source, date,
   const canonicalUrl = canonicalizeStoryUrl(link);
   const cleanHeadline = String(headline || '').trim();
   const cleanSource = String(source || '').trim();
+  const cleanSourceOwnership = String(sourceOwnership || 'external').trim().toLowerCase();
   const cleanDate = String(date || '').trim();
   const cleanReason = requireCorrectionReason(reason);
   if (!cleanHeadline) throw new Error('Headline is required.');
   if (!cleanSource) throw new Error('Source is required.');
+  if (!['owned', 'external'].includes(cleanSourceOwnership)) throw new Error('Choose whether the publisher is district-owned or external.');
   if (!/^\d{4}-\d{2}-\d{2}$/.test(cleanDate)) throw new Error('A valid story date is required.');
 
   const [{ data: canonicalMatch, error: canonicalError }, { data: linkMatch, error: linkError }] = await Promise.all([
@@ -822,6 +824,7 @@ export async function addManualStory({ districtId, link, headline, source, date,
     p_link: String(link).trim(),
     p_headline: cleanHeadline,
     p_source: cleanSource,
+    p_source_ownership: cleanSourceOwnership,
     p_date: cleanDate,
     p_reason: cleanReason,
     p_summary: String(summary || '').trim() || null,

@@ -13,7 +13,7 @@ import { calculateSocialMetricChange, dateInputValue, groupTopReportPostsByPlatf
 import { nativeSocialMetricWindowLabel } from '@/lib/socialMetrics.mjs';
 import { formatDisplayDate } from '@/lib/date.mjs';
 import { isCanaryComplimentary, isCanaryPaymentCovered } from '@/lib/payment-status.mjs';
-import { CUSTOMER_SEARCH_QUERY_LIMIT, activeNewsQueryCount } from '@/lib/queryPolicy.mjs';
+import { CUSTOMER_SEARCH_QUERY_LIMIT, activeNewsQueryCount, isCustomerEditableSearchQuery } from '@/lib/queryPolicy.mjs';
 import { buildCommunicationsBrief, formatCommunicationsBriefRecommendation } from '@/lib/communicationsBrief.mjs';
 import { buildStrategicGovernance } from '@/lib/strategicGovernance.mjs';
 import { buildReportingDataset, filterReportingDataset } from '@/lib/reportingDataset.mjs';
@@ -865,7 +865,7 @@ function QueriesView({ initialQueries, districts, userDistrictId, selectedDistri
     const isEditing = editingId === q.id && editForm?.id === q.id;
     const ch = CHANNEL_COLORS[q.channels] ?? CHANNEL_COLORS.news;
     const geo = [q.geo_city, q.geo_state, q.geo_zip].filter(Boolean).join(', ');
-    const canEditQuery = isAdmin || q.channels === 'news';
+    const canEditQuery = isAdmin || isCustomerEditableSearchQuery(q);
     return (
       <tr key={q.id}>
         <td style={{ fontWeight: 500, color: 'var(--text-primary)', minWidth: '260px' }}>
@@ -919,7 +919,7 @@ function QueriesView({ initialQueries, districts, userDistrictId, selectedDistri
         )}
         {canManageQueries && (
           <td style={{ textAlign: 'right', minWidth: '86px' }}>
-            {canEditQuery ? (isEditing ? (
+            {isEditing ? (
               <div style={{ display: 'flex', flexWrap: 'wrap', justifyContent: 'flex-end', gap: '6px' }}>
                 <button
                   className="btn btn-primary btn-sm"
@@ -939,15 +939,19 @@ function QueriesView({ initialQueries, districts, userDistrictId, selectedDistri
                 </button>
               </div>
             ) : (
-              <div style={{ display: 'flex', flexWrap: 'wrap', justifyContent: 'flex-end', gap: '6px' }}>
-                <button
-                  className="btn btn-secondary btn-sm"
-                  onClick={() => startEdit(q)}
-                  disabled={Boolean(updatingId || deletingId)}
-                  style={{ padding: '4px 10px', fontSize: '0.75rem' }}
-                >
-                  Edit
-                </button>
+              <div style={{ display: 'flex', flexWrap: 'wrap', alignItems: 'center', justifyContent: 'flex-end', gap: '6px' }}>
+                {canEditQuery ? (
+                  <button
+                    className="btn btn-secondary btn-sm"
+                    onClick={() => startEdit(q)}
+                    disabled={Boolean(updatingId || deletingId)}
+                    style={{ padding: '4px 10px', fontSize: '0.75rem' }}
+                  >
+                    Edit
+                  </button>
+                ) : (
+                  <span style={{ color: 'var(--text-tertiary)', fontSize: '0.75rem', fontWeight: 600 }}>Managed by Canary</span>
+                )}
                 <button
                   className="btn btn-danger btn-sm"
                   onClick={() => handleDelete(q.id)}
@@ -957,8 +961,6 @@ function QueriesView({ initialQueries, districts, userDistrictId, selectedDistri
                   {deletingId === q.id ? '…' : 'Remove'}
                 </button>
               </div>
-            )) : (
-              <span style={{ color: 'var(--text-tertiary)', fontSize: '0.75rem', fontWeight: 600 }}>Managed by Canary</span>
             )}
           </td>
         )}
@@ -1023,10 +1025,10 @@ function QueriesView({ initialQueries, districts, userDistrictId, selectedDistri
           <div style={{ background: 'var(--bg-elevated)', border: '1px solid var(--border-secondary)', borderRadius: 'var(--radius-lg)', padding: '14px 16px', marginBottom: '20px' }}>
             <div style={{ display: 'flex', justifyContent: 'space-between', gap: '12px', flexWrap: 'wrap', marginBottom: '5px' }}>
               <strong style={{ color: 'var(--text-primary)', fontSize: '0.88rem' }}>News query usage</strong>
-              <span style={{ color: 'var(--text-secondary)', fontSize: '0.82rem', fontWeight: 700 }}>{activeNewsQueries} of {CUSTOMER_SEARCH_QUERY_LIMIT} active</span>
+              <span style={{ color: 'var(--text-secondary)', fontSize: '0.82rem', fontWeight: 700 }}>{activeNewsQueries} of {CUSTOMER_SEARCH_QUERY_LIMIT} request slots used</span>
             </div>
             <p style={{ color: 'var(--text-secondary)', fontSize: '0.82rem', lineHeight: 1.5, margin: 0 }}>
-              Changes are saved as district requests and sent to Canary for review. Canonical monitoring changes only after relevance, source-quality, and clean-results checks. Use focused names, programs, facilities, or issues rather than broad one-word topics.
+              These are customer requests, not proof of live collection. Canary activates canonical monitoring only after relevance, source-quality, and clean-results checks. Use focused names, programs, facilities, or issues rather than broad one-word topics.
             </p>
           </div>
         )}
@@ -2619,6 +2621,7 @@ function CorrectionsView({ districts, userDistrictId, districtFilter, excludedSt
         link: form.get('link'),
         headline: form.get('headline'),
         source: form.get('source'),
+        sourceOwnership: form.get('source_ownership'),
         date: form.get('date'),
         summary: form.get('summary'),
         reason: form.get('reason'),
@@ -2670,12 +2673,18 @@ function CorrectionsView({ districts, userDistrictId, districtFilter, excludedSt
           <label className="form-group">Story URL
             <input className="form-input" name="link" type="url" required placeholder="https://publisher.com/story" />
           </label>
-          <div style={{ display: 'grid', gridTemplateColumns: 'minmax(0, 2fr) minmax(180px, 1fr)', gap: '14px' }}>
+          <div style={{ display: 'grid', gridTemplateColumns: 'repeat(auto-fit, minmax(180px, 1fr))', gap: '14px' }}>
             <label className="form-group">Headline
               <input className="form-input" name="headline" required />
             </label>
             <label className="form-group">Source
               <input className="form-input" name="source" required placeholder="Publisher name" />
+            </label>
+            <label className="form-group">Publisher ownership
+              <select className="form-input" name="source_ownership" defaultValue="external" required>
+                <option value="external">External publisher</option>
+                <option value="owned">District-owned publisher</option>
+              </select>
             </label>
           </div>
           <label className="form-group">Story date

@@ -7,6 +7,7 @@ import {
   buildSearchQueryUpdate,
   estimatedMonthlySearches,
   hasActiveSearchQueryDuplicate,
+  isCustomerEditableSearchQuery,
   normalizeSearchQueryText,
   reconcileActiveSearchQueryWrite,
   searchQueryFingerprint,
@@ -35,6 +36,9 @@ assert.equal(activeNewsQueryCount([
   { channels: 'social', active: true },
   { channels: 'news' },
 ]), 2);
+assert.equal(isCustomerEditableSearchQuery({ query_text: 'Lobo Gaming', channels: 'news', active: true }), true);
+assert.equal(isCustomerEditableSearchQuery({ query_text: '"Longview ISD" OR "Longview Lobos"', channels: 'news', active: true }), false);
+assert.equal(isCustomerEditableSearchQuery({ query_text: 'x'.repeat(201), channels: 'news', active: true }), false);
 assert.equal(estimatedMonthlySearches(10), 150);
 
 const reviewTask = buildQueryReviewTask({
@@ -106,6 +110,11 @@ assert.throws(() => buildSearchQueryUpdate({
   existingQuery: { ...activeNewsQuery, channels: 'social' },
   changes: { query_text: 'District A budget' },
 }), /active news queries/);
+assert.throws(() => buildSearchQueryUpdate({
+  actor: customerActor,
+  existingQuery: { ...activeNewsQuery, query_text: '"District A" OR "District B"' },
+  changes: { query_text: 'District A budget' },
+}), /Canary-managed query/);
 assert.throws(() => buildSearchQueryUpdate({
   actor: customerActor,
   existingQuery: activeNewsQuery,
@@ -311,5 +320,8 @@ const dashboardSource = await readFile(new URL('../src/app/dashboard/DashboardCl
 assert.match(dashboardSource, /Canonical monitoring stays unchanged until the request passes relevance, source-quality, and clean-results checks/);
 assert.match(dashboardSource, /does not directly change canonical ingestion/);
 assert.match(dashboardSource, /Request removal of this query\?[\s\S]*canonical monitoring will remain unchanged until Canary reviews the request/);
+assert.match(dashboardSource, /request slots used/);
+assert.match(dashboardSource, /customer requests, not proof of live collection/);
+assert.match(dashboardSource, /Managed by Canary<\/span>[\s\S]*?onClick=\{\(\) => handleDelete\(q\.id\)\}[\s\S]*?Remove/, 'managed queries must retain the removal-request action');
 
 console.log('Query management policy tests passed.');
