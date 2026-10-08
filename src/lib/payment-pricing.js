@@ -10,6 +10,7 @@ import {
 const ALLOWED_ANNUAL_PRICES = new Set([INTRODUCTORY_ANNUAL_PRICE_CENTS, STANDARD_ANNUAL_PRICE_CENTS]);
 const INTRODUCTORY_REASONS_ALLOWED_AFTER_CUTOFF = new Set([
   'commitment_po_in_process',
+  'owner_approved_introductory_rate',
   'paid_customer_introductory_renewal',
   'legacy_paid_customer_introductory_renewal',
   'protected_account_entitlement',

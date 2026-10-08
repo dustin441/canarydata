@@ -173,6 +173,32 @@ assert.equal(normalAdmin.rpcCalls.length, 1);
 assert.equal(normalAdmin.authUpdates.length, 0);
 assert.equal(normalAdmin.rpcCalls[0].params.p_request_id, 'req-1');
 assert.deepEqual(normalAdmin.rpcCalls[0].params.p_expected_app_metadata, normalUser.app_metadata);
+
+const ownerApprovedProtected = {
+  ...normalUser.app_metadata,
+  annual_price_cents: 149900,
+  renewal_price_cents: 149900,
+  pricing_policy_version: '2026-09-01-v1',
+  pricing_entitlement_reason: 'owner_approved_introductory_rate',
+  pricing_locked_at: '2026-09-28T18:11:47.978079+00:00',
+};
+const ownerApprovedAdmin = adminFor({ ...normalUser, app_metadata: ownerApprovedProtected }, {
+  onboarding,
+  rpcResult: { ok: true, alreadyProcessed: false, onboardingUpdated: true, testPurchase: false, paidAt: '2026-09-30T13:40:47.000Z', paidThrough: '2027-09-30T13:40:47.000Z' },
+});
+globalThis.__paymentStateAdmin = ownerApprovedAdmin;
+await markCanaryPaymentPaid({ session: sessionFor({
+  testPurchase: false,
+  requestId: 'req-1',
+  sessionId: 'cs_owner_approved',
+  paidAt: '2026-09-30T13:40:47.000Z',
+  pricingReason: 'owner_approved_introductory_rate',
+  pricingLocked: true,
+  pricingLockedAt: '2026-09-28T18:11:47.978079+00:00',
+}) });
+assert.equal(ownerApprovedAdmin.rpcCalls.length, 1, 'owner-approved introductory payment must fulfill after the public cutoff');
+assert.equal(ownerApprovedAdmin.rpcCalls[0].params.p_app_patch.pricing_entitlement_reason, 'owner_approved_introductory_rate');
+
 const revokedOnboardingAdmin = adminFor(normalUser, { onboarding: { ...onboarding, access_status: 'revoked' } });
 globalThis.__paymentStateAdmin = revokedOnboardingAdmin;
 await assert.rejects(() => markCanaryPaymentPaid({ session: sessionFor({ testPurchase: false, requestId: 'req-1' }) }), /cannot reactivate a disabled Canary onboarding account/);

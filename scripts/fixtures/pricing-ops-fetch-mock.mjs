@@ -1,6 +1,10 @@
 const scenario = process.env.CANARY_OPS_TEST_SCENARIO;
 let savedPatch = {};
-if (scenario === 'nspra-po-late-idempotent' || scenario === 'nspra-po-late-new') Date.now = () => Date.parse('2026-10-02T00:00:00-07:00');
+Date.now = () => Date.parse(
+  scenario === 'nspra-po-late-idempotent' || scenario === 'nspra-po-late-new'
+    ? '2026-10-02T00:00:00-07:00'
+    : '2026-08-30T00:00:00-07:00',
+);
 function response(payload, ok = true, status = 200) {
   return { ok, status, json: async () => payload };
 }

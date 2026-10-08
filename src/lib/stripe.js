@@ -281,3 +281,28 @@ export async function retrieveCheckoutSession(sessionId) {
   const encoded = encodeURIComponent(sessionId);
   return stripeRequest(`/checkout/sessions/${encoded}?expand[]=customer&expand[]=payment_intent.latest_charge`);
 }
+
+export async function listRecentCompletedCheckoutSessions({ createdGte, maxPages = 10 } = {}) {
+  const minimumCreated = Number(createdGte);
+  if (!Number.isInteger(minimumCreated) || minimumCreated <= 0) {
+    throw new Error('A valid Stripe Checkout creation cutoff is required.');
+  }
+
+  const sessions = [];
+  let startingAfter = '';
+  for (let page = 0; page < maxPages; page += 1) {
+    const query = new URLSearchParams({
+      status: 'complete',
+      limit: '100',
+      'created[gte]': String(minimumCreated),
+    });
+    if (startingAfter) query.set('starting_after', startingAfter);
+    const response = await stripeRequest(`/checkout/sessions?${query}`);
+    const batch = Array.isArray(response?.data) ? response.data : [];
+    sessions.push(...batch);
+    if (!response?.has_more || batch.length === 0) return sessions;
+    startingAfter = batch.at(-1)?.id || '';
+    if (!startingAfter) throw new Error('Stripe Checkout pagination did not return a continuation ID.');
+  }
+  throw new Error(`Stripe Checkout reconciliation exceeded the ${maxPages * 100}-session safety cap.`);
+}
