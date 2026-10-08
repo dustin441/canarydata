@@ -1,4 +1,5 @@
 import assert from 'node:assert/strict';
+import { readFile } from 'node:fs/promises';
 import { reconcileRecentCanaryStripePayments } from '../src/lib/payment-reconciliation.js';
 
 const summaries = [
@@ -29,4 +30,6 @@ assert.match(result.results.find((item) => item.sessionId === 'cs_paid_bad').rea
 
 await assert.rejects(() => reconcileRecentCanaryStripePayments({ now: 'bad date', listSessions: async () => [] }), /valid reconciliation time/);
 await assert.rejects(() => reconcileRecentCanaryStripePayments({ lookbackDays: 91, listSessions: async () => [] }), /between 1 and 90 days/);
+const middleware = await readFile(new URL('../src/lib/supabase/middleware.js', import.meta.url), 'utf8');
+assert.match(middleware, /request\.nextUrl\.pathname === ['"]\/api\/cron\/stripe-payment-reconciliation['"]/, 'the secret-protected Stripe cron route must bypass login redirects');
 console.log('Stripe payment reconciliation tests passed.');

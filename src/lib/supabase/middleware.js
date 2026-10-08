@@ -36,7 +36,8 @@ export async function updateSession(request) {
   const isSessionExemptRoute =
     request.nextUrl.pathname === '/api/integrations/meta/data-deletion'
     || request.nextUrl.pathname === '/api/integrations/meta/data-deletion/status'
-    || request.nextUrl.pathname === '/api/cron/meta-eic-sync';
+    || request.nextUrl.pathname === '/api/cron/meta-eic-sync'
+    || request.nextUrl.pathname === '/api/cron/stripe-payment-reconciliation';
 
   // If no user and not on login/signup/auth pages, redirect to login
   if (
