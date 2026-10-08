@@ -34,9 +34,11 @@ function PaymentTerms({ documentType, doc }) {
     return (
       <>
         <strong>Payment status:</strong> {doc.paymentStatus === 'paid' ? 'Paid' : 'Not paid yet'}<br />
+        <strong>Payment method:</strong> {doc.paymentMethod || 'Not recorded'}<br />
         <strong>Paid date:</strong> {formatDate(doc.paidAt)}<br />
         <strong>Annual access through:</strong> {formatDate(doc.paidThrough)}<br />
-        <strong>PO #:</strong> {doc.poNumber || 'Not provided'}
+        <strong>PO #:</strong> {doc.poNumber || 'Not provided'}<br />
+        {doc.stripeReceiptUrl && <a href={doc.stripeReceiptUrl} target="_blank" rel="noreferrer">View Stripe-hosted receipt</a>}
       </>
     );
   }
@@ -105,7 +107,7 @@ export default async function BillingDocumentPage({ params }) {
   }
 
   const copy = BILLING_DOCUMENT_COPY[documentType];
-  const doc = buildBillingDocumentContext(context);
+  const doc = buildBillingDocumentContext(context, { documentType });
   const documentNumber = resolveDocumentNumber(documentType, doc);
   const documentNumberLabel = resolveDocumentNumberLabel(documentType);
   const isReceipt = documentType === 'receipt';

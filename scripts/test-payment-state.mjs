@@ -1,6 +1,7 @@
 import assert from 'node:assert/strict';
 import { readFile } from 'node:fs/promises';
 import { resolvePaymentPricingSnapshot } from '../src/lib/payment-pricing.js';
+import { buildStripeReceiptSnapshot } from '../src/lib/stripe.js';
 import { INTRODUCTORY_ANNUAL_PRICE_CENTS, PRICING_CUTOFF_AT, PRICING_POLICY_VERSION, resolveCanaryPricing } from '../src/lib/pricing.js';
 
 process.env.STRIPE_SECRET_KEY = 'sk_test_payment_state';
@@ -8,11 +9,13 @@ process.env.STRIPE_SECRET_KEY = 'sk_test_payment_state';
 const source = await readFile(new URL('../src/lib/payment-state.js', import.meta.url), 'utf8');
 const testable = source
   .replace("import { createAdminClient } from '@/lib/supabase/admin';", 'const createAdminClient = () => globalThis.__paymentStateAdmin;')
+  .replace("import { buildStripeReceiptSnapshot } from './stripe.js';", 'const buildStripeReceiptSnapshot = globalThis.__buildStripeReceiptSnapshot;')
   .replace("import { resolvePaymentPricingSnapshot } from './payment-pricing.js';", 'const resolvePaymentPricingSnapshot = globalThis.__resolvePaymentPricingSnapshot;')
   .replace("import { INTRODUCTORY_ANNUAL_PRICE_CENTS, PRICING_CUTOFF_AT, PRICING_POLICY_VERSION, resolveCanaryPricing } from './pricing.js';", 'const { INTRODUCTORY_ANNUAL_PRICE_CENTS, PRICING_CUTOFF_AT, PRICING_POLICY_VERSION, resolveCanaryPricing } = globalThis.__pricing;')
   .replace("import { isCanaryAccountHardDenied } from './trial-access.mjs';", 'const isCanaryAccountHardDenied = globalThis.__isCanaryAccountHardDenied;');
 globalThis.__isCanaryAccountHardDenied = (metadata) => metadata?.account_enabled === false || ['revoked', 'disabled', 'suspended_security', 'terminated'].includes(metadata?.access_status);
 globalThis.__resolvePaymentPricingSnapshot = resolvePaymentPricingSnapshot;
+globalThis.__buildStripeReceiptSnapshot = buildStripeReceiptSnapshot;
 globalThis.__pricing = { INTRODUCTORY_ANNUAL_PRICE_CENTS, PRICING_CUTOFF_AT, PRICING_POLICY_VERSION, resolveCanaryPricing };
 const { markCanaryPaymentPaid } = await import(`data:text/javascript;base64,${Buffer.from(testable).toString('base64')}`);
 
@@ -62,7 +65,7 @@ function sessionFor({
       email: 'test@district.org',
       metadata: { ...(owner ? { user_id: owner } : {}), ...(district !== null ? { district_id: district } : {}) },
     },
-    payment_intent: { latest_charge: includeCharge ? { id: 'ch_1', created: Math.floor(Date.parse(paidAt) / 1000) } : 'ch_1' },
+    payment_intent: { id: 'pi_1', receipt_email: 'test@district.org', latest_charge: includeCharge ? { id: 'ch_1', created: Math.floor(Date.parse(paidAt) / 1000), receipt_url: 'https://pay.stripe.com/receipts/test', billing_details: { email: 'test@district.org' } } : 'ch_1' },
     metadata: {
       user_id: 'user-1',
       district_id: district ?? '',
@@ -78,6 +81,7 @@ function sessionFor({
       canary_pricing_locked: pricingLocked ? 'true' : 'false',
       canary_pricing_locked_at: pricingLockedAt,
       canary_pricing_expires_at: pricingExpiresAt,
+      canary_receipt_number: 'CD-RCPT-DIST1-2026',
     },
   };
 }
@@ -121,6 +125,15 @@ globalThis.__paymentStateAdmin = revokedReplayAdmin;
 const revokedReplay = await markCanaryPaymentPaid({ session: sessionFor(), eventId: 'evt_original' });
 assert.equal(revokedReplay.alreadyProcessed, true, 'a later revocation must not turn a completed fulfillment replay into a webhook failure');
 assert.equal(revokedReplayAdmin.rpcCalls.length, 1, 'webhook replay must atomically claim or verify its Stripe event ID');
+
+const reconciliationReplayAdmin = adminFor(user, { existingFulfillment: {
+  checkout_session_id: 'cs_test_1', stripe_event_id: '', auth_user_id: 'user-1',
+  district_id: 'district-1', stripe_customer_id: 'cus_test_1', result: { ok: true, alreadyProcessed: false },
+}, rpcResult: { ok: true, alreadyProcessed: true } });
+globalThis.__paymentStateAdmin = reconciliationReplayAdmin;
+await markCanaryPaymentPaid({ session: sessionFor() });
+assert.equal(reconciliationReplayAdmin.rpcCalls.length, 1, 'scheduled reconciliation must call the new RPC so an old-version fulfillment receives its canonical receipt');
+assert.equal(reconciliationReplayAdmin.rpcCalls[0].params.p_stripe_event_id, '');
 
 for (const [label, badSession, pattern] of [
   ['missing owner', sessionFor({ owner: '' }), /customer is not owned/],
@@ -173,6 +186,13 @@ assert.equal(normalAdmin.rpcCalls.length, 1);
 assert.equal(normalAdmin.authUpdates.length, 0);
 assert.equal(normalAdmin.rpcCalls[0].params.p_request_id, 'req-1');
 assert.deepEqual(normalAdmin.rpcCalls[0].params.p_expected_app_metadata, normalUser.app_metadata);
+assert.equal(normalAdmin.rpcCalls[0].params.p_amount_cents, 149900);
+assert.equal(normalAdmin.rpcCalls[0].params.p_currency, 'usd');
+assert.equal(normalAdmin.rpcCalls[0].params.p_payment_intent_id, 'pi_1');
+assert.equal(normalAdmin.rpcCalls[0].params.p_charge_id, 'ch_1');
+assert.equal(normalAdmin.rpcCalls[0].params.p_receipt_url, 'https://pay.stripe.com/receipts/test');
+assert.equal(normalAdmin.rpcCalls[0].params.p_billing_email, 'test@district.org');
+assert.equal(normalAdmin.rpcCalls[0].params.p_receipt_number, 'CD-RCPT-DIST1-2026-CH_1');
 
 const ownerApprovedProtected = {
   ...normalUser.app_metadata,

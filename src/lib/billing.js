@@ -67,6 +67,19 @@ export async function getAuthenticatedBillingContext() {
     };
   }
 
+  let receipt = null;
+  if (districtId) {
+    const { data: receiptRow, error: receiptError } = await admin
+      .from('canary_payment_receipts')
+      .select('receipt_number, payment_method, amount_cents, currency, paid_at, paid_through, stripe_checkout_session_id, stripe_customer_id, stripe_payment_intent_id, stripe_charge_id, stripe_receipt_url, billing_email, organization_name, district_id, source, source_reference')
+      .eq('district_id', districtId)
+      .order('paid_at', { ascending: false })
+      .limit(1)
+      .maybeSingle();
+    if (receiptError) throw new Error('Unable to load the protected Canary payment receipt.');
+    receipt = receiptRow || null;
+  }
+
   const pricing = resolveCanaryPricing({ protectedMetadata: billingUser?.app_metadata || protectedMetadata });
-  return { user: billingUser, districtId, districtName, email, onboardingRequest, pricing, accountAccess };
+  return { user: billingUser, districtId, districtName, email, onboardingRequest, receipt, pricing, accountAccess };
 }

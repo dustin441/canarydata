@@ -10,7 +10,7 @@
     "test:webhook": "node scripts/test-stripe-webhook.mjs && node scripts/test-stripe-webhook-route.mjs",
     "test:authz": "node scripts/test-authz-metadata.mjs && node scripts/test-dashboard-demo-reviewer.mjs && node scripts/test-dashboard-demo-reviewer-ui.mjs",
     "test:password-reset": "node scripts/test-password-reset-flow.mjs",
-    "test:pricing": "node scripts/test-pricing-policy.mjs && node scripts/test-pricing-integration.mjs && node scripts/test-stripe-customer-lifecycle.mjs && node scripts/test-payment-state.mjs && node scripts/test-payment-actions.mjs && node scripts/test-payment-reconciliation.mjs && node scripts/test-pricing-operations.mjs && node scripts/test-payment-fulfillment-migration.mjs && node scripts/test-trial-access.mjs",
+    "test:pricing": "node scripts/test-pricing-policy.mjs && node scripts/test-pricing-integration.mjs && node scripts/test-stripe-customer-lifecycle.mjs && node scripts/test-payment-state.mjs && node scripts/test-payment-actions.mjs && node scripts/test-payment-reconciliation.mjs && node scripts/test-payment-receipt-lifecycle.mjs && node scripts/test-pricing-operations.mjs && node scripts/test-payment-fulfillment-migration.mjs && node scripts/test-trial-access.mjs",
     "test:trial-access": "node scripts/test-trial-access.mjs",
     "test:collection-entitlement-pilot": "node scripts/test-collection-entitlement-pilot.mjs",
     "test:meta": "node scripts/test-meta-integration.mjs && node scripts/test-meta-owned-sync.mjs && node scripts/test-meta-insights.mjs && node scripts/test-meta-native-sync.mjs && node scripts/test-meta-recurring-sync.mjs && node scripts/test-meta-backfill.mjs && node scripts/test-meta-owned-sync-postgres.mjs && node scripts/test-meta-oauth-lifecycle-postgres.mjs",

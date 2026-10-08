@@ -23,7 +23,7 @@ globalThis.fetch = async (url, options = {}) => {
   throw new Error(`Unexpected Stripe request: ${options.method || 'GET'} ${path}`);
 };
 
-const { ensureCanaryStripeCustomer, createCanaryCheckoutSession } = await import('../src/lib/stripe.js');
+const { ensureCanaryStripeCustomer, createCanaryCheckoutSession, createCanaryEmbeddedCheckoutSession } = await import('../src/lib/stripe.js');
 const owner = { contactEmail: 'billing@district.org', userId: 'user-1', districtId: 'district-1' };
 const createdId = await ensureCanaryStripeCustomer(owner);
 assert.equal(createdId, 'cus_owned_1');
@@ -52,6 +52,7 @@ const checkout = calls.find((call) => call.path === '/v1/checkout/sessions');
 assert.ok(checkout.options.headers['Idempotency-Key'], 'Checkout Session creation must be idempotent');
 assert.equal(checkout.body.customer, 'cus_owned_1');
 assert.equal(checkout.body['payment_method_types[0]'], 'card');
+assert.equal(checkout.body['payment_intent_data[receipt_email]'], owner.contactEmail);
 assert.equal(checkout.body.customer_creation, undefined);
 assert.equal(checkout.body.success_url, 'https://www.canarydata.media/payment/success?session_id={CHECKOUT_SESSION_ID}');
 const initialCheckoutKey = checkout.options.headers['Idempotency-Key'];
@@ -63,6 +64,15 @@ await createCanaryCheckoutSession({
 });
 const replacementCheckout = calls.find((call) => call.path === '/v1/checkout/sessions');
 assert.notEqual(replacementCheckout.options.headers['Idempotency-Key'], initialCheckoutKey, 'an expired pending Session must produce a fresh replacement key');
+
+calls.length = 0;
+await createCanaryEmbeddedCheckoutSession({
+  organizationName: 'District 1', contactEmail: owner.contactEmail, requestId: 'req-1',
+  districtId: owner.districtId, userId: owner.userId, customerId: 'cus_owned_1', protectedMetadata: {},
+});
+const embeddedCheckout = calls.find((call) => call.path === '/v1/checkout/sessions');
+assert.equal(embeddedCheckout.body.ui_mode, 'embedded_page');
+assert.equal(embeddedCheckout.body['payment_intent_data[receipt_email]'], owner.contactEmail);
 
 await assert.rejects(
   () => createCanaryCheckoutSession({ ...owner, contactEmail: owner.contactEmail, customerId: '', protectedMetadata: {}, origin: 'https://www.canarydata.media' }),

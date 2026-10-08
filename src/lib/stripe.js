@@ -125,6 +125,7 @@ function checkoutMetadataParams({ organizationName, contactEmail, requestId, dis
   const numbers = billingDocumentNumbers({ districtId, email: contactEmail });
   const pricing = lineItem.pricing || {};
   return {
+    'payment_intent_data[receipt_email]': contactEmail,
     'metadata[canary_request_id]': requestId || '',
     'metadata[district_id]': districtId,
     'metadata[user_id]': userId,
@@ -280,6 +281,22 @@ export async function createCanaryEmbeddedCheckoutSession({ organizationName, co
 export async function retrieveCheckoutSession(sessionId) {
   const encoded = encodeURIComponent(sessionId);
   return stripeRequest(`/checkout/sessions/${encoded}?expand[]=customer&expand[]=payment_intent.latest_charge`);
+}
+
+export function buildStripeReceiptSnapshot(session) {
+  const paymentIntent = typeof session?.payment_intent === 'object' ? session.payment_intent : null;
+  const latestCharge = typeof paymentIntent?.latest_charge === 'object' ? paymentIntent.latest_charge : null;
+  const chargeId = String(latestCharge?.id || '');
+  const receiptBase = String(session?.metadata?.canary_receipt_number || '').trim();
+  return {
+    amountCents: Number(session?.amount_total),
+    currency: String(session?.currency || '').toLowerCase(),
+    paymentIntentId: String(paymentIntent?.id || ''),
+    chargeId,
+    stripeReceiptUrl: String(latestCharge?.receipt_url || ''),
+    billingEmail: String(session?.metadata?.contact_email || '').trim().toLowerCase(),
+    receiptNumber: receiptBase && chargeId ? `${receiptBase}-${chargeId.toUpperCase()}` : '',
+  };
 }
 
 export async function listRecentCompletedCheckoutSessions({ createdGte, maxPages = 10 } = {}) {

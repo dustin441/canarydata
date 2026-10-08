@@ -6,8 +6,8 @@ const CANARY_VENDOR_ADDRESS_LINE1 = process.env.CANARY_VENDOR_ADDRESS_LINE1 || '
 const CANARY_VENDOR_ADDRESS_LINE2 = process.env.CANARY_VENDOR_ADDRESS_LINE2 || '';
 const CANARY_VENDOR_EMAIL = process.env.CANARY_VENDOR_EMAIL || 'hello@canarydata.media';
 
-export function formatCurrency(cents = INTRODUCTORY_ANNUAL_PRICE_CENTS) {
-  return new Intl.NumberFormat('en-US', { style: 'currency', currency: 'USD' }).format((Number(cents) || 0) / 100);
+export function formatCurrency(cents = INTRODUCTORY_ANNUAL_PRICE_CENTS, currency = 'usd') {
+  return new Intl.NumberFormat('en-US', { style: 'currency', currency: String(currency || 'usd').toUpperCase() }).format((Number(cents) || 0) / 100);
 }
 
 export function addDays(date, days) {
@@ -48,15 +48,16 @@ export function billingDocumentNumbers({ districtId, email, year = new Date().ge
   };
 }
 
-export function buildBillingDocumentContext({ user, districtId, districtName, email, onboardingRequest, pricing: resolvedPricing }) {
+export function buildBillingDocumentContext({ user, districtId, districtName, email, onboardingRequest, receipt, pricing: resolvedPricing }, { documentType = '' } = {}) {
   const metadata = user?.user_metadata || {};
   const protectedMetadata = user?.app_metadata || {};
-  const paymentStatus = protectedMetadata.payment_status || onboardingRequest?.payment_status || 'pending';
-  const protectedPaidThrough = protectedMetadata.paid_through || onboardingRequest?.paid_through || null;
+  const canonicalReceipt = documentType === 'receipt' && receipt
+    && String(receipt.district_id || '') === String(districtId || protectedMetadata.district_id || '');
+  const paymentStatus = canonicalReceipt ? 'paid' : (protectedMetadata.payment_status || onboardingRequest?.payment_status || 'pending');
+  const protectedPaidThrough = canonicalReceipt ? receipt.paid_through : (protectedMetadata.paid_through || onboardingRequest?.paid_through || null);
   if (isCanaryComplimentary(paymentStatus) && isCanaryPaymentCovered(paymentStatus, protectedPaidThrough)) {
     throw new Error('Billing documents are unavailable for active complimentary accounts.');
   }
-  const pricing = resolvedPricing || resolveCanaryPricing({ protectedMetadata });
   const issuedAt = new Date();
   const dueAt = addDays(issuedAt, 30);
   const numbers = billingDocumentNumbers({ districtId, email });
@@ -65,6 +66,41 @@ export function buildBillingDocumentContext({ user, districtId, districtName, em
   const paidThrough = protectedMetadata.paid_through || onboardingRequest?.paid_through || (paidAt ? addYears(new Date(paidAt), 1).toISOString() : null);
   const organizationName = metadata.billing_organization_name || districtName || onboardingRequest?.organization_name || metadata.district_name || 'School District';
 
+  if (canonicalReceipt) {
+    return {
+      organizationName: receipt.organization_name,
+      districtId: receipt.district_id,
+      billingEmail: receipt.billing_email,
+      billingContactName: '', billingPhone: '', billingAddressLine1: '', billingAddressLine2: '',
+      billingCity: '', billingState: '', billingZip: '',
+      vendorName: CANARY_VENDOR_NAME, vendorAddressLine1: CANARY_VENDOR_ADDRESS_LINE1,
+      vendorAddressLine2: CANARY_VENDOR_ADDRESS_LINE2, vendorEmail: CANARY_VENDOR_EMAIL,
+      poNumber,
+      estimateNumber: protectedMetadata.estimate_number || numbers.estimateNumber,
+      invoiceNumber: protectedMetadata.invoice_number || numbers.invoiceNumber,
+      receiptNumber: receipt.receipt_number,
+      issuedAt: receipt.paid_at,
+      dueAt: receipt.paid_at,
+      trialStartsAt: protectedMetadata.trial_starts_at || onboardingRequest?.trial_starts_at || null,
+      trialEndsAt: protectedMetadata.trial_ends_at || onboardingRequest?.trial_ends_at || null,
+      paymentStatus,
+      paidAt: receipt.paid_at,
+      paidThrough: receipt.paid_through,
+      amountCents: receipt.amount_cents,
+      amountLabel: formatCurrency(receipt.amount_cents, receipt.currency),
+      currency: receipt.currency,
+      paymentMethod: receipt.payment_method,
+      stripeReceiptUrl: receipt.stripe_receipt_url || '',
+      receiptSource: 'canonical',
+      sourceReference: receipt.source_reference,
+      renewalAmountCents: null,
+      pricingPolicyVersion: null, pricingReason: null, pricingLocked: true,
+      pricingLockedAt: receipt.paid_at,
+      netTerms: 'Paid',
+    };
+  }
+
+  const pricing = resolvedPricing || resolveCanaryPricing({ protectedMetadata });
   return {
     organizationName,
     districtId: districtId || protectedMetadata.district_id || '',
@@ -93,6 +129,10 @@ export function buildBillingDocumentContext({ user, districtId, districtName, em
     paidThrough,
     amountCents: pricing.amountCents,
     amountLabel: formatCurrency(pricing.amountCents),
+    currency: pricing.currency || 'usd',
+    paymentMethod: protectedMetadata.payment_method || (protectedMetadata.stripe_checkout_session_id ? 'card' : 'Not recorded'),
+    stripeReceiptUrl: '',
+    receiptSource: documentType === 'receipt' && paymentStatus === 'paid' ? 'legacy_fallback' : null,
     renewalAmountCents: pricing.renewalAmountCents,
     pricingPolicyVersion: pricing.policyVersion,
     pricingReason: pricing.reason,

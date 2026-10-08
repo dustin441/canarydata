@@ -1,4 +1,5 @@
 import { createAdminClient } from '@/lib/supabase/admin';
+import { buildStripeReceiptSnapshot } from './stripe.js';
 import { resolvePaymentPricingSnapshot } from './payment-pricing.js';
 import { INTRODUCTORY_ANNUAL_PRICE_CENTS, PRICING_CUTOFF_AT, PRICING_POLICY_VERSION, resolveCanaryPricing } from './pricing.js';
 import { isCanaryAccountHardDenied } from './trial-access.mjs';
@@ -59,6 +60,7 @@ export async function markCanaryPaymentPaid({ session, eventId = '' } = {}) {
   if (!userId) return { ok: false, reason: 'missing_user_id' };
 
   const supabase = createAdminClient();
+  const receiptSnapshot = buildStripeReceiptSnapshot(session);
   const sessionDistrictId = String(session.metadata?.district_id || '');
   const replayCustomer = sessionCustomer(session);
   const { data: existingFulfillment, error: existingError } = await supabase
@@ -74,12 +76,11 @@ export async function markCanaryPaymentPaid({ session, eventId = '' } = {}) {
     if (!ownedReplay || (existingFulfillment.stripe_event_id && eventId && existingFulfillment.stripe_event_id !== eventId)) {
       throw new Error(`Stripe session ${session.id} prior fulfillment ownership does not match this event.`);
     }
-    if (!eventId) return { ...(existingFulfillment.result || {}), alreadyProcessed: true };
     const chargePaidAt = sessionChargeTimestamp(session);
     if (!chargePaidAt) throw new Error(`Stripe session ${session.id} is missing an authoritative expanded charge timestamp.`);
     const { data: replayResult, error: replayError } = await supabase.rpc('fulfill_canary_stripe_payment', {
       p_checkout_session_id: session.id,
-      p_stripe_event_id: String(eventId),
+      p_stripe_event_id: String(eventId || ''),
       p_auth_user_id: userId,
       p_expected_email: String(session.metadata?.contact_email || '').trim().toLowerCase(),
       p_district_id: sessionDistrictId,
@@ -91,6 +92,13 @@ export async function markCanaryPaymentPaid({ session, eventId = '' } = {}) {
       p_expected_app_metadata: {},
       p_app_patch: {},
       p_user_patch: {},
+      p_amount_cents: receiptSnapshot.amountCents,
+      p_currency: receiptSnapshot.currency,
+      p_payment_intent_id: receiptSnapshot.paymentIntentId,
+      p_charge_id: receiptSnapshot.chargeId,
+      p_receipt_url: receiptSnapshot.stripeReceiptUrl,
+      p_billing_email: receiptSnapshot.billingEmail,
+      p_receipt_number: receiptSnapshot.receiptNumber,
     });
     if (replayError || !replayResult?.ok) throw new Error(`Unable to atomically claim replay event for Stripe session ${session.id}.`);
     return replayResult;
@@ -141,6 +149,12 @@ export async function markCanaryPaymentPaid({ session, eventId = '' } = {}) {
   // Cutoff and snapshot validation always use the current expanded latest Charge.
   // Stored payment timestamps are retained only by the transactional RPC for idempotent display state.
   const snapshot = resolvePaymentPricingSnapshot(session, { paidAt: chargePaidAt });
+  if (!snapshot.isTestPurchase && (!Number.isInteger(receiptSnapshot.amountCents) || receiptSnapshot.amountCents <= 0
+    || !/^[a-z]{3}$/.test(receiptSnapshot.currency) || !receiptSnapshot.paymentIntentId
+    || !receiptSnapshot.chargeId || !receiptSnapshot.stripeReceiptUrl || !receiptSnapshot.billingEmail
+    || !receiptSnapshot.receiptNumber)) {
+    throw new Error(`Stripe session ${session.id} is missing the immutable receipt snapshot required for fulfillment.`);
+  }
   const requestId = String(session.metadata?.canary_request_id || '');
   const organizationName = String(session.metadata?.organization_name || '').trim();
   const onboarding = await validateOnboardingOwnership(supabase, {
@@ -224,6 +238,13 @@ export async function markCanaryPaymentPaid({ session, eventId = '' } = {}) {
     p_expected_app_metadata: existingProtected,
     p_app_patch: appPatch,
     p_user_patch: userPatch,
+    p_amount_cents: receiptSnapshot.amountCents,
+    p_currency: receiptSnapshot.currency,
+    p_payment_intent_id: receiptSnapshot.paymentIntentId,
+    p_charge_id: receiptSnapshot.chargeId,
+    p_receipt_url: receiptSnapshot.stripeReceiptUrl,
+    p_billing_email: receiptSnapshot.billingEmail,
+    p_receipt_number: receiptSnapshot.receiptNumber,
   });
   if (error || !data?.ok) {
     throw new Error(`Unable to atomically persist Canary payment state for Stripe session ${session.id}.`);

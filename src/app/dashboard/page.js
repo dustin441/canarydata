@@ -160,8 +160,12 @@ export default async function DashboardPage({ searchParams }) {
     .map((result) => result.warning)
     .filter(Boolean);
   const trialEndsAt = billingContext?.onboardingRequest?.trial_ends_at || billingContext?.user?.app_metadata?.trial_ends_at || null;
-  const paymentStatus = billingContext?.onboardingRequest?.payment_status || billingContext?.user?.app_metadata?.payment_status || 'pending';
-  const paidThrough = billingContext?.user?.app_metadata?.paid_through || billingContext?.onboardingRequest?.paid_through || null;
+  const paymentStatus = billingContext?.receipt ? 'paid' : (billingContext?.onboardingRequest?.payment_status || billingContext?.user?.app_metadata?.payment_status || 'pending');
+  const paidThrough = [
+    billingContext?.receipt?.paid_through,
+    billingContext?.user?.app_metadata?.paid_through,
+    billingContext?.onboardingRequest?.paid_through,
+  ].filter(Boolean).reduce((latest, value) => (!latest || Date.parse(value) > Date.parse(latest) ? value : latest), null);
   // eslint-disable-next-line react-hooks/purity -- Server-rendered billing notice intentionally compares trial date to current time.
   const daysUntilTrialEnds = trialEndsAt ? Math.ceil((new Date(trialEndsAt).getTime() - Date.now()) / 86400000) : null;
   const paymentNotice = dashboardUserDistrictId && !isCanaryPaymentCovered(paymentStatus, paidThrough) && daysUntilTrialEnds !== null
