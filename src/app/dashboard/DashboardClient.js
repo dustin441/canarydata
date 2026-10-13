@@ -4956,7 +4956,7 @@ export default function DashboardClient({ articles, legacySocialAuditArticles = 
               <div className="demo-product-direction-header">
                 <div>
                   <span>From monitoring to leadership proof</span>
-                  <h1>One communications cockpit for the full public conversation.</h1>
+                  <h1>One communications cockpit for the monitored public conversation.</h1>
                 </div>
                 <button type="button" className="btn btn-primary btn-sm" onClick={() => setCurrentView('social')}>Explore Social intelligence</button>
               </div>
@@ -4965,7 +4965,7 @@ export default function DashboardClient({ articles, legacySocialAuditArticles = 
                 <article>
                   <span className="demo-product-status available">Available now</span>
                   <h2>Intelligence and proof</h2>
-                  <p>News, owned social, public conversation, Canary Score, school-specific recommendations, Strategic Alignment, Bird’s Eye View, and CSV/PDF exports.</p>
+                  <p>News, owned social, monitored public conversation, Canary Score, school-specific recommendations, Strategic Alignment, Bird’s Eye View, and CSV/PDF exports.</p>
                 </article>
                 <article>
                   <span className="demo-product-status next">Next release focus</span>
