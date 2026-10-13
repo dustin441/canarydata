@@ -7,7 +7,7 @@ import { buildSocialResults, safeSocialMediaUrl, safeSocialUrl } from '../src/li
 import { rankSocialReportTopPerformers, resolveSocialReportComparisonWindow, resolveSocialReportWindow } from '../src/lib/socialReport.mjs';
 import { buildSocialPerformanceFromDailySeries } from '../src/lib/socialPerformance.mjs';
 import { buildReportingDataset, isNewsMediaArticle } from '../src/lib/reportingDataset.mjs';
-import { demoArticles, demoSocialSources } from '../src/lib/demo-data.js';
+import { buildDemoArticles, demoArticles, demoSocialSources } from '../src/lib/demo-data.js';
 
 const DAY_MS = 86_400_000;
 const DISTRICT_ID = 'canary-falls-usd';
@@ -15,6 +15,7 @@ const fixedAsOf = '2026-08-24T10:00:00.000Z';
 const shiftedAsOf = '2026-09-10T10:00:00.000Z';
 const fixed = buildDemoSocialData(fixedAsOf);
 const shifted = buildDemoSocialData(shiftedAsOf);
+const fixedArticles = buildDemoArticles('2026-10-13T10:00:00.000Z');
 const demoPageSource = await readFile(new URL('../src/app/demo/page.js', import.meta.url), 'utf8');
 const dashboardSource = await readFile(new URL('../src/app/dashboard/DashboardClient.js', import.meta.url), 'utf8');
 const threads = fixed.socialThreads;
@@ -43,6 +44,8 @@ assert.ok(threads.every((post) => post.canonical_url.startsWith('/demo/social/')
 assert.ok(threads.every((post) => !String(post.canonical_url).includes('DEMO://')), 'Legacy DEMO:// links must not escape into the UI.');
 assert.match(demoPageSource, /export const dynamic = ['"]force-dynamic['"]/, 'The demo route must not freeze relative dates in a static build artifact.');
 assert.match(dashboardSource, /if \(safeUrl\.startsWith\('\/demo-social\/'\)\) return safeUrl;/, 'Local demo images must load directly instead of passing through the remote-media proxy.');
+assert.equal(fixedArticles[0].date, '2026-10-12', 'The newest demo article must remain one day behind the demo visit date.');
+assert.equal(fixedArticles.at(-1).date, '2026-09-16', 'Demo article chronology must shift as a complete, recent window.');
 
 const expectedTopIds = new Set(OWNED_DEMO_SOCIAL_FIXTURES.filter((post) => post.isTopPost).map((post) => post.postId));
 assert.equal(expectedTopIds.size, 6, 'The source workbook must designate exactly 6 top posts.');

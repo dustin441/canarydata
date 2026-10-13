@@ -16,7 +16,20 @@ export const demoSocialSources = [
   { id: 'demo-social-instagram', district_id: 'canary-falls-usd', platform: 'instagram', url: '/demo/social/demo-social-instagram', handle: 'canaryfallsusd', display_name: 'Canary Falls Unified School District', active: true, metadata: { followers_count: 12850, demo_fixture: true } },
 ];
 
-export const demoArticles = [
+const DEMO_ARTICLE_SOURCE_ANCHOR = Date.UTC(2026, 5, 10, 12);
+const DEMO_DAY_MS = 86_400_000;
+
+function relativeDemoArticleDate(sourceDate, asOf) {
+  const sourceTime = Date.parse(`${sourceDate}T12:00:00.000Z`);
+  const reference = new Date(asOf);
+  if (!Number.isFinite(sourceTime) || !Number.isFinite(reference.getTime())) return sourceDate;
+  reference.setUTCHours(12, 0, 0, 0);
+  const sourceOffsetDays = Math.round((DEMO_ARTICLE_SOURCE_ANCHOR - sourceTime) / DEMO_DAY_MS);
+  reference.setUTCDate(reference.getUTCDate() - 1 - sourceOffsetDays);
+  return reference.toISOString().slice(0, 10);
+}
+
+const staticDemoArticles = [
   {
     id: 'demo-001', date: '2026-06-10', district_id: 'canary-falls-usd', source_type: 'news', source: 'Canary Falls Education Daily',
     headline: 'Beacon Ridge High School expands bilingual family resource nights for incoming freshmen',
@@ -399,3 +412,12 @@ Develop curriculum connections, anniversary features, and additional community-b
     source_query: '"Beacon Ridge High School" Canary Falls',
   },
 ];
+
+export function buildDemoArticles(asOf = new Date()) {
+  return staticDemoArticles.map((article) => ({
+    ...article,
+    date: relativeDemoArticleDate(article.date, asOf),
+  }));
+}
+
+export const demoArticles = buildDemoArticles();
