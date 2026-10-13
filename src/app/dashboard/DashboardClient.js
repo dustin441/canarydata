@@ -4960,7 +4960,7 @@ export default function DashboardClient({ articles, legacySocialAuditArticles = 
                 </div>
                 <button type="button" className="btn btn-primary btn-sm" onClick={() => setCurrentView('social')}>Explore Social intelligence</button>
               </div>
-              <p className="demo-product-direction-intro">This interactive demo represents Canary today and clearly labels the next product steps. The goal is simple: help school communicators find what matters, understand it in K-12 context, brief leadership, and act with confidence.</p>
+              <p className="demo-product-direction-intro">This interactive demo represents Canary today and clearly labels every capability as Available now, Next release focus, or Roadmap. The goal is simple: help school communicators find what matters, understand it in K-12 context, brief leadership, and act with confidence.</p>
               <div className="demo-product-direction-grid">
                 <article>
                   <span className="demo-product-status available">Available now</span>

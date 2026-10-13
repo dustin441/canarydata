@@ -7,7 +7,7 @@ import { buildSocialResults, safeSocialMediaUrl, safeSocialUrl } from '../src/li
 import { rankSocialReportTopPerformers, resolveSocialReportComparisonWindow, resolveSocialReportWindow } from '../src/lib/socialReport.mjs';
 import { buildSocialPerformanceFromDailySeries } from '../src/lib/socialPerformance.mjs';
 import { buildReportingDataset, isNewsMediaArticle } from '../src/lib/reportingDataset.mjs';
-import { buildDemoArticles, demoArticles, demoSocialSources } from '../src/lib/demo-data.js';
+import { buildDemoArticles, demoArticles, demoSocialSources, isDemoReportArticle } from '../src/lib/demo-data.js';
 
 const DAY_MS = 86_400_000;
 const DISTRICT_ID = 'canary-falls-usd';
@@ -22,7 +22,7 @@ const threads = fixed.socialThreads;
 const owned = threads.filter((post) => post.relationship_type === 'owned');
 const publicPosts = threads.filter((post) => post.relationship_type === 'ambient');
 const reportingDataset = buildReportingDataset({
-  articles: demoArticles.filter(isNewsMediaArticle),
+  articles: demoArticles.filter(isDemoReportArticle).filter(isNewsMediaArticle),
   socialThreads: threads,
   socialSources: demoSocialSources,
 });
@@ -46,6 +46,26 @@ assert.match(demoPageSource, /export const dynamic = ['"]force-dynamic['"]/, 'Th
 assert.match(dashboardSource, /if \(safeUrl\.startsWith\('\/demo-social\/'\)\) return safeUrl;/, 'Local demo images must load directly instead of passing through the remote-media proxy.');
 assert.equal(fixedArticles[0].date, '2026-10-12', 'The newest demo article must remain one day behind the demo visit date.');
 assert.equal(fixedArticles.at(-1).date, '2026-09-16', 'Demo article chronology must shift as a complete, recent window.');
+const expectedOwnership = new Map([
+  ['demo-001', 'Owned'],
+  ['demo-016', 'External'],
+  ['demo-003', 'External'],
+  ['demo-006', 'Owned'],
+  ['demo-007', 'External'],
+  ['demo-009', 'External'],
+  ['demo-011', 'External'],
+  ['demo-013', 'External'],
+  ['demo-015', 'Owned'],
+]);
+expectedOwnership.forEach((ownership, id) => {
+  const article = fixedArticles.find((item) => item.id === id);
+  assert.ok(article, `Expected demo article ${id} must exist.`);
+  assert.equal(article.is_earned_media ? 'External' : 'Owned', ownership, `${id} must retain Lesley-approved Source Ownership.`);
+});
+const validationExamples = fixedArticles.filter((article) => !isDemoReportArticle(article));
+assert.deepEqual(validationExamples.map((article) => article.id), ['demo-011'], 'The lookalike validation example must remain available but outside reportable coverage.');
+assert.equal(reportingDataset.mediaArticles.length, 8, 'The demo report must contain 8 reportable media articles after excluding the lookalike example.');
+assert.ok(reportingDataset.mediaArticles.every((article) => article.id !== 'demo-011'), 'The filtered-out lookalike must not appear in the reportable table or KPIs.');
 
 const expectedTopIds = new Set(OWNED_DEMO_SOCIAL_FIXTURES.filter((post) => post.isTopPost).map((post) => post.postId));
 assert.equal(expectedTopIds.size, 6, 'The source workbook must designate exactly 6 top posts.');

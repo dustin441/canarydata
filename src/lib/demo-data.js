@@ -35,7 +35,7 @@ const staticDemoArticles = [
     headline: 'Beacon Ridge High School expands bilingual family resource nights for incoming freshmen',
     summary: 'Beacon Ridge High School announced a monthly evening series for incoming freshmen families, with translation support, counseling staff, and campus tours focused on easing the ninth-grade transition.',
     link: 'https://example.com/demo/beacon-ridge-family-resource-nights', canary_score: 8.7,
-    tags: ['Engagement', 'Academic Success'], notes: 'Analyst note: Good owned-channel story to amplify before freshman orientation; include translation access in every post.', is_earned_media: true, is_perched: false,
+    tags: ['Engagement', 'Academic Success'], notes: 'Analyst note: Good owned-channel story to amplify before freshman orientation; include translation access in every post.', is_earned_media: false, is_perched: false,
     innovation_reason: '**Family Engagement** – Expanding bilingual outreach removes barriers for families and strengthens school-home partnerships during a critical student transition period.',
     recommendation: `**Strategic Intent**
 Position Beacon Ridge High as a welcoming, family-centered school committed to student success before the first day of classes. Reinforce accessibility, inclusion, and proactive student support.
@@ -68,7 +68,7 @@ Capture attendance data and feedback. Develop a freshman transition success stor
     headline: 'Beacon Ridge High enters brief lockdown after police activity reported near campus',
     summary: 'Beacon Ridge High School was placed in a brief precautionary lockdown after police activity was reported several blocks from campus. No students or staff were injured, and the school resumed normal operations after law enforcement cleared the area.',
     link: 'https://example.com/demo/brief-lockdown-safety-update', canary_score: 2.7,
-    tags: ['Safety & Wellness', 'Engagement'], notes: 'Analyst note: High-sensitivity safety scenario; use as the demo example for fast, clear family-first communication.', is_earned_media: false, is_perched: false,
+    tags: ['Safety & Wellness', 'Engagement'], notes: 'Analyst note: High-sensitivity safety scenario; use as the demo example for fast, clear family-first communication.', is_earned_media: true, is_perched: false,
     innovation_reason: "**School Safety** – Demonstrates the district's commitment to maintaining secure learning environments through established safety protocols and emergency response procedures.",
     recommendation: `**Strategic Intent**
 A false shooter report triggered a school lockdown, creating immediate safety concerns and potential community anxiety. The district must quickly confirm facts, reassure families, and clarify lockdown protocols to prevent misinformation and maintain public confidence in emergency response procedures.
@@ -124,7 +124,7 @@ Monitor local news for follow-up stories over the next 24–48 hours. If media r
     headline: 'Neighbors ask for more notice around Beacon Ridge High summer parking lot construction',
     summary: 'A neighborhood story noted confusion around temporary parking restrictions tied to construction on the Beacon Ridge High campus. Residents said signs appeared after work had already started.',
     link: 'https://example.com/demo/parking-construction-notice', canary_score: 3.4,
-    tags: ['Operations & Finance', 'Engagement'], notes: 'Analyst note: Preventable trust-friction item; operations and comms should coordinate same-day.', is_earned_media: false, is_perched: false,
+    tags: ['Operations & Finance', 'Engagement'], notes: 'Analyst note: Preventable trust-friction item; operations and comms should coordinate same-day.', is_earned_media: true, is_perched: false,
     innovation_reason: '**Community Engagement** – Highlights community expectations for proactive communication and transparency regarding district projects.',
     recommendation: `**Strategic Intent**
 Protect community trust by acknowledging concerns, improving communication, and demonstrating responsiveness to neighborhood impacts.
@@ -177,7 +177,7 @@ Use lessons learned to create a standardized community notification process for 
     headline: 'Beacon Ridge High track athletes qualify for state finals after standout relay performance',
     summary: 'Beacon Ridge High student athletes qualified for state finals after a season-best relay performance, with coaches praising academic eligibility and teamwork.',
     link: 'https://example.com/demo/track-state-finals', canary_score: 8.5,
-    tags: ['Academic Success', 'Engagement'], notes: null, is_earned_media: true, is_perched: false,
+    tags: ['Academic Success', 'Engagement'], notes: null, is_earned_media: false, is_perched: false,
     innovation_reason: "**Student Achievement** – Student success in athletics reflects the district's commitment to excellence and well-rounded educational experiences.",
     recommendation: `**Strategic Intent**
 Celebrate athletic excellence while reinforcing the connection between academics, discipline, and student development.
@@ -210,7 +210,7 @@ Follow the team's state competition journey and create post-event recognition op
     headline: 'Board agenda includes security-camera upgrade request for Beacon Ridge High campus',
     summary: 'A civic agenda preview noted an upcoming vote on campus security-camera upgrades, with parent comments split between safety benefits and privacy concerns.',
     link: 'https://example.com/demo/security-camera-agenda', canary_score: 4.2,
-    tags: ['Safety & Wellness', 'Operations & Finance', 'Engagement'], notes: 'Analyst note: Board-agenda item likely needs FAQ language before public comment grows.', is_earned_media: false, is_perched: false,
+    tags: ['Safety & Wellness', 'Operations & Finance', 'Engagement'], notes: 'Analyst note: Board-agenda item likely needs FAQ language before public comment grows.', is_earned_media: true, is_perched: false,
     innovation_reason: '**School Safety** – Proposed security enhancements support ongoing efforts to create safe and secure learning environments.',
     recommendation: `**Strategic Intent**
 Build understanding and trust around a potentially sensitive decision while demonstrating thoughtful consideration of stakeholder concerns.
@@ -253,7 +253,7 @@ Monitor public feedback and adjust communications to address recurring questions
     headline: 'Parents trade tips online after Beacon Ridge High posts summer credit-recovery schedule',
     summary: 'A parent forum thread shared questions about summer credit recovery, including how families should confirm transportation, meals, and course timing.',
     link: 'https://example.com/demo/credit-recovery-questions', canary_score: 6.2,
-    tags: ['Academic Success', 'Engagement'], notes: 'Analyst note: Family questions indicate the original summer-school post needs clearer logistics.', is_earned_media: false, is_perched: false,
+    tags: ['Academic Success', 'Engagement'], notes: 'Analyst note: Family questions indicate the original summer-school post needs clearer logistics.', is_earned_media: true, is_perched: false,
     innovation_reason: '**Student Success** – Access to credit-recovery opportunities supports on-time graduation and continued academic progress.',
     recommendation: `**Strategic Intent**
 Identify and address information gaps before confusion affects participation and student success.
@@ -296,7 +296,7 @@ Monitor questions throughout the summer and continuously update resources.`,
     headline: 'Filtered out: Beacon Ridge High in another state wins baseball championship',
     summary: 'This sample illustrates a lookalike mention that would be filtered out by geo-validation because the article is about a Beacon Ridge High in a different community.',
     link: 'https://example.com/demo/filtered-lookalike', canary_score: 1.8,
-    tags: ['Operations & Finance'], notes: 'Analyst note: Demo-only row; keep it as a visible example of wrong-district validation logic.', is_earned_media: false, is_perched: false,
+    tags: ['Operations & Finance'], notes: 'Analyst note: Demo-only wrong-district validation example; excluded from reportable coverage.', is_earned_media: true, is_perched: false, demo_validation_example: true,
     innovation_reason: 'N/A',
     recommendation: `**Strategic Intent**
 This result demonstrates a common monitoring problem: stories about a different school with the same or similar name. In the live Canary Data platform, geo-filtering automatically removes these false matches, helping ensure your results are accurate and actionable.`,
@@ -383,7 +383,7 @@ Monitor media coverage and community response. Update communications based on em
     headline: 'Beacon Ridge High students unveil mural honoring neighborhood history',
     summary: 'Students unveiled a campus mural created with local artists and community elders, connecting student art to neighborhood history.',
     link: 'https://example.com/demo/neighborhood-mural', canary_score: 8.9,
-    tags: ['Engagement', 'Academic Success'], notes: null, is_earned_media: true, is_perched: false,
+    tags: ['Engagement', 'Academic Success'], notes: null, is_earned_media: false, is_perched: false,
     innovation_reason: '**Community Connection** – Student learning that reflects local history strengthens civic pride and community engagement.',
     recommendation: `**Strategic Intent**
 Celebrate community-connected learning while reinforcing student voice, cultural preservation, and civic pride.
@@ -418,6 +418,10 @@ export function buildDemoArticles(asOf = new Date()) {
     ...article,
     date: relativeDemoArticleDate(article.date, asOf),
   }));
+}
+
+export function isDemoReportArticle(article) {
+  return !article?.demo_validation_example;
 }
 
 export const demoArticles = buildDemoArticles();

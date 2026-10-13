@@ -1,5 +1,5 @@
 import DashboardClient from '@/app/dashboard/DashboardClient';
-import { demoArticles, demoDistricts, demoQueries, demoSocialSources } from '@/lib/demo-data';
+import { demoArticles, demoDistricts, demoQueries, demoSocialSources, isDemoReportArticle } from '@/lib/demo-data';
 import { buildDemoSocialData } from '@/lib/demo-social-data.mjs';
 import { isNewsMediaArticle } from '@/lib/reportingDataset.mjs';
 import { formatAnnualPriceLabel, INTRODUCTORY_ANNUAL_PRICE_CENTS, resolveCanaryPricing } from '@/lib/pricing';
@@ -17,7 +17,7 @@ export default function DemoPage() {
   const publicPricing = resolveCanaryPricing();
   return (
     <DashboardClient
-      articles={demoArticles.filter(isNewsMediaArticle)}
+      articles={demoArticles.filter(isDemoReportArticle).filter(isNewsMediaArticle)}
       districts={demoDistricts}
       queries={demoQueries}
       clients={[]}
@@ -26,6 +26,7 @@ export default function DemoPage() {
       socialAccountMetricSummaries={socialDemo.socialAccountMetricSummaries}
       socialPerformanceHistory={socialDemo.socialPerformanceHistory}
       socialReportAsOf={socialDemo.reportAsOf}
+      excludedStories={demoArticles.filter((article) => !isDemoReportArticle(article))}
       publicPricingLabel={formatAnnualPriceLabel(publicPricing.amountCents)}
       publicPricingIntroductory={publicPricing.amountCents === INTRODUCTORY_ANNUAL_PRICE_CENTS}
       userDistrictId="canary-falls-usd"
