@@ -178,6 +178,7 @@ function nativeSocialWindowLabel(metric) {
 function renderedSocialMediaUrl(value, sourceValue = '') {
   const safeUrl = safeSocialMediaUrl(value);
   if (!safeUrl) return '';
+  if (safeUrl.startsWith('/demo-social/')) return safeUrl;
   const sourceUrl = safeSocialUrl(sourceValue);
   return sourceUrl ? `/api/social-media?url=${encodeURIComponent(safeUrl)}&source=${encodeURIComponent(sourceUrl)}` : safeUrl;
 }
@@ -4951,21 +4952,31 @@ export default function DashboardClient({ articles, legacySocialAuditArticles = 
             </div>
           )}
           {demoMode && currentView === 'dashboard' && (
-            <section className="demo-testimonials" aria-label="Early district feedback">
-              <div className="demo-testimonials-header">
-                <span>Early district feedback</span>
-                <strong>School communicators are seeing the value.</strong>
+            <section className="demo-product-direction" aria-label="Canary product direction">
+              <div className="demo-product-direction-header">
+                <div>
+                  <span>From monitoring to leadership proof</span>
+                  <h1>One communications cockpit for the full public conversation.</h1>
+                </div>
+                <button type="button" className="btn btn-primary btn-sm" onClick={() => setCurrentView('social')}>Explore Social intelligence</button>
               </div>
-              <div className="demo-testimonials-grid">
-                {DEMO_TESTIMONIALS.map((testimonial) => (
-                  <figure className="demo-testimonial-card" key={testimonial.quote}>
-                    <blockquote>“{testimonial.quote}”</blockquote>
-                    <figcaption>
-                      <strong>{testimonial.name}</strong>
-                      <span>{testimonial.role}</span>
-                    </figcaption>
-                  </figure>
-                ))}
+              <p className="demo-product-direction-intro">This interactive demo represents Canary today and clearly labels the next product steps. The goal is simple: help school communicators find what matters, understand it in K-12 context, brief leadership, and act with confidence.</p>
+              <div className="demo-product-direction-grid">
+                <article>
+                  <span className="demo-product-status available">Available now</span>
+                  <h2>Intelligence and proof</h2>
+                  <p>News, owned social, public conversation, Canary Score, school-specific recommendations, Strategic Alignment, Bird’s Eye View, and CSV/PDF exports.</p>
+                </article>
+                <article>
+                  <span className="demo-product-status next">Next release focus</span>
+                  <h2>Trust and reporting</h2>
+                  <p>Faster guided onboarding, a cleaner monitored-source profile, stronger coverage reliability, branded leadership reports, and easier recurring delivery.</p>
+                </article>
+                <article>
+                  <span className="demo-product-status roadmap">Roadmap</span>
+                  <h2>One communications workspace</h2>
+                  <p>School and program-level views, additional reporting inputs, Ask MELODI, story clustering, and human-approved content distribution.</p>
+                </article>
               </div>
             </section>
           )}
@@ -5226,6 +5237,26 @@ export default function DashboardClient({ articles, legacySocialAuditArticles = 
               <p className="communications-brief-empty">No specific next steps appear in this filtered coverage. Continue routine monitoring or adjust the filters.</p>
             )}
           </section>
+
+          {demoMode && (
+            <section className="demo-testimonials" aria-label="Early district feedback">
+              <div className="demo-testimonials-header">
+                <span>Validated by school communicators</span>
+                <strong>Built with the people who have to explain the work.</strong>
+              </div>
+              <div className="demo-testimonials-grid">
+                {DEMO_TESTIMONIALS.map((testimonial) => (
+                  <figure className="demo-testimonial-card" key={testimonial.quote}>
+                    <blockquote>“{testimonial.quote}”</blockquote>
+                    <figcaption>
+                      <strong>{testimonial.name}</strong>
+                      <span>{testimonial.role}</span>
+                    </figcaption>
+                  </figure>
+                ))}
+              </div>
+            </section>
+          )}
 
           {/* Charts */}
           <div className="charts-grid">

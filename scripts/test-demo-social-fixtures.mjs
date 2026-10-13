@@ -16,6 +16,7 @@ const shiftedAsOf = '2026-09-10T10:00:00.000Z';
 const fixed = buildDemoSocialData(fixedAsOf);
 const shifted = buildDemoSocialData(shiftedAsOf);
 const demoPageSource = await readFile(new URL('../src/app/demo/page.js', import.meta.url), 'utf8');
+const dashboardSource = await readFile(new URL('../src/app/dashboard/DashboardClient.js', import.meta.url), 'utf8');
 const threads = fixed.socialThreads;
 const owned = threads.filter((post) => post.relationship_type === 'owned');
 const publicPosts = threads.filter((post) => post.relationship_type === 'ambient');
@@ -41,6 +42,7 @@ assert.ok(threads.every((post) => post.district_id === DISTRICT_ID && post.provi
 assert.ok(threads.every((post) => post.canonical_url.startsWith('/demo/social/')), 'Every fixture must use an internal fictional demo permalink.');
 assert.ok(threads.every((post) => !String(post.canonical_url).includes('DEMO://')), 'Legacy DEMO:// links must not escape into the UI.');
 assert.match(demoPageSource, /export const dynamic = ['"]force-dynamic['"]/, 'The demo route must not freeze relative dates in a static build artifact.');
+assert.match(dashboardSource, /if \(safeUrl\.startsWith\('\/demo-social\/'\)\) return safeUrl;/, 'Local demo images must load directly instead of passing through the remote-media proxy.');
 
 const expectedTopIds = new Set(OWNED_DEMO_SOCIAL_FIXTURES.filter((post) => post.isTopPost).map((post) => post.postId));
 assert.equal(expectedTopIds.size, 6, 'The source workbook must designate exactly 6 top posts.');
