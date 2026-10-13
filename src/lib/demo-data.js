@@ -383,7 +383,7 @@ Monitor media coverage and community response. Update communications based on em
     headline: 'Beacon Ridge High students unveil mural honoring neighborhood history',
     summary: 'Students unveiled a campus mural created with local artists and community elders, connecting student art to neighborhood history.',
     link: 'https://example.com/demo/neighborhood-mural', canary_score: 8.9,
-    tags: ['Engagement', 'Academic Success'], notes: null, is_earned_media: false, is_perched: false,
+    tags: ['Engagement', 'Academic Success'], notes: null, is_earned_media: false, communications_earned: true, is_perched: false,
     innovation_reason: '**Community Connection** – Student learning that reflects local history strengthens civic pride and community engagement.',
     recommendation: `**Strategic Intent**
 Celebrate community-connected learning while reinforcing student voice, cultural preservation, and civic pride.

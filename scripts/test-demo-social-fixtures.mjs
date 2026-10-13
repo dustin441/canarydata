@@ -66,6 +66,8 @@ const validationExamples = fixedArticles.filter((article) => !isDemoReportArticl
 assert.deepEqual(validationExamples.map((article) => article.id), ['demo-011'], 'The lookalike validation example must remain available but outside reportable coverage.');
 assert.equal(reportingDataset.mediaArticles.length, 8, 'The demo report must contain 8 reportable media articles after excluding the lookalike example.');
 assert.ok(reportingDataset.mediaArticles.every((article) => article.id !== 'demo-011'), 'The filtered-out lookalike must not appear in the reportable table or KPIs.');
+const earnedMediaStories = fixedArticles.filter((article) => article.communications_earned);
+assert.deepEqual(earnedMediaStories.map((article) => article.id), ['demo-015'], 'Only the final mural story must retain Lesley-approved Earned Media status.');
 
 const expectedTopIds = new Set(OWNED_DEMO_SOCIAL_FIXTURES.filter((post) => post.isTopPost).map((post) => post.postId));
 assert.equal(expectedTopIds.size, 6, 'The source workbook must designate exactly 6 top posts.');
